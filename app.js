@@ -28,10 +28,29 @@ import {
   writeBatch 
 } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 
+
+export const DEFAULT_PROJECT_TYPES = [
+  "Nhà ở dân dụng",
+  "Thương mại dịch vụ",
+  "Cảnh quan",
+  "Giáo dục / nghiên cứu",
+  "Văn phòng",
+  "Văn hóa / triển lãm / bảo tàng",
+  "Resort / khách sạn",
+  "F&B – Nhà hàng / Cafe / Bar / Pub",
+  "Dịch vụ sức khỏe",
+  "Bến tàu / bến xe",
+  "Khác"
+];
+
+
+
 // --- STATE MANAGEMENT ---
 export const state = {
   user: null,
-  role: 'student', // 'admin' | 'supervisor' | 'student'
+  actualRole: 'student', // 'admin' | 'supervisor' | 'student'
+  currentView: 'student', // 'admin' | 'supervisor' | 'student'
+  role: 'student', // backward compatibility
   isAdmin: false,
   isSupervisor: false,
   isStudent: false,
@@ -42,7 +61,7 @@ export const state = {
   rounds: [],
   selectedRoundId: null,
   activeRound: null,
-  projectTypes: [],
+  projectTypes: DEFAULT_PROJECT_TYPES.map((name, idx) => ({ id: 'default_' + (idx + 1), name, order: idx + 1, active: true })),
   supervisorsMaster: [],
   roundSupervisors: [],
   eligibleStudents: [],
@@ -78,8 +97,30 @@ export const state = {
   manualAssignStudentId: null
 };
 
+window.state = state;
+
 let app, auth, db;
 let countdownInterval = null;
+
+// --- LOADING OVERLAY HELPERS ---
+export function showLoading(msg = 'Đang tải IFA+ Graduation...') {
+  const overlay = document.getElementById('app-loading-overlay');
+  const msgEl = document.getElementById('app-loading-msg');
+  if (msgEl) msgEl.textContent = msg;
+  if (overlay) {
+    overlay.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+  }
+}
+
+export function hideLoading() {
+  const overlay = document.getElementById('app-loading-overlay');
+  if (overlay) {
+    overlay.classList.add('opacity-0', 'pointer-events-none');
+    setTimeout(() => overlay.classList.add('hidden'), 300);
+  }
+}
+
+
 
 // --- INITIALIZATION ---
 async function initFirebase() {
@@ -101,87 +142,118 @@ async function initFirebase() {
   db = getFirestore(app);
 }
 
+
+
 // --- AUTH & ROLES ---
 export async function setupAuthListener() {
+  showLoading('Đang khởi tạo IFA+ Graduation...');
   onAuthStateChanged(auth, async user => {
     state.user = user;
-    updateAuthUI();
 
     if (user) {
       document.getElementById('login-required-section').classList.add('hidden');
-      await determineUserRoles();
+      showLoading('Đang xác định vai trò người dùng...');
+      await resolveActualRoles(user);
+      updateAuthUI();
+
+      showLoading('Đang tải dữ liệu đợt tốt nghiệp...');
       await loadInitialData();
+
+      // Automatically activate initial view without requiring manual button click
+      const initView = state.currentView || state.actualRole || 'student';
+      await switchView(initView);
+      hideLoading();
     } else {
+      await resolveActualRoles(null);
+      updateAuthUI();
       document.getElementById('login-required-section').classList.remove('hidden');
       document.getElementById('view-student').classList.add('hidden');
       document.getElementById('view-supervisor').classList.add('hidden');
       document.getElementById('view-admin').classList.add('hidden');
+      hideLoading();
     }
   });
 }
 
-async function determineUserRoles() {
-  const email = state.user?.email || '';
-  const emailLower = email.toLowerCase();
-  
-  // 1. Check Student
-  if (emailLower.endsWith('@student.tdtu.edu.vn')) {
-    state.isStudent = true;
-    state.studentMssv = emailLower.split('@')[0].toUpperCase();
-  } else {
+export async function resolveActualRoles(user) {
+  if (!user) {
+    state.actualRole = null;
+    state.currentView = null;
+    state.role = 'student';
+    state.isAdmin = false;
+    state.isSupervisor = false;
     state.isStudent = false;
     state.studentMssv = '';
+    return;
   }
 
-  // 2. Check Admin
-  let adminFound = false;
-  if (emailLower === 'tranquanghai@tdtu.edu.vn') {
-    adminFound = true;
+  const email = (user.email || '').toLowerCase().trim();
+
+  // 1. OWNER / ADMIN Check
+  let isAdmin = false;
+  if (email === 'tranquanghai@tdtu.edu.vn') {
+    isAdmin = true;
   } else {
     try {
-      const adminDoc = await getDoc(doc(db, 'admins', emailLower));
-      if (adminDoc.exists()) adminFound = true;
-    } catch (e) {}
+      const adminDoc = await getDoc(doc(db, 'admins', email));
+      if (adminDoc.exists()) {
+        isAdmin = true;
+      }
+    } catch (e) {
+      console.warn('[IFA-Graduation] Admins lookup notice:', e);
+    }
+    // Also check Portal shared auth if set
+    if (!isAdmin && window.__tdtu_user && (window.__tdtu_user.isAdmin || window.__tdtu_user.role === 'admin')) {
+      isAdmin = true;
+    }
   }
-  state.isAdmin = adminFound;
 
-  // 3. Check Supervisor
-  let supFound = false;
+  // 2. SUPERVISOR Check
+  let isSupervisor = false;
   try {
-    const qSup = query(collection(db, 'supervisorMaster'), where('email', '==', emailLower), where('active', '==', true));
+    const qSup = query(collection(db, 'supervisorMaster'), where('email', '==', email), where('active', '==', true));
     const supSnap = await getDocs(qSup);
-    if (!supSnap.empty) supFound = true;
-  } catch (e) {}
-  state.isSupervisor = supFound;
-
-  // Set default active view
-  if (state.isAdmin) {
-    state.role = 'admin';
-    document.getElementById('nav-btn-admin').classList.remove('hidden');
-    document.getElementById('nav-btn-admin').classList.add('flex');
-    document.getElementById('m-nav-admin').classList.remove('hidden');
-  }
-  if (state.isSupervisor) {
-    document.getElementById('nav-btn-supervisor').classList.remove('hidden');
-    document.getElementById('nav-btn-supervisor').classList.add('flex');
-    document.getElementById('m-nav-supervisor').classList.remove('hidden');
-    if (!state.isAdmin) state.role = 'supervisor';
-  }
-  if (state.isStudent && !state.isAdmin && !state.isSupervisor) {
-    state.role = 'student';
+    if (!supSnap.empty) {
+      isSupervisor = true;
+    }
+  } catch (e) {
+    console.warn('[IFA-Graduation] SupervisorMaster lookup notice:', e);
   }
 
-  // Check URL params
+  // 3. STUDENT Check
+  let isStudent = email.endsWith('@student.tdtu.edu.vn');
+  let studentMssv = isStudent ? email.split('@')[0].toUpperCase() : '';
+
+  state.isAdmin = isAdmin;
+  state.isSupervisor = isSupervisor;
+  state.isStudent = isStudent;
+  state.studentMssv = studentMssv;
+
+  // Strict Hierarchy: OWNER / HIGH ADMIN / ADMIN > SUPERVISOR > STUDENT
+  if (isAdmin) {
+    state.actualRole = 'admin';
+  } else if (isSupervisor) {
+    state.actualRole = 'supervisor';
+  } else {
+    state.actualRole = 'student';
+  }
+
+  // Determine currentView: URL param override if permitted, otherwise default to actualRole
   const urlParams = new URLSearchParams(window.location.search);
   const viewParam = urlParams.get('view');
-  if (viewParam === 'admin' && state.isAdmin) state.role = 'admin';
-  else if (viewParam === 'supervisor' && state.isSupervisor) state.role = 'supervisor';
-  else if (viewParam === 'student') state.role = 'student';
-
-  switchView(state.role);
+  if (viewParam === 'admin' && isAdmin) {
+    state.currentView = 'admin';
+  } else if (viewParam === 'supervisor' && (isSupervisor || isAdmin)) {
+    state.currentView = 'supervisor';
+  } else if (viewParam === 'student') {
+    state.currentView = 'student';
+  } else {
+    state.currentView = state.actualRole;
+  }
+  state.role = state.currentView;
 }
 
-function updateAuthUI() {
+export function updateAuthUI() {
   const userInfoBar = document.getElementById('user-info-bar');
   const btnHeaderLogin = document.getElementById('btn-header-login');
   
@@ -193,10 +265,67 @@ function updateAuthUI() {
     document.getElementById('user-display-name').textContent = state.user.displayName || state.user.email;
     document.getElementById('user-avatar').src = state.user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23fff"/><path fill="%23fff" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
     
-    let roleText = 'Sinh viên';
-    if (state.isAdmin) roleText = 'Quản trị viên';
-    else if (state.isSupervisor) roleText = 'Giảng viên';
-    document.getElementById('user-role-badge').textContent = roleText;
+    // Display ACTUAL ROLE badge
+    const roleBadge = document.getElementById('user-role-badge');
+    const viewingBadge = document.getElementById('user-viewing-badge');
+    
+    let roleName = 'Sinh viên';
+    let badgeClass = 'text-[10px] bg-blue-500/30 text-blue-200 px-1.5 py-0.5 rounded font-medium border border-blue-400/30';
+
+    if (state.actualRole === 'admin') {
+      roleName = 'Quản trị viên';
+      badgeClass = 'text-[10px] bg-rose-500/30 text-rose-200 px-1.5 py-0.5 rounded font-bold border border-rose-400/30';
+    } else if (state.actualRole === 'supervisor') {
+      roleName = 'Giảng viên';
+      badgeClass = 'text-[10px] bg-emerald-500/30 text-emerald-200 px-1.5 py-0.5 rounded font-medium border border-emerald-400/30';
+    }
+
+    if (roleBadge) {
+      roleBadge.textContent = roleName;
+      roleBadge.className = badgeClass;
+    }
+
+    // Subtext if viewing different view
+    if (viewingBadge) {
+      if (state.actualRole && state.currentView && state.actualRole !== state.currentView) {
+        const viewLabels = { student: 'Sinh viên', supervisor: 'GVHD', admin: 'Quản trị' };
+        viewingBadge.textContent = '(Đang xem: ' + (viewLabels[state.currentView] || state.currentView) + ')';
+        viewingBadge.classList.remove('hidden');
+      } else {
+        viewingBadge.classList.add('hidden');
+      }
+    }
+
+    // Role switcher buttons visibility
+    const adminDeskBtn = document.getElementById('nav-btn-admin');
+    const adminMobBtn = document.getElementById('m-nav-admin');
+    const supDeskBtn = document.getElementById('nav-btn-supervisor');
+    const supMobBtn = document.getElementById('m-nav-supervisor');
+    const studentDeskBtn = document.getElementById('nav-btn-student');
+    const studentMobBtn = document.getElementById('m-nav-student');
+
+    if (state.isAdmin) {
+      if (adminDeskBtn) { adminDeskBtn.classList.remove('hidden'); adminDeskBtn.classList.add('flex'); }
+      if (adminMobBtn) adminMobBtn.classList.remove('hidden');
+      if (state.isSupervisor) {
+        if (supDeskBtn) { supDeskBtn.classList.remove('hidden'); supDeskBtn.classList.add('flex'); }
+        if (supMobBtn) supMobBtn.classList.remove('hidden');
+      } else {
+        if (supDeskBtn) { supDeskBtn.classList.add('hidden'); supDeskBtn.classList.remove('flex'); }
+        if (supMobBtn) supMobBtn.classList.add('hidden');
+      }
+    } else if (state.isSupervisor) {
+      if (adminDeskBtn) { adminDeskBtn.classList.add('hidden'); adminDeskBtn.classList.remove('flex'); }
+      if (adminMobBtn) adminMobBtn.classList.add('hidden');
+      if (supDeskBtn) { supDeskBtn.classList.remove('hidden'); supDeskBtn.classList.add('flex'); }
+      if (supMobBtn) supMobBtn.classList.remove('hidden');
+    } else {
+      if (adminDeskBtn) { adminDeskBtn.classList.add('hidden'); adminDeskBtn.classList.remove('flex'); }
+      if (adminMobBtn) adminMobBtn.classList.add('hidden');
+      if (supDeskBtn) { supDeskBtn.classList.add('hidden'); supDeskBtn.classList.remove('flex'); }
+      if (supMobBtn) supMobBtn.classList.add('hidden');
+    }
+
   } else {
     userInfoBar.classList.add('hidden');
     userInfoBar.classList.remove('flex');
@@ -204,11 +333,17 @@ function updateAuthUI() {
   }
 }
 
-// --- VIEW SWITCHER ---
-window.switchView = function(targetView) {
-  state.role = targetView;
+window.resolveActualRoles = resolveActualRoles;
+window.updateAuthUI = updateAuthUI;
+window.showLoading = showLoading;
+window.hideLoading = hideLoading;
 
-  // Update Nav buttons styling
+// --- VIEW SWITCHER ---
+window.switchView = async function(targetView) {
+  state.currentView = targetView;
+  state.role = targetView;
+  updateAuthUI();
+
   const navBtns = {
     student: ['nav-btn-student', 'm-nav-student'],
     supervisor: ['nav-btn-supervisor', 'm-nav-supervisor'],
@@ -250,8 +385,12 @@ window.switchView = function(targetView) {
     loadAdminStats();
   } else if (targetView === 'supervisor' && state.selectedRoundId) {
     loadSupervisorReviewData(state.selectedRoundId);
+  } else if (targetView === 'student' && state.selectedRoundId) {
+    checkStudentEligibilityAndRegistration(state.selectedRoundId);
   }
 };
+
+
 
 // --- DATA INITIALIZATION ---
 async function loadInitialData() {
@@ -259,50 +398,59 @@ async function loadInitialData() {
   await loadRounds();
 }
 
-// --- PROJECT TYPES ---
-const DEFAULT_PROJECT_TYPES = [
-  "Nhà ở dân dụng",
-  "Thương mại dịch vụ",
-  "Cảnh quan",
-  "Giáo dục / nghiên cứu",
-  "Văn phòng",
-  "Văn hóa / triển lãm / bảo tàng",
-  "Resort / khách sạn",
-  "F&B – Nhà hàng / Cafe / Bar / Pub",
-  "Dịch vụ sức khỏe",
-  "Bến tàu / bến xe",
-  "Khác"
-];
-
 async function loadProjectTypes() {
   try {
     const snap = await getDocs(query(collection(db, 'graduationProjectTypes'), orderBy('order', 'asc')));
-    if (snap.empty && state.isAdmin) {
-      const batch = writeBatch(db);
-      DEFAULT_PROJECT_TYPES.forEach((name, index) => {
-        const ref = doc(collection(db, 'graduationProjectTypes'));
-        batch.set(ref, { name, order: index + 1, active: true });
-      });
-      await batch.commit();
-      return loadProjectTypes();
+    if (snap.empty) {
+      // Auto-bootstrap into Firestore if Admin
+      if (state.isAdmin) {
+        try {
+          const batch = writeBatch(db);
+          DEFAULT_PROJECT_TYPES.forEach((name, index) => {
+            const ref = doc(collection(db, 'graduationProjectTypes'));
+            batch.set(ref, { name, order: index + 1, active: true, createdAt: serverTimestamp() });
+          });
+          await batch.commit();
+          const reSnap = await getDocs(query(collection(db, 'graduationProjectTypes'), orderBy('order', 'asc')));
+          if (!reSnap.empty) {
+            state.projectTypes = reSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          }
+        } catch (seedErr) {
+          console.warn('Auto-seed project types error:', seedErr);
+        }
+      }
+    } else {
+      state.projectTypes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
-    state.projectTypes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderProjectTypesDropdown();
-    renderAdminProjectTypesTable();
   } catch (e) {
     console.error('Error loading project types:', e);
+  } finally {
+    renderProjectTypesDropdown();
+    renderAdminProjectTypesTable();
   }
 }
 
 function renderProjectTypesDropdown() {
   const select = document.getElementById('select-project-type');
   if (!select) return;
+  const activeTypes = (state.projectTypes && state.projectTypes.length > 0)
+    ? state.projectTypes.filter(p => p.active !== false).sort((a, b) => (a.order || 0) - (b.order || 0))
+    : DEFAULT_PROJECT_TYPES.map((name, i) => ({ name, order: i + 1 }));
+
   select.innerHTML = '<option value="">-- Chọn loại hình đồ án --</option>' +
-    state.projectTypes
-      .filter(p => p.active !== false)
-      .map(p => `<option value="${p.name}">${p.name}</option>`)
+    activeTypes
+      .map(p => '<option value="' + p.name + '">' + p.name + '</option>')
       .join('');
 }
+
+window.renderProjectTypesDropdown = renderProjectTypesDropdown;
+// Initial populate of dropdown
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', renderProjectTypesDropdown);
+} else {
+  renderProjectTypesDropdown();
+}
+
 
 // --- ROUNDS MANAGEMENT ---
 async function loadRounds() {
@@ -1331,6 +1479,764 @@ function renderSupervisorAcceptedTable() {
     </tr>
   `).join('');
 }
+
+
+
+export async function loadAdminStats() {
+  try {
+    document.getElementById('stat-rounds-count').textContent = state.rounds.length;
+    
+    const supMasterSnap = await getDocs(collection(db, 'supervisorMaster'));
+    document.getElementById('stat-supervisors-count').textContent = supMasterSnap.size;
+
+    if (state.selectedRoundId) {
+      const elSnap = await getDocs(collection(db, 'graduationRounds', state.selectedRoundId, 'eligibleStudents'));
+      document.getElementById('stat-eligible-count').textContent = elSnap.size;
+
+      const regSnap = await getDocs(collection(db, 'graduationRounds', state.selectedRoundId, 'registrations'));
+      document.getElementById('stat-registrations-count').textContent = regSnap.size;
+    }
+  } catch (e) {
+    console.error('Error loading admin stats:', e);
+  }
+}
+
+window.switchAdminTab = function(tabKey) {
+  document.querySelectorAll('.admin-tab-btn').forEach(b => {
+    b.classList.remove('bg-slate-800', 'text-white', 'text-amber-400');
+    b.classList.add('text-slate-400');
+  });
+  const activeBtn = document.getElementById('atab-btn-' + tabKey);
+  if (activeBtn) {
+    activeBtn.classList.add('bg-slate-800', 'text-white');
+    activeBtn.classList.remove('text-slate-400'); if (tabKey === 'review') activeBtn.classList.add('text-amber-400');
+  }
+
+  ['overview', 'review', 'rounds', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student'].forEach(t => {
+    const p = document.getElementById('atab-panel-' + t);
+    if (p) {
+      if (t === tabKey) p.classList.remove('hidden');
+      else p.classList.add('hidden');
+    }
+  });
+
+  if (tabKey === 'overview') loadAdminStats();
+  else if (tabKey === 'review') { if (state.selectedRoundId) loadAdminReviewData(state.selectedRoundId); }
+  else if (tabKey === 'rounds') renderAdminRoundsTable();
+  else if (tabKey === 'supervisors-master') loadAdminSupervisorsMaster();
+  else if (tabKey === 'round-supervisors' && state.selectedRoundId) loadAdminRoundSupervisors(state.selectedRoundId);
+  else if (tabKey === 'eligible-students' && state.selectedRoundId) loadAdminEligibleStudents(state.selectedRoundId);
+  else if (tabKey === 'registrations' && state.selectedRoundId) loadAdminRegistrations(state.selectedRoundId);
+  else if (tabKey === 'preview-student') preparePreviewStudentDropdown();
+};
+
+// --- ADMIN: ROUNDS CRUD ---
+function renderAdminRoundsTable() {
+  const tbody = document.getElementById('admin-rounds-tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = state.rounds.map(r => {
+    const fmt = d => d ? new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '--';
+    return `
+      <tr class="hover:bg-slate-50">
+        <td class="p-3.5 font-bold text-slate-900">${r.title}</td>
+        <td class="p-3.5 text-slate-600">${r.academicYear}</td>
+        <td class="p-3.5"><span class="badge badge-${r.status}">${r.status}</span></td>
+        <td class="p-3.5 text-[11px] text-slate-500">${fmt(r.openAtDate)} → ${fmt(r.closeAtDate)}</td>
+        <td class="p-3.5 font-bold">${r.preferenceCount || 3} NV</td>
+        <td class="p-3.5">${r.selectionMode === 'wizard' ? 'Wizard' : 'Cards'}</td>
+        <td class="p-3.5 text-right space-x-2">
+          <button onclick="editRoundModal('${r.id}')" class="text-blue-600 hover:underline font-bold">Sửa</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.openCreateRoundModal = function() {
+  document.getElementById('form-round').reset();
+  document.getElementById('round-form-id').value = '';
+  document.getElementById('modal-round-title').textContent = 'Tạo Đợt Đồ án Tốt nghiệp Mới';
+  document.getElementById('modal-round').classList.remove('hidden');
+};
+
+window.editRoundModal = function(roundId) {
+  const r = state.rounds.find(x => x.id === roundId);
+  if (!r) return;
+
+  document.getElementById('round-form-id').value = r.id;
+  document.getElementById('round-form-title').value = r.title || '';
+  document.getElementById('round-form-year').value = r.academicYear || '';
+  document.getElementById('round-form-name').value = r.roundName || '';
+  document.getElementById('round-form-status').value = r.status || 'draft';
+  document.getElementById('round-form-pref-count').value = r.preferenceCount || '3';
+  document.getElementById('round-form-selection-mode').value = r.selectionMode || 'cards';
+  document.getElementById('round-form-allow-edit').checked = r.allowStudentEdit !== false;
+  document.getElementById('round-form-allow-topic-edit').checked = r.allowTopicEdit !== false;
+  document.getElementById('round-form-allow-pref-edit').checked = r.allowPreferenceEdit !== false;
+
+  const toInputDatetime = d => {
+    if (!d) return '';
+    const date = new Date(d);
+    const pad = n => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  document.getElementById('round-form-open-at').value = toInputDatetime(r.openAtDate);
+  document.getElementById('round-form-close-at').value = toInputDatetime(r.closeAtDate);
+
+  document.getElementById('modal-round-title').textContent = 'Chỉnh sửa Đợt Đồ án Tốt nghiệp';
+  document.getElementById('modal-round').classList.remove('hidden');
+};
+
+window.closeRoundModal = function() {
+  document.getElementById('modal-round').classList.add('hidden');
+};
+
+window.saveRound = async function(e) {
+  e.preventDefault();
+  const id = document.getElementById('round-form-id').value;
+  const title = document.getElementById('round-form-title').value.trim();
+  const academicYear = document.getElementById('round-form-year').value.trim();
+  const roundName = document.getElementById('round-form-name').value.trim();
+  const openAtVal = document.getElementById('round-form-open-at').value;
+  const closeAtVal = document.getElementById('round-form-close-at').value;
+  const preferenceCount = parseInt(document.getElementById('round-form-pref-count').value, 10) || 3;
+  const selectionMode = document.getElementById('round-form-selection-mode').value;
+  const status = document.getElementById('round-form-status').value;
+  const allowStudentEdit = document.getElementById('round-form-allow-edit').checked;
+  const allowTopicEdit = document.getElementById('round-form-allow-topic-edit').checked;
+  const allowPreferenceEdit = document.getElementById('round-form-allow-pref-edit').checked;
+
+  const payload = {
+    title,
+    academicYear,
+    roundName,
+    openAt: new Date(openAtVal),
+    closeAt: new Date(closeAtVal),
+    preferenceCount,
+    selectionMode,
+    status,
+    allowStudentEdit,
+    allowTopicEdit,
+    allowPreferenceEdit,
+    updatedAt: serverTimestamp()
+  };
+
+  try {
+    if (id) {
+      await updateDoc(doc(db, 'graduationRounds', id), payload);
+    } else {
+      payload.createdAt = serverTimestamp();
+      payload.createdBy = state.user?.email || '';
+      await setDoc(doc(collection(db, 'graduationRounds')), payload);
+    }
+    closeRoundModal();
+    await loadRounds();
+  } catch (err) {
+    alert('Lỗi lưu đợt: ' + err.message);
+  }
+};
+
+// --- ADMIN: SUPERVISORS MASTER CRUD ---
+async function loadAdminSupervisorsMaster() {
+  try {
+    const snap = await getDocs(query(collection(db, 'supervisorMaster'), orderBy('name', 'asc')));
+    state.supervisorsMaster = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAdminSupervisorsMasterTable();
+  } catch (e) {
+    console.error('Error loading master supervisors:', e);
+  }
+}
+
+function renderAdminSupervisorsMasterTable() {
+  const tbody = document.getElementById('admin-supervisors-master-tbody');
+  if (!tbody) return;
+
+  const defaultAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23cbd5e1"/><path fill="%23cbd5e1" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
+
+  tbody.innerHTML = state.supervisorsMaster.map(s => `
+    <tr class="hover:bg-slate-50">
+      <td class="p-3.5"><img src="${s.photoUrl || defaultAvatar}" class="w-8 h-8 rounded-full object-cover border"></td>
+      <td class="p-3.5 font-bold text-slate-900">${s.name}</td>
+      <td class="p-3.5 text-slate-600">${s.email || '--'} ${s.phone ? '• ' + s.phone : ''}</td>
+      <td class="p-3.5">${s.department || '--'}</td>
+      <td class="p-3.5 max-w-[200px] truncate" title="${s.expertise || ''}">${s.expertise || '--'}</td>
+      <td class="p-3.5 text-[11px] text-slate-400">
+        ${s.showPhoto !== false ? '📷' : '🚫'} ${s.showEmail !== false ? '✉️' : '🚫'} ${s.showPhone ? '📞' : '🚫'}
+      </td>
+      <td class="p-3.5">
+        <span class="badge ${s.active !== false ? 'badge-open' : 'badge-closed'}">${s.active !== false ? 'Active' : 'Ngừng'}</span>
+      </td>
+      <td class="p-3.5 text-right space-x-2">
+        <button onclick="editSupervisorMasterModal('${s.id}')" class="text-blue-600 hover:underline font-bold">Sửa</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+window.openCreateSupervisorModal = function() {
+  document.getElementById('form-supervisor').reset();
+  document.getElementById('sup-form-id').value = '';
+  document.getElementById('modal-supervisor-title').textContent = 'Thêm GVHD vào Kho Master';
+  document.getElementById('modal-supervisor').classList.remove('hidden');
+};
+
+window.editSupervisorMasterModal = function(supId) {
+  const s = state.supervisorsMaster.find(x => x.id === supId);
+  if (!s) return;
+
+  document.getElementById('sup-form-id').value = s.id;
+  document.getElementById('sup-form-name').value = s.name || '';
+  document.getElementById('sup-form-email').value = s.email || '';
+  document.getElementById('sup-form-phone').value = s.phone || '';
+  document.getElementById('sup-form-photo').value = s.photoUrl || '';
+  document.getElementById('sup-form-dept').value = s.department || '';
+  document.getElementById('sup-form-expertise').value = s.expertise || '';
+  document.getElementById('sup-form-bio').value = s.bio || '';
+  document.getElementById('sup-form-active').checked = s.active !== false;
+  document.getElementById('sup-form-show-email').checked = s.showEmail !== false;
+  document.getElementById('sup-form-show-phone').checked = Boolean(s.showPhone);
+  document.getElementById('sup-form-show-photo').checked = s.showPhoto !== false;
+
+  document.getElementById('modal-supervisor-title').textContent = 'Chỉnh sửa Giảng viên Hướng dẫn';
+  document.getElementById('modal-supervisor').classList.remove('hidden');
+};
+
+window.closeSupervisorModal = function() {
+  document.getElementById('modal-supervisor').classList.add('hidden');
+};
+
+window.saveSupervisorMaster = async function(e) {
+  e.preventDefault();
+  const id = document.getElementById('sup-form-id').value;
+  const name = document.getElementById('sup-form-name').value.trim();
+  const email = document.getElementById('sup-form-email').value.trim().toLowerCase();
+  const phone = document.getElementById('sup-form-phone').value.trim();
+  const photoUrl = document.getElementById('sup-form-photo').value.trim();
+  const department = document.getElementById('sup-form-dept').value.trim();
+  const expertise = document.getElementById('sup-form-expertise').value.trim();
+  const bio = document.getElementById('sup-form-bio').value.trim();
+  const active = document.getElementById('sup-form-active').checked;
+  const showEmail = document.getElementById('sup-form-show-email').checked;
+  const showPhone = document.getElementById('sup-form-show-phone').checked;
+  const showPhoto = document.getElementById('sup-form-show-photo').checked;
+
+  const payload = {
+    name, email, phone, photoUrl, department, expertise, bio,
+    active, showEmail, showPhone, showPhoto,
+    updatedAt: serverTimestamp()
+  };
+
+  try {
+    if (id) {
+      await updateDoc(doc(db, 'supervisorMaster', id), payload);
+    } else {
+      payload.createdAt = serverTimestamp();
+      await setDoc(doc(collection(db, 'supervisorMaster')), payload);
+    }
+    closeSupervisorModal();
+    await loadAdminSupervisorsMaster();
+  } catch (err) {
+    alert('Lỗi lưu GVHD: ' + err.message);
+  }
+};
+
+// --- ADMIN: ROUND SUPERVISORS ---
+window.loadAdminRoundSupervisors = async function(roundId) {
+  try {
+    const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'supervisors'));
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAdminRoundSupervisorsTable(roundId, list);
+  } catch (e) {
+    console.error('Error loading admin round supervisors:', e);
+  }
+};
+
+function renderAdminRoundSupervisorsTable(roundId, list) {
+  const tbody = document.getElementById('admin-round-supervisors-tbody');
+  if (!tbody) return;
+
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400">Chưa có GVHD nào trong đợt này. Bấm "+ Thêm GVHD từ kho Master" để thêm.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(s => `
+    <tr class="hover:bg-slate-50">
+      <td class="p-3.5 font-bold text-slate-900">${s.name}</td>
+      <td class="p-3.5 text-slate-600">${s.department || '--'}</td>
+      <td class="p-3.5">
+        <input type="number" id="cap-input-${s.id}" value="${s.capacity || 10}" min="1" max="100" class="w-20 p-1 border rounded-lg font-bold text-center">
+      </td>
+      <td class="p-3.5">
+        <label class="flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" id="active-round-chk-${s.id}" ${s.activeInRound !== false ? 'checked' : ''} class="rounded text-blue-600">
+          <span class="text-xs font-semibold">${s.activeInRound !== false ? 'Hoạt động' : 'Tạm ẩn'}</span>
+        </label>
+      </td>
+      <td class="p-3.5 text-right space-x-2">
+        <button onclick="saveRoundSupervisorRow('${roundId}', '${s.id}')" class="text-emerald-600 font-bold hover:underline">Lưu</button>
+        <button onclick="removeRoundSupervisor('${roundId}', '${s.id}')" class="text-rose-600 font-bold hover:underline">Bỏ khỏi đợt</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+window.saveRoundSupervisorRow = async function(roundId, supId) {
+  const capacity = parseInt(document.getElementById('cap-input-' + supId).value, 10) || 10;
+  const activeInRound = document.getElementById('active-round-chk-' + supId).checked;
+
+  try {
+    await updateDoc(doc(db, 'graduationRounds', roundId, 'supervisors', supId), {
+      capacity, activeInRound, updatedAt: serverTimestamp()
+    });
+    alert('Đã cập nhật chỉ tiêu GVHD trong đợt thành công!');
+  } catch (e) {
+    alert('Lỗi cập nhật: ' + e.message);
+  }
+};
+
+window.removeRoundSupervisor = async function(roundId, supId) {
+  if (!confirm('Bạn có chắc muốn bỏ GVHD này khỏi đợt?')) return;
+  try {
+    await deleteDoc(doc(db, 'graduationRounds', roundId, 'supervisors', supId));
+    loadAdminRoundSupervisors(roundId);
+  } catch (e) {
+    alert('Lỗi xóa: ' + e.message);
+  }
+};
+
+window.openAddSupervisorsToRoundModal = async function() {
+  await loadAdminSupervisorsMaster();
+  const listEl = document.getElementById('sup-master-picker-list');
+  
+  listEl.innerHTML = state.supervisorsMaster.filter(s => s.active !== false).map(s => `
+    <label class="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer">
+      <input type="checkbox" value="${s.id}" class="sup-picker-chk w-4 h-4 rounded text-blue-600">
+      <div>
+        <span class="font-bold text-slate-800 block">${s.name}</span>
+        <span class="text-[11px] text-slate-400">${s.department || ''} • ${s.expertise || ''}</span>
+      </div>
+    </label>
+  `).join('');
+
+  document.getElementById('modal-add-sup-to-round').classList.remove('hidden');
+};
+
+window.closeAddSupToRoundModal = function() {
+  document.getElementById('modal-add-sup-to-round').classList.add('hidden');
+};
+
+window.saveSelectedSupervisorsToRound = async function() {
+  const roundId = document.getElementById('admin-round-sup-select').value;
+  if (!roundId) return;
+
+  const chks = Array.from(document.querySelectorAll('.sup-picker-chk:checked'));
+  if (chks.length === 0) {
+    alert('Vui lòng chọn ít nhất 1 giảng viên.');
+    return;
+  }
+
+  const batch = writeBatch(db);
+  chks.forEach(chk => {
+    const supId = chk.value;
+    const sup = state.supervisorsMaster.find(s => s.id === supId);
+    if (!sup) return;
+
+    const ref = doc(db, 'graduationRounds', roundId, 'supervisors', supId);
+    batch.set(ref, {
+      supervisorId: supId,
+      name: sup.name,
+      email: sup.email || '',
+      phone: sup.phone || '',
+      photoUrl: sup.photoUrl || '',
+      department: sup.department || '',
+      expertise: sup.expertise || '',
+      bio: sup.bio || '',
+      showEmail: sup.showEmail !== false,
+      showPhone: Boolean(sup.showPhone),
+      showPhoto: sup.showPhoto !== false,
+      capacity: 10,
+      activeInRound: true,
+      sortOrder: 1,
+      createdAt: serverTimestamp()
+    });
+  });
+
+  try {
+    await batch.commit();
+    closeAddSupToRoundModal();
+    loadAdminRoundSupervisors(roundId);
+  } catch (e) {
+    alert('Lỗi thêm GVHD: ' + e.message);
+  }
+};
+
+// --- ADMIN: ELIGIBLE STUDENTS (EXCEL PARSING & BATCH IMPORT) ---
+window.loadAdminEligibleStudents = async function(roundId) {
+  try {
+    const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents'));
+    state.eligibleStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAdminEligibleStudentsTable();
+  } catch (e) {
+    console.error('Error loading eligible students:', e);
+  }
+};
+
+function renderAdminEligibleStudentsTable() {
+  const tbody = document.getElementById('admin-eligible-students-tbody');
+  if (!tbody) return;
+
+  const searchTerm = (document.getElementById('search-eligible-input')?.value || '').toLowerCase();
+  const filtered = state.eligibleStudents.filter(s => {
+    return (s.studentId || '').toLowerCase().includes(searchTerm) || (s.name || '').toLowerCase().includes(searchTerm);
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-400">Chưa có dữ liệu sinh viên trong đợt này. Tải file Excel lên để nhập danh sách.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(s => `
+    <tr class="hover:bg-slate-50">
+      <td class="p-3 font-mono font-bold text-slate-900">${s.studentId}</td>
+      <td class="p-3 font-semibold text-slate-800">${s.name || '--'}</td>
+      <td class="p-3 text-slate-500">${s.email || '--'}</td>
+      <td class="p-3">${s.className || '--'}</td>
+      <td class="p-3">${s.major || 'Thiết kế Nội thất'}</td>
+      <td class="p-3"><span class="badge badge-open">Đủ ĐK</span></td>
+      <td class="p-3 text-right">
+        <button onclick="deleteEligibleStudent('${s.studentId}')" class="text-rose-600 hover:underline font-bold">Xóa</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+window.filterEligibleTable = function() {
+  renderAdminEligibleStudentsTable();
+};
+
+window.deleteEligibleStudent = async function(studentId) {
+  const roundId = document.getElementById('admin-round-student-select').value;
+  if (!confirm(`Xóa sinh viên ${studentId} khỏi danh sách đủ điều kiện?`)) return;
+  try {
+    await deleteDoc(doc(db, 'graduationRounds', roundId, 'eligibleStudents', studentId));
+    loadAdminEligibleStudents(roundId);
+  } catch (e) {
+    alert('Lỗi xóa: ' + e.message);
+  }
+};
+
+window.handleExcelFileUpload = function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  document.getElementById('excel-filename').textContent = file.name;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      parseAndValidateExcel(rawRows);
+    } catch (err) {
+      alert('Không đọc được file Excel: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+function parseAndValidateExcel(rows) {
+  if (!rows || rows.length < 2) {
+    alert('File Excel rỗng hoặc thiếu tiêu đề cột.');
+    return;
+  }
+
+  // Find header indices
+  const header = rows[0].map(h => String(h || '').trim().toLowerCase());
+  let mssvIdx = header.findIndex(h => h.includes('mssv') || h.includes('mã số') || h.includes('student'));
+  let nameIdx = header.findIndex(h => h.includes('họ') || h.includes('tên') || h.includes('name'));
+  let emailIdx = header.findIndex(h => h.includes('email') || h.includes('thư điện tử'));
+  let classIdx = header.findIndex(h => h.includes('lớp') || h.includes('class'));
+  let majorIdx = header.findIndex(h => h.includes('ngành') || h.includes('major'));
+
+  if (mssvIdx === -1) mssvIdx = 0;
+  if (nameIdx === -1) nameIdx = 1;
+
+  const existingMssvSet = new Set(state.eligibleStudents.map(s => s.studentId));
+  const seenInFile = new Set();
+  const staging = [];
+
+  let validCount = 0;
+  let invalidCount = 0;
+  let dupCount = 0;
+
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.length === 0) continue;
+
+    const rawMssv = String(r[mssvIdx] || '').trim().toUpperCase();
+    const rawName = String(r[nameIdx] || '').trim();
+    let rawEmail = emailIdx !== -1 ? String(r[emailIdx] || '').trim().toLowerCase() : '';
+    const rawClass = classIdx !== -1 ? String(r[classIdx] || '').trim() : '';
+    const rawMajor = majorIdx !== -1 ? String(r[majorIdx] || '').trim() : 'Thiết kế Nội thất';
+
+    if (!rawMssv) {
+      invalidCount++;
+      continue;
+    }
+
+    if (!rawEmail) {
+      rawEmail = `${rawMssv.toLowerCase()}@student.tdtu.edu.vn`;
+    }
+
+    const isDupInFile = seenInFile.has(rawMssv);
+    const isDupInDb = existingMssvSet.has(rawMssv);
+
+    if (isDupInFile || isDupInDb) {
+      dupCount++;
+    } else {
+      validCount++;
+    }
+    seenInFile.add(rawMssv);
+
+    staging.push({
+      studentId: rawMssv,
+      name: rawName,
+      email: rawEmail,
+      className: rawClass,
+      major: rawMajor,
+      isDup: isDupInFile || isDupInDb,
+      isValid: Boolean(rawMssv)
+    });
+  }
+
+  state.excelStaging = staging;
+
+  document.getElementById('excel-stat-valid').textContent = validCount;
+  document.getElementById('excel-stat-invalid').textContent = invalidCount;
+  document.getElementById('excel-stat-duplicate').textContent = dupCount;
+
+  // Render preview snippet
+  const tbody = document.getElementById('excel-preview-tbody');
+  tbody.innerHTML = staging.slice(0, 15).map(s => `
+    <tr class="hover:bg-slate-50">
+      <td class="p-2 font-mono font-bold text-slate-800">${s.studentId}</td>
+      <td class="p-2 font-medium">${s.name}</td>
+      <td class="p-2 text-slate-500 text-[11px]">${s.email}</td>
+      <td class="p-2">${s.className}</td>
+      <td class="p-2">${s.major}</td>
+      <td class="p-2">
+        ${s.isDup ? '<span class="text-amber-600 font-bold">Trùng</span>' : '<span class="text-emerald-600 font-bold">Hợp lệ</span>'}
+      </td>
+    </tr>
+  `).join('');
+
+  document.getElementById('excel-preview-card').classList.remove('hidden');
+}
+
+window.cancelExcelImport = function() {
+  state.excelStaging = [];
+  document.getElementById('excel-preview-card').classList.add('hidden');
+  document.getElementById('excel-file-input').value = '';
+};
+
+window.confirmExcelImport = async function() {
+  const roundId = document.getElementById('admin-round-student-select').value;
+  if (!roundId || state.excelStaging.length === 0) return;
+
+  const mode = document.querySelector('input[name="excel-import-mode"]:checked')?.value || 'append';
+  const existingSet = new Set(state.eligibleStudents.map(s => s.studentId));
+
+  const itemsToImport = state.excelStaging.filter(s => {
+    if (!s.isValid) return false;
+    if (mode === 'skip' && existingSet.has(s.studentId)) return false;
+    return true;
+  });
+
+  if (itemsToImport.length === 0) {
+    alert('Không có sinh viên nào cần import theo tùy chọn đã chọn.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-confirm-excel-import');
+  btn.disabled = true;
+  btn.textContent = '⏳ Đang lưu vào Firestore...';
+
+  try {
+    // Process in batches of 400
+    const chunkSize = 400;
+    for (let i = 0; i < itemsToImport.length; i += chunkSize) {
+      const chunk = itemsToImport.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+
+      chunk.forEach(s => {
+        const ref = doc(db, 'graduationRounds', roundId, 'eligibleStudents', s.studentId);
+        batch.set(ref, {
+          studentId: s.studentId,
+          name: s.name,
+          email: s.email,
+          className: s.className || '',
+          major: s.major || 'Thiết kế Nội thất',
+          eligible: true,
+          createdAt: serverTimestamp()
+        }, { merge: true });
+      });
+
+      await batch.commit();
+    }
+
+    alert(`Đã import thành công ${itemsToImport.length} sinh viên đủ điều kiện!`);
+    cancelExcelImport();
+    loadAdminEligibleStudents(roundId);
+  } catch (err) {
+    alert('Lỗi import Firestore: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✓ Xác nhận Nhập vào Firestore';
+  }
+};
+
+// --- ADMIN: PROJECT TYPES CRUD ---
+function renderAdminProjectTypesTable() {
+  const tbody = document.getElementById('admin-project-types-tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = state.projectTypes.map((p, idx) => `
+    <tr class="hover:bg-slate-50">
+      <td class="p-3.5 font-mono font-bold text-slate-400">${idx + 1}</td>
+      <td class="p-3.5 font-bold text-slate-900">${p.name}</td>
+      <td class="p-3.5">
+        <span class="badge ${p.active !== false ? 'badge-open' : 'badge-closed'}">${p.active !== false ? 'Hiển thị' : 'Đang ẩn'}</span>
+      </td>
+      <td class="p-3.5 text-right space-x-2">
+        <button onclick="toggleProjectTypeActive('${p.id}', ${p.active !== false})" class="text-slate-600 hover:underline font-bold">${p.active !== false ? 'Ẩn' : 'Bật'}</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+window.openAddProjectTypeModal = function() {
+  document.getElementById('form-project-type').reset();
+  document.getElementById('pt-form-id').value = '';
+  document.getElementById('pt-form-order').value = state.projectTypes.length + 1;
+  document.getElementById('modal-project-type').classList.remove('hidden');
+};
+
+window.closeProjectTypeModal = function() {
+  document.getElementById('modal-project-type').classList.add('hidden');
+};
+
+window.saveProjectType = async function(e) {
+  e.preventDefault();
+  const name = document.getElementById('pt-form-name').value.trim();
+  const order = parseInt(document.getElementById('pt-form-order').value, 10) || 1;
+  const active = document.getElementById('pt-form-active').checked;
+
+  try {
+    await setDoc(doc(collection(db, 'graduationProjectTypes')), {
+      name, order, active, createdAt: serverTimestamp()
+    });
+    closeProjectTypeModal();
+    await loadProjectTypes();
+  } catch (err) {
+    alert('Lỗi lưu loại hình: ' + err.message);
+  }
+};
+
+window.toggleProjectTypeActive = async function(id, currentActive) {
+  try {
+    await updateDoc(doc(db, 'graduationProjectTypes', id), { active: !currentActive });
+    await loadProjectTypes();
+  } catch (e) {
+    alert('Lỗi cập nhật: ' + e.message);
+  }
+};
+
+// --- ADMIN: REGISTRATIONS LIST & CSV EXPORT ---
+window.loadAdminRegistrations = async function(roundId) {
+  try {
+    const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'registrations'));
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAdminRegistrationsTable(list);
+  } catch (e) {
+    console.error('Error loading registrations:', e);
+  }
+};
+
+function renderAdminRegistrationsTable(list) {
+  const tbody = document.getElementById('admin-registrations-tbody');
+  if (!tbody) return;
+
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-slate-400">Chưa có sinh viên nào đăng ký trong đợt này.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map(r => {
+    const getSupName = rank => (r.preferences || []).find(p => p.rank === rank)?.supervisorName || '--';
+    const subDate = r.submittedAt ? (r.submittedAt.toDate ? r.submittedAt.toDate() : new Date(r.submittedAt)) : null;
+
+    return `
+      <tr class="hover:bg-slate-50">
+        <td class="p-3.5 font-mono font-bold text-slate-900">${r.studentId}</td>
+        <td class="p-3.5 font-semibold text-slate-800">${r.studentName || '--'}</td>
+        <td class="p-3.5 max-w-[200px] truncate font-bold text-blue-900" title="${r.topicTitle}">${r.topicTitle || '--'}</td>
+        <td class="p-3.5 text-slate-600">${r.projectType || '--'}</td>
+        <td class="p-3.5 font-bold text-slate-700">${getSupName(1)}</td>
+        <td class="p-3.5 text-slate-600">${getSupName(2)}</td>
+        <td class="p-3.5 text-slate-600">${getSupName(3)}</td>
+        <td class="p-3.5 text-[11px] text-slate-400">${subDate ? subDate.toLocaleString('vi-VN') : '--'}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.exportRegistrationsCSV = function() {
+  const roundId = document.getElementById('admin-round-reg-select')?.value;
+  if (!roundId) return;
+
+  getDocs(collection(db, 'graduationRounds', roundId, 'registrations')).then(snap => {
+    const list = snap.docs.map(d => d.data());
+    if (list.length === 0) {
+      alert('Không có dữ liệu đăng ký để xuất.');
+      return;
+    }
+
+    const headers = ['MSSV', 'Họ và tên', 'Email', 'Tên đề tài', 'Loại hình đồ án', 'Nguyện vọng 1', 'Nguyện vọng 2', 'Nguyện vọng 3', 'Thời gian nộp'];
+    const rows = list.map(r => {
+      const getSup = rank => (r.preferences || []).find(p => p.rank === rank)?.supervisorName || '';
+      const dt = r.submittedAt ? (r.submittedAt.toDate ? r.submittedAt.toDate() : new Date(r.submittedAt)).toLocaleString('vi-VN') : '';
+      return [
+        r.studentId || '',
+        r.studentName || '',
+        r.email || '',
+        `"${(r.topicTitle || '').replace(/"/g, '""')}"`,
+        `"${(r.projectType || '').replace(/"/g, '""')}"`,
+        `"${getSup(1)}"`,
+        `"${getSup(2)}"`,
+        `"${getSup(3)}"`,
+        dt
+      ];
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `DS_DangKy_DATN_${roundId}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+};
+
 
 // =========================================================================
 // --- PHASE 2A: ADMIN REVIEW MANAGEMENT MODULE ---
