@@ -147,23 +147,65 @@ async function initFirebase() {
 // --- AUTH & ROLES ---
 export async function setupAuthListener() {
   showLoading('Đang khởi tạo IFA+ Graduation...');
+
+  // Fallback an toàn: Loading overlay bắt buộc phải ẩn sau tối đa 6 giây
+  const safetyTimer = setTimeout(() => {
+    hideLoading();
+  }, 6000);
+
   onAuthStateChanged(auth, async user => {
     state.user = user;
 
     if (user) {
       document.getElementById('login-required-section').classList.add('hidden');
-      showLoading('Đang xác định vai trò người dùng...');
-      await resolveActualRoles(user);
-      updateAuthUI();
+      
+      try {
+        // 1. Phân giải quyền nhanh
+        showLoading('Đang xác định vai trò người dùng...');
+        try {
+          await Promise.race([
+            resolveActualRoles(user),
+            new Promise(r => setTimeout(r, 2500))
+          ]);
+        } catch (e) {
+          console.warn('[IFA-Graduation] Role resolution notice:', e);
+        }
+        updateAuthUI();
 
-      showLoading('Đang tải dữ liệu đợt tốt nghiệp...');
-      await loadInitialData();
+        // 2. Kích hoạt ngay view ban đầu để UI hiển thị tức thì
+        const initView = state.currentView || state.actualRole || 'student';
+        await switchView(initView);
 
-      // Automatically activate initial view without requiring manual button click
-      const initView = state.currentView || state.actualRole || 'student';
-      await switchView(initView);
-      hideLoading();
+        // 3. Tải dữ liệu đợt và loại hình đồ án với timeout bảo vệ
+        showLoading('Đang tải dữ liệu đợt tốt nghiệp...');
+        try {
+          await Promise.race([
+            loadInitialData(),
+            new Promise(r => setTimeout(r, 3500))
+          ]);
+        } catch (loadErr) {
+          console.warn('[IFA-Graduation] Initial data loading notice:', loadErr);
+        }
+
+        // Tái đồng bộ view sau khi đã có dữ liệu đợt
+        await switchView(state.currentView || initView);
+
+      } catch (err) {
+        console.error('[IFA-Graduation] Startup error:', err);
+      } finally {
+        clearTimeout(safetyTimer);
+        hideLoading();
+      }
+
+      // 4. Background bootstrap cho project types nếu là Admin (chạy ngầm, không chặn startup)
+      if (state.isAdmin) {
+        setTimeout(() => {
+          bootstrapProjectTypesIfNeeded().catch(() => {});
+        }, 1200);
+      }
+
     } else {
+      clearTimeout(safetyTimer);
       await resolveActualRoles(null);
       updateAuthUI();
       document.getElementById('login-required-section').classList.remove('hidden');
@@ -193,36 +235,41 @@ export async function resolveActualRoles(user) {
   let isAdmin = false;
   if (email === 'tranquanghai@tdtu.edu.vn') {
     isAdmin = true;
-  } else {
-    try {
-      const adminDoc = await getDoc(doc(db, 'admins', email));
-      if (adminDoc.exists()) {
-        isAdmin = true;
-      }
-    } catch (e) {
-      console.warn('[IFA-Graduation] Admins lookup notice:', e);
-    }
-    // Also check Portal shared auth if set
-    if (!isAdmin && window.__tdtu_user && (window.__tdtu_user.isAdmin || window.__tdtu_user.role === 'admin')) {
-      isAdmin = true;
-    }
+  } else if (window.__tdtu_user && (window.__tdtu_user.isAdmin || window.__tdtu_user.role === 'admin')) {
+    isAdmin = true;
   }
 
-  // 2. SUPERVISOR Check
-  let isSupervisor = false;
-  try {
-    const qSup = query(collection(db, 'supervisorMaster'), where('email', '==', email), where('active', '==', true));
-    const supSnap = await getDocs(qSup);
-    if (!supSnap.empty) {
-      isSupervisor = true;
-    }
-  } catch (e) {
-    console.warn('[IFA-Graduation] SupervisorMaster lookup notice:', e);
-  }
-
-  // 3. STUDENT Check
+  // 2. STUDENT Check
   let isStudent = email.endsWith('@student.tdtu.edu.vn');
   let studentMssv = isStudent ? email.split('@')[0].toUpperCase() : '';
+
+  // 3. SUPERVISOR Check
+  let isSupervisor = false;
+
+  // Chỉ truy vấn Firestore nếu chưa xác định được là Owner hoặc Student
+  if (!isAdmin && !isStudent) {
+    try {
+      await Promise.race([
+        Promise.all([
+          getDoc(doc(db, 'admins', email)).then(d => { if (d.exists()) isAdmin = true; }).catch(() => {}),
+          getDocs(query(collection(db, 'supervisorMaster'), where('email', '==', email), where('active', '==', true)))
+            .then(snap => { if (!snap.empty) isSupervisor = true; }).catch(() => {})
+        ]),
+        new Promise(r => setTimeout(r, 2000))
+      ]);
+    } catch (e) {
+      console.warn('[IFA-Graduation] Admins/Supervisor lookup timeout notice:', e);
+    }
+  } else if (isAdmin) {
+    // Nếu là Admin, kiểm tra ngầm supervisor mà không chặn
+    getDocs(query(collection(db, 'supervisorMaster'), where('email', '==', email), where('active', '==', true)))
+      .then(snap => {
+        if (!snap.empty) {
+          state.isSupervisor = true;
+          updateAuthUI();
+        }
+      }).catch(() => {});
+  }
 
   state.isAdmin = isAdmin;
   state.isSupervisor = isSupervisor;
@@ -394,39 +441,48 @@ window.switchView = async function(targetView) {
 
 // --- DATA INITIALIZATION ---
 async function loadInitialData() {
-  await loadProjectTypes();
-  await loadRounds();
+  await Promise.allSettled([
+    loadProjectTypes(),
+    loadRounds()
+  ]);
 }
 
 async function loadProjectTypes() {
+  // Luôn hiển thị fallback in-memory/HTML ngay lập tức để dropdown không bao giờ trống
+  renderProjectTypesDropdown();
+  renderAdminProjectTypesTable();
+
   try {
-    const snap = await getDocs(query(collection(db, 'graduationProjectTypes'), orderBy('order', 'asc')));
-    if (snap.empty) {
-      // Auto-bootstrap into Firestore if Admin
-      if (state.isAdmin) {
-        try {
-          const batch = writeBatch(db);
-          DEFAULT_PROJECT_TYPES.forEach((name, index) => {
-            const ref = doc(collection(db, 'graduationProjectTypes'));
-            batch.set(ref, { name, order: index + 1, active: true, createdAt: serverTimestamp() });
-          });
-          await batch.commit();
-          const reSnap = await getDocs(query(collection(db, 'graduationProjectTypes'), orderBy('order', 'asc')));
-          if (!reSnap.empty) {
-            state.projectTypes = reSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-          }
-        } catch (seedErr) {
-          console.warn('Auto-seed project types error:', seedErr);
-        }
-      }
-    } else {
-      state.projectTypes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const snap = await getDocs(collection(db, 'graduationProjectTypes'));
+    if (!snap.empty) {
+      state.projectTypes = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      renderProjectTypesDropdown();
+      renderAdminProjectTypesTable();
     }
   } catch (e) {
-    console.error('Error loading project types:', e);
-  } finally {
-    renderProjectTypesDropdown();
-    renderAdminProjectTypesTable();
+    console.warn('[IFA-Graduation] Project types query notice:', e);
+  }
+}
+
+async function bootstrapProjectTypesIfNeeded() {
+  if (!state.isAdmin) return;
+  try {
+    const snap = await getDocs(collection(db, 'graduationProjectTypes'));
+    if (snap.empty) {
+      console.log('[IFA-Graduation] Bootstrapping 11 default project types into Firestore...');
+      const batch = writeBatch(db);
+      DEFAULT_PROJECT_TYPES.forEach((name, index) => {
+        const ref = doc(collection(db, 'graduationProjectTypes'));
+        batch.set(ref, { name, order: index + 1, active: true, createdAt: serverTimestamp() });
+      });
+      await batch.commit();
+      console.log('[IFA-Graduation] 11 default project types bootstrapped.');
+      await loadProjectTypes();
+    }
+  } catch (err) {
+    console.warn('[IFA-Graduation] Background bootstrap notice:', err.message);
   }
 }
 
