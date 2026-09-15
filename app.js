@@ -46,6 +46,45 @@ export const DEFAULT_PROJECT_TYPES = [
 
 
 
+
+// 24H Date formatting helpers
+export const fmt24h = d => {
+  if (!d) return '--';
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return '--';
+  const pad = n => String(n).padStart(2, '0');
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  const dd = pad(date.getDate());
+  const MM = pad(date.getMonth() + 1);
+  const yyyy = date.getFullYear();
+  return `${hh}:${mm} ${dd}/${MM}/${yyyy}`;
+};
+
+export const fmtDateRange24h = (d1, d2) => {
+  if (!d1 || !d2) return '--';
+  const date1 = new Date(d1);
+  const date2 = new Date(d2);
+  const pad = n => String(n).padStart(2, '0');
+  const t1 = `${pad(date1.getHours())}:${pad(date1.getMinutes())} ${pad(date1.getDate())}/${pad(date1.getMonth()+1)}`;
+  const t2 = `${pad(date2.getHours())}:${pad(date2.getMinutes())} ${pad(date2.getDate())}/${pad(date2.getMonth()+1)}/${date2.getFullYear()}`;
+  return `${t1} → ${t2}`;
+};
+
+window.copyRoundLink = function(roundId, shortCode) {
+  const code = shortCode || roundId;
+  const link = `https://tknt-tdtu.web.app/graduation/?x=${encodeURIComponent(code)}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(() => {
+      alert('Đã sao chép link đợt:\n' + link);
+    }).catch(() => {
+      prompt('Link đợt tốt nghiệp:', link);
+    });
+  } else {
+    prompt('Link đợt tốt nghiệp:', link);
+  }
+};
+
 // --- STATE MANAGEMENT ---
 export const state = {
   user: null,
@@ -433,17 +472,77 @@ window.switchView = async function(targetView) {
     loadAdminStats();
   } else if (targetView === 'supervisor' && state.selectedRoundId) {
     loadSupervisorReviewData(state.selectedRoundId);
-  } else if (targetView === 'student') {
-    const hasOpenRound = state.rounds && state.rounds.some(r => r.status === 'open');
+    } else if (targetView === 'student') {
     const emptyCard = document.getElementById('student-empty-round');
     const regFlow = document.getElementById('registration-flow-container');
-    if (!hasOpenRound) {
-      if (emptyCard) emptyCard.classList.remove('hidden');
+    const targetRound = state.activeRound;
+
+    if (!targetRound) {
+      // No active round configured
+      if (emptyCard) {
+        emptyCard.innerHTML = `
+          <div class="w-16 h-16 bg-blue-50 text-tdtu-blue rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+            📋
+          </div>
+          <h3 class="text-lg font-black text-slate-800 mb-2 leading-snug">
+            Hiện tại chưa đến đợt đăng ký<br>Đồ án tốt nghiệp.
+          </h3>
+          <p class="text-xs text-slate-500 leading-relaxed">
+            Bạn vui lòng quay lại sau khi Khoa có thông báo chính thức.
+          </p>
+        `;
+        emptyCard.classList.remove('hidden');
+      }
       if (regFlow) regFlow.classList.add('hidden');
     } else {
-      if (emptyCard) emptyCard.classList.add('hidden');
-      if (regFlow) regFlow.classList.remove('hidden');
-      if (state.selectedRoundId) checkStudentEligibilityAndRegistration(state.selectedRoundId);
+      const now = new Date();
+      const isNotYetOpen = targetRound.openAtDate && now < targetRound.openAtDate;
+      const isClosed = (targetRound.closeAtDate && now > targetRound.closeAtDate) || targetRound.status === 'closed';
+
+      if (isNotYetOpen) {
+        if (emptyCard) {
+          emptyCard.innerHTML = `
+            <div class="w-16 h-16 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+              ⏳
+            </div>
+            <h3 class="text-lg font-black text-slate-800 mb-2">
+              Đợt đăng ký chưa mở
+            </h3>
+            <p class="text-xs text-slate-600 leading-relaxed font-semibold">
+              ${targetRound.title}
+            </p>
+            <p class="text-xs text-slate-500 mt-1 font-mono">
+              Thời gian mở: ${fmt24h(targetRound.openAtDate)}
+            </p>
+          `;
+          emptyCard.classList.remove('hidden');
+        }
+        if (regFlow) regFlow.classList.add('hidden');
+      } else if (isClosed) {
+        if (emptyCard) {
+          emptyCard.innerHTML = `
+            <div class="w-16 h-16 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+              🔒
+            </div>
+            <h3 class="text-lg font-black text-slate-800 mb-2">
+              Đợt đăng ký đã kết thúc
+            </h3>
+            <p class="text-xs text-slate-600 leading-relaxed font-semibold">
+              ${targetRound.title}
+            </p>
+            <p class="text-xs text-slate-500 mt-1 font-mono">
+              Thời gian đóng: ${fmt24h(targetRound.closeAtDate)}
+            </p>
+          `;
+          emptyCard.classList.remove('hidden');
+        }
+        if (regFlow) regFlow.classList.add('hidden');
+      } else {
+        // Open & in window!
+        if (emptyCard) emptyCard.classList.add('hidden');
+        if (regFlow) regFlow.classList.remove('hidden');
+        if (state.selectedRoundId) checkStudentEligibilityAndRegistration(state.selectedRoundId);
+      }
     }
   }
 };
@@ -536,16 +635,23 @@ async function loadRounds() {
     renderRoundsDropdowns();
     renderAdminRoundsTable();
 
-    // Pick active round
+    // Check ?x=SHORTCODE or ?round=ID URL parameter
     const urlParams = new URLSearchParams(window.location.search);
-    const roundQuery = urlParams.get('e') || urlParams.get('round');
-    
-    if (roundQuery && state.rounds.some(r => r.id === roundQuery)) {
-      state.selectedRoundId = roundQuery;
-    } else {
-      const openRound = state.rounds.find(r => r.status === 'open' || r.status === 'reviewing') || state.rounds[0];
-      state.selectedRoundId = openRound ? openRound.id : null;
+    const xCode = urlParams.get('x') || urlParams.get('round') || urlParams.get('e');
+
+    let targetRound = null;
+    if (xCode) {
+      // Find round matching shortCode, roundName or id
+      targetRound = state.rounds.find(r => !r.deleted && (r.shortCode === xCode || r.roundName === xCode || r.id === xCode));
     }
+
+    // If no direct link, ONLY use the ACTIVE round
+    if (!targetRound) {
+      targetRound = state.rounds.find(r => !r.deleted && r.isActive === true);
+    }
+
+    state.activeRound = targetRound || null;
+    state.selectedRoundId = targetRound ? targetRound.id : null;
 
     if (state.selectedRoundId) {
       await selectRound(state.selectedRoundId);
@@ -555,19 +661,32 @@ async function loadRounds() {
   }
 }
 
+
+// Safe helper to populate round selectors across views
+window.populateRoundSelectors = function() {
+  try {
+    renderRoundsDropdowns();
+  } catch (err) {
+    console.warn('[IFA-Graduation] renderRoundsDropdowns warning:', err);
+  }
+};
+
 function renderRoundsDropdowns() {
   const selectActive = document.getElementById('select-active-round');
   const selectAdminSup = document.getElementById('admin-round-sup-select');
   const selectAdminStudent = document.getElementById('admin-round-student-select');
   const selectAdminReg = document.getElementById('admin-round-reg-select');
   const selectAdminReview = document.getElementById('admin-review-round-select');
-
-  const optionsHtml = state.rounds.map(r => `<option value="${r.id}">${r.title} (${r.academicYear})</option>`).join('');
+  
+  const validRounds = (state.rounds || []).filter(r => !r.deleted);
+  const optionsHtml = validRounds.map(r => '<option value="' + r.id + '" ' + (r.id === state.selectedRoundId ? 'selected' : '') + '>' + r.title + ' (' + (r.academicYear || '') + ')' + (r.isActive ? ' ★ Hiện hành' : '') + '</option>').join('');
 
   if (selectActive) {
     selectActive.innerHTML = optionsHtml;
-    if (state.rounds.length > 1) {
+    if (validRounds.length > 1) {
       document.getElementById('multi-round-selector-wrap')?.classList.remove('hidden');
+    } else {
+      document.getElementById('multi-round-selector-wrap')?.classList.add('hidden');
     }
   }
   if (selectAdminSup) selectAdminSup.innerHTML = optionsHtml;
@@ -1583,7 +1702,7 @@ window.switchAdminTab = function(tabKey) {
     if (dot) dot.classList.replace('bg-slate-400', 'bg-blue-400');
   }
 
-  ['overview', 'review', 'rounds', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student'].forEach(t => {
+  ['overview', 'review', 'rounds', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash'].forEach(t => {
     const p = document.getElementById('atab-panel-' + t);
     if (p) {
       if (t === tabKey) p.classList.remove('hidden');
@@ -1599,25 +1718,209 @@ window.switchAdminTab = function(tabKey) {
   else if (tabKey === 'eligible-students' && state.selectedRoundId) loadAdminEligibleStudents(state.selectedRoundId);
   else if (tabKey === 'registrations' && state.selectedRoundId) loadAdminRegistrations(state.selectedRoundId);
   else if (tabKey === 'preview-student') preparePreviewStudentDropdown();
+  else if (tabKey === 'trash') renderAdminTrashTable();
 };
+
+
+// --- ACTIVE ROUND TOGGLE ---
+window.setActiveRound = async function(roundId) {
+  if (!state.isAdmin) return;
+  try {
+    const targetRound = state.rounds.find(r => r.id === roundId);
+    if (!targetRound) return;
+
+    // 1. Deactivate other rounds in local state
+    state.rounds.forEach(r => {
+      if (r.id === roundId) r.isActive = true;
+      else r.isActive = false;
+    });
+
+    state.activeRound = targetRound;
+    state.selectedRoundId = roundId;
+
+    renderAdminRoundsTable();
+    populateRoundSelectors();
+
+    // 2. Persist in Firestore
+    await updateDoc(doc(db, 'graduationRounds', roundId), { isActive: true, updatedAt: serverTimestamp() });
+    for (const r of state.rounds) {
+      if (r.id !== roundId && r.isActive !== false) {
+        await updateDoc(doc(db, 'graduationRounds', r.id), { isActive: false, updatedAt: serverTimestamp() }).catch(() => {});
+      }
+    }
+    alert(`Đã đặt "${targetRound.title}" làm đợt hiện hành!`);
+  } catch (err) {
+    console.error('Lỗi đặt đợt hiện hành:', err);
+    alert('Lỗi đặt đợt hiện hành: ' + err.message);
+  }
+};
+
+// --- SOFT DELETE & TRASH ---
+window.softDeleteRound = async function(roundId) {
+  if (!state.isAdmin) return;
+  const r = state.rounds.find(x => x.id === roundId);
+  if (!r) return;
+
+  if (!confirm(`Bạn có chắc chắn muốn chuyển đợt "${r.title}" vào Thùng rác?`)) return;
+
+  try {
+    const wasActive = Boolean(r.isActive);
+    r.deleted = true;
+    r.deletedAt = new Date().toISOString();
+    r.isActive = false;
+
+    renderAdminRoundsTable();
+    populateRoundSelectors();
+
+    await updateDoc(doc(db, 'graduationRounds', roundId), {
+      deleted: true,
+      deletedAt: serverTimestamp(),
+      isActive: false,
+      updatedAt: serverTimestamp()
+    });
+
+    alert('Đã chuyển đợt vào Thùng rác.');
+  } catch (err) {
+    console.error('Lỗi xóa đợt:', err);
+    alert('Lỗi xóa đợt: ' + err.message);
+  }
+};
+
+window.restoreRound = async function(roundId) {
+  if (!state.isAdmin) return;
+  const r = state.rounds.find(x => x.id === roundId);
+  if (!r) return;
+
+  try {
+    r.deleted = false;
+    r.deletedAt = null;
+    r.isActive = false; // Never auto-reactivate
+
+    renderAdminTrashTable();
+    renderAdminRoundsTable();
+    populateRoundSelectors();
+
+    await updateDoc(doc(db, 'graduationRounds', roundId), {
+      deleted: false,
+      deletedAt: null,
+      isActive: false,
+      updatedAt: serverTimestamp()
+    });
+
+    alert(`Đã khôi phục đợt "${r.title}". Đợt ở trạng thái không hiện hành.`);
+  } catch (err) {
+    console.error('Lỗi khôi phục đợt:', err);
+    alert('Lỗi khôi phục đợt: ' + err.message);
+  }
+};
+
+window.permanentDeleteRound = async function(roundId) {
+  if (!state.isAdmin) return;
+  const r = state.rounds.find(x => x.id === roundId);
+  const title = r ? r.title : roundId;
+
+  if (!confirm(`HÀNH ĐỘNG KHÔNG THỂ HOÀN TÁC!\nBạn có chắc chắn muốn XÓA VĨNH VIỄN đợt "${title}"?`)) return;
+
+  try {
+    state.rounds = state.rounds.filter(x => x.id !== roundId);
+    renderAdminTrashTable();
+
+    await deleteDoc(doc(db, 'graduationRounds', roundId));
+    alert('Đã xóa vĩnh viễn đợt khỏi cơ sở dữ liệu.');
+  } catch (err) {
+    console.error('Lỗi xóa vĩnh viễn đợt:', err);
+    alert('Lỗi xóa vĩnh viễn: ' + err.message);
+  }
+};
+
+function renderAdminTrashTable() {
+  const tbody = document.getElementById('admin-trash-tbody');
+  if (!tbody) return;
+
+  const now = Date.now();
+  const trashedRounds = (state.rounds || []).filter(r => r.deleted === true);
+
+  // Auto purge items older than 30 days
+  trashedRounds.forEach(r => {
+    const delTime = r.deletedAt ? new Date(r.deletedAt).getTime() : now;
+    const daysPassed = Math.floor((now - delTime) / (1000 * 60 * 60 * 24));
+    if (daysPassed >= 30) {
+      permanentDeleteRound(r.id).catch(console.warn);
+    }
+  });
+
+  if (trashedRounds.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400">Thùng rác trống</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = trashedRounds.map(r => {
+    const delTime = r.deletedAt ? new Date(r.deletedAt).getTime() : now;
+    const daysPassed = Math.floor((now - delTime) / (1000 * 60 * 60 * 24));
+    const daysRemaining = Math.max(0, 30 - daysPassed);
+    const delDateStr = fmt24h(r.deletedAt);
+
+    return `
+      <tr class="hover:bg-slate-50">
+        <td class="p-3.5 font-bold text-slate-900">${r.title}</td>
+        <td class="p-3.5 text-slate-600">${r.academicYear || '--'}</td>
+        <td class="p-3.5 text-slate-500 font-mono text-[11px]">${delDateStr}</td>
+        <td class="p-3.5">
+          <span class="badge ${daysRemaining <= 5 ? 'badge-closed' : 'bg-amber-100 text-amber-800'}">Còn ${daysRemaining} ngày</span>
+        </td>
+        <td class="p-3.5 text-right space-x-2">
+          <button onclick="restoreRound('${r.id}')" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg border border-emerald-300">Khôi phục</button>
+          <button onclick="permanentDeleteRound('${r.id}')" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg border border-rose-300">Xóa vĩnh viễn</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
 
 // --- ADMIN: ROUNDS CRUD ---
 function renderAdminRoundsTable() {
   const tbody = document.getElementById('admin-rounds-tbody');
   if (!tbody) return;
 
-  tbody.innerHTML = state.rounds.map(r => {
-    const fmt = d => d ? new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '--';
+  const activeRounds = (state.rounds || []).filter(r => !r.deleted);
+
+  if (activeRounds.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-slate-400">Chưa có đợt tốt nghiệp nào. Bấm "+ Tạo đợt mới" để bắt đầu.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = activeRounds.map(r => {
+    const timeRangeStr = fmtDateRange24h(r.openAtDate, r.closeAtDate);
+    const isCurrentActive = Boolean(r.isActive);
+    const shortCode = r.shortCode || r.roundName || r.id;
+
     return `
-      <tr class="hover:bg-slate-50">
-        <td class="p-3.5 font-bold text-slate-900">${r.title}</td>
-        <td class="p-3.5 text-slate-600">${r.academicYear}</td>
-        <td class="p-3.5"><span class="badge badge-${r.status}">${r.status}</span></td>
-        <td class="p-3.5 text-[11px] text-slate-500">${fmt(r.openAtDate)} → ${fmt(r.closeAtDate)}</td>
-        <td class="p-3.5 font-bold">${r.preferenceCount || 3} NV</td>
-        <td class="p-3.5">${r.selectionMode === 'wizard' ? 'Wizard' : 'Cards'}</td>
-        <td class="p-3.5 text-right space-x-2">
-          <button onclick="editRoundModal('${r.id}')" class="text-blue-600 hover:underline font-bold">Sửa</button>
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="p-3.5">
+          <span class="font-bold text-slate-900 block">${r.title}</span>
+          <span class="text-[10px] font-mono text-slate-400 block mt-0.5">Mã: ${shortCode}</span>
+        </td>
+        <td class="p-3.5 text-slate-600 font-semibold">${r.academicYear}</td>
+        <td class="p-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">${timeRangeStr}</td>
+        <td class="p-3.5 font-bold text-slate-800">${r.supervisorsCount || '--'}</td>
+        <td class="p-3.5 font-bold text-slate-800">${r.registrationsCount || '--'}</td>
+        <td class="p-3.5">
+          <span class="badge badge-${r.status}">${r.status}</span>
+        </td>
+        <td class="p-3.5">
+          ${isCurrentActive 
+            ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">● Đợt hiện hành</span>' 
+            : `<button onclick="setActiveRound('${r.id}')" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors border border-slate-300">Đặt làm hiện hành</button>`
+          }
+        </td>
+        <td class="p-3.5">
+          <button onclick="copyRoundLink('${r.id}', '${shortCode}')" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-tdtu-blue rounded-lg font-bold text-xs flex items-center gap-1 border border-blue-200 transition-colors" title="Sao chép link ?x=${shortCode}">
+            <span>📋 Link</span>
+          </button>
+        </td>
+        <td class="p-3.5 text-right space-x-2 whitespace-nowrap">
+          <button onclick="editRoundModal('${r.id}')" class="text-blue-600 hover:underline font-bold text-xs">Sửa</button>
+          <button onclick="softDeleteRound('${r.id}')" class="text-rose-600 hover:underline font-bold text-xs">Xóa</button>
         </td>
       </tr>
     `;
@@ -1628,8 +1931,73 @@ window.openCreateRoundModal = function() {
   document.getElementById('form-round').reset();
   document.getElementById('round-form-id').value = '';
   document.getElementById('modal-round-title').textContent = 'Tạo Đợt Đồ án Tốt nghiệp Mới';
+
+  // Default dates
+  const today = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const todayStr = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+  const nextMonth = new Date(today.getTime() + 30 * 24 * 3600 * 1000);
+  const nextMonthStr = `${nextMonth.getFullYear()}-${pad(nextMonth.getMonth()+1)}-${pad(nextMonth.getDate())}`;
+
+  if (document.getElementById('round-open-date')) document.getElementById('round-open-date').value = todayStr;
+  if (document.getElementById('round-close-date')) document.getElementById('round-close-date').value = nextMonthStr;
+  if (document.getElementById('round-open-hour')) document.getElementById('round-open-hour').value = '08';
+  if (document.getElementById('round-open-minute')) document.getElementById('round-open-minute').value = '00';
+  if (document.getElementById('round-close-hour')) document.getElementById('round-close-hour').value = '17';
+  if (document.getElementById('round-close-minute')) document.getElementById('round-close-minute').value = '30';
+
+  // Reset selected supervisors
+  state.createRoundSelectedSupIds = new Set();
+  updateSelectedRoundSupUI();
+  const pickerCont = document.getElementById('round-sup-picker-container');
+  if (pickerCont) pickerCont.classList.add('hidden');
+
   document.getElementById('modal-round').classList.remove('hidden');
 };
+
+window.editRoundModal = async function(roundId) {
+  const r = state.rounds.find(x => x.id === roundId);
+  if (!r) return;
+
+  document.getElementById('round-form-id').value = r.id;
+  document.getElementById('round-form-title').value = r.title || '';
+  document.getElementById('round-form-year').value = r.academicYear || '';
+  document.getElementById('round-form-name').value = r.shortCode || r.roundName || '';
+  document.getElementById('round-form-status').value = r.status || 'draft';
+  document.getElementById('round-form-pref-count').value = r.preferenceCount || '3';
+  document.getElementById('round-form-selection-mode').value = r.selectionMode || 'cards';
+  document.getElementById('round-form-allow-edit').checked = r.allowStudentEdit !== false;
+  document.getElementById('round-form-allow-topic-edit').checked = r.allowTopicEdit !== false;
+  document.getElementById('round-form-allow-pref-edit').checked = r.allowPreferenceEdit !== false;
+
+  const pad = n => String(n).padStart(2, '0');
+  if (r.openAtDate) {
+    const od = new Date(r.openAtDate);
+    if (document.getElementById('round-open-date')) document.getElementById('round-open-date').value = `${od.getFullYear()}-${pad(od.getMonth()+1)}-${pad(od.getDate())}`;
+    if (document.getElementById('round-open-hour')) document.getElementById('round-open-hour').value = pad(od.getHours());
+    if (document.getElementById('round-open-minute')) document.getElementById('round-open-minute').value = pad(od.getMinutes());
+  }
+  if (r.closeAtDate) {
+    const cd = new Date(r.closeAtDate);
+    if (document.getElementById('round-close-date')) document.getElementById('round-close-date').value = `${cd.getFullYear()}-${pad(cd.getMonth()+1)}-${pad(cd.getDate())}`;
+    if (document.getElementById('round-close-hour')) document.getElementById('round-close-hour').value = pad(cd.getHours());
+    if (document.getElementById('round-close-minute')) document.getElementById('round-close-minute').value = pad(cd.getMinutes());
+  }
+
+  // Pre-load existing round supervisors
+  state.createRoundSelectedSupIds = new Set();
+  try {
+    const snap = await getDocs(collection(db, 'graduationRounds', r.id, 'supervisors'));
+    snap.docs.forEach(d => state.createRoundSelectedSupIds.add(d.id));
+  } catch (e) {
+    console.warn('Could not pre-load supervisors for edit modal:', e);
+  }
+  updateSelectedRoundSupUI();
+
+  document.getElementById('modal-round-title').textContent = 'Chỉnh sửa Đợt Đồ án Tốt nghiệp';
+  document.getElementById('modal-round').classList.remove('hidden');
+};
+
 
 window.editRoundModal = function(roundId) {
   const r = state.rounds.find(x => x.id === roundId);
@@ -1669,9 +2037,21 @@ window.saveRound = async function(e) {
   const id = document.getElementById('round-form-id')?.value;
   const title = document.getElementById('round-form-title')?.value.trim();
   const academicYear = document.getElementById('round-form-year')?.value.trim();
-  const roundName = document.getElementById('round-form-name')?.value.trim();
-  const openAtVal = document.getElementById('round-form-open-at')?.value;
-  const closeAtVal = document.getElementById('round-form-close-at')?.value;
+  let roundName = document.getElementById('round-form-name')?.value.trim();
+  
+  // Normalize shortCode to URL-safe
+  const shortCode = (roundName || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  roundName = shortCode;
+
+  // Read 24H time components
+  const openDateStr = document.getElementById('round-open-date')?.value;
+  const openHour = document.getElementById('round-open-hour')?.value || '08';
+  const openMin = document.getElementById('round-open-minute')?.value || '00';
+
+  const closeDateStr = document.getElementById('round-close-date')?.value;
+  const closeHour = document.getElementById('round-close-hour')?.value || '17';
+  const closeMin = document.getElementById('round-close-minute')?.value || '30';
+
   const preferenceCount = parseInt(document.getElementById('round-form-pref-count')?.value, 10) || 3;
   const selectionMode = document.getElementById('round-form-selection-mode')?.value || 'cards';
   const status = document.getElementById('round-form-status')?.value || 'draft';
@@ -1679,7 +2059,7 @@ window.saveRound = async function(e) {
   const allowTopicEdit = document.getElementById('round-form-allow-topic-edit')?.checked !== false;
   const allowPreferenceEdit = document.getElementById('round-form-allow-pref-edit')?.checked !== false;
 
-  if (!title || !academicYear || !roundName || !openAtVal || !closeAtVal) {
+  if (!title || !academicYear || !roundName || !openDateStr || !closeDateStr) {
     alert('Vui lòng nhập đầy đủ các trường bắt buộc (*)');
     return;
   }
@@ -1691,13 +2071,17 @@ window.saveRound = async function(e) {
     submitBtn.innerHTML = '<span>⏳ Đang lưu...</span>';
   }
 
-  const openDate = new Date(openAtVal);
-  const closeDate = new Date(closeAtVal);
+  const [oy, om, od] = openDateStr.split('-').map(Number);
+  const openDate = new Date(oy, om - 1, od, Number(openHour), Number(openMin), 0);
+
+  const [cy, cm, cd] = closeDateStr.split('-').map(Number);
+  const closeDate = new Date(cy, cm - 1, cd, Number(closeHour), Number(closeMin), 0);
 
   const payload = {
     title,
     academicYear,
-    roundName,
+    roundName: shortCode,
+    shortCode: shortCode,
     openAt: openDate,
     closeAt: closeDate,
     preferenceCount,
@@ -1706,6 +2090,7 @@ window.saveRound = async function(e) {
     allowStudentEdit,
     allowTopicEdit,
     allowPreferenceEdit,
+    deleted: false,
     updatedAt: serverTimestamp()
   };
 
@@ -1716,11 +2101,37 @@ window.saveRound = async function(e) {
     } else {
       payload.createdAt = serverTimestamp();
       payload.createdBy = state.user?.email || '';
+      payload.isActive = (state.rounds.length === 0); // If first round, make active
       const docRef = await addDoc(collection(db, 'graduationRounds'), payload);
       savedId = docRef.id;
     }
 
-    // Immediately update local state
+    // Attach selected supervisors to subcollection graduationRounds/{savedId}/supervisors
+    if (state.createRoundSelectedSupIds && state.createRoundSelectedSupIds.size > 0) {
+      const allSups = state.supervisorsMaster && state.supervisorsMaster.length > 0 
+        ? state.supervisorsMaster 
+        : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
+
+      for (const supId of state.createRoundSelectedSupIds) {
+        const sup = allSups.find(s => (s.id === supId || s.email === supId));
+        if (sup) {
+          const supPayload = {
+            supervisorId: supId,
+            name: sup.name,
+            email: sup.email,
+            department: sup.department || 'Thiết kế nội thất',
+            photoUrl: sup.photoUrl || '',
+            maxQuota: 5,
+            currentCount: 0,
+            active: true,
+            createdAt: serverTimestamp()
+          };
+          await setDoc(doc(db, 'graduationRounds', savedId, 'supervisors', supId), supPayload).catch(console.warn);
+        }
+      }
+    }
+
+    // Update in-memory state
     const roundObj = {
       id: savedId,
       ...payload,
@@ -1734,18 +2145,20 @@ window.saveRound = async function(e) {
       state.rounds.unshift(roundObj);
     }
 
-    if (!state.activeRound || status === 'open') {
+    if (!state.activeRound || status === 'open' || roundObj.isActive) {
       state.activeRound = roundObj;
       state.selectedRoundId = savedId;
     }
 
-    renderAdminRoundsTable();
-    populateRoundSelectors();
+    // Safe UI refreshes
+    try { renderAdminRoundsTable(); } catch (e) { console.warn(e); }
+    try { renderRoundsDropdowns(); } catch (e) { console.warn(e); }
+
     closeRoundModal();
     alert('Lưu đợt tốt nghiệp thành công!');
 
     // Background sync
-    loadRounds().catch(console.error);
+    loadRounds().catch(console.warn);
   } catch (err) {
     console.error('Lỗi lưu đợt:', err);
     alert('Lỗi lưu đợt: ' + err.message);
