@@ -1,0 +1,57 @@
+name: Release App Artifact
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Package and publish release artifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine release tag
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT\
+          echo "Building artifact for tag: $TAG"
+
+      - name: Package web application artifact
+        run: |
+          test -f index.html || { echo "ERROR: index.html missing"; exit 1; }
+          test -f app.js || { echo "ERROR: app.js missing"; exit 1; }
+          test -f styles.css || { echo "ERROR: styles.css missing"; exit 1; }
+          test -f xlsx.full.min.js || { echo "ERROR: xlsx.full.min.js missing"; exit 1; }
+
+
+          zip -9 ifa-graduation.zip index.html app.js styles.css xlsx.full.min.js
+          unzip -l ifa-graduation.zip
+
+      - name: Publish GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.vars.outputs.tag }}
+        run: |
+          gh release create "$TAG" ifa-graduation.zip \
+            --title "IFA+ Graduation $TAG" \
+            --notes "Automated distribution artifact release for TDTU TKNT Portal integration." \
+            --generate-notes || \
+          gh release upload "$TAG" ifa-graduation.zip --clobber

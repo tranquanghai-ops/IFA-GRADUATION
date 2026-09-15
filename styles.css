@@ -1,0 +1,107 @@
+/* IFA+ Graduation Custom Styles */
+:root {
+  --primary: #1a3c5e;
+  --primary-hover: #132b43;
+  --accent: #2563eb;
+  --accent-light: #eff6ff;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Glassmorphism & Cards */
+.card-surface {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  border-color: #cbd5e1;
+}
+
+/* Stepper styles */
+.stepper-item.active .stepper-circle {
+  background-color: #1a3c5e;
+  color: #ffffff;
+  border-color: #1a3c5e;
+  box-shadow: 0 0 0 4px rgba(26, 60, 94, 0.15);
+}
+
+.stepper-item.completed .stepper-circle {
+  background-color: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}
+
+.stepper-item .stepper-circle {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border: 2px solid #cbd5e1;
+  background-color: #ffffff;
+  color: #64748b;
+  transition: all 0.2s;
+}
+
+/* Modal animation */
+.modal-backdrop {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+}
+.badge-open { background: #dcfce7; color: #166534; }
+.badge-upcoming { background: #fef3c7; color: #92400e; }
+.badge-closed { background: #f1f5f9; color: #475569; }
+.badge-draft { background: #e2e8f0; color: #334155; }
+
+/* Pulse countdown */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+.pulse-timer {
+  animation: pulse-subtle 2s infinite ease-in-out;
+}
