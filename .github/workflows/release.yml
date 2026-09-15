@@ -31,7 +31,7 @@ jobs:
           else
             TAG="${{ github.ref_name }}"
           fi
-          echo "tag=$TAG" >> $GITHUB_OUTPUT\
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Building artifact for tag: $TAG"
 
       - name: Package web application artifact

@@ -3,7 +3,7 @@
  * Khoa Mỹ thuật Công nghiệp — Đại học Tôn Đức Thắng
  */
 
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
+import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { 
   getAuth, 
   onAuthStateChanged, 
@@ -78,7 +78,7 @@ async function initFirebase() {
   } catch (e) {
     console.warn('[IFA-Graduation] Fallback firebase config used.');
   }
-  app = initializeApp(config);
+  app = getApps().length > 0 ? getApp() : initializeApp(config);
   auth = getAuth(app);
   db = getFirestore(app);
 }
