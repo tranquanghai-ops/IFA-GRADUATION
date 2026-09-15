@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.1.2</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.2.0</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -126,6 +126,19 @@
 
     <!-- VIEW 1: STUDENT VIEW -->
     <section id="view-student" class="hidden space-y-6">
+
+      <!-- EMPTY STATE WHEN NO OPEN ROUND -->
+      <div id="student-empty-round" class="hidden card-surface p-12 text-center max-w-lg mx-auto my-8 border border-slate-200 shadow-sm rounded-2xl bg-white">
+        <div class="w-16 h-16 bg-blue-50 text-tdtu-blue rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+          📋
+        </div>
+        <h3 class="text-lg font-black text-slate-800 mb-2">
+          Hiện chưa có đợt đăng ký<br>Đồ án tốt nghiệp
+        </h3>
+        <p class="text-xs text-slate-500 leading-relaxed">
+          Vui lòng quay lại sau khi Khoa có thông báo.
+        </p>
+      </div>
 
       <!-- ROUND HEADER BANNER & COUNTDOWN -->
       <div class="card-surface p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl relative overflow-hidden">
@@ -560,18 +573,60 @@
     <!-- VIEW 3: ADMIN VIEW -->
     <section id="view-admin" class="hidden space-y-6">
 
-      <!-- Admin Tab Bar -->
-      <div class="card-surface p-2 bg-slate-900 text-white rounded-2xl flex flex-wrap gap-1 shadow-md">
-        <button onclick="switchAdminTab('overview')" id="atab-btn-overview" class="admin-tab-btn px-3 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 transition-all">📊 Tổng quan</button>
-        <button onclick="switchAdminTab('review')" id="atab-btn-review" class="admin-tab-btn px-3 py-2 rounded-xl text-xs font-bold text-amber-400 hover:text-amber-300 transition-all">🎯 Xét nguyện vọng (Vòng)</button>
-        <button onclick="switchAdminTab('rounds')" id="atab-btn-rounds" class="admin-tab-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all">🗓️ Đợt tốt nghiệp</button>
-        <button onclick="switchAdminTab('supervisors-master')" id="atab-btn-supervisors-master" class="admin-tab-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all">👥 Kho GVHD (Master)</button>
-        <button onclick="switchAdminTab('round-supervisors')" id="atab-btn-round-supervisors" class="admin-tab-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all">🎯 GVHD của đợt</button>
-        <button onclick="switchAdminTab('eligible-students')" id="atab-btn-eligible-students" class="admin-tab-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all">📁 SV đủ điều kiện (Excel)</button>
-        <button onclick="switchAdminTab('project-types')" id="atab-btn-project-types" class="admin-tab-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all">🏷️ Loại hình đồ án</button>
-        <button onclick="switchAdminTab('registrations')" id="atab-btn-registrations" class="admin-tab-btn px-3 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all">📑 DS Đăng ký SV</button>
-        <button onclick="switchAdminTab('preview-student')" id="atab-btn-preview-student" class="admin-tab-btn px-3 py-2 rounded-xl text-xs font-bold text-blue-400 hover:text-blue-300 transition-all">👁️ Preview as Student</button>
-      </div>
+      <!-- Admin Sidebar & Main Content Layout -->
+      <div class="flex flex-col lg:flex-row gap-6 items-start">
+        <!-- SIDEBAR TRÁI -->
+        <aside class="w-full lg:w-64 shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 p-3.5 space-y-1">
+          <div class="px-3 py-2 text-[11px] font-black uppercase tracking-wider text-slate-400">Quản trị Đồ án</div>
+          
+          <button onclick="switchAdminTab('overview')" id="atab-btn-overview" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 bg-slate-900 text-white shadow-sm">
+            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+            <span>Tổng quan</span>
+          </button>
+          
+          <button onclick="switchAdminTab('rounds')" id="atab-btn-rounds" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+            <span>Đợt tốt nghiệp</span>
+          </button>
+          
+          <button onclick="switchAdminTab('eligible-students')" id="atab-btn-eligible-students" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+            <span>Danh sách SV đủ điều kiện</span>
+          </button>
+          
+          <button onclick="switchAdminTab('registrations')" id="atab-btn-registrations" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+            <span>Danh sách đăng ký</span>
+          </button>
+          
+          <button onclick="switchAdminTab('supervisors-master')" id="atab-btn-supervisors-master" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+            <span>Danh sách GVHD</span>
+          </button>
+          
+          <button onclick="switchAdminTab('round-supervisors')" id="atab-btn-round-supervisors" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+            <span>GVHD của đợt</span>
+          </button>
+          
+          <button onclick="switchAdminTab('review')" id="atab-btn-review" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+            <span>Xét nguyện vọng</span>
+          </button>
+          
+          <button onclick="switchAdminTab('preview-student')" id="atab-btn-preview-student" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+            <span>Kết quả phân công</span>
+          </button>
+          
+          <button onclick="switchAdminTab('project-types')" id="atab-btn-project-types" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+            <span>Loại hình đồ án</span>
+          </button>
+        </aside>
+
+        <!-- NỘI DUNG BÊN PHẢI -->
+        <main class="flex-1 min-w-0 w-full space-y-6">
 
       <!-- ADMIN TAB: OVERVIEW -->
       <div id="atab-panel-overview" class="space-y-6">
@@ -581,7 +636,7 @@
             <p id="stat-rounds-count" class="text-2xl font-black text-slate-900 mt-1">0</p>
           </div>
           <div class="card-surface p-5 border-l-4 border-indigo-600">
-            <span class="text-xs font-bold text-slate-400 uppercase">Kho GVHD Master</span>
+            <span class="text-xs font-bold text-slate-400 uppercase">Danh sách GVHD</span>
             <p id="stat-supervisors-count" class="text-2xl font-black text-slate-900 mt-1">0</p>
           </div>
           <div class="card-surface p-5 border-l-4 border-emerald-600">
@@ -597,7 +652,7 @@
         <div class="card-surface p-6">
           <h3 class="text-base font-bold text-slate-900 mb-3">Quy trình Vận hành Đợt ĐATN</h3>
           <ol class="list-decimal list-inside space-y-2 text-xs text-slate-600 leading-relaxed">
-            <li><strong>Kho GVHD Master:</strong> Quản lý hồ sơ giảng viên toàn khoa.</li>
+            <li><strong>Danh sách GVHD:</strong> Quản lý hồ sơ giảng viên toàn khoa.</li>
             <li><strong>Tạo đợt tốt nghiệp & Chọn GVHD đợt:</strong> Thiết lập chỉ tiêu (Quota) riêng cho từng GVHD trong đợt.</li>
             <li><strong>Import Sinh viên:</strong> Tải lên danh sách MSSV đủ điều kiện qua Excel (.xlsx).</li>
             <li><strong>Mở đợt & Sinh viên đăng ký:</strong> Sinh viên đăng ký nguyện vọng (NV1, NV2, NV3...).</li>
@@ -762,7 +817,7 @@
       <div id="atab-panel-supervisors-master" class="hidden space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 class="text-base font-bold text-slate-900">Kho Dữ liệu Giảng viên Hướng dẫn (Master Pool)</h2>
+            <h2 class="text-base font-bold text-slate-900">Danh sách Giảng viên Hướng dẫn</h2>
             <p class="text-xs text-slate-500">Dữ liệu GVHD dùng chung qua các đợt. Quota sẽ được gán riêng theo từng đợt.</p>
           </div>
           <button onclick="openCreateSupervisorModal()" class="px-4 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto">
@@ -1033,6 +1088,9 @@
         </div>
       </div>
 
+        </main>
+      </div>
+
     </section>
 
   </main>
@@ -1041,7 +1099,7 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Studio v1.1.0</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Studio v1.2.0</p>
     </div>
   </footer>
 
@@ -1049,84 +1107,86 @@
 
   <!-- 1. CREATE / EDIT ROUND MODAL -->
   <div id="modal-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between border-b pb-3">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+      <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0">
         <h3 id="modal-round-title" class="font-bold text-base text-tdtu-blue">Tạo Đợt Đồ án Tốt nghiệp</h3>
-        <button onclick="closeRoundModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+        <button type="button" onclick="closeRoundModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
       </div>
 
-      <form id="form-round" onsubmit="saveRound(event)" class="space-y-3 text-xs">
-        <input type="hidden" id="round-form-id">
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Tên đợt *</label>
-          <input type="text" id="round-form-title" required placeholder="Ví dụ: Đồ án Tốt nghiệp - Đợt 1 (2026-2027)" class="w-full p-2.5 border rounded-xl text-xs">
-        </div>
-        <div class="grid grid-cols-2 gap-2">
+      <form id="form-round" onsubmit="saveRound(event)" class="flex flex-col flex-1 overflow-hidden">
+        <div class="p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
+          <input type="hidden" id="round-form-id">
           <div>
-            <label class="font-bold text-slate-700 block mb-1">Năm học *</label>
-            <input type="text" id="round-form-year" required placeholder="2026-2027" class="w-full p-2.5 border rounded-xl text-xs">
+            <label class="font-bold text-slate-700 block mb-1">Tên đợt *</label>
+            <input type="text" id="round-form-title" required placeholder="Ví dụ: Đồ án Tốt nghiệp - Đợt 1 (2026-2027)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Năm học *</label>
+              <input type="text" id="round-form-year" required placeholder="2026-2027" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Tên ngắn *</label>
+              <input type="text" id="round-form-name" required placeholder="Dot1_2026" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Thời gian mở *</label>
+              <input type="datetime-local" id="round-form-open-at" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Thời gian đóng *</label>
+              <input type="datetime-local" id="round-form-close-at" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Số lượng nguyện vọng</label>
+              <select id="round-form-pref-count" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:outline-none">
+                <option value="3">3 Nguyện vọng</option>
+                <option value="4">4 Nguyện vọng</option>
+                <option value="5">5 Nguyện vọng</option>
+              </select>
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Chế độ chọn</label>
+              <select id="round-form-selection-mode" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:outline-none">
+                <option value="cards">Thẻ (Cards Grid)</option>
+                <option value="wizard">Từng bước (Wizard)</option>
+              </select>
+            </div>
           </div>
           <div>
-            <label class="font-bold text-slate-700 block mb-1">Tên ngắn *</label>
-            <input type="text" id="round-form-name" required placeholder="Dot1_2026" class="w-full p-2.5 border rounded-xl text-xs">
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Thời gian mở *</label>
-            <input type="datetime-local" id="round-form-open-at" required class="w-full p-2.5 border rounded-xl text-xs">
-          </div>
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Thời gian đóng *</label>
-            <input type="datetime-local" id="round-form-close-at" required class="w-full p-2.5 border rounded-xl text-xs">
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Số lượng nguyện vọng</label>
-            <select id="round-form-pref-count" class="w-full p-2.5 border rounded-xl text-xs">
-              <option value="3">3 Nguyện vọng</option>
-              <option value="4">4 Nguyện vọng</option>
-              <option value="5">5 Nguyện vọng</option>
+            <label class="font-bold text-slate-700 block mb-1">Trạng thái đợt</label>
+            <select id="round-form-status" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:outline-none">
+              <option value="draft">Bản nháp (Draft)</option>
+              <option value="upcoming">Sắp mở (Upcoming)</option>
+              <option value="open">Đang mở đăng ký (Open)</option>
+              <option value="closed">Đã đóng đăng ký (Closed)</option>
+              <option value="reviewing">Đang xét duyệt (Reviewing)</option>
+              <option value="published">Đã công bố kết quả (Published)</option>
             </select>
           </div>
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Chế độ chọn</label>
-            <select id="round-form-selection-mode" class="w-full p-2.5 border rounded-xl text-xs">
-              <option value="cards">Thẻ (Cards Grid)</option>
-              <option value="wizard">Từng bước (Wizard)</option>
-            </select>
+          <div class="space-y-1.5 pt-2 border-t border-slate-200 text-slate-700">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="round-form-allow-edit" checked class="rounded text-blue-600">
+              <span>Cho phép SV chỉnh sửa đơn khi đợt đang mở</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="round-form-allow-topic-edit" checked class="rounded text-blue-600">
+              <span>Cho phép SV sửa tên đề tài</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="round-form-allow-pref-edit" checked class="rounded text-blue-600">
+              <span>Cho phép SV đổi thứ tự nguyện vọng</span>
+            </label>
           </div>
-        </div>
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Trạng thái đợt</label>
-          <select id="round-form-status" class="w-full p-2.5 border rounded-xl text-xs">
-            <option value="draft">Bản nháp (Draft)</option>
-            <option value="upcoming">Sắp mở (Upcoming)</option>
-            <option value="open">Đang mở đăng ký (Open)</option>
-            <option value="closed">Đã đóng đăng ký (Closed)</option>
-            <option value="reviewing">Đang xét duyệt (Reviewing)</option>
-            <option value="published">Đã công bố kết quả (Published)</option>
-          </select>
-        </div>
-        <div class="space-y-1.5 pt-2 border-t text-slate-700">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" id="round-form-allow-edit" checked class="rounded text-blue-600">
-            <span>Cho phép SV chỉnh sửa đơn khi đợt đang mở</span>
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" id="round-form-allow-topic-edit" checked class="rounded text-blue-600">
-            <span>Cho phép SV sửa tên đề tài</span>
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" id="round-form-allow-pref-edit" checked class="rounded text-blue-600">
-            <span>Cho phép SV đổi thứ tự nguyện vọng</span>
-          </label>
         </div>
 
-        <div class="flex justify-end gap-2 pt-3 border-t">
-          <button type="button" onclick="closeRoundModal()" class="px-4 py-2 bg-slate-100 rounded-xl font-bold hover:bg-slate-200">Hủy</button>
-          <button type="submit" class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md">Lưu Đợt</button>
+        <div class="flex justify-end gap-2 p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+          <button type="button" onclick="closeRoundModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Hủy</button>
+          <button type="submit" class="px-6 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md transition-colors">Lưu Đợt</button>
         </div>
       </form>
     </div>
@@ -1134,69 +1194,86 @@
 
   <!-- 2. CREATE / EDIT SUPERVISOR MASTER MODAL -->
   <div id="modal-supervisor" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between border-b pb-3">
-        <h3 id="modal-supervisor-title" class="font-bold text-base text-tdtu-blue">Thêm GVHD vào Kho Master</h3>
-        <button onclick="closeSupervisorModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+      <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0">
+        <h3 id="modal-supervisor-title" class="font-bold text-base text-tdtu-blue">Thêm Giảng viên Hướng dẫn</h3>
+        <button type="button" onclick="closeSupervisorModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
       </div>
 
-      <form id="form-supervisor" onsubmit="saveSupervisorMaster(event)" class="space-y-3 text-xs">
-        <input type="hidden" id="sup-form-id">
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Họ và tên *</label>
-          <input type="text" id="sup-form-name" required placeholder="ThS. KTS. Nguyễn Văn A" class="w-full p-2.5 border rounded-xl text-xs">
-        </div>
-        <div class="grid grid-cols-2 gap-2">
+      <form id="form-supervisor" onsubmit="saveSupervisorMaster(event)" class="flex flex-col flex-1 overflow-hidden">
+        <div class="p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
+          <input type="hidden" id="sup-form-id">
           <div>
-            <label class="font-bold text-slate-700 block mb-1">Email (@tdtu.edu.vn) *</label>
-            <input type="email" id="sup-form-email" required placeholder="nguyenvana@tdtu.edu.vn" class="w-full p-2.5 border rounded-xl text-xs">
+            <label class="font-bold text-slate-700 block mb-1">Họ và tên *</label>
+            <input type="text" id="sup-form-name" required placeholder="ThS. NCS. Nguyễn Văn A" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Email (@tdtu.edu.vn) *</label>
+              <input type="email" id="sup-form-email" required placeholder="nguyenvana@tdtu.edu.vn" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Số điện thoại</label>
+              <input type="tel" id="sup-form-phone" placeholder="0901234567" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
           </div>
           <div>
-            <label class="font-bold text-slate-700 block mb-1">Số điện thoại</label>
-            <input type="tel" id="sup-form-phone" placeholder="0901234567" class="w-full p-2.5 border rounded-xl text-xs">
+            <label class="font-bold text-slate-700 block mb-1">Bộ môn / Đơn vị</label>
+            <input type="text" id="sup-form-dept" value="Thiết kế nội thất" placeholder="Thiết kế nội thất" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
           </div>
-        </div>
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Bộ môn / Đơn vị</label>
-          <input type="text" id="sup-form-dept" placeholder="Bộ môn Thiết kế Nội thất" class="w-full p-2.5 border rounded-xl text-xs">
-        </div>
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Đường dẫn ảnh chân dung (URL)</label>
-          <input type="url" id="sup-form-photo" placeholder="https://..." class="w-full p-2.5 border rounded-xl text-xs">
-        </div>
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Lĩnh vực / Chuyên môn hướng dẫn</label>
-          <input type="text" id="sup-form-expertise" placeholder="Nhà ở dân dụng, Thương mại dịch vụ, Khách sạn..." class="w-full p-2.5 border rounded-xl text-xs">
-        </div>
-        <div>
-          <label class="font-bold text-slate-700 block mb-1">Giới thiệu ngắn (Bio)</label>
-          <textarea id="sup-form-bio" rows="3" placeholder="Kinh nghiệm, định hướng nghiên cứu..." class="w-full p-2.5 border rounded-xl text-xs"></textarea>
+          
+          <!-- Image upload & Preview -->
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Ảnh chân dung</label>
+            <div class="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <div class="w-14 h-14 rounded-full border-2 border-white shadow bg-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                <img id="sup-photo-preview" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23cbd5e1'/><path fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" class="w-full h-full object-cover">
+              </div>
+              <div class="flex-1">
+                <label class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-colors border border-slate-300 shadow-sm">
+                  <span>📁 Chọn ảnh</span>
+                  <input type="file" id="sup-form-file" accept="image/*" class="hidden" onchange="previewSupervisorPhoto(this)">
+                </label>
+                <input type="hidden" id="sup-form-photo">
+                <p class="text-[11px] text-slate-400 mt-1">Định dạng JPG, PNG (tối đa 2MB)</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Lĩnh vực / Chuyên môn hướng dẫn</label>
+            <input type="text" id="sup-form-expertise" placeholder="Nhà ở dân dụng, Thương mại dịch vụ, Khách sạn..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Giới thiệu ngắn (Bio)</label>
+            <textarea id="sup-form-bio" rows="2" placeholder="Kinh nghiệm, định hướng nghiên cứu..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+          </div>
+
+          <div class="space-y-1.5 pt-2 border-t border-slate-200 text-slate-700">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="sup-form-active" checked class="rounded text-blue-600">
+              <span>Đang hoạt động (Active)</span>
+            </label>
+            <div class="flex gap-4 pt-1">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="sup-form-show-email" checked class="rounded text-blue-600">
+                <span>Hiện Email</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="sup-form-show-photo" checked class="rounded text-blue-600">
+                <span>Hiện Ảnh</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="sup-form-show-phone" class="rounded text-blue-600">
+                <span>Hiện SĐT</span>
+              </label>
+            </div>
+          </div>
         </div>
 
-        <div class="space-y-1.5 pt-2 border-t text-slate-700">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" id="sup-form-active" checked class="rounded text-blue-600">
-            <span>Đang hoạt động (Active)</span>
-          </label>
-          <div class="grid grid-cols-3 gap-2 pt-1 text-[11px]">
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" id="sup-form-show-email" checked class="rounded text-blue-600">
-              <span>Hiện Email</span>
-            </label>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" id="sup-form-show-phone" class="rounded text-blue-600">
-              <span>Hiện SĐT</span>
-            </label>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" id="sup-form-show-photo" checked class="rounded text-blue-600">
-              <span>Hiện Ảnh</span>
-            </label>
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-2 pt-3 border-t">
-          <button type="button" onclick="closeSupervisorModal()" class="px-4 py-2 bg-slate-100 rounded-xl font-bold hover:bg-slate-200">Hủy</button>
-          <button type="submit" class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md">Lưu GVHD</button>
+        <div class="flex justify-end gap-2 p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+          <button type="button" onclick="closeSupervisorModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Hủy</button>
+          <button type="submit" class="px-6 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md transition-colors">Lưu GVHD</button>
         </div>
       </form>
     </div>
