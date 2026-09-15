@@ -66,8 +66,11 @@ let countdownInterval = null;
 // --- INITIALIZATION ---
 async function initFirebase() {
   let config = {
+    apiKey: "AIzaSyA7HDp4XThUSN2XO3m0GoBGnYf-nFjvM_M",
     authDomain: "tknt-tdtu.firebaseapp.com",
-    projectId: "tknt-tdtu"
+    projectId: "tknt-tdtu",
+    storageBucket: "tknt-tdtu.firebasestorage.app",
+    messagingSenderId: "52631763904"
   };
   try {
     const res = await fetch('/__/firebase/init.json');
