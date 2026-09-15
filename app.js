@@ -1,3 +1,146 @@
+/** IFA+ Graduation Studio v1.4.0 **/
+
+// Override native alert to use non-blocking toast
+window.alert = function(msg) {
+  if (window.showToast) {
+    window.showToast(String(msg), 'info');
+  } else {
+    console.log('[Alert]', msg);
+  }
+};
+
+
+window.handleSupervisorDeptChange = function(val) {
+  const customInput = document.getElementById('sup-form-dept-custom');
+  const hiddenDept = document.getElementById('sup-form-dept');
+  if (val === '__other__') {
+    if (customInput) customInput.classList.remove('hidden');
+    if (hiddenDept && customInput) hiddenDept.value = customInput.value.trim() || 'Khác';
+  } else {
+    if (customInput) customInput.classList.add('hidden');
+    if (hiddenDept) hiddenDept.value = val;
+  }
+};
+
+
+// ============================================================================
+// UI HELPERS: TOAST NOTIFICATIONS & CUSTOM CONFIRM MODAL (NO ALERT/CONFIRM)
+// ============================================================================
+window.showToast = function(message, type = 'info', duration = 3500) {
+  const container = document.getElementById('toast-container');
+  if (!container) {
+    console.log(`[Toast ${type}] ${message}`);
+    return;
+  }
+  const icons = {
+    success: '✓',
+    error: '✕',
+    warning: '⚠️',
+    info: 'ℹ️'
+  };
+  const bgColors = {
+    success: 'bg-emerald-600 text-white border-emerald-500',
+    error: 'bg-rose-600 text-white border-rose-500',
+    warning: 'bg-amber-500 text-slate-900 border-amber-400',
+    info: 'bg-slate-900 text-white border-slate-800'
+  };
+
+  const toast = document.createElement('div');
+  toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-xl text-xs font-semibold transform transition-all duration-200 translate-y-2 opacity-0 ${bgColors[type] || bgColors.info}`;
+  toast.innerHTML = `
+    <span class="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0 font-bold">${icons[type] || 'ℹ️'}</span>
+    <span class="flex-1 leading-snug">${message}</span>
+    <button type="button" class="text-white/60 hover:text-white font-bold ml-1">✕</button>
+  `;
+
+  const closeBtn = toast.querySelector('button');
+  const removeToast = () => {
+    toast.classList.add('opacity-0', 'translate-y-2');
+    setTimeout(() => toast.remove(), 200);
+  };
+  closeBtn.onclick = removeToast;
+
+  container.appendChild(toast);
+  requestAnimationFrame(() => {
+    toast.classList.remove('opacity-0', 'translate-y-2');
+  });
+
+  if (duration > 0) {
+    setTimeout(removeToast, duration);
+  }
+};
+
+window.showConfirm = function(title, message, { confirmText = 'Xác nhận', cancelText = 'Hủy', danger = true } = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-confirm');
+    if (!modal) {
+      resolve(true);
+      return;
+    }
+    const titleEl = document.getElementById('modal-confirm-title');
+    const msgEl = document.getElementById('modal-confirm-message');
+    const iconEl = document.getElementById('modal-confirm-icon');
+    const okBtn = document.getElementById('modal-confirm-btn-ok');
+    const cancelBtn = document.getElementById('modal-confirm-btn-cancel');
+
+    if (titleEl) titleEl.textContent = title || 'Xác nhận';
+    if (msgEl) msgEl.textContent = message || '';
+    if (iconEl) {
+      iconEl.className = danger 
+        ? 'w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 text-xl font-bold' 
+        : 'w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 text-xl font-bold';
+      iconEl.textContent = danger ? '⚠️' : '❓';
+    }
+    if (okBtn) {
+      okBtn.textContent = confirmText;
+      okBtn.className = danger
+        ? 'px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md transition-colors'
+        : 'px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold text-xs shadow-md transition-colors';
+    }
+    if (cancelBtn) cancelBtn.textContent = cancelText;
+
+    const cleanup = (result) => {
+      modal.classList.add('hidden');
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      resolve(result);
+    };
+
+    okBtn.onclick = () => cleanup(true);
+    cancelBtn.onclick = () => cleanup(false);
+    modal.classList.remove('hidden');
+  });
+};
+
+// Safe Vietnamese slug generator
+window.slugify = function(text) {
+  if (!text) return '';
+  return text
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
+window.copyRoundLink = function(slugOrId) {
+  const url = `${window.location.origin}${window.location.pathname}?round=${slugOrId}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('Đã sao chép đường dẫn đợt tốt nghiệp!', 'success');
+    }).catch(() => {
+      prompt('Sao chép đường dẫn đợt tốt nghiệp:', url);
+    });
+  } else {
+    prompt('Sao chép đường dẫn đợt tốt nghiệp:', url);
+  }
+};
+
 /**
  * IFA+ Graduation — App Logic & Firestore Integration
  * Version: v1.1.0 (Phase 2A Multi-Round Review Workflow)
@@ -103,6 +246,7 @@ export const state = {
   activeRound: null,
   projectTypes: DEFAULT_PROJECT_TYPES.map((name, idx) => ({ id: 'default_' + (idx + 1), name, order: idx + 1, active: true })),
   supervisorsMaster: [],
+  facultyStudents: [],
   roundSupervisors: [],
   eligibleStudents: [],
   myRegistration: null,
@@ -283,32 +427,33 @@ export async function resolveActualRoles(user) {
   let isStudent = email.endsWith('@student.tdtu.edu.vn');
   let studentMssv = isStudent ? email.split('@')[0].toUpperCase() : '';
 
-  // 3. SUPERVISOR Check
+  // 3. SUPERVISOR Check: ONLY active lecturers in supervisorMaster match by email
   let isSupervisor = false;
 
-  // Chỉ truy vấn Firestore nếu chưa xác định được là Owner hoặc Student
-  if (!isAdmin && !isStudent) {
-    try {
+  try {
+    // Check if in-memory list already contains this active supervisor
+    if (state.supervisorsMaster && state.supervisorsMaster.length > 0) {
+      const match = state.supervisorsMaster.find(s => s.active !== false && s.email && s.email.toLowerCase().trim() === email);
+      if (match) isSupervisor = true;
+    }
+
+    // If not found in memory, query Firestore
+    if (!isSupervisor) {
       await Promise.race([
         Promise.all([
-          getDoc(doc(db, 'admins', email)).then(d => { if (d.exists()) isAdmin = true; }).catch(() => {}),
-          getDocs(query(collection(db, 'supervisorMaster'), where('email', '==', email), where('active', '==', true)))
-            .then(snap => { if (!snap.empty) isSupervisor = true; }).catch(() => {})
+          (!isAdmin ? getDoc(doc(db, 'admins', email)).then(d => { if (d.exists()) isAdmin = true; }).catch(() => {}) : Promise.resolve()),
+          getDocs(collection(db, 'supervisorMaster')).then(snap => {
+            const activeSups = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.active !== false);
+            if (activeSups.some(s => s.email && s.email.toLowerCase().trim() === email)) {
+              isSupervisor = true;
+            }
+          }).catch(() => {})
         ]),
-        new Promise(r => setTimeout(r, 2000))
+        new Promise(r => setTimeout(r, 2500))
       ]);
-    } catch (e) {
-      console.warn('[IFA-Graduation] Admins/Supervisor lookup timeout notice:', e);
     }
-  } else if (isAdmin) {
-    // Nếu là Admin, kiểm tra ngầm supervisor mà không chặn
-    getDocs(query(collection(db, 'supervisorMaster'), where('email', '==', email), where('active', '==', true)))
-      .then(snap => {
-        if (!snap.empty) {
-          state.isSupervisor = true;
-          updateAuthUI();
-        }
-      }).catch(() => {});
+  } catch (e) {
+    console.warn('[IFA-Graduation] Admins/Supervisor lookup notice:', e);
   }
 
   state.isAdmin = isAdmin;
@@ -642,7 +787,7 @@ async function loadRounds() {
     let targetRound = null;
     if (xCode) {
       // Find round matching shortCode, roundName or id
-      targetRound = state.rounds.find(r => !r.deleted && (r.shortCode === xCode || r.roundName === xCode || r.id === xCode));
+      targetRound = state.rounds.find(r => !r.deleted && (r.shortCode === xCode || r.roundName === xCode || r.id === xCode || r.slug === xCode));
     }
 
     // If no direct link, ONLY use the ACTIVE round
@@ -898,8 +1043,8 @@ function renderStudentOfficialResult(reg) {
           <h3 class="text-xl font-black text-white mt-1">${reg.acceptedSupervisorName || sup?.name || 'Giảng viên Hướng dẫn'}</h3>
           <p class="text-xs text-blue-200 mt-0.5">${sup?.department || 'Khoa Mỹ thuật Công nghiệp'}</p>
           <div class="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-3 text-xs">
-            ${sup?.email ? '<span class="bg-white/10 px-2.5 py-1 rounded-lg">✉️ ' + sup.email + '</span>' : ''}
-            ${sup?.phone ? '<span class="bg-white/10 px-2.5 py-1 rounded-lg">📞 ' + sup.phone + '</span>' : ''}
+            ${(state.activeRound?.showEmailAfterPublish !== false && sup?.email) ? '<span class="bg-white/10 px-2.5 py-1 rounded-lg">✉️ ' + sup.email + '</span>' : ''}
+            ${(state.activeRound?.showPhoneAfterPublish !== false && sup?.phone) ? '<span class="bg-white/10 px-2.5 py-1 rounded-lg">📞 ' + sup.phone + '</span>' : ''}
           </div>
         </div>
       </div>
@@ -1083,7 +1228,7 @@ window.addCardPreference = function(supervisorId, encName) {
   const name = decodeURIComponent(encName);
   const maxPref = state.activeRound?.preferenceCount || 3;
   if (state.selectedPreferences.length >= maxPref) {
-    alert(`Bạn chỉ được chọn tối đa ${maxPref} nguyện vọng.`);
+    showToast(`Bạn chỉ được chọn tối đa ${maxPref} nguyện vọng.`, 'info');
     return;
   }
 
@@ -1216,16 +1361,50 @@ window.goToStep = function(step) {
 };
 
 window.validateAndGoToStep2 = function() {
-  const topic = (document.getElementById('input-topic-title')?.value || '').trim();
+  const topicInput = document.getElementById('input-topic-title');
+  const errorEl = document.getElementById('topic-title-error');
+  const topic = (topicInput?.value || '').trim();
   const projectType = document.getElementById('select-project-type')?.value || '';
 
+  if (errorEl) {
+    errorEl.classList.add('hidden');
+    errorEl.textContent = '';
+  }
+
   if (!topic) {
-    alert('Vui lòng nhập tên đề tài dự kiến.');
-    document.getElementById('input-topic-title')?.focus();
+    const msg = 'Vui lòng nhập tên đề tài tốt nghiệp dự kiến.';
+    if (errorEl) {
+      errorEl.textContent = msg;
+      errorEl.classList.remove('hidden');
+    }
+    showToast(msg, 'warning');
+    topicInput?.focus();
     return;
   }
+
+  // Check Interior Design requirement:
+  // If student major or projectType or current round contains "nội thất"
+  const studentMajor = (state.currentStudentInfo?.major || '').toLowerCase();
+  const roundName = (state.activeRound?.name || '').toLowerCase();
+  const isInteriorDesign = studentMajor.includes('nội thất') || 
+                           projectType.toLowerCase().includes('nội thất') || 
+                           roundName.includes('nội thất');
+
+  if (isInteriorDesign) {
+    if (!topic.toLowerCase().startsWith('thiết kế nội thất')) {
+      const msg = 'Tên đề tài của sinh viên ngành Thiết kế nội thất BẮT BUỘC phải bắt đầu bằng cụm từ "Thiết kế nội thất".';
+      if (errorEl) {
+        errorEl.textContent = msg;
+        errorEl.classList.remove('hidden');
+      }
+      showToast(msg, 'error');
+      topicInput?.focus();
+      return;
+    }
+  }
+
   if (!projectType) {
-    alert('Vui lòng chọn loại hình đồ án.');
+    showToast('Vui lòng chọn loại hình đồ án.', 'warning');
     document.getElementById('select-project-type')?.focus();
     return;
   }
@@ -1236,7 +1415,7 @@ window.validateAndGoToStep2 = function() {
 window.validateAndGoToStep3 = function() {
   const maxPref = state.activeRound?.preferenceCount || 3;
   if (state.selectedPreferences.length < maxPref) {
-    alert(`Vui lòng chọn đủ ${maxPref} nguyện vọng trước khi tiếp tục.`);
+    showToast(`Vui lòng chọn đủ ${maxPref} nguyện vọng trước khi tiếp tục.`, 'info');
     return;
   }
   goToStep(3);
@@ -1267,7 +1446,7 @@ window.submitRegistration = async function() {
   const projectType = document.getElementById('select-project-type')?.value || '';
 
   if (!roundId || !mssv) {
-    alert('Không xác định được phiên làm việc hoặc MSSV.');
+    showToast('Không xác định được phiên làm việc hoặc MSSV.', 'warning');
     return;
   }
 
@@ -1296,11 +1475,11 @@ window.submitRegistration = async function() {
 
     await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload);
     
-    alert('🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!');
+    showToast('🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
     await checkStudentEligibilityAndRegistration(roundId);
   } catch (err) {
     console.error('Lỗi khi nộp đăng ký:', err);
-    alert('Lỗi đăng ký: ' + err.message);
+    showToast('Lỗi đăng ký: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<span>🚀 XÁC NHẬN ĐĂNG KÝ CHÍNH THỨC</span>';
@@ -1509,7 +1688,7 @@ window.toggleSupervisorDecision = async function(studentId) {
     const remaining = totalCap - acceptedPrev - selectedCurr;
 
     if (remaining <= 0) {
-      alert(`Thầy/Cô đã đạt giới hạn chỉ tiêu (${totalCap} SV). Vui lòng bỏ chọn sinh viên khác trước khi chọn thêm.`);
+      showToast(`Thầy/Cô đã đạt giới hạn chỉ tiêu (${totalCap} SV). Vui lòng bỏ chọn sinh viên khác trước khi chọn thêm.`, 'info');
       return;
     }
   }
@@ -1541,7 +1720,7 @@ window.toggleSupervisorDecision = async function(studentId) {
     }, { merge: true });
   } catch (err) {
     console.error('Error saving review decision:', err);
-    alert('Lỗi lưu quyết định: ' + err.message);
+    showToast('Lỗi lưu quyết định: ' + err.message, 'error');
   }
 };
 
@@ -1581,10 +1760,10 @@ window.confirmSupervisorRoundCompletion = async function() {
     await updateDoc(doc(db, 'graduationRounds', roundId, 'supervisors', currentSup.id), updatePayload);
 
     closeSupervisorConfirmModal();
-    alert(`✓ Thầy/Cô đã hoàn tất lựa chọn Vòng ${currentRound} thành công!`);
+    showToast(`✓ Thầy/Cô đã hoàn tất lựa chọn Vòng ${currentRound} thành công!`, 'info');
     await loadSupervisorReviewData(roundId);
   } catch (err) {
-    alert('Lỗi cập nhật trạng thái hoàn thành: ' + err.message);
+    showToast('Lỗi cập nhật trạng thái hoàn thành: ' + err.message, 'error');
   }
 };
 
@@ -1594,7 +1773,7 @@ window.reopenSupervisorRound = async function() {
   const isLocked = Boolean(state.activeRound?.reviewLocks && state.activeRound?.reviewLocks['round_' + currentRound]);
 
   if (isLocked) {
-    alert('Vòng này đã được Quản trị viên chốt. Không thể mở lại để chỉnh sửa.');
+    showToast('Vòng này đã được Quản trị viên chốt. Không thể mở lại để chỉnh sửa.', 'warning');
     return;
   }
 
@@ -1602,7 +1781,7 @@ window.reopenSupervisorRound = async function() {
   const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower);
   if (!roundId || !currentSup) return;
 
-  if (!confirm(`Mở lại Vòng ${currentRound} để chỉnh sửa danh sách lựa chọn?`)) return;
+  if (!(await showConfirm('Mở lại vòng lựa chọn', `Mở lại Vòng ${currentRound} để chỉnh sửa danh sách lựa chọn?`, { confirmText: 'Mở lại vòng', danger: false }))) return;
 
   try {
     const roundKey = `round_${currentRound}`;
@@ -1616,7 +1795,7 @@ window.reopenSupervisorRound = async function() {
     await updateDoc(doc(db, 'graduationRounds', roundId, 'supervisors', currentSup.id), updatePayload);
     await loadSupervisorReviewData(roundId);
   } catch (err) {
-    alert('Lỗi mở lại vòng: ' + err.message);
+    showToast('Lỗi mở lại vòng: ' + err.message, 'error');
   }
 };
 
@@ -1702,7 +1881,7 @@ window.switchAdminTab = function(tabKey) {
     if (dot) dot.classList.replace('bg-slate-400', 'bg-blue-400');
   }
 
-  ['overview', 'review', 'rounds', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash'].forEach(t => {
+  ['overview', 'review', 'rounds', 'faculty-students', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash'].forEach(t => {
     const p = document.getElementById('atab-panel-' + t);
     if (p) {
       if (t === tabKey) p.classList.remove('hidden');
@@ -1748,10 +1927,10 @@ window.setActiveRound = async function(roundId) {
         await updateDoc(doc(db, 'graduationRounds', r.id), { isActive: false, updatedAt: serverTimestamp() }).catch(() => {});
       }
     }
-    alert(`Đã đặt "${targetRound.title}" làm đợt hiện hành!`);
+    showToast(`Đã đặt "${targetRound.title}" làm đợt hiện hành!`, 'info');
   } catch (err) {
     console.error('Lỗi đặt đợt hiện hành:', err);
-    alert('Lỗi đặt đợt hiện hành: ' + err.message);
+    showToast('Lỗi đặt đợt hiện hành: ' + err.message, 'error');
   }
 };
 
@@ -1761,7 +1940,7 @@ window.softDeleteRound = async function(roundId) {
   const r = state.rounds.find(x => x.id === roundId);
   if (!r) return;
 
-  if (!confirm(`Bạn có chắc chắn muốn chuyển đợt "${r.title}" vào Thùng rác?`)) return;
+  if (!(await showConfirm('Chuyển vào Thùng rác', `Bạn có chắc chắn muốn chuyển đợt "${r.title}" vào Thùng rác?`, { confirmText: 'Chuyển vào Thùng rác', danger: true }))) return;
 
   try {
     const wasActive = Boolean(r.isActive);
@@ -1779,10 +1958,10 @@ window.softDeleteRound = async function(roundId) {
       updatedAt: serverTimestamp()
     });
 
-    alert('Đã chuyển đợt vào Thùng rác.');
+    showToast('Đã chuyển đợt vào Thùng rác.', 'warning');
   } catch (err) {
     console.error('Lỗi xóa đợt:', err);
-    alert('Lỗi xóa đợt: ' + err.message);
+    showToast('Lỗi xóa đợt: ' + err.message, 'error');
   }
 };
 
@@ -1807,10 +1986,10 @@ window.restoreRound = async function(roundId) {
       updatedAt: serverTimestamp()
     });
 
-    alert(`Đã khôi phục đợt "${r.title}". Đợt ở trạng thái không hiện hành.`);
+    showToast(`Đã khôi phục đợt "${r.title}". Đợt ở trạng thái không hiện hành.`, 'info');
   } catch (err) {
     console.error('Lỗi khôi phục đợt:', err);
-    alert('Lỗi khôi phục đợt: ' + err.message);
+    showToast('Lỗi khôi phục đợt: ' + err.message, 'error');
   }
 };
 
@@ -1819,17 +1998,17 @@ window.permanentDeleteRound = async function(roundId) {
   const r = state.rounds.find(x => x.id === roundId);
   const title = r ? r.title : roundId;
 
-  if (!confirm(`HÀNH ĐỘNG KHÔNG THỂ HOÀN TÁC!\nBạn có chắc chắn muốn XÓA VĨNH VIỄN đợt "${title}"?`)) return;
+  if (!(await showConfirm('XÓA VĨNH VIỄN ĐỢT', `⚠️ HÀNH ĐỘNG KHÔNG THỂ HOÀN TÁC!\nBạn có chắc chắn muốn XÓA VĨNH VIỄN đợt "${title}"?`, { confirmText: 'Xóa vĩnh viễn', danger: true }))) return;
 
   try {
     state.rounds = state.rounds.filter(x => x.id !== roundId);
     renderAdminTrashTable();
 
     await deleteDoc(doc(db, 'graduationRounds', roundId));
-    alert('Đã xóa vĩnh viễn đợt khỏi cơ sở dữ liệu.');
+    showToast('Đã xóa vĩnh viễn đợt khỏi cơ sở dữ liệu.', 'warning');
   } catch (err) {
     console.error('Lỗi xóa vĩnh viễn đợt:', err);
-    alert('Lỗi xóa vĩnh viễn: ' + err.message);
+    showToast('Lỗi xóa vĩnh viễn: ' + err.message, 'error');
   }
 };
 
@@ -2060,7 +2239,7 @@ window.saveRound = async function(e) {
   const allowPreferenceEdit = document.getElementById('round-form-allow-pref-edit')?.checked !== false;
 
   if (!title || !academicYear || !roundName || !openDateStr || !closeDateStr) {
-    alert('Vui lòng nhập đầy đủ các trường bắt buộc (*)');
+    showToast('Vui lòng nhập đầy đủ các trường bắt buộc (*)', 'warning');
     return;
   }
 
@@ -2155,13 +2334,13 @@ window.saveRound = async function(e) {
     try { renderRoundsDropdowns(); } catch (e) { console.warn(e); }
 
     closeRoundModal();
-    alert('Lưu đợt tốt nghiệp thành công!');
+    showToast('Lưu đợt tốt nghiệp thành công!', 'success');
 
     // Background sync
     loadRounds().catch(console.warn);
   } catch (err) {
     console.error('Lỗi lưu đợt:', err);
-    alert('Lỗi lưu đợt: ' + err.message);
+    showToast('Lỗi lưu đợt: ' + err.message, 'error');
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
@@ -2258,7 +2437,7 @@ window.seedSampleSupervisors = async function(force = false) {
   const existingEmails = new Set(state.supervisorsMaster.map(s => s.email?.toLowerCase()));
   const toAdd = SAMPLE_SUPERVISORS.filter(s => !existingEmails.has(s.email.toLowerCase()));
   if (toAdd.length === 0) {
-    if (force) alert('Tất cả 6 GVHD mẫu Thiết kế nội thất đã tồn tại trong danh sách!');
+    if (force) showToast('Tất cả 6 GVHD mẫu Thiết kế nội thất đã tồn tại trong danh sách!', 'warning');
     return;
   }
   try {
@@ -2275,7 +2454,7 @@ window.seedSampleSupervisors = async function(force = false) {
     if (force) alert('Đã thêm thành công ' + toAdd.length + ' Giảng viên Hướng dẫn mẫu!');
   } catch (err) {
     console.error('Lỗi nạp GVHD mẫu:', err);
-    if (force) alert('Lỗi nạp GVHD mẫu: ' + err.message);
+    if (force) showToast('Lỗi nạp GVHD mẫu: ' + err.message, 'error');
   }
 };
 
@@ -2298,19 +2477,18 @@ function renderAdminSupervisorsMasterTable() {
 
   tbody.innerHTML = state.supervisorsMaster.map(s => `
     <tr class="hover:bg-slate-50">
-      <td class="p-3.5"><img src="${s.photoUrl || defaultAvatar}" class="w-8 h-8 rounded-full object-cover border"></td>
+      <td class="p-3.5"><img src="${s.photoUrl || defaultAvatar}" class="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm"></td>
       <td class="p-3.5 font-bold text-slate-900">${s.name}</td>
+      <td class="p-3.5 text-slate-600">${s.gender || 'Nam'}</td>
       <td class="p-3.5 text-slate-600">${s.email || '--'} ${s.phone ? '• ' + s.phone : ''}</td>
-      <td class="p-3.5">${s.department || '--'}</td>
-      <td class="p-3.5 max-w-[200px] truncate" title="${s.expertise || ''}">${s.expertise || '--'}</td>
-      <td class="p-3.5 text-[11px] text-slate-400">
-        ${s.showPhoto !== false ? '📷' : '🚫'} ${s.showEmail !== false ? '✉️' : '🚫'} ${s.showPhone ? '📞' : '🚫'}
-      </td>
+      <td class="p-3.5 font-semibold text-slate-800">${s.department || 'Thiết kế nội thất'}</td>
+      <td class="p-3.5 max-w-[200px] truncate text-slate-600" title="${s.expertise || ''}">${s.expertise || '--'}</td>
       <td class="p-3.5">
         <span class="badge ${s.active !== false ? 'badge-open' : 'badge-closed'}">${s.active !== false ? 'Active' : 'Ngừng'}</span>
       </td>
       <td class="p-3.5 text-right space-x-2">
         <button onclick="editSupervisorMasterModal('${s.id}')" class="text-blue-600 hover:underline font-bold">Sửa</button>
+        <button onclick="deleteSupervisorMaster('${s.id}')" class="text-rose-600 hover:underline font-bold">Xóa</button>
       </td>
     </tr>
   `).join('');
@@ -2321,7 +2499,7 @@ window.previewSupervisorPhoto = function(input) {
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
   if (file.size > 2 * 1024 * 1024) {
-    alert('Vui lòng chọn ảnh dung lượng dưới 2MB');
+    showToast('Vui lòng chọn ảnh dung lượng dưới 2MB', 'warning');
     input.value = '';
     return;
   }
@@ -2342,7 +2520,22 @@ window.openCreateSupervisorModal = function() {
   document.getElementById('sup-form-photo').value = '';
   const prevEl = document.getElementById('sup-photo-preview');
   if (prevEl) prevEl.src = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23cbd5e1'/><path fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>";
-  document.getElementById('modal-supervisor-title').textContent = 'Thêm GVHD vào Kho Master';
+  
+  if (document.getElementById('sup-form-dept-select')) {
+    document.getElementById('sup-form-dept-select').value = 'Thiết kế nội thất';
+  }
+  if (document.getElementById('sup-form-dept-custom')) {
+    document.getElementById('sup-form-dept-custom').classList.add('hidden');
+    document.getElementById('sup-form-dept-custom').value = '';
+  }
+  if (document.getElementById('sup-form-dept')) {
+    document.getElementById('sup-form-dept').value = 'Thiết kế nội thất';
+  }
+  if (document.getElementById('sup-form-gender')) {
+    document.getElementById('sup-form-gender').value = 'Nam';
+  }
+  
+  document.getElementById('modal-supervisor-title').textContent = 'Thêm Giảng viên Hướng dẫn';
   document.getElementById('modal-supervisor').classList.remove('hidden');
 };
 
@@ -2357,16 +2550,58 @@ window.editSupervisorMasterModal = function(supId) {
   document.getElementById('sup-form-photo').value = s.photoUrl || '';
   const prevElEdit = document.getElementById('sup-photo-preview');
   if (prevElEdit) prevElEdit.src = s.photoUrl || "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23cbd5e1'/><path fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>";
-  document.getElementById('sup-form-dept').value = s.department || '';
+  
+  if (document.getElementById('sup-form-gender')) {
+    document.getElementById('sup-form-gender').value = s.gender || 'Nam';
+  }
+
+  const dept = s.department || 'Thiết kế nội thất';
+  const deptSelect = document.getElementById('sup-form-dept-select');
+  const deptCustom = document.getElementById('sup-form-dept-custom');
+  const deptHidden = document.getElementById('sup-form-dept');
+  
+  const standardDepts = ['Thiết kế nội thất', 'Thiết kế đồ họa', 'Thiết kế thời trang', 'Thiết kế công nghiệp', 'Mỹ thuật cơ bản'];
+  if (standardDepts.includes(dept)) {
+    if (deptSelect) deptSelect.value = dept;
+    if (deptCustom) { deptCustom.classList.add('hidden'); deptCustom.value = ''; }
+    if (deptHidden) deptHidden.value = dept;
+  } else {
+    if (deptSelect) deptSelect.value = '__other__';
+    if (deptCustom) { deptCustom.classList.remove('hidden'); deptCustom.value = dept; }
+    if (deptHidden) deptHidden.value = dept;
+  }
+
   document.getElementById('sup-form-expertise').value = s.expertise || '';
   document.getElementById('sup-form-bio').value = s.bio || '';
   document.getElementById('sup-form-active').checked = s.active !== false;
-  document.getElementById('sup-form-show-email').checked = s.showEmail !== false;
-  document.getElementById('sup-form-show-phone').checked = Boolean(s.showPhone);
-  document.getElementById('sup-form-show-photo').checked = s.showPhoto !== false;
 
   document.getElementById('modal-supervisor-title').textContent = 'Chỉnh sửa Giảng viên Hướng dẫn';
   document.getElementById('modal-supervisor').classList.remove('hidden');
+};
+
+window.deleteSupervisorMaster = async function(supId) {
+  const sup = state.supervisorsMaster.find(s => s.id === supId);
+  if (!sup) return;
+
+  // Check if used in any rounds
+  const inRound = state.roundSupervisors.some(rs => rs.supervisorId === supId || rs.id === supId);
+  let msg = `Xóa giảng viên "${sup.name}" (${sup.email}) khỏi Danh sách GVHD?`;
+  if (inRound) {
+    msg = `⚠️ CẢNH BÁO: Giảng viên "${sup.name}" đang được phân công trong đợt tốt nghiệp hiện tại!\n\nBạn có chắc chắn muốn xóa khỏi Danh sách GVHD không?`;
+  }
+
+  const confirmed = await showConfirm('Xóa Giảng viên Hướng dẫn', msg, { confirmText: 'Xóa vĩnh viễn', danger: true });
+  if (!confirmed) return;
+
+  try {
+    await deleteDoc(doc(db, 'supervisorMaster', supId));
+    state.supervisorsMaster = state.supervisorsMaster.filter(s => s.id !== supId);
+    renderAdminSupervisorsMasterTable();
+    showToast(`Đã xóa giảng viên "${sup.name}" thành công.`, 'success');
+  } catch (err) {
+    console.error('Lỗi xóa GVHD:', err);
+    showToast('Lỗi xóa GVHD: ' + err.message, 'error');
+  }
 };
 
 window.closeSupervisorModal = function() {
@@ -2380,16 +2615,22 @@ window.saveSupervisorMaster = async function(e) {
   const email = document.getElementById('sup-form-email')?.value.trim().toLowerCase();
   const phone = document.getElementById('sup-form-phone')?.value.trim();
   const photoUrl = document.getElementById('sup-form-photo')?.value.trim();
-  const department = document.getElementById('sup-form-dept')?.value.trim() || 'Thiết kế nội thất';
+  const gender = document.getElementById('sup-form-gender')?.value || 'Nam';
+
+  let department = 'Thiết kế nội thất';
+  const deptSelect = document.getElementById('sup-form-dept-select')?.value;
+  if (deptSelect === '__other__') {
+    department = document.getElementById('sup-form-dept-custom')?.value.trim() || 'Khác';
+  } else if (deptSelect) {
+    department = deptSelect;
+  }
+
   const expertise = document.getElementById('sup-form-expertise')?.value.trim();
   const bio = document.getElementById('sup-form-bio')?.value.trim();
   const active = document.getElementById('sup-form-active')?.checked !== false;
-  const showEmail = document.getElementById('sup-form-show-email')?.checked !== false;
-  const showPhone = Boolean(document.getElementById('sup-form-show-phone')?.checked);
-  const showPhoto = document.getElementById('sup-form-show-photo')?.checked !== false;
 
-  if (!name || !email) {
-    alert('Vui lòng điền Họ tên và Email (@tdtu.edu.vn)');
+  if (!name || !email || !email.includes('@')) {
+    showToast('Vui lòng điền Họ tên và Email hợp lệ', 'error');
     return;
   }
 
@@ -2401,8 +2642,8 @@ window.saveSupervisorMaster = async function(e) {
   }
 
   const payload = {
-    name, email, phone, photoUrl, department, expertise, bio,
-    active, showEmail, showPhone, showPhoto,
+    name, email, phone, photoUrl, gender, department, expertise, bio,
+    active,
     updatedAt: serverTimestamp()
   };
 
@@ -2426,13 +2667,13 @@ window.saveSupervisorMaster = async function(e) {
 
     renderAdminSupervisorsMasterTable();
     closeSupervisorModal();
-    alert('Lưu Giảng viên Hướng dẫn thành công!');
+    showToast('Lưu Giảng viên Hướng dẫn thành công!', 'success');
 
     // Background sync
     loadAdminSupervisorsMaster().catch(console.error);
   } catch (err) {
     console.error('Lỗi lưu GVHD:', err);
-    alert('Lỗi lưu GVHD: ' + err.message);
+    showToast('Lỗi lưu GVHD: ' + err.message, 'error');
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
@@ -2490,36 +2731,56 @@ window.saveRoundSupervisorRow = async function(roundId, supId) {
     await updateDoc(doc(db, 'graduationRounds', roundId, 'supervisors', supId), {
       capacity, activeInRound, updatedAt: serverTimestamp()
     });
-    alert('Đã cập nhật chỉ tiêu GVHD trong đợt thành công!');
+    showToast('Đã cập nhật chỉ tiêu GVHD trong đợt thành công!', 'success');
   } catch (e) {
-    alert('Lỗi cập nhật: ' + e.message);
+    showToast('Lỗi cập nhật: ' + e.message, 'error');
   }
 };
 
 window.removeRoundSupervisor = async function(roundId, supId) {
-  if (!confirm('Bạn có chắc muốn bỏ GVHD này khỏi đợt?')) return;
+  if (!(await showConfirm('Bỏ GVHD khỏi đợt', 'Bạn có chắc chắn muốn gỡ GVHD này khỏi đợt tốt nghiệp?', { confirmText: 'Gỡ khỏi đợt', danger: true }))) return;
   try {
     await deleteDoc(doc(db, 'graduationRounds', roundId, 'supervisors', supId));
     loadAdminRoundSupervisors(roundId);
   } catch (e) {
-    alert('Lỗi xóa: ' + e.message);
+    showToast('Lỗi xóa: ' + e.message, 'error');
   }
+};
+
+window.updateSupPickerCount = function() {
+  const count = document.querySelectorAll('.sup-picker-chk:checked').length;
+  const countEl = document.getElementById('sup-master-picker-selected-count');
+  if (countEl) countEl.textContent = count;
+};
+
+window.toggleSelectAllSupPicker = function() {
+  const chks = document.querySelectorAll('.sup-picker-chk');
+  const anyUnchecked = Array.from(chks).some(c => !c.checked);
+  chks.forEach(c => c.checked = anyUnchecked);
+  updateSupPickerCount();
 };
 
 window.openAddSupervisorsToRoundModal = async function() {
   await loadAdminSupervisorsMaster();
   const listEl = document.getElementById('sup-master-picker-list');
+  const defaultAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23cbd5e1"/><path fill="%23cbd5e1" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
   
-  listEl.innerHTML = state.supervisorsMaster.filter(s => s.active !== false).map(s => `
-    <label class="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer">
-      <input type="checkbox" value="${s.id}" class="sup-picker-chk w-4 h-4 rounded text-blue-600">
-      <div>
-        <span class="font-bold text-slate-800 block">${s.name}</span>
-        <span class="text-[11px] text-slate-400">${s.department || ''} • ${s.expertise || ''}</span>
+  const activeSups = state.supervisorsMaster.filter(s => s.active !== false);
+  const totalBadge = document.getElementById('sup-picker-total-badge');
+  if (totalBadge) totalBadge.textContent = `${activeSups.length} GVHD khả dụng`;
+
+  listEl.innerHTML = activeSups.map(s => `
+    <label class="flex items-center gap-3.5 p-3 hover:bg-slate-50 cursor-pointer rounded-xl transition-colors">
+      <input type="checkbox" value="${s.id}" onchange="updateSupPickerCount()" class="sup-picker-chk w-4 h-4 rounded text-blue-600">
+      <img src="${s.photoUrl || defaultAvatar}" class="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-sm shrink-0">
+      <div class="flex-1 min-w-0">
+        <span class="font-bold text-slate-800 text-xs block truncate">${s.name}</span>
+        <span class="text-[11px] text-slate-500 block truncate">${s.department || 'Thiết kế nội thất'} • ${s.expertise || 'Đang cập nhật'}</span>
       </div>
     </label>
   `).join('');
 
+  updateSupPickerCount();
   document.getElementById('modal-add-sup-to-round').classList.remove('hidden');
 };
 
@@ -2533,7 +2794,7 @@ window.saveSelectedSupervisorsToRound = async function() {
 
   const chks = Array.from(document.querySelectorAll('.sup-picker-chk:checked'));
   if (chks.length === 0) {
-    alert('Vui lòng chọn ít nhất 1 giảng viên.');
+    showToast('Vui lòng chọn ít nhất 1 giảng viên.', 'warning');
     return;
   }
 
@@ -2568,7 +2829,7 @@ window.saveSelectedSupervisorsToRound = async function() {
     closeAddSupToRoundModal();
     loadAdminRoundSupervisors(roundId);
   } catch (e) {
-    alert('Lỗi thêm GVHD: ' + e.message);
+    showToast('Lỗi thêm GVHD: ' + e.message, 'error');
   }
 };
 
@@ -2618,12 +2879,12 @@ window.filterEligibleTable = function() {
 
 window.deleteEligibleStudent = async function(studentId) {
   const roundId = document.getElementById('admin-round-student-select').value;
-  if (!confirm(`Xóa sinh viên ${studentId} khỏi danh sách đủ điều kiện?`)) return;
+  if (!(await showConfirm('Xóa sinh viên', `Xóa sinh viên ${studentId} khỏi danh sách đủ điều kiện của đợt?`, { confirmText: 'Xóa', danger: true }))) return;
   try {
     await deleteDoc(doc(db, 'graduationRounds', roundId, 'eligibleStudents', studentId));
     loadAdminEligibleStudents(roundId);
   } catch (e) {
-    alert('Lỗi xóa: ' + e.message);
+    showToast('Lỗi xóa: ' + e.message, 'error');
   }
 };
 
@@ -2652,7 +2913,7 @@ window.handleExcelFileUpload = function(event) {
 
 function parseAndValidateExcel(rows) {
   if (!rows || rows.length < 2) {
-    alert('File Excel rỗng hoặc thiếu tiêu đề cột.');
+    showToast('File Excel rỗng hoặc thiếu tiêu đề cột.', 'warning');
     return;
   }
 
@@ -2759,7 +3020,7 @@ window.confirmExcelImport = async function() {
   });
 
   if (itemsToImport.length === 0) {
-    alert('Không có sinh viên nào cần import theo tùy chọn đã chọn.');
+    showToast('Không có sinh viên nào cần import theo tùy chọn đã chọn.', 'warning');
     return;
   }
 
@@ -2790,11 +3051,11 @@ window.confirmExcelImport = async function() {
       await batch.commit();
     }
 
-    alert(`Đã import thành công ${itemsToImport.length} sinh viên đủ điều kiện!`);
+    showToast(`Đã import thành công ${itemsToImport.length} sinh viên đủ điều kiện!`, 'info');
     cancelExcelImport();
     loadAdminEligibleStudents(roundId);
   } catch (err) {
-    alert('Lỗi import Firestore: ' + err.message);
+    showToast('Lỗi import Firestore: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = '✓ Xác nhận Nhập vào Firestore';
@@ -2814,11 +3075,46 @@ function renderAdminProjectTypesTable() {
         <span class="badge ${p.active !== false ? 'badge-open' : 'badge-closed'}">${p.active !== false ? 'Hiển thị' : 'Đang ẩn'}</span>
       </td>
       <td class="p-3.5 text-right space-x-2">
-        <button onclick="toggleProjectTypeActive('${p.id}', ${p.active !== false})" class="text-slate-600 hover:underline font-bold">${p.active !== false ? 'Ẩn' : 'Bật'}</button>
+        <button onclick="editProjectTypeModal('${p.id}')" class="text-blue-600 hover:underline font-bold text-xs">Sửa</button>
+        <button onclick="toggleProjectTypeActive('${p.id}', ${p.active !== false})" class="text-slate-600 hover:underline font-bold text-xs">${p.active !== false ? 'Ẩn' : 'Hiện'}</button>
+        <button onclick="deleteProjectType('${p.id}')" class="text-rose-600 hover:underline font-bold text-xs">Xóa</button>
       </td>
     </tr>
   `).join('');
 }
+
+window.editProjectTypeModal = function(id) {
+  const pt = state.projectTypes.find(p => p.id === id);
+  if (!pt) return;
+  document.getElementById('pt-form-id').value = pt.id;
+  document.getElementById('pt-form-name').value = pt.name || '';
+  document.getElementById('pt-form-order').value = pt.order || 1;
+  document.getElementById('pt-form-active').checked = pt.active !== false;
+  document.getElementById('modal-project-type').classList.remove('hidden');
+};
+
+window.deleteProjectType = async function(id) {
+  const pt = state.projectTypes.find(p => p.id === id);
+  if (!pt) return;
+
+  // Check if used in any rounds
+  const inUse = state.rounds.some(r => (r.allowedProjectTypes || []).includes(pt.name));
+  let msg = `Xóa loại hình đồ án "${pt.name}"?`;
+  if (inUse) {
+    msg = `⚠️ CẢNH BÁO: Loại hình đồ án "${pt.name}" đang được sử dụng trong các đợt tốt nghiệp!\n\nBạn có chắc chắn muốn xóa không?`;
+  }
+
+  const confirmed = await showConfirm('Xóa Loại hình Đồ án', msg, { confirmText: 'Xóa vĩnh viễn', danger: true });
+  if (!confirmed) return;
+
+  try {
+    await deleteDoc(doc(db, 'graduationProjectTypes', id));
+    showToast(`Đã xóa loại hình "${pt.name}".`, 'success');
+    await loadProjectTypes();
+  } catch (err) {
+    showToast('Lỗi xóa loại hình: ' + err.message, 'error');
+  }
+};
 
 window.openAddProjectTypeModal = function() {
   document.getElementById('form-project-type').reset();
@@ -2833,18 +3129,32 @@ window.closeProjectTypeModal = function() {
 
 window.saveProjectType = async function(e) {
   e.preventDefault();
+  const id = document.getElementById('pt-form-id')?.value;
   const name = document.getElementById('pt-form-name').value.trim();
   const order = parseInt(document.getElementById('pt-form-order').value, 10) || 1;
   const active = document.getElementById('pt-form-active').checked;
 
+  if (!name) {
+    showToast('Vui lòng nhập tên loại hình đồ án.', 'error');
+    return;
+  }
+
   try {
-    await setDoc(doc(collection(db, 'graduationProjectTypes')), {
-      name, order, active, createdAt: serverTimestamp()
-    });
+    if (id) {
+      await updateDoc(doc(db, 'graduationProjectTypes', id), {
+        name, order, active, updatedAt: serverTimestamp()
+      });
+      showToast('Đã cập nhật loại hình đồ án thành công!', 'success');
+    } else {
+      await addDoc(collection(db, 'graduationProjectTypes'), {
+        name, order, active, createdAt: serverTimestamp()
+      });
+      showToast('Đã thêm loại hình đồ án thành công!', 'success');
+    }
     closeProjectTypeModal();
     await loadProjectTypes();
   } catch (err) {
-    alert('Lỗi lưu loại hình: ' + err.message);
+    showToast('Lỗi lưu loại hình: ' + err.message, 'error');
   }
 };
 
@@ -2853,7 +3163,7 @@ window.toggleProjectTypeActive = async function(id, currentActive) {
     await updateDoc(doc(db, 'graduationProjectTypes', id), { active: !currentActive });
     await loadProjectTypes();
   } catch (e) {
-    alert('Lỗi cập nhật: ' + e.message);
+    showToast('Lỗi cập nhật: ' + e.message, 'error');
   }
 };
 
@@ -2903,7 +3213,7 @@ window.exportRegistrationsCSV = function() {
   getDocs(collection(db, 'graduationRounds', roundId, 'registrations')).then(snap => {
     const list = snap.docs.map(d => d.data());
     if (list.length === 0) {
-      alert('Không có dữ liệu đăng ký để xuất.');
+      showToast('Không có dữ liệu đăng ký để xuất.', 'warning');
       return;
     }
 
@@ -3166,7 +3476,7 @@ window.startAdminReviewRound1 = async function() {
   const roundId = state.selectedRoundId;
   if (!roundId) return;
 
-  if (!confirm('Bắt đầu quy trình xét duyệt Nguyện vọng 1? Giảng viên hướng dẫn sẽ có thể đăng nhập và chọn sinh viên.')) return;
+  if (!(await showConfirm('Bắt đầu Xét duyệt', 'Bắt đầu quy trình xét duyệt Nguyện vọng 1? Giảng viên hướng dẫn sẽ có thể đăng nhập và chọn sinh viên.', { confirmText: 'Bắt đầu ngay', danger: false }))) return;
 
   try {
     await updateDoc(doc(db, 'graduationRounds', roundId), {
@@ -3176,10 +3486,10 @@ window.startAdminReviewRound1 = async function() {
       updatedAt: serverTimestamp()
     });
 
-    alert('▶️ Đã bắt đầu xét duyệt Nguyện vọng 1 thành công!');
+    showToast('▶️ Đã bắt đầu xét duyệt Nguyện vọng 1 thành công!', 'success');
     await loadAdminReviewData(roundId);
   } catch (e) {
-    alert('Lỗi bắt đầu xét duyệt: ' + e.message);
+    showToast('Lỗi bắt đầu xét duyệt: ' + e.message, 'error');
   }
 };
 
@@ -3304,11 +3614,11 @@ window.confirmAdminLockRound = async function() {
     await batch.commit();
 
     closeAdminLockRoundModal();
-    alert(`🔒 ĐÃ CHỐT THÀNH CÔNG NGUYỆN VỌNG ${currentRound}!\nChuyển sang: ${nextStatus === 'manual_assignment' ? 'Phân công thủ công' : 'Xét Nguyện vọng ' + nextRound}`);
+    showToast(`🔒 ĐÃ CHỐT THÀNH CÔNG NGUYỆN VỌNG ${currentRound}!\nChuyển sang: ${nextStatus === 'manual_assignment' ? 'Phân công thủ công' : 'Xét Nguyện vọng ' + nextRound}`, 'info');
     await loadAdminReviewData(roundId);
   } catch (err) {
     console.error('Lỗi khi chốt vòng:', err);
-    alert('Lỗi chốt vòng: ' + err.message);
+    showToast('Lỗi chốt vòng: ' + err.message, 'error');
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -3404,7 +3714,7 @@ window.saveAdminManualAssign = async function() {
   const remaining = (sup?.capacity || 10) - acceptedCount;
 
   if (remaining <= 0 && !overrideCapacity) {
-    alert('Giảng viên này đã hết chỉ tiêu. Hãy chọn giảng viên khác hoặc tích vào ô "Quyền High Admin: Cho phép phân công vượt chỉ tiêu".');
+    showToast('Giảng viên này đã hết chỉ tiêu. Hãy chọn giảng viên khác hoặc tích vào ô "Quyền High Admin: Cho phép phân công vượt chỉ tiêu".', 'info');
     return;
   }
 
@@ -3432,10 +3742,10 @@ window.saveAdminManualAssign = async function() {
     await batch.commit();
 
     closeAdminManualAssignModal();
-    alert(`✓ Đã phân công sinh viên ${studentId} cho Thầy/Cô ${sup?.name} thành công!`);
+    showToast(`✓ Đã phân công sinh viên ${studentId} cho Thầy/Cô ${sup?.name} thành công!`, 'info');
     await loadAdminReviewData(roundId);
   } catch (err) {
-    alert('Lỗi phân công: ' + err.message);
+    showToast('Lỗi phân công: ' + err.message, 'error');
   }
 };
 
@@ -3446,9 +3756,9 @@ window.publishAdminResults = async function() {
   const unassignedCount = (state.adminReviewData.registrations || []).filter(r => r.reviewStatus !== 'accepted' && r.reviewStatus !== 'manually_assigned').length;
 
   if (unassignedCount > 0) {
-    if (!confirm(`Vẫn còn ${unassignedCount} sinh viên chưa được phân công GVHD. Bạn có chắc chắn muốn hoàn tất và CÔNG BỐ KẾT QUẢ CHÍNH THỨC không?`)) return;
+    if (!(await showConfirm('Công bố Kết quả Chính thức', `Vẫn còn ${unassignedCount} sinh viên chưa được phân công GVHD. Bạn có chắc chắn muốn hoàn tất và CÔNG BỐ KẾT QUẢ CHÍNH THỨC không?`, { confirmText: 'Công bố kết quả', danger: true }))) return;
   } else {
-    if (!confirm('Xác nhận HOÀN TẤT & CÔNG BỐ KẾT QUẢ CHÍNH THỨC cho sinh viên và giảng viên?')) return;
+    if (!(await showConfirm('Công bố Kết quả Chính thức', 'Xác nhận HOÀN TẤT & CÔNG BỐ KẾT QUẢ CHÍNH THỨC cho sinh viên và giảng viên?', { confirmText: 'Xác nhận công bố', danger: false }))) return;
   }
 
   try {
@@ -3459,10 +3769,10 @@ window.publishAdminResults = async function() {
       updatedAt: serverTimestamp()
     });
 
-    alert('🎉 ĐÃ CÔNG BỐ KẾT QUẢ ĐỒ ÁN TỐT NGHIỆP CHÍNH THỨC THÀNH CÔNG!');
+    showToast('🎉 ĐÃ CÔNG BỐ KẾT QUẢ ĐỒ ÁN TỐT NGHIỆP CHÍNH THỨC THÀNH CÔNG!', 'success');
     await loadAdminReviewData(roundId);
   } catch (err) {
-    alert('Lỗi công bố kết quả: ' + err.message);
+    showToast('Lỗi công bố kết quả: ' + err.message, 'error');
   }
 };
 
@@ -3524,12 +3834,17 @@ window.openBioModal = function(supId) {
   document.getElementById('bio-modal-expertise').textContent = sup.expertise || 'Đang cập nhật';
   document.getElementById('bio-modal-text').textContent = sup.bio || 'Chưa có thông tin giới thiệu.';
 
+  // Requirement 7: Hide email and phone during registration / before published
   let contactHtml = '';
-  if (sup.showEmail !== false && sup.email) {
+  const isPublished = state.activeRound?.status === 'published' || state.activeRound?.reviewStatus === 'completed';
+  if (isPublished && state.activeRound?.showEmailAfterPublish !== false && sup.email) {
     contactHtml += `<div class="flex items-center gap-1.5 text-slate-600"><span>✉️ Email:</span> <a href="mailto:${sup.email}" class="text-blue-600 hover:underline">${sup.email}</a></div>`;
   }
-  if (sup.showPhone && sup.phone) {
+  if (isPublished && state.activeRound?.showPhoneAfterPublish !== false && sup.phone) {
     contactHtml += `<div class="flex items-center gap-1.5 text-slate-600"><span>📞 SĐT:</span> <a href="tel:${sup.phone}" class="text-blue-600 hover:underline">${sup.phone}</a></div>`;
+  }
+  if (!isPublished) {
+    contactHtml = '<div class="text-[11px] text-slate-400 italic">Thông tin liên hệ (Email, SĐT) sẽ được hiển thị sau khi Khoa công bố kết quả phân công chính thức.</div>';
   }
   document.getElementById('bio-modal-contacts').innerHTML = contactHtml;
 
@@ -3573,3 +3888,255 @@ document.getElementById('input-topic-title')?.addEventListener('input', e => {
 initFirebase().then(() => {
   setupAuthListener();
 });
+
+
+// ============================================================================
+// ADMIN: DANH SÁCH SINH VIÊN KHOA (MASTER DATASET)
+// ============================================================================
+window.loadFacultyStudents = async function() {
+  const tbody = document.getElementById('faculty-students-tbody');
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-400">⏳ Đang tải danh sách sinh viên khoa...</td></tr>';
+  }
+
+  try {
+    const snap = await getDocs(collection(db, 'facultyStudents'));
+    state.facultyStudents = snap.docs.map(d => ({ mssv: d.id, ...d.data() }));
+    
+    // Sort by MSSV asc
+    state.facultyStudents.sort((a, b) => String(a.mssv).localeCompare(String(b.mssv)));
+
+    populateFacultyStudentFilters();
+    renderFacultyStudentsTable();
+  } catch (err) {
+    console.error('Lỗi tải danh sách SV khoa:', err);
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-rose-500">Lỗi tải dữ liệu: ${err.message}</td></tr>`;
+    }
+  }
+};
+
+function populateFacultyStudentFilters() {
+  const majorSelect = document.getElementById('faculty-major-filter');
+  const classSelect = document.getElementById('faculty-class-filter');
+  if (!majorSelect || !classSelect) return;
+
+  const majors = [...new Set(state.facultyStudents.map(s => s.major).filter(Boolean))].sort();
+  const classes = [...new Set(state.facultyStudents.map(s => s.studentClass).filter(Boolean))].sort();
+
+  const curMajor = majorSelect.value;
+  const curClass = classSelect.value;
+
+  majorSelect.innerHTML = '<option value="">-- Tất cả ngành --</option>' + 
+    majors.map(m => `<option value="${m}" ${m === curMajor ? 'selected' : ''}>${m}</option>`).join('');
+
+  classSelect.innerHTML = '<option value="">-- Tất cả lớp --</option>' + 
+    classes.map(c => `<option value="${c}" ${c === curClass ? 'selected' : ''}>${c}</option>`).join('');
+}
+
+window.renderFacultyStudentsTable = function() {
+  const tbody = document.getElementById('faculty-students-tbody');
+  if (!tbody) return;
+
+  const search = (document.getElementById('faculty-search-input')?.value || '').trim().toLowerCase();
+  const majorFilter = document.getElementById('faculty-major-filter')?.value || '';
+  const classFilter = document.getElementById('faculty-class-filter')?.value || '';
+
+  let filtered = state.facultyStudents;
+
+  if (search) {
+    filtered = filtered.filter(s => 
+      (s.mssv && s.mssv.toLowerCase().includes(search)) ||
+      (s.name && s.name.toLowerCase().includes(search)) ||
+      (s.email && s.email.toLowerCase().includes(search))
+    );
+  }
+
+  if (majorFilter) {
+    filtered = filtered.filter(s => s.major === majorFilter);
+  }
+
+  if (classFilter) {
+    filtered = filtered.filter(s => s.studentClass === classFilter);
+  }
+
+  const totalEl = document.getElementById('faculty-students-total-count');
+  const filtEl = document.getElementById('faculty-students-filtered-count');
+  if (totalEl) totalEl.textContent = state.facultyStudents.length;
+  if (filtEl) filtEl.textContent = filtered.length;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">Không tìm thấy sinh viên phù hợp.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(s => `
+    <tr class="hover:bg-slate-50 transition-colors">
+      <td class="p-3 font-mono font-bold text-slate-900">${s.mssv}</td>
+      <td class="p-3 font-bold text-slate-800">${s.name || '--'}</td>
+      <td class="p-3 text-slate-600">${s.gender || '--'}</td>
+      <td class="p-3 text-slate-700 font-medium">${s.major || '--'}</td>
+      <td class="p-3 font-mono text-slate-600">${s.studentClass || '--'}</td>
+      <td class="p-3 text-slate-500 font-mono text-[11px]">${s.email || '--'}</td>
+      <td class="p-3 text-right">
+        <button onclick="deleteFacultyStudent('${s.mssv}')" class="text-rose-600 hover:text-rose-800 hover:underline font-bold text-xs">Xóa</button>
+      </td>
+    </tr>
+  `).join('');
+};
+
+window.handleFacultyStudentsUpload = async function(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  try {
+    const data = new Uint8Array(await file.arrayBuffer());
+    const workbook = XLSX.read(data, { type: 'array' });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+    if (!rawRows || rawRows.length === 0) {
+      showToast('File Excel rỗng hoặc không có dữ liệu.', 'error');
+      return;
+    }
+
+    // Dynamic header detection matching IFAA standard
+    const keys = Object.keys(rawRows[0]);
+    const norm = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const findKey = (...aliases) => keys.find(k => aliases.includes(norm(k)));
+
+    const mssvKey = findKey('mssv', 'masv', 'masinhvien', 'studentid');
+    const nameKey = findKey('hoten', 'hovaten', 'name', 'fullname');
+    const familyKey = findKey('holot', 'hodem', 'ho');
+    const givenKey = findKey('ten', 'firstname');
+    const genderKey = findKey('gioitinh', 'gender');
+    const majorKey = findKey('nganh', 'nganhhoc', 'major');
+    const classKey = findKey('lop', 'lopquanly', 'class');
+    const emailKey = findKey('email', 'thudientu');
+
+    if (!mssvKey || (!nameKey && !(familyKey && givenKey))) {
+      showToast('File cần có tối thiểu cột MSSV và Họ tên (hoặc Họ lót + Tên).', 'error');
+      return;
+    }
+
+    const uniqueMap = new Map();
+    rawRows.forEach(row => {
+      const rawMssv = String(row[mssvKey] || '').trim().toUpperCase();
+      if (!/^(?=.{8,12}$)(?=.*\d)[A-Z0-9]+$/.test(rawMssv)) return;
+
+      const rawName = nameKey ? String(row[nameKey] || '').trim() : `${row[familyKey] || ''} ${row[givenKey] || ''}`.trim();
+      if (!rawName) return;
+
+      const rawGender = genderKey ? String(row[genderKey] || '').trim() : '';
+      const rawMajor = majorKey ? String(row[majorKey] || '').trim() : '';
+      const rawClass = classKey ? String(row[classKey] || '').trim() : '';
+      const rawEmail = (emailKey && String(row[emailKey] || '').trim()) 
+        ? String(row[emailKey]).trim().toLowerCase() 
+        : `${rawMssv.toLowerCase()}@student.tdtu.edu.vn`;
+
+      uniqueMap.set(rawMssv, {
+        mssv: rawMssv,
+        name: rawName.replace(/\s+/g, ' '),
+        gender: rawGender,
+        major: rawMajor,
+        studentClass: rawClass,
+        email: rawEmail
+      });
+    });
+
+    const records = Array.from(uniqueMap.values());
+    if (records.length === 0) {
+      showToast('Không tìm thấy dòng sinh viên hợp lệ trong file.', 'warning');
+      return;
+    }
+
+    showToast(`Đang lưu ${records.length} sinh viên vào Firestore...`, 'info');
+
+    // Batch write in chunks of 450
+    for (let offset = 0; offset < records.length; offset += 450) {
+      const batch = writeBatch(db);
+      const chunk = records.slice(offset, offset + 450);
+      chunk.forEach(item => {
+        const ref = doc(db, 'facultyStudents', item.mssv);
+        batch.set(ref, {
+          ...item,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      });
+      await batch.commit();
+    }
+
+    showToast(`✓ Đã nhập thành công ${records.length} sinh viên khoa!`, 'success');
+    await loadFacultyStudents();
+  } catch (err) {
+    console.error('Lỗi nhập file SV khoa:', err);
+    showToast('Lỗi đọc file: ' + err.message, 'error');
+  } finally {
+    event.target.value = '';
+  }
+};
+
+window.deleteFacultyStudent = async function(mssv) {
+  const confirmed = await showConfirm(
+    'Xóa sinh viên khỏi Khoa',
+    `Bạn có chắc chắn muốn xóa sinh viên MSSV ${mssv} khỏi danh sách sinh viên toàn khoa?`,
+    { confirmText: 'Xóa sinh viên', danger: true }
+  );
+  if (!confirmed) return;
+
+  try {
+    await deleteDoc(doc(db, 'facultyStudents', mssv));
+    state.facultyStudents = state.facultyStudents.filter(s => s.mssv !== mssv);
+    renderFacultyStudentsTable();
+    showToast(`Đã xóa sinh viên ${mssv}.`, 'success');
+  } catch (err) {
+    showToast('Lỗi xóa sinh viên: ' + err.message, 'error');
+  }
+};
+
+window.clearAllFacultyStudents = async function() {
+  if (state.facultyStudents.length === 0) {
+    showToast('Danh sách sinh viên khoa hiện đang trống.', 'info');
+    return;
+  }
+
+  const confirmed = await showConfirm(
+    'Xóa toàn bộ Danh sách SV Khoa?',
+    `⚠️ CẢNH BÁO NGUY HIỂM:\n\nBạn sắp xóa toàn bộ ${state.facultyStudents.length} sinh viên khỏi cơ sở dữ liệu sinh viên khoa! Hành động này không thể hoàn tác.`,
+    { confirmText: 'Xóa toàn bộ', danger: true }
+  );
+  if (!confirmed) return;
+
+  try {
+    showToast('Đang xóa toàn bộ dữ liệu...', 'info');
+    const toDelete = [...state.facultyStudents];
+    for (let offset = 0; offset < toDelete.length; offset += 450) {
+      const batch = writeBatch(db);
+      toDelete.slice(offset, offset + 450).forEach(s => {
+        batch.delete(doc(db, 'facultyStudents', s.mssv));
+      });
+      await batch.commit();
+    }
+
+    state.facultyStudents = [];
+    populateFacultyStudentFilters();
+    renderFacultyStudentsTable();
+    showToast('Đã xóa toàn bộ sinh viên khoa.', 'success');
+  } catch (err) {
+    showToast('Lỗi xóa dữ liệu: ' + err.message, 'error');
+  }
+};
+
+window.downloadFacultyStudentsTemplate = function() {
+  const sampleData = [
+    { MSSV: '52000888', 'Họ và tên': 'Nguyễn Văn A', 'Giới tính': 'Nam', 'Ngành': 'Thiết kế nội thất', 'Lớp': '20050201', 'Email': '52000888@student.tdtu.edu.vn' },
+    { MSSV: '52000889', 'Họ và tên': 'Trần Thị B', 'Giới tính': 'Nữ', 'Ngành': 'Thiết kế đồ họa', 'Lớp': '20050301', 'Email': '52000889@student.tdtu.edu.vn' },
+    { MSSV: '52000890', 'Họ và tên': 'Lê Hoàng C', 'Giới tính': 'Nam', 'Ngành': 'Thiết kế thời trang', 'Lớp': '20050401', 'Email': '52000890@student.tdtu.edu.vn' }
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(sampleData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'DanhSachSVKhoa');
+  XLSX.writeFile(wb, 'MAU_DANH_SACH_SV_KHOA.xlsx');
+  showToast('Đã tải xuống file mẫu!', 'success');
+};

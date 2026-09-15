@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.3.0</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.4.0</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -296,6 +296,7 @@
                 Tên đề tài tốt nghiệp dự kiến <span class="text-rose-500">*</span>
               </label>
               <input type="text" id="input-topic-title" placeholder="Ví dụ: Thiết kế nội thất Trung tâm Văn hóa Nghệ thuật Đương đại..." class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none shadow-sm" maxlength="250">
+              <p id="topic-title-error" class="hidden text-rose-600 text-xs font-semibold mt-1"></p>
               <div class="flex justify-between text-[11px] text-slate-400 mt-1">
                 <span>Tên đề tài có thể chỉnh sửa sau theo quy định của đợt.</span>
                 <span id="topic-char-count">0/250</span>
@@ -592,6 +593,12 @@
             <span>Đợt tốt nghiệp</span>
           </button>
           
+          
+          <button onclick="switchAdminTab('faculty-students')" id="atab-btn-faculty-students" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+            <span>Danh sách SV khoa</span>
+          </button>
+
           <button onclick="switchAdminTab('eligible-students')" id="atab-btn-eligible-students" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
             <span class="w-2 h-2 rounded-full bg-slate-400"></span>
             <span>Danh sách SV đủ điều kiện</span>
@@ -840,10 +847,10 @@
                 <tr>
                   <th class="p-3.5">Ảnh</th>
                   <th class="p-3.5">Họ và tên</th>
+                  <th class="p-3.5">Giới tính</th>
                   <th class="p-3.5">Email / SĐT</th>
                   <th class="p-3.5">Bộ môn</th>
                   <th class="p-3.5">Chuyên môn</th>
-                  <th class="p-3.5">Hiển thị</th>
                   <th class="p-3.5">Trạng thái</th>
                   <th class="p-3.5 text-right">Thao tác</th>
                 </tr>
@@ -887,6 +894,77 @@
           </div>
         </div>
       </div>
+
+      
+      <!-- ADMIN TAB: FACULTY STUDENTS (DANH SÁCH SV KHOA) -->
+      <div id="atab-panel-faculty-students" class="hidden space-y-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <h2 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                <span>Danh sách Sinh viên Khoa</span>
+                <span class="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold border border-indigo-200">Master Dataset</span>
+              </h2>
+              <p class="text-xs text-slate-500 mt-0.5">Dữ liệu sinh viên toàn khoa MTCN phục vụ đối chiếu, phân công và kiểm tra điều kiện</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors">
+                <span>📥 Tải lên Excel / CSV</span>
+                <input type="file" id="faculty-students-file-input" accept=".xlsx,.xls,.csv" onchange="handleFacultyStudentsUpload(event)" class="hidden">
+              </label>
+              <button type="button" onclick="downloadFacultyStudentsTemplate()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors">
+                <span>📄 File mẫu</span>
+              </button>
+              <button type="button" onclick="clearAllFacultyStudents()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors">
+                <span>🗑️ Xóa tất cả</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- FILTERS & STATS -->
+          <div class="flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+            <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div class="relative flex-1 sm:w-64">
+                <input type="text" id="faculty-search-input" oninput="renderFacultyStudentsTable()" placeholder="Tìm theo MSSV hoặc Họ tên..." class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                <span class="absolute left-2.5 top-2 text-slate-400">🔍</span>
+              </div>
+              <select id="faculty-major-filter" onchange="renderFacultyStudentsTable()" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs">
+                <option value="">-- Tất cả ngành --</option>
+              </select>
+              <select id="faculty-class-filter" onchange="renderFacultyStudentsTable()" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs">
+                <option value="">-- Tất cả lớp --</option>
+              </select>
+            </div>
+            <div class="text-slate-600 shrink-0 font-medium">
+              Tổng số: <strong id="faculty-students-total-count" class="text-indigo-700 font-black">0</strong> sinh viên 
+              (<span id="faculty-students-filtered-count">0</span> hiển thị)
+            </div>
+          </div>
+
+          <!-- TABLE -->
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
+                  <tr>
+                    <th class="p-3">MSSV</th>
+                    <th class="p-3">Họ và tên</th>
+                    <th class="p-3">Giới tính</th>
+                    <th class="p-3">Ngành</th>
+                    <th class="p-3">Lớp</th>
+                    <th class="p-3">Email</th>
+                    <th class="p-3 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="faculty-students-tbody" class="divide-y divide-slate-100">
+                  <tr><td colspan="7" class="p-8 text-center text-slate-400">Đang tải danh sách sinh viên khoa...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
 
       <!-- ADMIN TAB: ELIGIBLE STUDENTS (EXCEL) -->
       <div id="atab-panel-eligible-students" class="hidden space-y-6">
@@ -1137,7 +1215,7 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Studio v1.3.0</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Studio v1.4.0</p>
     </div>
   </footer>
 
@@ -1255,6 +1333,23 @@
             </select>
           </div>
 
+          
+          <!-- TÙY CHỌN HIỂN THỊ LIÊN HỆ GVHD -->
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <span class="font-bold text-slate-800 text-xs block">Hiển thị liên hệ GVHD cho sinh viên</span>
+            <div class="flex flex-col sm:flex-row gap-3 text-xs text-slate-700">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="round-form-show-email-after-publish" checked class="rounded text-blue-600">
+                <span>Hiện Email sau khi công bố kết quả</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="round-form-show-phone-after-publish" checked class="rounded text-blue-600">
+                <span>Hiện SĐT sau khi công bố kết quả</span>
+              </label>
+            </div>
+            <p class="text-[11px] text-slate-400 italic">Trong giai đoạn đăng ký và xét duyệt, Email và SĐT của GVHD được tự động ẩn.</p>
+          </div>
+
           <!-- SECTION: CHỌN GVHD NGAY KHI TẠO ĐỢT -->
           <div class="border-t border-slate-200 pt-3">
             <div class="flex items-center justify-between mb-2">
@@ -1314,19 +1409,37 @@
             <label class="font-bold text-slate-700 block mb-1">Họ và tên *</label>
             <input type="text" id="sup-form-name" required placeholder="ThS. NCS. Nguyễn Văn A" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
           </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="font-bold text-slate-700 block mb-1">Email (@tdtu.edu.vn) *</label>
-              <input type="email" id="sup-form-email" required placeholder="nguyenvana@tdtu.edu.vn" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <div class="grid grid-cols-3 gap-2">
+            <div class="col-span-2">
+              <label class="font-bold text-slate-700 block mb-1">Email *</label>
+              <input type="email" id="sup-form-email" required placeholder="email@tdtu.edu.vn hoặc @gmail.com" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
             </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Giới tính</label>
+              <select id="sup-form-gender" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <option value="Nam">Nam</option>
+                <option value="Nữ">Nữ</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="font-bold text-slate-700 block mb-1">Số điện thoại</label>
               <input type="tel" id="sup-form-phone" placeholder="0901234567" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
             </div>
-          </div>
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Bộ môn / Đơn vị</label>
-            <input type="text" id="sup-form-dept" value="Thiết kế nội thất" placeholder="Thiết kế nội thất" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Bộ môn / Ngành</label>
+              <select id="sup-form-dept-select" onchange="handleSupervisorDeptChange(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <option value="Thiết kế nội thất">Thiết kế nội thất</option>
+                <option value="Thiết kế đồ họa">Thiết kế đồ họa</option>
+                <option value="Thiết kế thời trang">Thiết kế thời trang</option>
+                <option value="Thiết kế công nghiệp">Thiết kế công nghiệp</option>
+                <option value="Mỹ thuật cơ bản">Mỹ thuật cơ bản</option>
+                <option value="__other__">Khác...</option>
+              </select>
+              <input type="text" id="sup-form-dept-custom" placeholder="Nhập tên bộ môn khác..." class="hidden mt-1.5 w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <input type="hidden" id="sup-form-dept" value="Thiết kế nội thất">
+            </div>
           </div>
           
           <!-- Image upload & Preview -->
@@ -1356,25 +1469,11 @@
             <textarea id="sup-form-bio" rows="2" placeholder="Kinh nghiệm, định hướng nghiên cứu..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
           </div>
 
-          <div class="space-y-1.5 pt-2 border-t border-slate-200 text-slate-700">
+          <div class="pt-2 border-t border-slate-200 text-slate-700">
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="sup-form-active" checked class="rounded text-blue-600">
-              <span>Đang hoạt động (Active)</span>
+              <span class="font-bold text-xs">Đang hoạt động (Active trong Danh sách GVHD)</span>
             </label>
-            <div class="flex gap-4 pt-1">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="sup-form-show-email" checked class="rounded text-blue-600">
-                <span>Hiện Email</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="sup-form-show-photo" checked class="rounded text-blue-600">
-                <span>Hiện Ảnh</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="sup-form-show-phone" class="rounded text-blue-600">
-                <span>Hiện SĐT</span>
-              </label>
-            </div>
           </div>
         </div>
 
@@ -1388,20 +1487,29 @@
 
   <!-- 3. ADD SUPERVISORS TO ROUND MODAL -->
   <div id="modal-add-sup-to-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
-      <div class="flex items-center justify-between border-b pb-3">
-        <h3 class="font-bold text-base text-tdtu-blue">Thêm Giảng viên vào Đợt Tốt nghiệp</h3>
-        <button onclick="closeAddSupToRoundModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0">
+        <div>
+          <h3 class="font-bold text-base text-tdtu-blue">Thêm Giảng viên vào Đợt Tốt nghiệp</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Chọn giảng viên từ Danh sách GVHD để tham gia hướng dẫn trong đợt này</p>
+        </div>
+        <button onclick="closeAddSupToRoundModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
       </div>
 
-      <p class="text-xs text-slate-500">Chọn các giảng viên từ kho Master để tham gia hướng dẫn trong đợt này:</p>
-
-      <div id="sup-master-picker-list" class="flex-1 overflow-y-auto divide-y divide-slate-100 border rounded-xl max-h-72">
+      <div class="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs">
+        <span class="text-slate-600">Đã chọn: <strong id="sup-master-picker-selected-count" class="text-blue-600 font-black">0</strong> giảng viên</span>
+        <button type="button" onclick="toggleSelectAllSupPicker()" class="text-blue-600 hover:underline font-bold">Chọn tất cả</button>
       </div>
 
-      <div class="flex justify-end gap-2 pt-3 border-t">
-        <button type="button" onclick="closeAddSupToRoundModal()" class="px-4 py-2 bg-slate-100 rounded-xl font-bold text-xs hover:bg-slate-200">Hủy</button>
-        <button type="button" onclick="saveSelectedSupervisorsToRound()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-md">Thêm vào Đợt</button>
+      <div id="sup-master-picker-list" class="flex-1 overflow-y-auto divide-y divide-slate-100 p-2">
+      </div>
+
+      <div class="flex justify-between items-center p-4 bg-white border-t border-slate-100 shrink-0 sticky bottom-0">
+        <span id="sup-picker-total-badge" class="text-[11px] text-slate-400 font-medium">0 GVHD khả dụng</span>
+        <div class="flex gap-2">
+          <button type="button" onclick="closeAddSupToRoundModal()" class="px-4 py-2 bg-slate-100 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-200 transition-colors">Hủy</button>
+          <button type="button" onclick="saveSelectedSupervisorsToRound()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-md transition-colors">Thêm vào Đợt</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1608,5 +1716,26 @@
 
   <!-- MODULE ENTRYPOINT -->
   <script type="module" src="app.js"></script>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- CUSTOM CONFIRM MODAL -->
+  <div id="modal-confirm" class="hidden fixed inset-0 z-[9998] modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-start gap-3">
+        <div id="modal-confirm-icon" class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xl font-bold bg-rose-100 text-rose-600">⚠️</div>
+        <div class="flex-1">
+          <h3 id="modal-confirm-title" class="font-bold text-base text-slate-900">Xác nhận</h3>
+          <p id="modal-confirm-message" class="text-xs text-slate-600 mt-1 leading-relaxed whitespace-pre-line"></p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2.5 pt-2 border-t border-slate-100">
+        <button id="modal-confirm-btn-cancel" type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors">Hủy</button>
+        <button id="modal-confirm-btn-ok" type="button" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md transition-colors">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
