@@ -347,7 +347,8 @@ service cloud.firestore {
       // GVHD tham gia đợt (kèm quota của đợt)
       match /supervisors/{supervisorId} {
         allow read: if signedIn();
-        allow create, update, delete: if admin();
+        allow create, delete: if admin();
+        allow update: if admin() || (staff() && (email() == supervisorId || email() == resource.data.email));
       }
 
       // Danh sách sinh viên đủ điều kiện
@@ -355,6 +356,13 @@ service cloud.firestore {
         allow get: if admin() || (student() && email().matches('^' + studentId + '@student\\.tdtu\\.edu\\.vn$'));
         allow list: if admin();
         allow create, update, delete: if admin();
+      }
+
+      // Quyết định xét duyệt của GVHD từng vòng
+      match /reviewDecisions/{decisionId} {
+        allow read: if admin() || staff();
+        allow create, update: if admin() || (staff() && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy));
+        allow delete: if admin();
       }
 
       // Đăng ký nguyện vọng của sinh viên
@@ -385,7 +393,7 @@ service cloud.firestore {
           && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt']) 
               || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt);
 
-        // Cập nhật: Chỉ sinh viên chính chủ, đợt open, allowStudentEdit == true, chưa quá closeAt
+        // Cập nhật: Admin (duyệt/chốt/phân công) HOẶC Sinh viên chính chủ khi đợt mở và cho phép sửa
         allow update: if (admin())
           || (student()
             && email().matches('^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
