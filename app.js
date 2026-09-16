@@ -41,7 +41,7 @@ export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   }).length;
 }
 
-/** IFA+ Graduation Beta Studio v2.2.0-beta.1 **/
+/** IFA+ Graduation Beta Studio v2.3.1-beta.1 (Phase B Migration) **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -13939,5 +13939,365 @@ window.canAccessStudentSubmission = function(userEmail, userRole, studentId, act
     }
   }
   return false;
+};
+
+
+
+// ============================================================================
+// IFA+ GRADUATION BETA v2.3.1-beta.1:
+// PHASE B MIGRATION — SUBCOLLECTION NEW-WRITE + DUAL-READ + TRANSACTIONS
+// ============================================================================
+
+// Helper to sanitize keys for document IDs
+window.sanitizeFirestoreKey = function(key) {
+  if (!key) return 'unknown';
+  return String(key).replace(/[\/\\]/g, '_').replace(/\s+/g, '_');
+};
+
+// 1. COUNCIL SCORES SUBCOLLECTION HELPERS (NEW-WRITE + DUAL-READ)
+window.buildDeterministicCouncilScoreId = function(activityId, councilId, studentId, scorerId) {
+  const act = sanitizeFirestoreKey(activityId);
+  const cId = sanitizeFirestoreKey(councilId);
+  const stId = sanitizeFirestoreKey(studentId);
+  const scId = sanitizeFirestoreKey(scorerId);
+  return `${act}_${cId}_${stId}_${scId}`;
+};
+
+window.saveCouncilScoreRecord = async function(roundId, scoreData) {
+  if (!roundId || !scoreData) return { success: false, error: 'Thiếu thông tin roundId hoặc scoreData' };
+
+  const actId = scoreData.activityId;
+  const cId = scoreData.councilId;
+  const stId = scoreData.studentId;
+  const scId = scoreData.scorerId || (scoreData.scorerEmail ? scoreData.scorerEmail.split('@')[0] : 'scorer');
+  const scoreId = buildDeterministicCouncilScoreId(actId, cId, stId, scId);
+
+  // Clean document payload
+  const docPayload = {
+    roundId,
+    activityId: actId,
+    councilId: cId,
+    studentId: stId,
+    studentName: scoreData.studentName || '',
+    scorerId: scId,
+    scorerEmail: scoreData.scorerEmail || '',
+    scorerName: scoreData.scorerName || '',
+    role: scoreData.role || 'member',
+    mode: scoreData.scoreMode || 'defense_rubric',
+    score: scoreData.score ?? null,
+    total: scoreData.score ?? null,
+    rubricScores: scoreData.rubricScores || {},
+    components: scoreData.components || {},
+    feedback: scoreData.feedback || '',
+    status: scoreData.status || 'draft',
+    isGuest: Boolean(scoreData.isGuest),
+    isOfficialScorer: scoreData.isOfficialScorer !== false,
+    calibration: scoreData.calibration || null,
+    updatedAt: new Date().toISOString()
+  };
+
+  // 1. New Write: Save to subcollection /graduationRounds/{roundId}/councilScores/{scoreId}
+  let subcolSuccess = false;
+  try {
+    const scoreRef = doc(db, 'graduationRounds', roundId, 'councilScores', scoreId);
+    await setDoc(scoreRef, docPayload, { merge: true });
+    subcolSuccess = true;
+  } catch (err) {
+    console.warn('Notice: Subcollection councilScores write pending rules approval:', err.message);
+  }
+
+  // 2. Legacy Fallback Write (Admin only, or best effort)
+  const legacyKey = `${actId}_${cId}_${stId}_${scId}`;
+  if (state.isAdmin) {
+    try {
+      const roundRef = doc(db, 'graduationRounds', roundId);
+      await updateDoc(roundRef, {
+        [`councilScores.${legacyKey}`]: docPayload,
+        updatedAt: serverTimestamp()
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
+  // Update local memory
+  if (!state.councilScores) state.councilScores = {};
+  state.councilScores[legacyKey] = docPayload;
+
+  return { success: true, scoreId, docPayload, subcolSuccess };
+};
+
+window.getCouncilScoreRecord = async function({ roundId, activityId, councilId, studentId, scorerId, fallbackRound }) {
+  const act = sanitizeFirestoreKey(activityId);
+  const cId = sanitizeFirestoreKey(councilId);
+  const st = sanitizeFirestoreKey(studentId);
+  const sc = sanitizeFirestoreKey(scorerId);
+  const scoreId = `${act}_${cId}_${st}_${sc}`;
+  const legacyKey = scoreId;
+
+  // 1. Primary: Try reading from Subcollection
+  try {
+    const scoreRef = doc(db, 'graduationRounds', roundId, 'councilScores', scoreId);
+    const snap = await getDoc(scoreRef);
+    if (snap && snap.exists()) {
+      return snap.data();
+    }
+  } catch (e) {}
+
+  // 2. Fallback: Read from in-memory state or fallbackRound.councilScores
+  if (state.councilScores?.[legacyKey]) {
+    return state.councilScores[legacyKey];
+  }
+  if (fallbackRound?.councilScores?.[legacyKey]) {
+    return fallbackRound.councilScores[legacyKey];
+  }
+
+  return null;
+};
+
+// 2. SUBMISSIONS SUBCOLLECTION HELPERS (ATOMIC ATTEMPT + DUAL-READ)
+window.saveSubmissionAttemptRecord = async function(roundId, activityId, studentId, submissionData) {
+  if (!roundId || !activityId || !studentId || !submissionData) {
+    return { success: false, error: 'Thiếu thông tin nộp bài' };
+  }
+
+  // Atomic attempt resolution: query existing docs or fallback to memory
+  let existingAttemptsCount = 0;
+  try {
+    const subColRef = collection(db, 'graduationRounds', roundId, 'submissions');
+    const q = query(subColRef, where('activityId', '==', activityId), where('studentId', '==', studentId));
+    const snap = await getDocs(q);
+    if (snap && !snap.empty) {
+      existingAttemptsCount = snap.size;
+    }
+  } catch (e) {}
+
+  if (existingAttemptsCount === 0) {
+    const memAttempts = submissionData.existingAttempts || [];
+    existingAttemptsCount = memAttempts.length;
+  }
+
+  const attemptNum = existingAttemptsCount + 1;
+  const receiptId = submissionData.receiptId || ('REC-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase());
+  const submissionId = `${sanitizeFirestoreKey(activityId)}_${sanitizeFirestoreKey(studentId)}_att${attemptNum}_${Date.now()}`;
+
+  const docPayload = {
+    roundId,
+    activityId,
+    activityTitle: submissionData.activityTitle || '',
+    studentId,
+    studentName: submissionData.studentName || '',
+    studentEmail: submissionData.studentEmail || (studentId + '@student.tdtu.edu.vn'),
+    attempt: attemptNum,
+    attemptNumber: attemptNum,
+    receiptId,
+    files: submissionData.files || [],
+    submittedAt: submissionData.submittedAt || new Date().toISOString(),
+    isLate: Boolean(submissionData.isLate),
+    status: submissionData.status || 'submitted',
+    submittedBy: submissionData.submittedBy || studentId
+  };
+
+  // 1. New Write: Save to subcollection /graduationRounds/{roundId}/submissions/{submissionId}
+  let subcolSuccess = false;
+  try {
+    const subDocRef = doc(db, 'graduationRounds', roundId, 'submissions', submissionId);
+    await setDoc(subDocRef, docPayload);
+    subcolSuccess = true;
+  } catch (err) {
+    console.warn('Notice: Subcollection submissions write pending rules approval:', err.message);
+  }
+
+  // 2. Legacy Fallback Write (best-effort into round document)
+  const round = (state.rounds || []).find(r => r.id === roundId);
+  if (round) {
+    if (!round.activitySubmissions) round.activitySubmissions = {};
+    if (!round.activitySubmissions[activityId]) round.activitySubmissions[activityId] = {};
+    const existingEntry = round.activitySubmissions[activityId][studentId] || { attempts: [] };
+    const newAttempts = [...(existingEntry.attempts || []), docPayload];
+    round.activitySubmissions[activityId][studentId] = {
+      currentSubmission: docPayload,
+      attempts: newAttempts
+    };
+
+    if (state.isAdmin) {
+      try {
+        const roundRef = doc(db, 'graduationRounds', roundId);
+        await updateDoc(roundRef, {
+          [`activitySubmissions.${activityId}.${studentId}`]: {
+            currentSubmission: docPayload,
+            attempts: newAttempts
+          },
+          updatedAt: serverTimestamp()
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  }
+
+  return { success: true, submissionId, attemptNumber: attemptNum, receiptId, docPayload, subcolSuccess };
+};
+
+window.getStudentSubmissionsRecord = async function(roundId, activityId, studentId, fallbackRound) {
+  // 1. Primary: Query Subcollection
+  try {
+    const subColRef = collection(db, 'graduationRounds', roundId, 'submissions');
+    const q = query(
+      subColRef,
+      where('activityId', '==', activityId),
+      where('studentId', '==', studentId)
+    );
+    const snap = await getDocs(q);
+    if (snap && !snap.empty) {
+      const attempts = snap.docs.map(d => d.data()).sort((a, b) => (a.attemptNumber || a.attempt || 0) - (b.attemptNumber || b.attempt || 0));
+      const current = attempts[attempts.length - 1] || null;
+      return { currentSubmission: current, attempts };
+    }
+  } catch (e) {}
+
+  // 2. Fallback: Legacy nested map in round
+  const targetRound = fallbackRound || (state.rounds || []).find(r => r.id === roundId);
+  const legacyRecord = targetRound?.activitySubmissions?.[activityId]?.[studentId];
+  if (legacyRecord) {
+    const attempts = legacyRecord.attempts || [];
+    const currentSubmission = legacyRecord.currentSubmission || attempts[attempts.length - 1] || null;
+    return { currentSubmission, attempts };
+  }
+
+  return { currentSubmission: null, attempts: [] };
+};
+
+// 3. AUDIT LOGS SUBCOLLECTION HELPERS (APPEND-ONLY + DUAL-READ)
+window.appendAuditLogRecord = async function(roundId, auditData) {
+  if (!roundId || !auditData) return;
+
+  const logId = auditData.id || ('log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
+  const docPayload = {
+    id: logId,
+    roundId,
+    type: auditData.type || 'info',
+    action: auditData.action || 'Hành động',
+    target: auditData.target || '',
+    detail: auditData.detail || '',
+    by: auditData.by || state.currentUser?.email || 'system',
+    timestamp: auditData.timestamp || new Date().toISOString()
+  };
+
+  // 1. New Write: Save to subcollection /graduationRounds/{roundId}/auditLogs/{logId}
+  try {
+    const logRef = doc(db, 'graduationRounds', roundId, 'auditLogs', logId);
+    await setDoc(logRef, docPayload);
+  } catch (err) {
+    console.warn('Notice: Subcollection auditLogs write pending rules approval:', err.message);
+  }
+
+  // 2. In-memory append to round
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (targetRound) {
+    targetRound.auditLogs = targetRound.auditLogs || [];
+    targetRound.auditLogs.unshift(docPayload);
+  }
+};
+
+window.getRoundAuditLogs = async function(roundId, fallbackRound) {
+  const targetRound = fallbackRound || (state.rounds || []).find(r => r.id === roundId);
+  const legacyLogs = Array.isArray(targetRound?.auditLogs) ? targetRound.auditLogs : [];
+
+  try {
+    const logColRef = collection(db, 'graduationRounds', roundId, 'auditLogs');
+    const snap = await getDocs(logColRef);
+    if (snap && !snap.empty) {
+      const subLogs = snap.docs.map(d => d.data());
+      // Union and deduplicate by ID
+      const map = new Map();
+      subLogs.forEach(l => map.set(l.id, l));
+      legacyLogs.forEach(l => {
+        if (!map.has(l.id)) map.set(l.id, l);
+      });
+      return Array.from(map.values()).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    }
+  } catch (e) {}
+
+  return legacyLogs;
+};
+
+// 4. FIRST-COMPLETED-WINS TRANSACTIONS (GVHD & TM HD)
+window.submitSupervisorScoreTransaction = async function({ roundId, studentId, supervisorId, supervisorEmail, supervisorName, score, feedback, isCompleted }) {
+  const roundRef = doc(db, 'graduationRounds', roundId);
+  const now = new Date().toISOString();
+
+  return await runTransaction(db, async (transaction) => {
+    const roundSnap = await transaction.get(roundRef);
+    if (!roundSnap.exists()) {
+      throw new Error('Đợt tốt nghiệp không tồn tại.');
+    }
+
+    const roundData = roundSnap.data();
+    const existing = roundData.supervisorScores?.[studentId];
+
+    // ATOMIC CHECK: First completed wins
+    if (isCompleted && existing?.status === 'completed' && existing.submittedBySupervisorId !== supervisorId && !state.isAdmin) {
+      throw new Error(`Điểm GVHD đã được hoàn tất trước bởi ${existing.submittedByName || 'giảng viên khác'}.`);
+    }
+
+    const newRecord = {
+      roundId,
+      studentId,
+      score: isNaN(score) ? null : score,
+      comment: feedback || '',
+      submittedBySupervisorId: supervisorId,
+      submittedByName: supervisorName,
+      submittedByEmail: supervisorEmail,
+      decidedBy: supervisorEmail,
+      supervisorEmail,
+      status: isCompleted ? 'completed' : 'draft',
+      updatedAt: now,
+      completedAt: isCompleted ? (existing?.completedAt || now) : null
+    };
+
+    transaction.update(roundRef, {
+      [`supervisorScores.${studentId}`]: newRecord,
+      updatedAt: serverTimestamp()
+    });
+
+    return newRecord;
+  });
+};
+
+window.submitThesisScoreHDTransaction = async function({ roundId, studentId, supervisorId, supervisorEmail, supervisorName, score, feedback, isCompleted }) {
+  const roundRef = doc(db, 'graduationRounds', roundId);
+  const now = new Date().toISOString();
+
+  return await runTransaction(db, async (transaction) => {
+    const roundSnap = await transaction.get(roundRef);
+    if (!roundSnap.exists()) {
+      throw new Error('Đợt tốt nghiệp không tồn tại.');
+    }
+
+    const roundData = roundSnap.data();
+    const existing = roundData.thesisScores?.[studentId]?.hd;
+
+    // ATOMIC CHECK: First completed wins
+    if (isCompleted && existing?.status === 'completed' && existing.submittedBySupervisorId !== supervisorId && !state.isAdmin) {
+      throw new Error(`Điểm TM HD đã được hoàn tất trước bởi ${existing.submittedByName || 'giảng viên khác'}.`);
+    }
+
+    const newRecord = {
+      roundId,
+      studentId,
+      score: isNaN(score) ? null : score,
+      comment: feedback || '',
+      submittedBySupervisorId: supervisorId,
+      submittedByName: supervisorName,
+      submittedByEmail: supervisorEmail,
+      status: isCompleted ? 'completed' : 'draft',
+      updatedAt: now,
+      completedAt: isCompleted ? (existing?.completedAt || now) : null
+    };
+
+    transaction.update(roundRef, {
+      [`thesisScores.${studentId}.hd`]: newRecord,
+      updatedAt: serverTimestamp()
+    });
+
+    return newRecord;
+  });
 };
 
