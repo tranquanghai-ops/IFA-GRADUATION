@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation Beta</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.8.0-beta.1</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.9.0-beta.1</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -507,6 +507,18 @@
           <button id="sup-tab-btn-accepted" onclick="switchSupervisorTab('accepted')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
             🏆 Danh sách Đã nhận chính thức (<span id="sup-accepted-count-badge">0</span>)
           </button>
+          <button id="sup-tab-btn-preliminary" onclick="switchSupervisorTab('preliminary')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
+            🎯 Chấm Sơ khảo Đợt TN
+          </button>
+          <button id="sup-tab-btn-reviewer" onclick="switchSupervisorTab('reviewer')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
+            📖 Phản biện Thuyết minh (<span id="sup-reviewer-count-badge">0</span>)
+          </button>
+          <button id="sup-tab-btn-preliminary" onclick="switchSupervisorTab('preliminary')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
+            🎯 Chấm Sơ khảo Đợt TN
+          </button>
+          <button id="sup-tab-btn-reviewer" onclick="switchSupervisorTab('reviewer')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
+            📖 Phản biện Thuyết minh (<span id="sup-reviewer-count-badge">0</span>)
+          </button>
         </div>
 
         <div id="sup-round-review-indicator" class="text-xs font-bold text-indigo-900 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200">
@@ -593,6 +605,122 @@
         </div>
       </div>
 
+      <!-- SUPERVISOR SUB-PANEL 3: CHẤM SƠ KHẢO ĐỢT TN (v1.9.0-beta.1) -->
+      <div id="sup-panel-preliminary" class="hidden space-y-4">
+        <div class="card-surface p-4 bg-gradient-to-r from-amber-500 to-amber-700 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl shadow-sm">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="badge bg-white text-amber-900 font-black text-xs">GIÁM KHẢO SƠ KHẢO</span>
+              <span class="text-xs text-amber-100">Đợt tốt nghiệp hiện tại</span>
+            </div>
+            <p class="text-xs text-amber-100 mt-1">
+              Thầy/Cô được phân công chấm Sơ khảo cho tất cả các sinh viên đủ điều kiện trong Đợt.
+            </p>
+          </div>
+          <div class="text-right">
+            <span class="text-[11px] text-amber-200 block">Tiến độ của Thầy/Cô:</span>
+            <span id="sup-prelim-my-progress" class="text-xl font-black">0 / 0 đã chấm</span>
+          </div>
+        </div>
+
+        <div class="card-surface overflow-hidden">
+          <div class="p-3.5 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-700">Bộ lọc:</span>
+              <select id="sup-prelim-filter-status" onchange="renderSupervisorPreliminaryList()" class="p-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
+                <option value="all">Tất cả sinh viên</option>
+                <option value="unscored">Chưa chấm</option>
+                <option value="scored">Đã chấm</option>
+              </select>
+            </div>
+            <input type="text" id="sup-prelim-search" oninput="renderSupervisorPreliminaryList()" placeholder="Tìm MSSV, Họ tên, Đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+          </div>
+
+          <div id="sup-prelim-cards-container" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SUPERVISOR SUB-PANEL 4: PHẢN BIỆN THUYẾT MINH (v1.9.0-beta.1) -->
+      <div id="sup-panel-reviewer" class="hidden space-y-4">
+        <div class="card-surface p-4 bg-gradient-to-r from-blue-600 to-indigo-800 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl shadow-sm">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="badge bg-white text-blue-900 font-black text-xs">GIẢNG VIÊN PHẢN BIỆN (GVPB)</span>
+              <span class="text-xs text-blue-100">Đánh giá Thuyết minh</span>
+            </div>
+            <p class="text-xs text-blue-100 mt-1">
+              Danh sách sinh viên được Khoa phân công cho Thầy/Cô đánh giá điểm Thuyết minh phản biện (TM PB).
+            </p>
+          </div>
+        </div>
+
+        <div class="card-surface overflow-hidden">
+          <div id="sup-reviewer-cards-container" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SUPERVISOR SUB-PANEL 3: CHẤM SƠ KHẢO ĐỢT TN (v1.9.0-beta.1) -->
+      <div id="sup-panel-preliminary" class="hidden space-y-4">
+        <div class="card-surface p-4 bg-gradient-to-r from-amber-500 to-amber-700 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl shadow-sm">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="badge bg-white text-amber-900 font-black text-xs">GIÁM KHẢO SƠ KHẢO</span>
+              <span class="text-xs text-amber-100">Đợt tốt nghiệp hiện tại</span>
+            </div>
+            <p class="text-xs text-amber-100 mt-1">
+              Thầy/Cô được phân công chấm Sơ khảo cho tất cả các sinh viên đủ điều kiện trong Đợt.
+            </p>
+          </div>
+          <div class="text-right">
+            <span class="text-[11px] text-amber-200 block">Tiến độ của Thầy/Cô:</span>
+            <span id="sup-prelim-my-progress" class="text-xl font-black">0 / 0 đã chấm</span>
+          </div>
+        </div>
+
+        <div class="card-surface overflow-hidden">
+          <div class="p-3.5 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-700">Bộ lọc:</span>
+              <select id="sup-prelim-filter-status" onchange="renderSupervisorPreliminaryList()" class="p-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
+                <option value="all">Tất cả sinh viên</option>
+                <option value="unscored">Chưa chấm</option>
+                <option value="scored">Đã chấm</option>
+              </select>
+            </div>
+            <input type="text" id="sup-prelim-search" oninput="renderSupervisorPreliminaryList()" placeholder="Tìm MSSV, Họ tên, Đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+          </div>
+
+          <div id="sup-prelim-cards-container" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SUPERVISOR SUB-PANEL 4: PHẢN BIỆN THUYẾT MINH (v1.9.0-beta.1) -->
+      <div id="sup-panel-reviewer" class="hidden space-y-4">
+        <div class="card-surface p-4 bg-gradient-to-r from-blue-600 to-indigo-800 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl shadow-sm">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="badge bg-white text-blue-900 font-black text-xs">GIẢNG VIÊN PHẢN BIỆN (GVPB)</span>
+              <span class="text-xs text-blue-100">Đánh giá Thuyết minh</span>
+            </div>
+            <p class="text-xs text-blue-100 mt-1">
+              Danh sách sinh viên được Khoa phân công cho Thầy/Cô đánh giá điểm Thuyết minh phản biện (TM PB).
+            </p>
+          </div>
+        </div>
+
+        <div class="card-surface overflow-hidden">
+          <div id="sup-reviewer-cards-container" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
     </section>
 
     <!-- VIEW 3: ADMIN VIEW -->
@@ -642,6 +770,16 @@
           <button onclick="switchAdminTab('review')" id="atab-btn-review" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
             <span class="w-2 h-2 rounded-full bg-amber-500"></span>
             <span>Xét nguyện vọng</span>
+          </button>
+          
+          <button onclick="switchAdminTab('scoring-dashboard')" id="atab-btn-scoring-dashboard" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+            <span>📊 Quản lý Điểm & Sơ khảo / TM</span>
+          </button>
+          
+          <button onclick="switchAdminTab('scoring-dashboard')" id="atab-btn-scoring-dashboard" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+            <span>📊 Quản lý Điểm & Sơ khảo / TM</span>
           </button>
           
           <button onclick="switchAdminTab('preview-student')" id="atab-btn-preview-student" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
@@ -1431,7 +1569,176 @@
       </div>
 
         
-      <!-- ADMIN TAB: TRASH PANEL -->
+      <!-- ADMIN TAB: SCORING DASHBOARD (v1.9.0-beta.1) -->
+      <div id="atab-panel-scoring-dashboard" class="hidden space-y-6">
+        
+        <!-- Header & Round Selector -->
+        <div class="card-surface p-5 bg-gradient-to-br from-white via-slate-50 to-emerald-50/30 border border-slate-200">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="badge bg-emerald-100 text-emerald-800 font-bold text-xs">MODULE ĐIỂM SƠ KHẢO • GVHD • THUYẾT MINH</span>
+              </div>
+              <h2 class="text-xl font-black text-slate-900 tracking-tight">Quản lý Đánh giá & Điểm số</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Theo dõi toàn diện Điểm Sơ khảo, Điểm GVHD và Điểm Thuyết minh (TM HD + TM PB).</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-bold text-slate-700">Đợt:</label>
+              <select id="admin-scoring-round-select" onchange="onAdminScoringRoundChange(this.value)" class="p-2 border border-slate-300 rounded-xl text-xs font-bold bg-white">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sub-tabs Navigation -->
+        <div class="flex border-b border-slate-200 bg-white px-4 rounded-xl border border-slate-200 shrink-0 gap-3 text-xs font-bold overflow-x-auto shadow-xs">
+          <button type="button" onclick="switchAdminScoringSubTab('overview')" id="ascore-tab-btn-overview" class="py-3 border-b-2 border-emerald-600 text-emerald-700 whitespace-nowrap">
+            📊 Bảng tổng hợp Điểm SV
+          </button>
+          <button type="button" onclick="switchAdminScoringSubTab('preliminary-config')" id="ascore-tab-btn-preliminary-config" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+            🎯 Cấu hình Sơ khảo
+          </button>
+          <button type="button" onclick="switchAdminScoringSubTab('supervisor-config')" id="ascore-tab-btn-supervisor-config" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+            📝 Cấu hình Điểm GVHD
+          </button>
+          <button type="button" onclick="switchAdminScoringSubTab('reviewer-assignment')" id="ascore-tab-btn-reviewer-assignment" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+            📖 Phân công GVPB Thuyết minh
+          </button>
+        </div>
+
+        <!-- SUB-TAB 1: BẢNG TỔNG HỢP ĐIỂM -->
+        <div id="ascore-panel-overview" class="space-y-4">
+          <div class="card-surface p-3.5 bg-slate-50 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-slate-700">Lọc theo tiến độ:</span>
+              <select id="admin-scoring-filter" onchange="renderAdminScoresTable()" class="p-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
+                <option value="all">Tất cả sinh viên</option>
+                <option value="missing_prelim">Thiếu Sơ khảo</option>
+                <option value="missing_gvhd">Thiếu Điểm GVHD</option>
+                <option value="missing_tm_hd">Thiếu TM HD</option>
+                <option value="missing_tm_pb">Thiếu TM PB</option>
+                <option value="completed">Đủ tất cả điểm</option>
+              </select>
+            </div>
+            <input type="text" id="admin-scoring-search" oninput="renderAdminScoresTable()" placeholder="Tìm MSSV, họ tên, đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+          </div>
+
+          <div class="card-surface overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                <tr>
+                  <th class="p-3 text-center">#</th>
+                  <th class="p-3">MSSV</th>
+                  <th class="p-3">Họ và tên</th>
+                  <th class="p-3 text-center">Sơ khảo TB</th>
+                  <th class="p-3 text-center">Điểm GVHD</th>
+                  <th class="p-3 text-center">TM HD</th>
+                  <th class="p-3 text-center">TM PB</th>
+                  <th class="p-3 text-center">TM FINAL</th>
+                  <th class="p-3 text-center">Chi tiết</th>
+                </tr>
+              </thead>
+              <tbody id="admin-scoring-tbody" class="divide-y divide-slate-100">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 2: CẤU HÌNH SƠ KHẢO -->
+        <div id="ascore-panel-preliminary-config" class="hidden space-y-4">
+          <div class="card-surface p-5 bg-white space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b">
+              <div>
+                <h3 class="font-bold text-slate-900 text-sm">Cấu hình Đánh giá Sơ khảo</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Chọn giảng viên được quyền chấm Sơ khảo cho toàn bộ sinh viên trong Đợt này.</p>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="chk-admin-preliminary-enabled" class="rounded text-tdtu-blue">
+                <span class="font-bold text-xs text-amber-800">Kích hoạt chấm Sơ khảo</span>
+              </label>
+            </div>
+
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-slate-700 text-xs">Danh sách Giảng viên được phân công chấm Sơ khảo:</span>
+                <span id="preliminary-selected-count" class="text-xs font-bold text-indigo-600">Đã chọn: 0 GV</span>
+              </div>
+              <div id="preliminary-scorers-checklist" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-96 overflow-y-auto p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+
+            <div class="flex justify-end pt-3 border-t">
+              <button type="button" onclick="saveAdminPreliminaryConfig()" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow-xs">
+                Lưu Cấu hình Sơ khảo
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 3: CẤU HÌNH ĐIỂM GVHD -->
+        <div id="ascore-panel-supervisor-config" class="hidden space-y-4">
+          <div class="card-surface p-5 bg-white space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b">
+              <div>
+                <h3 class="font-bold text-slate-900 text-sm">Cấu hình Điểm GVHD</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Cho phép Giảng viên hướng dẫn chính thức nhập Điểm GVHD cho sinh viên.</p>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="chk-admin-supervisor-score-enabled" class="rounded text-tdtu-blue">
+                <span class="font-bold text-xs text-emerald-800">Mở cổng nhập Điểm GVHD</span>
+              </label>
+            </div>
+            <div class="p-4 bg-emerald-50/50 rounded-xl border border-emerald-200 text-xs text-emerald-950 space-y-1">
+              <p class="font-bold">💡 Nguyên tắc nghiệp vụ:</p>
+              <p>• Chỉ có GVHD chính thức (officialSupervisors) của sinh viên mới được nhập điểm.</p>
+              <p>• Nếu sinh viên có nhiều GVHD: chỉ cần MỘT GVHD nhập điểm; người hoàn tất trước là owner chính thức; không lấy trung bình.</p>
+              <p>• Quản trị viên có quyền Mở lại Điểm GVHD nếu cần điều chỉnh.</p>
+            </div>
+            <div class="flex justify-end pt-3 border-t">
+              <button type="button" onclick="saveAdminSupervisorScoreConfig()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-xs">
+                Lưu Cấu hình Điểm GVHD
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 4: PHÂN CÔNG GVPB THUYẾT MINH -->
+        <div id="ascore-panel-reviewer-assignment" class="hidden space-y-4">
+          <div class="card-surface p-4 bg-white flex items-center justify-between">
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm">Phân công Giảng viên phản biện (GVPB) Thuyết minh</h3>
+              <p class="text-xs text-slate-500 mt-0.5">GVPB chịu trách nhiệm chấm điểm TM PB. GVPB không được trùng với bất kỳ GVHD nào của sinh viên.</p>
+            </div>
+            <button type="button" onclick="saveAdminReviewerAssignments()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-xs">
+              💾 Lưu toàn bộ phân công GVPB
+            </button>
+          </div>
+
+          <div class="card-surface overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                <tr>
+                  <th class="p-3 text-center">#</th>
+                  <th class="p-3">MSSV</th>
+                  <th class="p-3">Họ và tên</th>
+                  <th class="p-3">Đề tài</th>
+                  <th class="p-3">GVHD chính / hỗ trợ</th>
+                  <th class="p-3">GVPB Thuyết minh được phân công</th>
+                </tr>
+              </thead>
+              <tbody id="admin-reviewer-assignment-tbody" class="divide-y divide-slate-100">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ADMIN TAB: TRASH -->
       <div id="atab-panel-trash" class="hidden space-y-4">
         <div class="flex items-center justify-between">
           <div>
@@ -1471,7 +1778,7 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v1.8.0-beta.1</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v1.9.0-beta.1</p>
     </div>
   </footer>
 
@@ -2136,7 +2443,7 @@
   <!-- TOAST CONTAINER -->
   <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
-  <!-- CREATE / EDIT ACTIVITY MODAL (v1.8.0-beta.1) -->
+  <!-- CREATE / EDIT ACTIVITY MODAL (v1.9.0-beta.1) -->
   <div id="modal-activity" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
@@ -2350,7 +2657,7 @@
                   <span class="font-semibold text-xs text-slate-600">Cho Sinh viên xem thứ tự trình bày (showPresentationOrderToStudents)</span>
                 </label>
 
-                <!-- SCORING CONFIGURATION (v1.8.0-beta.1) -->
+                <!-- SCORING CONFIGURATION (v1.9.0-beta.1) -->
                 <div class="border-t border-slate-200 pt-2.5 space-y-2">
                   <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" id="activity-form-scoring-enabled" onchange="toggleActivityScoringConfig(this.checked)" class="rounded text-tdtu-blue">
@@ -2512,7 +2819,7 @@
   </div>
 
   <!-- ============================================================================
-       MODAL: ACTIVITY COUNCIL MANAGEMENT (v1.8.0-beta.1)
+       MODAL: ACTIVITY COUNCIL MANAGEMENT (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-activity-councils" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
     <div class="bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[94vh] overflow-hidden border border-slate-200">
@@ -2781,7 +3088,7 @@
 
 
   <!-- ============================================================================
-       MODAL: LETTER OPTION EDITOR (v1.8.0-beta.1)
+       MODAL: LETTER OPTION EDITOR (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-add-letter-option" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden border border-slate-200">
@@ -2812,7 +3119,7 @@
   </div>
 
   <!-- ============================================================================
-       MODAL: COUNCIL WORKSPACE / ĐIỀU HÀNH & CHẤM ĐIỂM HỘI ĐỒNG (v1.8.0-beta.1)
+       MODAL: COUNCIL WORKSPACE / ĐIỀU HÀNH & CHẤM ĐIỂM HỘI ĐỒNG (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-council-workspace" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
     <div class="bg-white rounded-2xl max-w-6xl w-full shadow-2xl flex flex-col max-h-[96vh] overflow-hidden border border-slate-200">
@@ -2919,6 +3226,126 @@
 
       </div>
 
+    </div>
+  </div>
+
+
+  <!-- ============================================================================
+       MODAL: ADMIN STUDENT SCORE DETAIL (v1.9.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-admin-score-detail" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 text-xs">
+      <div class="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
+        <div>
+          <h3 id="admin-score-detail-title" class="font-black text-sm sm:text-base text-slate-900">Chi tiết Điểm số: Nguyễn Văn A (12345678)</h3>
+          <p id="admin-score-detail-topic" class="text-[11px] text-slate-500 mt-0.5 truncate max-w-md">Đề tài: ...</p>
+        </div>
+        <button type="button" onclick="closeAdminStudentScoreDetail()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
+      </div>
+
+      <div class="p-5 space-y-5 overflow-y-auto flex-1">
+        
+        <!-- SƠ KHẢO DETAIL -->
+        <div class="p-4 bg-amber-50/50 rounded-2xl border border-amber-200 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-black text-xs text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🎯</span> ĐÁNH GIÁ SƠ KHẢO
+            </h4>
+            <span id="admin-score-detail-prelim-avg" class="font-black text-sm text-amber-900 bg-white px-2.5 py-1 rounded-xl border border-amber-300">
+              TB: --
+            </span>
+          </div>
+          <div id="admin-score-detail-prelim-list" class="space-y-1.5">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- ĐIỂM GVHD DETAIL -->
+        <div class="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-black text-xs text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+              <span>📝</span> ĐIỂM GIẢNG VIÊN HƯỚNG DẪN (GVHD)
+            </h4>
+            <div id="admin-score-detail-gvhd-actions" class="flex items-center gap-2">
+              <!-- Reopen button if completed -->
+            </div>
+          </div>
+          <div id="admin-score-detail-gvhd-body" class="p-3 bg-white rounded-xl border border-emerald-100 text-xs">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- THUYẾT MINH DETAIL -->
+        <div class="p-4 bg-blue-50/50 rounded-2xl border border-blue-200 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-black text-xs text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
+              <span>📖</span> ĐIỂM THUYẾT MINH (TM HD + TM PB)
+            </h4>
+            <span id="admin-score-detail-tm-final" class="font-black text-sm text-blue-900 bg-white px-2.5 py-1 rounded-xl border border-blue-300">
+              TM FINAL: --
+            </span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div id="admin-score-detail-tm-hd-card" class="p-3 bg-white rounded-xl border border-blue-100">
+              <!-- TM HD -->
+            </div>
+            <div id="admin-score-detail-tm-pb-card" class="p-3 bg-white rounded-xl border border-blue-100">
+              <!-- TM PB -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button type="button" onclick="closeAdminStudentScoreDetail()" class="px-4 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-700">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================
+       MODAL: GENERIC SCORE ENTRY FOR SUPERVISOR / PRELIMINARY / REVIEWER (v1.9.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-score-entry" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div>
+          <h4 id="score-entry-modal-title" class="font-black text-sm text-slate-900">Nhập Điểm Đánh giá</h4>
+          <p id="score-entry-student-name" class="text-xs text-slate-500 mt-0.5">Sinh viên: ...</p>
+        </div>
+        <button type="button" onclick="closeScoreEntryModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <input type="hidden" id="score-entry-type">
+        <input type="hidden" id="score-entry-student-id">
+
+        <div id="score-entry-warning-box" class="hidden p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">
+          <!-- Warning e.g. already finalized by another supervisor -->
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Điểm đánh giá (0 – 10, bước điểm 0.1) <span class="text-rose-500">*</span></label>
+          <div class="flex items-center gap-3">
+            <input type="number" id="score-entry-value" min="0" max="10" step="0.1" placeholder="8.5" class="w-36 p-2 border border-slate-300 rounded-xl font-mono text-sm font-black text-slate-900">
+            <span class="text-slate-500 font-semibold">/ 10 điểm</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Nhận xét chuyên môn (không bắt buộc):</label>
+          <textarea id="score-entry-comment" rows="3" placeholder="Góp ý chuyên môn, ưu khuyết điểm..." class="w-full p-2.5 border border-slate-300 rounded-xl"></textarea>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <span id="score-entry-saved-time" class="text-[11px] text-slate-400 font-mono"></span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeScoreEntryModal()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-600 font-bold">Hủy</button>
+          <button type="button" id="btn-score-entry-draft" onclick="saveScoreEntry(false)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded-lg">💾 Lưu tạm</button>
+          <button type="button" id="btn-score-entry-complete" onclick="saveScoreEntry(true)" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs">✓ Hoàn tất</button>
+        </div>
+      </div>
     </div>
   </div>
 
