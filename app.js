@@ -41,7 +41,7 @@ export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   }).length;
 }
 
-/** IFA+ Graduation Beta Studio v2.3.6-beta.1 (UAT Hotfix #1) **/
+/** IFA+ Graduation Beta Studio v2.4.0-beta.1 (IFAA CORS Fix + Drive Backend) **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -5263,7 +5263,7 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
     populateFacultyClassFilter(cached.rows);
     updateFacultyStatusUI(`Dữ liệu IFAA: ${cached.rows.length.toLocaleString('vi-VN')} SV (Bản lưu offline)`, 'warning');
     if (force) {
-      showToast(`Không thể cập nhật từ IFAA. Đang sử dụng dữ liệu đã lưu gần nhất: ${cached.rows.length.toLocaleString('vi-VN')} sinh viên.`, 'warning', 5000);
+      showToast(`Không thể cập nhật từ IFAA. Đang dùng dữ liệu lưu gần nhất: ${cached.rows.length.toLocaleString('vi-VN')} SV.`, 'warning', 5000);
     }
     return cached.rows;
   }
@@ -5294,7 +5294,7 @@ window.syncFacultyDatasetFromIFAA = async function() {
       return;
     }
     applyFacultyFiltersAndRender(1);
-    showToast(`✓ Đã đồng bộ thành công ${rows.length.toLocaleString('vi-VN')} sinh viên từ IFAA!`, 'success', 5000);
+    showToast(`✓ Đã tải ${rows.length.toLocaleString('vi-VN')} sinh viên từ IFAA.`, 'success', 5000);
   } catch (err) {
     showToast('Lỗi đồng bộ dữ liệu: ' + err.message, 'error', 5000);
   }
