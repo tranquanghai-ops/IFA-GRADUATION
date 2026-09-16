@@ -41,7 +41,7 @@ export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   }).length;
 }
 
-/** IFA+ Graduation Beta Studio v2.3.1-beta.1 (Phase B Migration) **/
+/** IFA+ Graduation Beta Studio v2.3.5-beta.1 (Phase B Activated) **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -10066,57 +10066,42 @@ window.saveScoreEntry = async function(isCompleted) {
     targetRound.preliminaryScores[key] = record;
     await persistScoreItem(roundId, `preliminaryScores.${key}`, record, key);
   } else if (type === 'supervisor') {
-    targetRound.supervisorScores = targetRound.supervisorScores || {};
-    const existing = targetRound.supervisorScores[studentId];
-
-    // Concurrency check
-    if (existing?.status === 'completed' && existing.submittedBySupervisorId !== myScorerId && !state.isAdmin) {
-      showToast('Điểm GVHD đã được hoàn tất bởi giảng viên khác.', 'error');
+    try {
+      const record = await window.submitSupervisorScoreTransaction({
+        roundId,
+        studentId,
+        supervisorId: myScorerId,
+        supervisorEmail: myScorerEmail,
+        supervisorName: myScorerName,
+        score: numVal,
+        feedback: comment,
+        isCompleted
+      });
+      targetRound.supervisorScores = targetRound.supervisorScores || {};
+      targetRound.supervisorScores[studentId] = record;
+    } catch (err) {
+      showToast(err.message || 'Lỗi lưu điểm GVHD', 'error');
       return;
     }
-
-    const record = {
-      roundId,
-      studentId,
-      score: isNaN(numVal) ? null : numVal,
-      comment,
-      submittedBySupervisorId: myScorerId,
-      submittedByName: myScorerName,
-      submittedByEmail: myScorerEmail,
-      decidedBy: myScorerEmail,
-      supervisorEmail: myScorerEmail,
-      status: isCompleted ? 'completed' : 'draft',
-      updatedAt: now,
-      completedAt: isCompleted ? (existing?.completedAt || now) : null
-    };
-    targetRound.supervisorScores[studentId] = record;
-    await persistScoreItem(roundId, `supervisorScores.${studentId}`, record, `sup_${studentId}`);
   } else if (type === 'tm_hd') {
-    targetRound.thesisScores = targetRound.thesisScores || {};
-    targetRound.thesisScores[studentId] = targetRound.thesisScores[studentId] || {};
-    const existing = targetRound.thesisScores[studentId].hd;
-
-    if (existing?.status === 'completed' && existing.submittedBySupervisorId !== myScorerId && !state.isAdmin) {
-      showToast('Điểm TM HD đã được hoàn tất bởi giảng viên khác.', 'error');
+    try {
+      const record = await window.submitThesisScoreHDTransaction({
+        roundId,
+        studentId,
+        supervisorId: myScorerId,
+        supervisorEmail: myScorerEmail,
+        supervisorName: myScorerName,
+        score: numVal,
+        feedback: comment,
+        isCompleted
+      });
+      targetRound.thesisScores = targetRound.thesisScores || {};
+      targetRound.thesisScores[studentId] = targetRound.thesisScores[studentId] || {};
+      targetRound.thesisScores[studentId].hd = record;
+    } catch (err) {
+      showToast(err.message || 'Lỗi lưu điểm TM HD', 'error');
       return;
     }
-
-    const record = {
-      roundId,
-      studentId,
-      score: isNaN(numVal) ? null : numVal,
-      comment,
-      submittedBySupervisorId: myScorerId,
-      submittedByName: myScorerName,
-      submittedByEmail: myScorerEmail,
-      decidedBy: myScorerEmail,
-      supervisorEmail: myScorerEmail,
-      status: isCompleted ? 'completed' : 'draft',
-      updatedAt: now,
-      completedAt: isCompleted ? (existing?.completedAt || now) : null
-    };
-    targetRound.thesisScores[studentId].hd = record;
-    await persistScoreItem(roundId, `thesisScores.${studentId}.hd`, record, `tmhd_${studentId}`);
   } else if (type === 'tm_pb') {
     targetRound.thesisScores = targetRound.thesisScores || {};
     targetRound.thesisScores[studentId] = targetRound.thesisScores[studentId] || {};
@@ -13871,17 +13856,9 @@ window.saveCouncilScoreRecord = async function(roundId, scoreData) {
     console.warn('Notice: Subcollection councilScores write pending rules approval:', err.message);
   }
 
-  // 2. Legacy Fallback Write (Admin only, or best effort)
+  // 2. Phase B Activated: New writes go strictly to subcollection /graduationRounds/{roundId}/councilScores/{scoreId}.
+  // We do NOT write into the parent round document to prevent document size bloat.
   const legacyKey = `${actId}_${cId}_${stId}_${scId}`;
-  if (state.isAdmin) {
-    try {
-      const roundRef = doc(db, 'graduationRounds', roundId);
-      await updateDoc(roundRef, {
-        [`councilScores.${legacyKey}`]: docPayload,
-        updatedAt: serverTimestamp()
-      }).catch(() => {});
-    } catch (e) {}
-  }
 
   // Update local memory
   if (!state.councilScores) state.councilScores = {};
@@ -13983,18 +13960,8 @@ window.saveSubmissionAttemptRecord = async function(roundId, activityId, student
       attempts: newAttempts
     };
 
-    if (state.isAdmin) {
-      try {
-        const roundRef = doc(db, 'graduationRounds', roundId);
-        await updateDoc(roundRef, {
-          [`activitySubmissions.${activityId}.${studentId}`]: {
-            currentSubmission: docPayload,
-            attempts: newAttempts
-          },
-          updatedAt: serverTimestamp()
-        }).catch(() => {});
-      } catch (e) {}
-    }
+    // Phase B Activated: Submissions are written strictly to subcollection.
+    // Parent round doc is kept clean without appending submission payload arrays.
   }
 
   return { success: true, submissionId, attemptNumber: attemptNum, receiptId, docPayload, subcolSuccess };
