@@ -1207,90 +1207,28 @@
             </div>
           </div>
 
-          <!-- 2. MIDDLE: FORM THÊM / CẬP NHẬT SINH VIÊN (CLEAN DESKTOP GRID) -->
-          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-            <div class="flex items-center justify-between border-b border-slate-200/60 pb-2.5">
-              <span class="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-                <span>👤 Thêm / Cập nhật sinh viên</span>
-              </span>
-              <span class="text-[11px] text-slate-500">Nhập MSSV đã có để cập nhật thông tin, MSSV mới để thêm vào danh sách</span>
-            </div>
-            <form id="form-faculty-student" onsubmit="saveSingleFacultyStudent(event)" class="space-y-3">
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                <div>
-                  <label class="font-bold text-slate-700 block mb-1">MSSV *</label>
-                  <input type="text" id="faculty-form-mssv" required placeholder="52000888" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase">
-                </div>
-                <div>
-                  <label class="font-bold text-slate-700 block mb-1">Họ và tên *</label>
-                  <input type="text" id="faculty-form-name" required placeholder="Nguyễn Văn A" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                </div>
-                <div>
-                  <label class="font-bold text-slate-700 block mb-1">Giới tính</label>
-                  <select id="faculty-form-gender" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                    <option value="">-- Chưa xác định --</option>
-                    <option value="Nam">Nam</option>
-                    <option value="Nữ">Nữ</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="font-bold text-slate-700 block mb-1">Ngành</label>
-                  <select id="faculty-form-major" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                    <option value="Thiết kế nội thất">Thiết kế nội thất</option>
-                    <option value="Thiết kế đồ họa">Thiết kế đồ họa</option>
-                    <option value="Thiết kế thời trang">Thiết kế thời trang</option>
-                    <option value="Thiết kế công nghiệp">Thiết kế công nghiệp</option>
-                    <option value="Nghệ thuật số">Nghệ thuật số</option>
-                    <option value="Khác">Khác</option>
-                  </select>
-                </div>
+          <!-- 2. READ-ONLY NOTICE BANNER (IFAA SINGLE SOURCE OF TRUTH) -->
+          <div class="bg-indigo-50/70 border border-indigo-200 rounded-2xl p-5 shadow-sm space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-300 shadow-sm">
+                  <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
+                  CHẾ ĐỘ CHỈ ĐỌC (READ-ONLY)
+                </span>
+                <span class="text-xs font-bold text-slate-800">Nguồn dữ liệu duy nhất: IFA+ Activities (ifa-activities)</span>
               </div>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                <div>
-                  <label class="font-bold text-slate-700 block mb-1">Lớp</label>
-                  <input type="text" id="faculty-form-class" placeholder="20050201" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                </div>
-                <div>
-                  <label class="font-bold text-slate-700 block mb-1">Email cá nhân / SV</label>
-                  <input type="email" id="faculty-form-email" placeholder="email@student.tdtu.edu.vn" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                </div>
-                <div>
-                  <label class="font-bold text-slate-700 block mb-1">Số điện thoại</label>
-                  <div class="flex gap-2">
-                    <input type="tel" id="faculty-form-phone" placeholder="0901234567" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                    <button type="submit" class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-lg font-bold text-xs shrink-0 shadow-sm transition-colors">
-                      <span>✓ Lưu sinh viên</span>
-                    </button>
-                  </div>
-                </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="syncFacultyDatasetFromIFAA()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors">
+                  <span>🔄 Đồng bộ từ IFAA</span>
+                </button>
+                <button type="button" onclick="exportFacultyStudentsExcel()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors">
+                  <span>📊 Xuất Excel</span>
+                </button>
               </div>
-            </form>
-          </div>
-
-          <!-- 3. LOWER: TOOLBAR ACTION BUTTONS (DATASET ACTIONS) -->
-          <div class="bg-white border border-slate-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">Thao tác dữ liệu:</span>
-              <span class="text-[11px] text-slate-400">Import file Excel, nén dataset hoặc sao lưu</span>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <label class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors">
-                <span>📥 Upload danh sách</span>
-                <input type="file" id="faculty-students-file-input" accept=".xlsx,.xls,.csv" onchange="handleFacultyStudentsUpload(event)" class="hidden">
-              </label>
-              <button type="button" onclick="rebuildFacultyDataset()" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-indigo-200 transition-colors" title="Đồng bộ & nén lại dữ liệu nền">
-                <span>🔄 Tạo lại dữ liệu nền</span>
-              </button>
-              <button type="button" onclick="downloadFacultyStudentsTemplate()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors">
-                <span>📄 File mẫu</span>
-              </button>
-              <button type="button" onclick="exportFacultyStudentsExcel()" class="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-emerald-200 transition-colors">
-                <span>📊 Xuất Excel</span>
-              </button>
-              <button type="button" onclick="clearAllFacultyStudents()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-rose-200 transition-colors">
-                <span>🗑️ Xóa tất cả</span>
-              </button>
-            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Danh mục sinh viên toàn khoa MTCN được quản lý tập trung tại <strong>IFA+ Activities</strong>. Hệ thống Graduation đóng vai trò <strong>Consumer (Chỉ đọc)</strong> phục vụ tự động điền hồ sơ, gợi ý sinh viên vào đợt và đối soát kết quả. Mọi thao tác thêm sinh viên, chỉnh sửa thông tin, cập nhật ngành/lớp đều thực hiện tại trang Quản trị IFAA.
+            </p>
           </div>
 
           <!-- BỘ LỌC & TÌM KIẾM (CLIENT-SIDE) -->

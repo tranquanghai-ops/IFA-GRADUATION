@@ -209,6 +209,11 @@ window.toggleRoundOpenImmediately = function(openNow) {
 
 import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
 import { 
+  getStorage, 
+  ref as storageRef, 
+  getBytes as storageGetBytes 
+} from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-storage.js';
+import { 
   getAuth, 
   onAuthStateChanged, 
   signInWithPopup, 
@@ -315,6 +320,7 @@ export const state = {
   projectTypes: DEFAULT_PROJECT_TYPES.map((name, idx) => ({ id: 'default_' + (idx + 1), name, order: idx + 1, active: true })),
   supervisorsMaster: [],
   facultyStudents: [],
+  facultyStudentsMap: new Map(),
   roundSupervisors: [],
   eligibleStudents: [],
   myRegistration: null,
@@ -4679,6 +4685,44 @@ const FACULTY_MAJORS = [
   'Nghệ thuật số'
 ];
 
+// ============================================================================
+// IFAA FACULTY STUDENT MASTER — READ-ONLY INTEGRATION (v2.3.4)
+// Single Source of Truth: ifa-activities (IFAA)
+// Graduation is STRICT CONSUMER ONLY. 0 Writes to IFAA.
+// ============================================================================
+
+export const IFAA_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDoz3iLOjU1JpHkgTDQHPyh29vUYOCcJhU",
+  authDomain: "ifa-activities.firebaseapp.com",
+  projectId: "ifa-activities",
+  storageBucket: "ifa-activities.firebasestorage.app",
+  messagingSenderId: "633545868576",
+  appId: "1:633545868576:web:c1509233a2b5046b320345"
+};
+
+let ifaaAppInstance = null;
+let ifaaFirestoreInstance = null;
+let ifaaStorageInstance = null;
+
+export function getIFAAFirebase() {
+  try {
+    if (!ifaaAppInstance) {
+      const existing = getApps().find(a => a.name === 'ifaa-readonly');
+      ifaaAppInstance = existing || initializeApp(IFAA_FIREBASE_CONFIG, 'ifaa-readonly');
+    }
+    if (!ifaaFirestoreInstance && ifaaAppInstance) {
+      ifaaFirestoreInstance = getFirestore(ifaaAppInstance);
+    }
+    if (!ifaaStorageInstance && ifaaAppInstance) {
+      ifaaStorageInstance = getStorage(ifaaAppInstance);
+    }
+    return { app: ifaaAppInstance, db: ifaaFirestoreInstance, storage: ifaaStorageInstance };
+  } catch (err) {
+    console.warn('[IFAA ReadOnly] Không thể khởi tạo secondary app:', err);
+    return { app: null, db: null, storage: null };
+  }
+}
+
 // IndexedDB Cache for Faculty Dataset
 const FACULTY_CACHE_DB = 'graduation-faculty-dataset';
 const FACULTY_CACHE_STORE = 'datasets';
@@ -4734,23 +4778,16 @@ async function setFacultyCache(data) {
   } catch {}
 }
 
-async function gzipData(text) {
-  if (!('CompressionStream' in window)) return null;
-  try {
-    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
-  } catch {
-    return null;
-  }
-}
-
 async function gunzipData(bytes) {
-  if (!('DecompressionStream' in window)) return null;
+  if (!('DecompressionStream' in window)) {
+    throw new Error('Trình duyệt chưa hỗ trợ DecompressionStream(gzip).');
+  }
   try {
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-    return new Response(stream).text();
-  } catch {
-    return null;
+    return await new Response(stream).text();
+  } catch (err) {
+    console.error('Lỗi giải nén gzip:', err);
+    throw err;
   }
 }
 
@@ -4760,6 +4797,9 @@ state.facultyStudentsLoaded = false;
 state.facultyFilteredStudents = [];
 state.facultyCurrentPage = 1;
 state.facultyPageSize = 15;
+if (!state.facultyStudentsMap) {
+  state.facultyStudentsMap = new Map();
+}
 
 function updateFacultyStatusUI(text, stateType = 'info') {
   const textEl = document.getElementById('faculty-dataset-status-text');
@@ -4775,122 +4815,266 @@ function updateFacultyStatusUI(text, stateType = 'info') {
   }
 }
 
-// Tab Entry: zero documents rendered by default, loads metadata only
+function normalizeFacultyRows(value) {
+  const rows = Array.isArray(value) ? value : value?.students;
+  if (!Array.isArray(rows)) return [];
+  return rows.filter(item => item && item.mssv).map(item => {
+    const mssv = String(item.mssv).trim().toUpperCase();
+    const fullName = String(item.name || item.fullName || '').trim().replace(/\s+/g, ' ');
+    const studentClass = String(item.studentClass || item.className || '').trim();
+    return {
+      mssv,
+      studentId: mssv,
+      name: fullName,
+      fullName: fullName,
+      email: String(item.email || `${mssv.toLowerCase()}@student.tdtu.edu.vn`).trim().toLowerCase(),
+      gender: String(item.gender || '').trim(),
+      major: String(item.major || '').trim(),
+      className: studentClass,
+      studentClass: studentClass,
+      admissionYear: item.admissionYear || '',
+      course: item.course || '',
+      phone: item.phone || ''
+    };
+  });
+}
+
+// ============================================================================
+// CENTRAL STUDENT RESOLVER API (READ-ONLY)
+// ============================================================================
+
+window.getFacultyStudent = function(studentId) {
+  if (!studentId) return null;
+  const cleanId = String(studentId).trim().toUpperCase();
+
+  // 1. In-memory Map lookup (O(1))
+  if (state.facultyStudentsMap && state.facultyStudentsMap.has(cleanId)) {
+    return state.facultyStudentsMap.get(cleanId);
+  }
+
+  // 2. In-memory array fallback
+  const inList = (state.facultyStudents || []).find(s => s.mssv === cleanId || s.studentId === cleanId);
+  if (inList) {
+    if (state.facultyStudentsMap) state.facultyStudentsMap.set(cleanId, inList);
+    return inList;
+  }
+
+  // 3. Graceful fallback for missing student in master (never crash)
+  return {
+    mssv: cleanId,
+    studentId: cleanId,
+    name: `Sinh viên ${cleanId}`,
+    fullName: `Sinh viên ${cleanId}`,
+    gender: '',
+    major: '',
+    className: '',
+    studentClass: '',
+    email: `${cleanId.toLowerCase()}@student.tdtu.edu.vn`,
+    phone: '',
+    isMissing: true,
+    notFoundInMaster: true
+  };
+};
+
+window.getFacultyStudents = function(filterFn) {
+  const list = state.facultyStudents || [];
+  return typeof filterFn === 'function' ? list.filter(filterFn) : list;
+};
+
+window.searchFacultyStudents = async function(query, options = {}) {
+  await ensureFacultyDatasetLoaded();
+  const q = String(query || '').trim().toLowerCase();
+  let results = state.facultyStudents || [];
+
+  if (q) {
+    results = results.filter(s =>
+      (s.mssv && s.mssv.toLowerCase().includes(q)) ||
+      (s.fullName && s.fullName.toLowerCase().includes(q)) ||
+      (s.name && s.name.toLowerCase().includes(q)) ||
+      (s.email && s.email.toLowerCase().includes(q)) ||
+      (s.className && s.className.toLowerCase().includes(q)) ||
+      (s.studentClass && s.studentClass.toLowerCase().includes(q))
+    );
+  }
+
+  if (options.major) {
+    results = results.filter(s => (s.major || '').toLowerCase() === String(options.major).toLowerCase());
+  }
+
+  if (options.className || options.studentClass) {
+    const cls = options.className || options.studentClass;
+    results = results.filter(s => (s.className || s.studentClass || '') === cls);
+  }
+
+  if (options.gender) {
+    results = results.filter(s => (s.gender || '').toLowerCase() === String(options.gender).toLowerCase());
+  }
+
+  return results;
+};
+
+// Main Loader: Fetches from IFAA Secondary App / Storage + IndexedDB Cache
+export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
+  // 1. In-memory cached
+  if (!force && state.facultyStudentsLoaded && state.facultyStudents && state.facultyStudents.length > 0) {
+    return state.facultyStudents;
+  }
+
+  // 2. Local IndexedDB Cache
+  const cached = await getFacultyCache();
+
+  // 3. Read metadata from IFAA Firestore
+  let meta = null;
+  try {
+    const { db: ifaaDb } = getIFAAFirebase();
+    if (ifaaDb) {
+      const metaSnap = await getDoc(doc(ifaaDb, 'facultyStudentMeta', 'current'));
+      if (metaSnap.exists()) {
+        meta = metaSnap.data();
+        state.facultyDatasetMeta = meta;
+      }
+    }
+  } catch (err) {
+    console.warn('[IFAA ReadOnly] Không thể đọc facultyStudentMeta từ IFAA:', err.message);
+  }
+
+  const currentVersion = Number(meta?.datasetVersion || meta?.version || 0);
+
+  // 4. Cache validation check: if cached version matches metadata version, use cache
+  if (!force && cached && Array.isArray(cached.rows) && cached.rows.length > 0) {
+    if (!currentVersion || Number(cached.version) === currentVersion) {
+      state.facultyStudents = cached.rows;
+      state.facultyStudentsMap = new Map(cached.rows.map(s => [s.mssv, s]));
+      state.facultyStudentsLoaded = true;
+      populateFacultyClassFilter(cached.rows);
+      updateFacultyStatusUI(`Dữ liệu IFAA: ${cached.rows.length} SV (từ Cache)`, 'success');
+      return cached.rows;
+    }
+  }
+
+  // 5. Download Gzipped JSON from IFAA Storage / URL
+  updateFacultyStatusUI('Đang tải dữ liệu từ IFA+ Activities...', 'info');
+  let bytes = null;
+
+  // Method A: Download via datasetUrl (if public token present)
+  if (meta?.datasetUrl) {
+    try {
+      const res = await fetch(meta.datasetUrl, { cache: 'no-store' });
+      if (res.ok) {
+        const buffer = await res.arrayBuffer();
+        bytes = new Uint8Array(buffer);
+      }
+    } catch (e) {
+      console.warn('[IFAA ReadOnly] Lỗi tải từ datasetUrl:', e);
+    }
+  }
+
+  // Method B: Download via Firebase Storage SDK (read-only)
+  if (!bytes) {
+    try {
+      const { storage: ifaaStorage } = getIFAAFirebase();
+      if (ifaaStorage) {
+        const path = meta?.datasetPath || 'datasets/faculty-students.json.gz';
+        bytes = await storageGetBytes(storageRef(ifaaStorage, path), 15 * 1024 * 1024);
+      }
+    } catch (e) {
+      console.warn('[IFAA ReadOnly] Lỗi tải từ Storage getBytes:', e.message);
+    }
+  }
+
+  // 6. Decompress & Parse
+  if (bytes) {
+    try {
+      const text = await gunzipData(bytes);
+      const parsed = JSON.parse(text);
+      const rows = normalizeFacultyRows(parsed);
+      rows.sort((a, b) => String(a.mssv).localeCompare(String(b.mssv)));
+
+      state.facultyStudents = rows;
+      state.facultyStudentsMap = new Map(rows.map(s => [s.mssv, s]));
+      state.facultyStudentsLoaded = true;
+
+      // Save to IndexedDB
+      await setFacultyCache({
+        version: currentVersion || Date.now(),
+        rows: rows,
+        cachedAt: Date.now(),
+        count: rows.length
+      });
+
+      populateFacultyClassFilter(rows);
+      updateFacultyStatusUI(`Dữ liệu IFAA: ${rows.length} SV (Đã đồng bộ)`, 'success');
+      return rows;
+    } catch (err) {
+      console.error('[IFAA ReadOnly] Lỗi xử lý dữ liệu IFAA:', err);
+    }
+  }
+
+  // 7. Offline fallback to cached rows if available
+  if (cached && Array.isArray(cached.rows) && cached.rows.length > 0) {
+    state.facultyStudents = cached.rows;
+    state.facultyStudentsMap = new Map(cached.rows.map(s => [s.mssv, s]));
+    state.facultyStudentsLoaded = true;
+    populateFacultyClassFilter(cached.rows);
+    updateFacultyStatusUI(`Dữ liệu IFAA: ${cached.rows.length} SV (Cache ngoại tuyến)`, 'warning');
+    return cached.rows;
+  }
+
+  // 8. Graceful empty state (never throw to break callers)
+  state.facultyStudents = [];
+  state.facultyStudentsMap = new Map();
+  state.facultyStudentsLoaded = true;
+  updateFacultyStatusUI('Chưa có dữ liệu nền từ IFAA', 'warning');
+  return [];
+}
+
+window.ensureFacultyDatasetLoaded = async function(force = false) {
+  return await loadFacultyDatasetFromIFAA({ force });
+};
+
+window.syncFacultyDatasetFromIFAA = async function() {
+  showToast('🔄 Đang đồng bộ danh mục sinh viên từ IFA+ Activities...', 'info');
+  updateFacultyStatusUI('Đang đồng bộ từ IFAA...', 'info');
+  try {
+    const rows = await loadFacultyDatasetFromIFAA({ force: true });
+    applyFacultyFiltersAndRender(1);
+    showToast(`✓ Đã đồng bộ thành công ${rows.length} sinh viên từ IFAA!`, 'success');
+  } catch (err) {
+    showToast('Lỗi đồng bộ dữ liệu: ' + err.message, 'error');
+  }
+};
+
 window.openFacultyStudentsTab = async function() {
   const totalCountEl = document.getElementById('faculty-students-total-count');
   const filteredCountEl = document.getElementById('faculty-students-filtered-count');
   const metaInfoEl = document.getElementById('faculty-dataset-meta-info');
 
-  // If already loaded in memory, just update metadata counts
   if (state.facultyStudentsLoaded && state.facultyStudents && state.facultyStudents.length > 0) {
     if (totalCountEl) totalCountEl.textContent = state.facultyStudents.length.toLocaleString('vi-VN');
-    updateFacultyStatusUI(`Dữ liệu nền: ${state.facultyStudents.length} SV (đã trong bộ nhớ)`, 'success');
+    updateFacultyStatusUI(`Dữ liệu IFAA: ${state.facultyStudents.length} SV (sẵn sàng)`, 'success');
     return;
   }
 
-  updateFacultyStatusUI('Đang kiểm tra dữ liệu nền...', 'info');
+  updateFacultyStatusUI('Đang kiểm tra dữ liệu từ IFA+ Activities...', 'info');
 
   try {
-    // 1. Check local IndexedDB cache first
-    const cached = await getFacultyCache();
-    if (cached && Array.isArray(cached.rows) && cached.rows.length > 0) {
-      const count = cached.rows.length;
-      if (totalCountEl) totalCountEl.textContent = count.toLocaleString('vi-VN');
+    const rows = await ensureFacultyDatasetLoaded(false);
+    if (rows && rows.length > 0) {
+      if (totalCountEl) totalCountEl.textContent = rows.length.toLocaleString('vi-VN');
       if (filteredCountEl) filteredCountEl.textContent = '0';
-      if (metaInfoEl) metaInfoEl.textContent = `· Cache: ${count} SV · Cập nhật: ${new Date(cached.cachedAt || Date.now()).toLocaleDateString('vi-VN')}`;
-      updateFacultyStatusUI(`Dữ liệu nền: ${count} SV (sẵn sàng tải)`, 'success');
-      populateFacultyClassFilter(cached.rows);
-      return;
-    }
-
-    // 2. Read single metadata document from Firestore (only 1 read)
-    let meta = null;
-    try {
-      const metaSnap = await getDoc(doc(db, 'facultyStudentMeta', 'current'));
-      if (metaSnap.exists()) {
-        meta = metaSnap.data();
-        state.facultyDatasetMeta = meta;
+      if (metaInfoEl) {
+        metaInfoEl.textContent = `· Nguồn: IFAA · ${rows.length} SV`;
       }
-    } catch (err) {
-      console.warn('Could not read facultyStudentMeta document:', err);
-    }
-
-    if (meta && meta.count) {
-      const count = Number(meta.count);
-      if (totalCountEl) totalCountEl.textContent = count.toLocaleString('vi-VN');
-      if (filteredCountEl) filteredCountEl.textContent = '0';
-      if (metaInfoEl) metaInfoEl.textContent = `· v${meta.datasetVersion || 1} · ${meta.datasetBytes ? (meta.datasetBytes/1024).toFixed(1) + ' KB' : ''}`;
-      updateFacultyStatusUI(`Dữ liệu nền: ${count.toLocaleString('vi-VN')} SV (sẵn sàng tải)`, 'success');
+      applyFacultyFiltersAndRender(1);
     } else {
       if (totalCountEl) totalCountEl.textContent = '0';
-      updateFacultyStatusUI('Chưa có dữ liệu nền (vui lòng upload Excel)', 'warning');
+      updateFacultyStatusUI('Chưa có dữ liệu sinh viên từ IFAA', 'warning');
     }
   } catch (err) {
-    console.error('Lỗi kiểm tra metadata SV khoa:', err);
-    updateFacultyStatusUI('Dữ liệu nền sẵn sàng', 'info');
+    console.error('Lỗi nạp danh sách SV khoa:', err);
+    updateFacultyStatusUI('Lỗi tải dữ liệu: ' + err.message, 'error');
   }
 };
-
-// Helper: load raw dataset into client memory
-async function ensureFacultyDatasetLoaded(force = false) {
-  if (!force && state.facultyStudentsLoaded && state.facultyStudents && state.facultyStudents.length > 0) {
-    return state.facultyStudents;
-  }
-
-  updateFacultyStatusUI('Đang nạp dữ liệu nền vào bộ nhớ...', 'info');
-
-  // Check cache
-  if (!force) {
-    const cached = await getFacultyCache();
-    if (cached && Array.isArray(cached.rows) && cached.rows.length > 0) {
-      state.facultyStudents = cached.rows;
-      state.facultyStudentsLoaded = true;
-      populateFacultyClassFilter(state.facultyStudents);
-      updateFacultyStatusUI(`Đã tải: ${state.facultyStudents.length} SV (từ Cache)`, 'success');
-      return state.facultyStudents;
-    }
-  }
-
-  // Load from Firestore collection
-  try {
-    const snap = await getDocs(collection(db, 'facultyStudents'));
-    const rows = snap.docs.map(d => {
-      const data = d.data();
-      return {
-        mssv: d.id,
-        fullName: data.fullName || data.name || '',
-        name: data.fullName || data.name || '',
-        gender: data.gender || '',
-        major: data.major || '',
-        className: data.className || data.studentClass || '',
-        studentClass: data.className || data.studentClass || '',
-        email: data.email || `${d.id.toLowerCase()}@student.tdtu.edu.vn`,
-        phone: data.phone || ''
-      };
-    });
-
-    // Sort by MSSV
-    rows.sort((a, b) => String(a.mssv).localeCompare(String(b.mssv)));
-
-    state.facultyStudents = rows;
-    state.facultyStudentsLoaded = true;
-
-    // Cache locally
-    await setFacultyCache({
-      version: Date.now(),
-      rows: rows,
-      cachedAt: Date.now()
-    });
-
-    populateFacultyClassFilter(rows);
-    updateFacultyStatusUI(`Đã tải: ${rows.length} SV vào bộ nhớ`, 'success');
-    return rows;
-  } catch (err) {
-    console.error('Lỗi tải dataset SV khoa:', err);
-    updateFacultyStatusUI('Lỗi tải dữ liệu: ' + err.message, 'error');
-    throw err;
-  }
-}
 
 function populateFacultyClassFilter(rows) {
   const classSelect = document.getElementById('faculty-class-filter');
@@ -4901,19 +5085,14 @@ function populateFacultyClassFilter(rows) {
     classes.map(c => `<option value="${c}" ${c === curVal ? 'selected' : ''}>${c}</option>`).join('');
 }
 
-// Client-side Search & Filter
-window.searchFacultyStudents = async function() {
-  await loadAndRenderFacultyStudents();
-};
-
 window.loadAndRenderFacultyStudents = async function() {
   const tbody = document.getElementById('faculty-students-tbody');
   if (tbody) {
-    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500">⏳ Đang tải và lọc danh sách sinh viên...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500">⏳ Đang tải danh sách sinh viên từ IFAA...</td></tr>';
   }
 
   try {
-    const dataset = await ensureFacultyDatasetLoaded();
+    await ensureFacultyDatasetLoaded();
     applyFacultyFiltersAndRender(1);
   } catch (err) {
     if (tbody) {
@@ -5000,10 +5179,11 @@ function renderFacultyStudentsCurrentPage() {
       <td class="p-3 text-slate-700 font-medium">${s.major || '--'}</td>
       <td class="p-3 font-mono text-slate-600">${s.className || s.studentClass || '--'}</td>
       <td class="p-3 text-slate-500 font-mono text-[11px]">${s.email || '--'}</td>
-      <td class="p-3 text-slate-500 font-mono text-[11px]">${s.phone || '--'}</td>
+      <td class="p-3 text-slate-500 font-mono text-[11px]">${s.course || s.admissionYear || s.phone || '--'}</td>
       <td class="p-3 text-right">
-        <button onclick="editFacultyStudentInline('${s.mssv}')" class="text-blue-600 hover:text-blue-800 hover:underline font-bold text-xs mr-2">Sửa</button>
-        <button onclick="deleteFacultyStudent('${s.mssv}')" class="text-rose-600 hover:text-rose-800 hover:underline font-bold text-xs">Xóa</button>
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+          IFAA Master
+        </span>
       </td>
     </tr>
   `).join('');
@@ -5046,394 +5226,52 @@ window.resetFacultyStudentFilters = function() {
 };
 
 // ============================================================================
-// EXCEL IMPORTER: FORMAT A & FORMAT B WITH UNIFIED SCHEMA & DEDUPLICATION
+// STRICT READ-ONLY LOCKDOWN: LEGACY MUTATION FUNCTIONS INTERCEPTED
+// Zero writes to IFAA. Zero writes to Graduation facultyStudents.
 // ============================================================================
-window.handleFacultyStudentsUpload = async function(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
 
-  try {
-    const data = new Uint8Array(await file.arrayBuffer());
-    const workbook = XLSX.read(data, { type: 'array' });
-    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
-
-    if (!rawRows || rawRows.length === 0) {
-      showToast('File Excel rỗng hoặc không có dữ liệu.', 'error');
-      return;
-    }
-
-    // Flexible Header Matcher supporting Format A & Format B
-    const keys = Object.keys(rawRows[0]);
-    const cleanHeader = s => String(s || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, '');
-
-    const findKey = (...aliases) => keys.find(k => aliases.includes(cleanHeader(k)));
-
-    // Recognized Aliases for Format A & Format B
-    const mssvKey = findKey('masv', 'maso', 'mssv', 'masinhvien', 'studentid');
-    const fullNameKey = findKey('hoten', 'hovaten', 'fullname', 'name');
-    const familyKey = findKey('holot', 'hodem', 'ho', 'familyname');
-    const givenKey = findKey('ten', 'firstname');
-    const genderKey = findKey('gioitinh', 'phai', 'gender', 'sex');
-    const majorKey = findKey('nganh', 'nganhhoc', 'chuyennganh', 'major');
-    const classKey = findKey('lop', 'lophoc', 'lopquanly', 'class', 'classname');
-    const emailKey = findKey('email', 'thudientu', 'mail');
-    const phoneKey = findKey('sodienthoai', 'dienthoai', 'sdt', 'phone', 'telephone', 'mobile');
-
-    if (!mssvKey || (!fullNameKey && !(familyKey && givenKey))) {
-      showToast('File cần có cột MSSV (Mã SV / Mã số) và Họ tên (hoặc Họ lót + Tên).', 'error');
-      return;
-    }
-
-    // Normalization & Deduplication by MSSV
-    const uniqueMap = new Map();
-
-    rawRows.forEach(row => {
-      const rawMssv = String(row[mssvKey] || '').trim().toUpperCase();
-      if (!rawMssv || rawMssv.length < 5) return;
-
-      // Full Name resolution
-      let fullName = '';
-      if (fullNameKey && String(row[fullNameKey] || '').trim()) {
-        fullName = String(row[fullNameKey]).trim();
-      } else {
-        const fam = familyKey ? String(row[familyKey] || '').trim() : '';
-        const giv = givenKey ? String(row[givenKey] || '').trim() : '';
-        fullName = [fam, giv].filter(Boolean).join(' ');
-      }
-      fullName = fullName.replace(/\s+/g, ' ');
-      if (!fullName) return;
-
-      const gender = genderKey ? String(row[genderKey] || '').trim() : '';
-      const major = majorKey ? String(row[majorKey] || '').trim() : '';
-      const className = classKey ? String(row[classKey] || '').trim() : '';
-      let email = emailKey ? String(row[emailKey] || '').trim().toLowerCase() : '';
-      if (!email) {
-        email = `${rawMssv.toLowerCase()}@student.tdtu.edu.vn`;
-      }
-      const phone = phoneKey ? String(row[phoneKey] || '').trim() : '';
-
-      // Standard Schema
-      const studentObj = {
-        mssv: rawMssv,
-        fullName: fullName,
-        name: fullName,
-        gender: gender,
-        major: major,
-        className: className,
-        studentClass: className,
-        email: email,
-        phone: phone
-      };
-
-      // Deduplicate by MSSV: keep first or update missing
-      if (!uniqueMap.has(rawMssv)) {
-        uniqueMap.set(rawMssv, studentObj);
-      } else {
-        const existing = uniqueMap.get(rawMssv);
-        uniqueMap.set(rawMssv, {
-          ...existing,
-          gender: existing.gender || gender,
-          major: existing.major || major,
-          className: existing.className || className,
-          phone: existing.phone || phone
-        });
-      }
-    });
-
-    const records = Array.from(uniqueMap.values());
-    if (records.length === 0) {
-      showToast('Không tìm thấy dòng sinh viên hợp lệ trong file.', 'warning');
-      return;
-    }
-
-    showToast(`Đang xử lý và lưu ${records.length} sinh viên...`, 'info');
-
-    // Batch write to Firestore
-    for (let offset = 0; offset < records.length; offset += 450) {
-      const batch = writeBatch(db);
-      const chunk = records.slice(offset, offset + 450);
-      chunk.forEach(item => {
-        const ref = doc(db, 'facultyStudents', item.mssv);
-        batch.set(ref, {
-          ...item,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      });
-      await batch.commit();
-    }
-
-    // Update metadata document
-    const metaPayload = {
-      count: records.length,
-      datasetVersion: Date.now(),
-      datasetEncoding: 'gzip',
-      updatedAt: serverTimestamp()
-    };
-    await setDoc(doc(db, 'facultyStudentMeta', 'current'), metaPayload, { merge: true }).catch(console.warn);
-
-    // Save in local state & IndexedDB cache
-    state.facultyStudents = records;
-    state.facultyStudentsLoaded = true;
-    await setFacultyCache({
-      version: metaPayload.datasetVersion,
-      rows: records,
-      cachedAt: Date.now()
-    });
-
-    populateFacultyClassFilter(records);
-    applyFacultyFiltersAndRender(1);
-
-    // Try gzip compression (IFAA mechanism)
-    try {
-      const payloadStr = JSON.stringify({ schemaVersion: 1, students: records });
-      const compressed = await gzipData(payloadStr);
-      if (compressed) {
-        console.log(`[IFAA Dataset] Nén thành công: ${records.length} SV · ${(compressed.byteLength / 1024).toFixed(1)} KB`);
-      }
-    } catch (e) {
-      console.warn('Lỗi nén dataset:', e);
-    }
-
-    showToast(`✓ Đã nhập thành công ${records.length} sinh viên khoa!`, 'success');
-  } catch (err) {
-    console.error('Lỗi nhập file SV khoa:', err);
-    showToast('Lỗi đọc file: ' + err.message, 'error');
-  } finally {
-    event.target.value = '';
-  }
-};
-
-// Form Single Student Create / Update
 window.saveSingleFacultyStudent = async function(e) {
   if (e && typeof e.preventDefault === 'function') e.preventDefault();
-
-  const mssvInput = document.getElementById('faculty-form-mssv');
-  const nameInput = document.getElementById('faculty-form-name');
-  const genderInput = document.getElementById('faculty-form-gender');
-  const majorInput = document.getElementById('faculty-form-major');
-  const classInput = document.getElementById('faculty-form-class');
-  const emailInput = document.getElementById('faculty-form-email');
-  const phoneInput = document.getElementById('faculty-form-phone');
-
-  const mssv = (mssvInput?.value || '').trim().toUpperCase();
-  const fullName = (nameInput?.value || '').trim().replace(/\s+/g, ' ');
-  const gender = genderInput?.value || '';
-  const major = majorInput?.value || '';
-  const className = (classInput?.value || '').trim();
-  let email = (emailInput?.value || '').trim().toLowerCase();
-  if (!email && mssv) {
-    email = `${mssv.toLowerCase()}@student.tdtu.edu.vn`;
-  }
-  const phone = (phoneInput?.value || '').trim();
-
-  if (!mssv || !fullName) {
-    showToast('Vui lòng nhập MSSV và Họ tên sinh viên!', 'warning');
-    return;
-  }
-
-  const studentObj = {
-    mssv,
-    fullName,
-    name: fullName,
-    gender,
-    major,
-    className,
-    studentClass: className,
-    email,
-    phone,
-    updatedAt: serverTimestamp()
-  };
-
-  try {
-    await setDoc(doc(db, 'facultyStudents', mssv), studentObj, { merge: true });
-
-    // Update in-memory
-    if (state.facultyStudentsLoaded && Array.isArray(state.facultyStudents)) {
-      const idx = state.facultyStudents.findIndex(s => s.mssv === mssv);
-      if (idx >= 0) {
-        state.facultyStudents[idx] = { ...state.facultyStudents[idx], ...studentObj };
-      } else {
-        state.facultyStudents.unshift(studentObj);
-      }
-      await setFacultyCache({
-        version: Date.now(),
-        rows: state.facultyStudents,
-        cachedAt: Date.now()
-      });
-      applyFacultyFiltersAndRender(state.facultyCurrentPage || 1);
-    }
-
-    // Reset form
-    if (mssvInput) mssvInput.value = '';
-    if (nameInput) nameInput.value = '';
-    if (genderInput) genderInput.value = '';
-    if (classInput) classInput.value = '';
-    if (emailInput) emailInput.value = '';
-    if (phoneInput) phoneInput.value = '';
-
-    showToast(`✓ Đã lưu sinh viên ${mssv}!`, 'success');
-  } catch (err) {
-    showToast('Lỗi lưu sinh viên: ' + err.message, 'error');
-  }
+  showToast('⚠️ Chế độ Read-Only: Dữ liệu sinh viên toàn khoa được quản lý tập trung tại IFA+ Activities. Vui lòng thêm/sửa tại hệ thống IFAA.', 'warning');
+  return false;
 };
 
 window.editFacultyStudentInline = function(mssv) {
-  const s = (state.facultyStudents || []).find(x => x.mssv === mssv);
-  if (!s) return;
-
-  const mssvInput = document.getElementById('faculty-form-mssv');
-  const nameInput = document.getElementById('faculty-form-name');
-  const genderInput = document.getElementById('faculty-form-gender');
-  const majorInput = document.getElementById('faculty-form-major');
-  const classInput = document.getElementById('faculty-form-class');
-  const emailInput = document.getElementById('faculty-form-email');
-  const phoneInput = document.getElementById('faculty-form-phone');
-
-  if (mssvInput) mssvInput.value = s.mssv;
-  if (nameInput) nameInput.value = s.fullName || s.name || '';
-  if (genderInput) genderInput.value = s.gender || '';
-  if (majorInput) majorInput.value = s.major || 'Thiết kế nội thất';
-  if (classInput) classInput.value = s.className || s.studentClass || '';
-  if (emailInput) emailInput.value = s.email || '';
-  if (phoneInput) phoneInput.value = s.phone || '';
-
-  showToast(`Đã đưa sinh viên ${s.mssv} vào form để chỉnh sửa.`, 'info');
-  mssvInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  showToast(`ℹ️ Chế độ Read-Only: Hồ sơ sinh viên ${mssv} được quản lý tại IFA+ Activities (ifa-activities).`, 'info');
+  return false;
 };
 
 window.deleteFacultyStudent = async function(mssv) {
-  const confirmed = await showConfirm(
-    'Xóa sinh viên khỏi Khoa',
-    `Bạn có chắc chắn muốn xóa sinh viên MSSV ${mssv} khỏi danh sách sinh viên toàn khoa?`,
-    { confirmText: 'Xóa sinh viên', danger: true }
-  );
-  if (!confirmed) return;
-
-  try {
-    await deleteDoc(doc(db, 'facultyStudents', mssv));
-    if (state.facultyStudents) {
-      state.facultyStudents = state.facultyStudents.filter(s => s.mssv !== mssv);
-      await setFacultyCache({
-        version: Date.now(),
-        rows: state.facultyStudents,
-        cachedAt: Date.now()
-      });
-      applyFacultyFiltersAndRender(state.facultyCurrentPage || 1);
-    }
-    showToast(`Đã xóa sinh viên ${mssv}.`, 'success');
-  } catch (err) {
-    showToast('Lỗi xóa sinh viên: ' + err.message, 'error');
-  }
+  showToast('⚠️ Chế độ Read-Only: Danh sách sinh viên được đồng bộ từ IFA+ Activities. Không thể xóa sinh viên tại Graduation.', 'warning');
+  return false;
 };
 
 window.clearAllFacultyStudents = async function() {
-  const count = (state.facultyStudents || []).length;
-  if (count === 0) {
-    showToast('Danh sách sinh viên khoa hiện đang trống hoặc chưa được tải.', 'info');
-    return;
-  }
-
-  const confirmed = await showConfirm(
-    'Xóa toàn bộ Danh sách SV Khoa?',
-    `⚠️ CẢNH BÁO NGUY HIỂM:\n\nBạn sắp xóa toàn bộ ${count} sinh viên khỏi cơ sở dữ liệu sinh viên khoa! Hành động này không thể hoàn tác.`,
-    { confirmText: 'Xóa toàn bộ', danger: true }
-  );
-  if (!confirmed) return;
-
-  try {
-    showToast('Đang xóa toàn bộ dữ liệu...', 'info');
-    const toDelete = [...state.facultyStudents];
-    for (let offset = 0; offset < toDelete.length; offset += 450) {
-      const batch = writeBatch(db);
-      toDelete.slice(offset, offset + 450).forEach(s => {
-        batch.delete(doc(db, 'facultyStudents', s.mssv));
-      });
-      await batch.commit();
-    }
-
-    state.facultyStudents = [];
-    state.facultyFilteredStudents = [];
-    await setFacultyCache({ version: 0, rows: [], cachedAt: Date.now() });
-    await setDoc(doc(db, 'facultyStudentMeta', 'current'), { count: 0, datasetVersion: 0, updatedAt: serverTimestamp() }, { merge: true }).catch(console.warn);
-
-    applyFacultyFiltersAndRender(1);
-    updateFacultyStatusUI('Dữ liệu nền trống (0 SV)', 'warning');
-    showToast('Đã xóa toàn bộ sinh viên khoa.', 'success');
-  } catch (err) {
-    showToast('Lỗi xóa dữ liệu: ' + err.message, 'error');
-  }
+  showToast('⚠️ Chế độ Read-Only: Danh mục sinh viên được quản lý tại IFA+ Activities. Thao tác xóa bị vô hiệu hóa.', 'warning');
+  return false;
 };
 
-// Rebuild Compressed Dataset (IFAA Standard)
+window.handleFacultyStudentsUpload = async function(event) {
+  if (event?.target) event.target.value = '';
+  showToast('⚠️ Chế độ Read-Only: Vui lòng tải lên danh sách sinh viên toàn khoa tại trang Quản trị IFA+ Activities để cập nhật master dataset.', 'warning');
+  return false;
+};
+
 window.rebuildFacultyDataset = async function() {
-  showToast('Đang tải danh sách để tạo lại dữ liệu nền...', 'info');
-  updateFacultyStatusUI('Đang tạo lại dữ liệu nền...', 'info');
-
-  try {
-    const snap = await getDocs(collection(db, 'facultyStudents'));
-    const rows = snap.docs.map(d => {
-      const data = d.data();
-      return {
-        mssv: d.id,
-        fullName: data.fullName || data.name || '',
-        name: data.fullName || data.name || '',
-        gender: data.gender || '',
-        major: data.major || '',
-        className: data.className || data.studentClass || '',
-        studentClass: data.className || data.studentClass || '',
-        email: data.email || `${d.id.toLowerCase()}@student.tdtu.edu.vn`,
-        phone: data.phone || ''
-      };
-    });
-
-    rows.sort((a, b) => String(a.mssv).localeCompare(String(b.mssv)));
-    state.facultyStudents = rows;
-    state.facultyStudentsLoaded = true;
-
-    // Compress with Gzip
-    const payloadStr = JSON.stringify({ schemaVersion: 1, version: Date.now(), students: rows });
-    const compressed = await gzipData(payloadStr);
-
-    // Save to Cache
-    await setFacultyCache({
-      version: Date.now(),
-      rows: rows,
-      cachedAt: Date.now()
-    });
-
-    // Update metadata document
-    const metaPayload = {
-      count: rows.length,
-      datasetVersion: Date.now(),
-      datasetEncoding: 'gzip',
-      datasetBytes: compressed ? compressed.byteLength : 0,
-      updatedAt: serverTimestamp()
-    };
-    await setDoc(doc(db, 'facultyStudentMeta', 'current'), metaPayload, { merge: true }).catch(console.warn);
-
-    populateFacultyClassFilter(rows);
-    applyFacultyFiltersAndRender(1);
-
-    const sizeStr = compressed ? ` · ${(compressed.byteLength / 1024).toFixed(1)} KB` : '';
-    updateFacultyStatusUI(`Dữ liệu nền: ${rows.length} SV${sizeStr}`, 'success');
-    showToast(`✓ Đã tạo lại dữ liệu nền (${rows.length} SV${sizeStr})!`, 'success');
-  } catch (err) {
-    console.error('Lỗi tạo lại dữ liệu nền:', err);
-    showToast('Lỗi tạo lại dữ liệu nền: ' + err.message, 'error');
-  }
+  return await window.syncFacultyDatasetFromIFAA();
 };
 
-// Export to Excel
+window.downloadFacultyStudentsTemplate = function() {
+  showToast('ℹ️ Quản lý danh mục sinh viên toàn khoa được thực hiện tại IFA+ Activities.', 'info');
+  return false;
+};
+
+// Export to Excel (Read-Only Utility)
 window.exportFacultyStudentsExcel = async function() {
   try {
     let rows = state.facultyStudents;
     if (!state.facultyStudentsLoaded || !rows || rows.length === 0) {
-      showToast('Đang tải dữ liệu để xuất Excel...', 'info');
+      showToast('Đang tải dữ liệu từ IFAA để xuất Excel...', 'info');
       rows = await ensureFacultyDatasetLoaded();
     }
 
@@ -5450,32 +5288,21 @@ window.exportFacultyStudentsExcel = async function() {
       'Ngành': s.major || '',
       'Lớp': s.className || s.studentClass || '',
       'Email': s.email || '',
-      'Số điện thoại': s.phone || ''
+      'Khóa / Tuyển sinh': s.course || s.admissionYear || '',
+      'Số điện thoại': s.phone || '',
+      'Nguồn dữ liệu': 'IFAA Master'
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportRows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'DanhSachSVKhoa');
-    XLSX.writeFile(wb, `DANH_SACH_SINH_VIEN_KHOA_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    showToast(`✓ Đã xuất Excel ${exportRows.length} sinh viên khoa!`, 'success');
+    XLSX.utils.book_append_sheet(wb, ws, 'DanhSachSVKhoa_IFAA');
+    XLSX.writeFile(wb, `DANH_SACH_SINH_VIEN_IFAA_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast(`✓ Đã xuất Excel ${exportRows.length} sinh viên từ IFAA Master!`, 'success');
   } catch (err) {
     showToast('Lỗi xuất Excel: ' + err.message, 'error');
   }
 };
 
-window.downloadFacultyStudentsTemplate = function() {
-  const sampleData = [
-    { 'Mã SV': '52000888', 'Họ lót': 'Nguyễn Văn', 'Tên': 'An', 'Giới tính': 'Nam', 'Ngành': 'Thiết kế nội thất', 'Lớp': '20050201', 'Email': '52000888@student.tdtu.edu.vn', 'Số điện thoại': '0901234567' },
-    { 'Mã số': '52000889', 'Họ Lót': 'Trần Thị', 'Tên': 'Bình', 'Lớp': '20050301', 'Giới tính': 'Nữ', 'Ngành': 'Thiết kế đồ họa', 'ĐTB Học Kỳ 1': '7.5', 'ĐRL HK1': '85', 'Xét điều kiện': 'Đạt' },
-    { 'MSSV': '52000890', 'Họ và tên': 'Lê Hoàng Cường', 'Giới tính': 'Nam', 'Ngành': 'Thiết kế thời trang', 'Lớp': '20050401', 'Email': '52000890@student.tdtu.edu.vn', 'Số điện thoại': '0912345678' }
-  ];
-
-  const ws = XLSX.utils.json_to_sheet(sampleData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'MauFormatAvsB');
-  XLSX.writeFile(wb, 'MAU_DANH_SACH_SV_KHOA_2_FORMAT.xlsx');
-  showToast('Đã tải xuống file mẫu (hỗ trợ cả Format A & B)!', 'success');
-};
 
 
 // ============================================================================
@@ -7595,7 +7422,42 @@ function getRoundAllStudents() {
 
 function findStudentInRound(studentId) {
   const all = getRoundAllStudents();
-  return all.find(s => (s.mssv === studentId || s.studentId === studentId));
+  const found = all.find(s => (s.mssv === studentId || s.studentId === studentId));
+  if (found) {
+    if ((!found.name && !found.fullName) || (!found.className && !found.studentClass)) {
+      const fac = window.getFacultyStudent ? window.getFacultyStudent(studentId) : null;
+      if (fac && !fac.isMissing) {
+        return {
+          ...found,
+          name: found.name || fac.name,
+          fullName: found.fullName || fac.fullName,
+          className: found.className || fac.className,
+          studentClass: found.studentClass || fac.studentClass,
+          major: found.major || fac.major,
+          gender: found.gender || fac.gender,
+          email: found.email || fac.email
+        };
+      }
+    }
+    return found;
+  }
+  if (window.getFacultyStudent) {
+    const fac = window.getFacultyStudent(studentId);
+    if (fac && !fac.isMissing) {
+      return {
+        studentId: fac.mssv,
+        mssv: fac.mssv,
+        name: fac.name,
+        fullName: fac.fullName,
+        className: fac.className,
+        studentClass: fac.studentClass,
+        major: fac.major,
+        gender: fac.gender,
+        email: fac.email
+      };
+    }
+  }
+  return null;
 }
 
 // --- STUDENT COUNCIL ASSIGNMENT ACTIONS ---
@@ -11638,7 +11500,10 @@ export function computeRoundRanking(roundId) {
   const studentMap = new Map();
   eligibleStudents.forEach(s => {
     const sid = s.mssv || s.studentId;
-    if (sid) studentMap.set(sid, { studentId: sid, fullName: s.fullName || s.studentName || sid });
+    if (sid) {
+      const facName = (window.getFacultyStudent ? window.getFacultyStudent(sid)?.name : '') || sid;
+      studentMap.set(sid, { studentId: sid, fullName: s.fullName || s.studentName || facName });
+    }
   });
   registrations.forEach(r => {
     const sid = r.studentId || r.mssv;
