@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation Beta</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v2.1.0-beta.1</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v2.2.0-beta.1</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -2163,7 +2163,7 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v2.1.0-beta.1</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v2.2.0-beta.1</p>
     </div>
   </footer>
 
@@ -3025,11 +3025,179 @@
               <input type="checkbox" id="activity-form-show-expired" checked class="rounded text-tdtu-blue">
               <span class="font-semibold text-xs">Sau khi kết thúc vẫn hiển thị cho sinh viên</span>
             </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" id="activity-form-submission" class="rounded text-tdtu-blue">
-              <span class="font-semibold text-xs">Có nộp bài (submissionEnabled)</span>
-            </label>
-            <p class="text-[11px] text-slate-400 italic">💡 Nếu tick "Có nộp bài", giao diện sinh viên sẽ hiển thị badge "Nộp bài — Chưa mở ở phiên bản Beta này".</p>
+            <!-- SUBMISSION CONFIGURATION (v2.2.0-beta.1) -->
+            <div class="border-t border-slate-200 pt-2.5 space-y-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="activity-form-submission" onchange="toggleActivitySubmissionConfig(this.checked)" class="rounded text-tdtu-blue">
+                <span class="font-bold text-xs text-emerald-800">📥 Cho phép Nộp bài tại mốc này (submissionEnabled)</span>
+              </label>
+
+              <div id="activity-submission-config-panel" class="hidden pl-2 space-y-3 bg-emerald-50/40 p-3.5 rounded-xl border border-emerald-200 text-xs">
+                <!-- 1. Accepted Extensions -->
+                <div>
+                  <label class="font-bold text-slate-800 block mb-1">1. Định dạng file được phép nộp:</label>
+                  <div class="flex items-center flex-wrap gap-3 font-semibold text-slate-700">
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-pdf" value="pdf" checked class="rounded text-emerald-600">
+                      <span>PDF</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-zip" value="zip" class="rounded text-emerald-600">
+                      <span>ZIP</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-jpg" value="jpg" class="rounded text-emerald-600">
+                      <span>JPG/JPEG</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-png" value="png" class="rounded text-emerald-600">
+                      <span>PNG</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-docx" value="docx" class="rounded text-emerald-600">
+                      <span>DOCX</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-xlsx" value="xlsx" class="rounded text-emerald-600">
+                      <span>XLSX</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-pptx" value="pptx" class="rounded text-emerald-600">
+                      <span>PPTX</span>
+                    </label>
+                  </div>
+                  <div class="mt-1.5 flex items-center gap-2">
+                    <span class="text-[11px] text-slate-500 font-medium">Khác (cách nhau bởi dấu phẩy):</span>
+                    <input type="text" id="sub-ext-custom" placeholder="rar, 7z" class="p-1 border border-slate-300 rounded text-[11px] w-36">
+                  </div>
+                </div>
+
+                <!-- 2. Constraints: Max files, Max Size MB, Max Attempts -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">Số file tối đa</label>
+                    <input type="number" id="sub-max-files" value="1" min="1" max="20" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
+                  </div>
+                  <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">Dung lượng tối đa (MB/file)</label>
+                    <input type="number" id="sub-max-size" value="100" min="1" max="1024" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
+                  </div>
+                  <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">Số lần nộp tối đa</label>
+                    <input type="number" id="sub-max-attempts" value="3" min="1" max="20" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
+                  </div>
+                </div>
+
+                <!-- 3. Deadline & Late submission -->
+                <div class="border-t border-emerald-100 pt-2 space-y-2">
+                  <label class="font-bold text-slate-800 block mb-1">2. Hạn chót nộp bài (Deadline):</label>
+                  <div class="flex items-center gap-4 text-xs font-semibold">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="sub_deadline_mode" value="activity_end" checked onchange="toggleSubCustomDeadline(false)">
+                      <span>Dùng thời gian kết thúc của Mốc (endAt)</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="sub_deadline_mode" value="custom" onchange="toggleSubCustomDeadline(true)">
+                      <span>Hạn nộp riêng</span>
+                    </label>
+                  </div>
+                  <div id="sub-custom-deadline-wrap" class="hidden grid grid-cols-2 gap-2 mt-1">
+                    <div>
+                      <label class="text-[10px] text-slate-500 font-bold block">Ngày hạn nộp (DD/MM/YYYY)</label>
+                      <input type="text" id="sub-deadline-date" placeholder="DD/MM/YYYY" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono">
+                    </div>
+                    <div>
+                      <label class="text-[10px] text-slate-500 font-bold block">Giờ hạn nộp (HH:mm - 24h)</label>
+                      <input type="text" id="sub-deadline-time" placeholder="23:59" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono">
+                    </div>
+                  </div>
+                  <label class="flex items-center gap-2 cursor-pointer mt-1">
+                    <input type="checkbox" id="sub-allow-late" class="rounded text-emerald-600">
+                    <span class="font-semibold text-xs text-slate-700">Cho phép nộp sau hạn (ghi nhận trạng thái Nộp trễ)</span>
+                  </label>
+                </div>
+
+                <!-- 4. Filename Rule Engine -->
+                <div class="border-t border-emerald-100 pt-2 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <label class="font-bold text-slate-800 block">3. Quy tắc đặt tên file (Rule Engine):</label>
+                    <span class="text-[10px] text-slate-500">Chuẩn hóa không dấu, viết hoa</span>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Mẫu tên file (Template):</label>
+                      <input type="text" id="sub-filename-template" value="{MSSV}_{HO_TEN}_{LOAI}" oninput="updateFilenamePreviewInAdmin()" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs font-bold">
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Giá trị {LOAI} mặc định:</label>
+                      <input type="text" id="sub-loai-val" value="THUYET_MINH" oninput="updateFilenamePreviewInAdmin()" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs font-bold">
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4 text-xs font-semibold mt-1">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="sub_filename_mode" value="exact" checked onchange="updateFilenamePreviewInAdmin()">
+                      <span>Khớp chính xác</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="sub_filename_mode" value="prefix" onchange="updateFilenamePreviewInAdmin()">
+                      <span>Bắt đầu đúng mẫu (Tiền tố)</span>
+                    </label>
+                  </div>
+                  <div class="p-2 bg-white rounded-lg border border-slate-200 text-xs">
+                    <span class="text-[10px] text-slate-500 font-bold block">XEM TRƯỚC TÊN FILE YÊU CẦU:</span>
+                    <div id="sub-filename-preview" class="font-mono font-bold text-emerald-800 mt-0.5">
+                      12100314_NGUYEN_VAN_A_THUYET_MINH.pdf
+                    </div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">
+                      Biến: {MSSV}, {HO_TEN}, {HOI_DONG}, {STT}, {LOAI}, {ACTIVITY}, {ROUND}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 5. Visibility / Access permissions -->
+                <div class="border-t border-emerald-100 pt-2 space-y-1.5">
+                  <label class="font-bold text-slate-800 block">4. Quyền xem bài nộp:</label>
+                  <div class="flex items-center flex-wrap gap-4 text-xs font-semibold text-slate-700">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" id="sub-vis-supervisor" checked class="rounded text-emerald-600">
+                      <span>GVHD (Xem SV hướng dẫn)</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" id="sub-vis-reviewer" checked class="rounded text-emerald-600">
+                      <span>GVPB (Xem SV phản biện)</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" id="sub-vis-council" checked class="rounded text-emerald-600">
+                      <span>Thành viên HĐ (Xem SV trong HĐ)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- 6. Google Drive Storage Provider Config -->
+                <div class="border-t border-emerald-100 pt-2 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <label class="font-bold text-slate-800 block">5. Dịch vụ lưu trữ (Storage Provider):</label>
+                    <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">Google Drive Ready</span>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Nhà cung cấp:</label>
+                      <select id="sub-storage-provider" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold">
+                        <option value="google_drive" selected>Google Drive (Khoa / Tài khoản Sở hữu)</option>
+                        <option value="none">Chưa cấu hình</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Google Drive Subfolder ID:</label>
+                      <input type="text" id="sub-drive-folder-id" placeholder="Để trống sẽ dùng Root Folder của Đợt" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs">
+                    </div>
+                  </div>
+                  <div class="p-2 bg-blue-50/70 border border-blue-200 rounded-lg text-[11px] text-blue-900 leading-relaxed">
+                    ℹ️ <strong>Bảo mật:</strong> Client không lưu Access/Refresh Token của chủ sở hữu. Luồng nộp file sẽ gọi qua <code>uploadProvider</code>. Nếu chưa có Trusted Backend Service, hệ thống sẽ thông báo rõ: <em>"Google Drive chưa được kết nối an toàn. Cần cấu hình dịch vụ tải tệp phía máy chủ."</em>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <div class="border-t border-slate-200 pt-2.5 space-y-2">
               <label class="flex items-center gap-2 cursor-pointer">
@@ -4025,6 +4193,161 @@
           🔍 Hiện điểm chi tiết (Full Raw)
         </button>
         <button type="button" onclick="closeFinalScoreDetailModal()" class="px-4 py-1.5 bg-slate-200 text-slate-700 rounded-xl font-bold">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================================
+       MODAL: ADMIN ACTIVITY SUBMISSIONS DASHBOARD (v2.2.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-activity-submissions" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-5xl w-full shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh] text-xs">
+      <div class="p-4 border-b border-slate-200 bg-emerald-50 flex items-center justify-between">
+        <div>
+          <h4 id="sub-dash-title" class="font-black text-sm sm:text-base text-emerald-950 flex items-center gap-1.5">
+            <span>📥</span> Quản lý Sinh viên Nộp bài — Mốc Kế hoạch
+          </h4>
+          <p id="sub-dash-subtitle" class="text-[11px] text-emerald-800 mt-0.5 font-semibold">Đợt: ... • Mốc: ...</p>
+        </div>
+        <button type="button" onclick="closeActivitySubmissionDashboard()" class="text-emerald-800 hover:text-emerald-950 font-bold text-base p-1">✕</button>
+      </div>
+
+      <!-- Stats Bar & Controls -->
+      <div class="p-4 bg-slate-50 border-b border-slate-200 space-y-3">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          <div class="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+            <span class="text-[10px] text-slate-500 font-bold block uppercase">Tổng số SV</span>
+            <span id="sub-dash-stat-total" class="font-mono text-base font-black text-slate-800">0</span>
+          </div>
+          <div class="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-xs">
+            <span class="text-[10px] text-emerald-600 font-bold block uppercase">Đã nộp</span>
+            <span id="sub-dash-stat-submitted" class="font-mono text-base font-black text-emerald-700">0</span>
+          </div>
+          <div class="bg-white p-2.5 rounded-xl border border-amber-200 shadow-xs">
+            <span class="text-[10px] text-amber-600 font-bold block uppercase">Chưa nộp</span>
+            <span id="sub-dash-stat-missing" class="font-mono text-base font-black text-amber-700">0</span>
+          </div>
+          <div class="bg-white p-2.5 rounded-xl border border-rose-200 shadow-xs">
+            <span class="text-[10px] text-rose-600 font-bold block uppercase">Nộp trễ</span>
+            <span id="sub-dash-stat-late" class="font-mono text-base font-black text-rose-700">0</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <input type="text" id="sub-dash-search" oninput="filterAdminSubmissionsTable()" placeholder="Tìm kiếm MSSV, Họ tên..." class="p-2 border border-slate-300 rounded-xl text-xs w-full sm:w-64">
+            <select id="sub-dash-filter-status" onchange="filterAdminSubmissionsTable()" class="p-2 border border-slate-300 rounded-xl text-xs font-bold">
+              <option value="all">Tất cả trạng thái</option>
+              <option value="submitted">Đã nộp</option>
+              <option value="missing">Chưa nộp</option>
+              <option value="late">Nộp trễ</option>
+              <option value="withdrawn">Đã rút bài</option>
+            </select>
+          </div>
+          <button type="button" onclick="exportCurrentActivitySubmissionsToExcel()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs flex items-center gap-1.5 shrink-0">
+            <span>📥 Xuất Excel danh sách</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="flex-1 overflow-auto p-4">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px] sticky top-0">
+            <tr>
+              <th class="p-2.5 text-center w-12">#</th>
+              <th class="p-2.5">MSSV & Họ tên</th>
+              <th class="p-2.5 text-center">Hội đồng</th>
+              <th class="p-2.5 text-center">Trạng thái</th>
+              <th class="p-2.5 text-center">Lần nộp</th>
+              <th class="p-2.5">Thời gian nộp</th>
+              <th class="p-2.5">Files</th>
+              <th class="p-2.5 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="sub-dash-tbody" class="divide-y divide-slate-100">
+            <tr><td colspan="8" class="p-6 text-center text-slate-400">Đang tải danh sách bài nộp...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-[11px] text-slate-500">
+        <span>Google Drive Storage: Tích hợp Provider Abstraction</span>
+        <button type="button" onclick="closeActivitySubmissionDashboard()" class="px-4 py-1.5 bg-slate-200 text-slate-700 rounded-xl font-bold">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================
+       MODAL: ADMIN DEADLINE & ATTEMPTS OVERRIDE (v2.2.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-submission-override" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-amber-50 flex items-center justify-between">
+        <h4 class="font-black text-sm text-amber-950 flex items-center gap-1.5">
+          <span>⭐</span> Gia hạn / Cấp thêm lượt nộp cho Sinh viên
+        </h4>
+        <button type="button" onclick="closeSubmissionOverrideModal()" class="text-amber-800 hover:text-amber-950 font-bold p-1">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+          <div class="font-bold text-slate-900" id="sub-override-student-name">Sinh viên: ...</div>
+          <div class="text-[11px] text-slate-500" id="sub-override-activity-name">Mốc: ...</div>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">1. Gia hạn nộp bài đến (tùy chọn):</label>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-[10px] text-slate-500 block">Ngày (DD/MM/YYYY)</label>
+              <input type="text" id="sub-override-date" placeholder="DD/MM/YYYY" class="w-full p-2 border border-slate-300 rounded-xl font-mono text-xs">
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-500 block">Giờ (HH:mm - 24h)</label>
+              <input type="text" id="sub-override-time" placeholder="23:59" class="w-full p-2 border border-slate-300 rounded-xl font-mono text-xs">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">2. Cấp thêm số lần nộp:</label>
+          <input type="number" id="sub-override-extra-attempts" value="0" min="0" max="10" class="w-full p-2 border border-slate-300 rounded-xl font-bold text-xs">
+          <span class="text-[10px] text-slate-400 mt-0.5 block">Nhập 0 nếu chỉ gia hạn thời gian.</span>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">3. Lý do gia hạn / cấp lượt (* Bắt buộc):</label>
+          <textarea id="sub-override-reason" rows="3" placeholder="Ghi rõ lý do (VD: Được phê duyệt gia hạn theo quyết định của Khoa...)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs"></textarea>
+        </div>
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button type="button" onclick="closeSubmissionOverrideModal()" class="px-3.5 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-600">Hủy</button>
+        <button type="button" onclick="saveSubmissionOverride()" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-xs">Lưu Quyết định</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================
+       MODAL: SUBMISSION ATTEMPTS HISTORY (v2.2.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-submission-history" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[85vh]">
+      <div class="p-4 border-b border-slate-200 bg-slate-100 flex items-center justify-between">
+        <h4 class="font-black text-sm text-slate-900 flex items-center gap-1.5">
+          <span>📜</span> Lịch sử các lần nộp bài (Version History)
+        </h4>
+        <button type="button" onclick="closeSubmissionHistoryModal()" class="text-slate-600 hover:text-slate-900 font-bold p-1">✕</button>
+      </div>
+      <div class="p-4 bg-slate-50 border-b border-slate-200">
+        <div class="font-bold text-slate-900 text-xs" id="sub-hist-student-info">Sinh viên: ...</div>
+        <div class="text-[11px] text-slate-500 mt-0.5" id="sub-hist-activity-info">Mốc: ...</div>
+      </div>
+      <div class="p-4 flex-1 overflow-auto space-y-3" id="sub-hist-list">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button type="button" onclick="closeSubmissionHistoryModal()" class="px-4 py-1.5 bg-slate-200 text-slate-700 rounded-xl font-bold">Đóng</button>
       </div>
     </div>
   </div>

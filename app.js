@@ -41,7 +41,7 @@ export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   }).length;
 }
 
-/** IFA+ Graduation Beta Studio v2.1.0-beta.1 **/
+/** IFA+ Graduation Beta Studio v2.2.0-beta.1 **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -6002,6 +6002,7 @@ window.loadAdminRoundActivities = async function(roundId) {
           ${subBadge}
         </td>
         <td class="p-3 text-right whitespace-nowrap space-x-1">
+          ${act.submissionEnabled ? `<button type="button" onclick="openActivitySubmissionDashboard('${targetRound.id}', '${act.id}')" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200 transition-colors inline-flex items-center gap-1" title="Quản lý Sinh viên Nộp bài"><span>📥 Nộp bài</span></button>` : ''}
           ${act.councilEnabled ? `<button type="button" onclick="openActivityCouncilManagement('${targetRound.id}', '${act.id}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 transition-colors inline-flex items-center gap-1" title="Quản lý Hội đồng Mốc này"><span>⚖️ Hội đồng</span><span class="bg-indigo-200 text-indigo-900 px-1.5 py-0.2 rounded-full text-[10px]">${(act.councils || []).length}</span></button>` : ''}
           <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Sao chép link mốc ?x=...&a=...">🔗 Link</button>
           <button type="button" onclick="copyActivityModal('${act.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Sao chép tạo bản ghi mới">📋 Sao chép</button>
@@ -6028,6 +6029,8 @@ window.openCreateActivityModal = function() {
   document.getElementById('activity-form-visibility').checked = true;
   document.getElementById('activity-form-show-expired').checked = true;
   document.getElementById('activity-form-submission').checked = false;
+  if (typeof toggleActivitySubmissionConfig === 'function') toggleActivitySubmissionConfig(false);
+  if (typeof resetActivitySubmissionForm === 'function') resetActivitySubmissionForm();
   document.getElementById('activity-form-type').value = 'review';
 
   // Clear date/time
@@ -6106,7 +6109,10 @@ window.editActivityModal = function(actId) {
 
   document.getElementById('activity-form-visibility').checked = act.visibility !== false;
   document.getElementById('activity-form-show-expired').checked = act.showAfterExpired !== false;
-  document.getElementById('activity-form-submission').checked = Boolean(act.submissionEnabled);
+  const subEnabled = Boolean(act.submissionEnabled);
+  document.getElementById('activity-form-submission').checked = subEnabled;
+  if (typeof toggleActivitySubmissionConfig === 'function') toggleActivitySubmissionConfig(subEnabled);
+  if (typeof populateActivitySubmissionForm === 'function') populateActivitySubmissionForm(act.submissionConfig);
 
   const councilEnabled = Boolean(act.councilEnabled);
   if (document.getElementById('activity-form-council-enabled')) {
@@ -6519,6 +6525,10 @@ window.saveActivity = async function(e) {
     // Preserve existing council data if editing
     const existingAct = activities.find(a => a.id === actId);
 
+    const submissionConfig = submissionEnabled && typeof readActivitySubmissionForm === 'function'
+      ? readActivitySubmissionForm()
+      : (existingAct?.submissionConfig || null);
+
     const activityData = {
       id: actId,
       roundId,
@@ -6532,6 +6542,7 @@ window.saveActivity = async function(e) {
       visibility,
       showAfterExpired,
       submissionEnabled,
+      submissionConfig,
       councilEnabled,
       showPresentationOrderToStudents,
       scoringConfig,
@@ -6875,15 +6886,7 @@ window.loadStudentRoundActivities = async function(roundId) {
 
           ${descriptionRender}
 
-          ${act.submissionEnabled ? `
-            <div class="mt-2.5 flex items-center gap-2 p-2.5 bg-emerald-50/80 border border-emerald-200 text-emerald-900 rounded-xl text-xs">
-              <span class="text-base">📥</span>
-              <div class="flex-1">
-                <span class="font-bold block">Nộp bài — Chưa mở ở phiên bản Beta này</span>
-                <span class="text-[11px] text-emerald-700 block">Chức năng nộp bài trực tuyến sẽ được mở trong các phiên bản cập nhật tiếp theo.</span>
-              </div>
-            </div>
-          ` : ''}
+          ${act.submissionEnabled && typeof renderStudentSubmissionPanel === 'function' ? renderStudentSubmissionPanel(act, targetRound) : ''}
 
           ${renderStudentCouncilTimelineInfo(act)}
         </div>
@@ -12576,5 +12579,1365 @@ window.renderStudentFinalScoreCard = function(userMssv, round) {
     if (rankWrap) rankWrap.classList.add('hidden');
     if (titleBadge) titleBadge.classList.add('hidden');
   }
+};
+
+
+
+// ============================================================================
+// IFA+ GRADUATION BETA v2.2.0-beta.1:
+// STUDENT SUBMISSION / FILE UPLOAD + GOOGLE DRIVE READY ARCHITECTURE
+// ============================================================================
+
+// 1. FILENAME RULE ENGINE & NORMALIZATION (NO AI)
+window.normalizeVietnameseNoDiacritics = function(str) {
+  if (!str) return '';
+  return String(str)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, m => m === 'đ' ? 'd' : 'D')
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+};
+
+window.generateExpectedFilename = function({ template, student, activity, round, fileTypeCategory, extension, mode }) {
+  const tpl = template || '{MSSV}_{HO_TEN}_{LOAI}';
+  const mssv = student?.studentId || student?.mssv || '12100314';
+  const hoTen = normalizeVietnameseNoDiacritics(student?.studentName || student?.name || 'NGUYEN_VAN_A');
+  const hoiDong = student?.councilCode || student?.councilId || 'HD1';
+  const stt = String(student?.presentationOrder || student?.stt || 1).padStart(2, '0');
+  const loai = normalizeVietnameseNoDiacritics(fileTypeCategory || activity?.submissionConfig?.fileTypeCategory || 'THUYET_MINH');
+  const actName = normalizeVietnameseNoDiacritics(activity?.title || 'ACTIVITY');
+  const rName = normalizeVietnameseNoDiacritics(round?.title || round?.code || 'ROUND');
+
+  let base = tpl
+    .replace(/\{MSSV\}/gi, mssv)
+    .replace(/\{HO_TEN\}/gi, hoTen)
+    .replace(/\{HOI_DONG\}/gi, hoiDong)
+    .replace(/\{STT\}/gi, stt)
+    .replace(/\{LOAI\}/gi, loai)
+    .replace(/\{ACTIVITY\}/gi, actName)
+    .replace(/\{ROUND\}/gi, rName);
+
+  base = normalizeVietnameseNoDiacritics(base);
+  const ext = extension ? ('.' + String(extension).toLowerCase().replace(/^\./, '')) : '';
+  return base + ext;
+};
+
+window.validateFilename = function({ filename, template, student, activity, round, fileTypeCategory, mode, acceptedExtensions }) {
+  if (!filename) {
+    return { valid: false, error: 'Chưa có tệp nào được chọn' };
+  }
+  const lastDot = filename.lastIndexOf('.');
+  const ext = lastDot >= 0 ? filename.substring(lastDot + 1).toLowerCase() : '';
+  const actualBase = lastDot >= 0 ? filename.substring(0, lastDot) : filename;
+
+  // Extension check
+  const allowed = Array.isArray(acceptedExtensions) && acceptedExtensions.length > 0
+    ? acceptedExtensions.map(e => String(e).toLowerCase().replace(/^\./, ''))
+    : ['pdf'];
+  if (!allowed.includes(ext)) {
+    return {
+      valid: false,
+      error: `Định dạng file ".${ext}" không hợp lệ. Chỉ chấp nhận: ${allowed.join(', ')}`,
+      expectedExtension: allowed.join(', '),
+      actualExtension: ext
+    };
+  }
+
+  const expectedBase = generateExpectedFilename({
+    template,
+    student,
+    activity,
+    round,
+    fileTypeCategory,
+    extension: ''
+  });
+
+  const ruleMode = mode || activity?.submissionConfig?.filenameMode || 'exact';
+  let valid = false;
+  if (ruleMode === 'exact') {
+    valid = actualBase.toUpperCase() === expectedBase.toUpperCase();
+  } else {
+    valid = actualBase.toUpperCase().startsWith(expectedBase.toUpperCase());
+  }
+
+  const expectedFilename = expectedBase + (ext ? '.' + ext : (allowed[0] ? '.' + allowed[0] : ''));
+
+  if (!valid) {
+    return {
+      valid: false,
+      error: `Tên file chưa đúng định dạng ${ruleMode === 'exact' ? 'chính xác' : 'tiền tố'}. Tên yêu cầu: ${expectedFilename}`,
+      expectedFilename,
+      actualFilename: filename
+    };
+  }
+
+  return {
+    valid: true,
+    expectedFilename,
+    actualFilename: filename
+  };
+};
+
+window.updateFilenamePreviewInAdmin = function() {
+  const tpl = document.getElementById('sub-filename-template')?.value || '{MSSV}_{HO_TEN}_{LOAI}';
+  const loai = document.getElementById('sub-loai-val')?.value || 'THUYET_MINH';
+  const mode = document.querySelector('input[name="sub_filename_mode"]:checked')?.value || 'exact';
+  const previewEl = document.getElementById('sub-filename-preview');
+  if (!previewEl) return;
+
+  const mockStudent = { studentId: '12100314', studentName: 'Nguyễn Văn A', councilCode: 'HD1', presentationOrder: 1 };
+  const mockActivity = { title: 'Duyệt 1' };
+  const mockRound = { title: 'Đợt 1' };
+
+  const expected = generateExpectedFilename({
+    template: tpl,
+    student: mockStudent,
+    activity: mockActivity,
+    round: mockRound,
+    fileTypeCategory: loai,
+    extension: 'pdf',
+    mode
+  });
+
+  previewEl.textContent = expected + (mode === 'prefix' ? '  (hoặc bắt đầu bằng mẫu này)' : '');
+};
+
+// 2. ACTIVITY FORM HELPERS FOR SUBMISSION CONFIG
+window.toggleActivitySubmissionConfig = function(enabled) {
+  const panel = document.getElementById('activity-submission-config-panel');
+  if (panel) {
+    if (enabled) panel.classList.remove('hidden');
+    else panel.classList.add('hidden');
+  }
+};
+
+window.toggleSubCustomDeadline = function(isCustom) {
+  const wrap = document.getElementById('sub-custom-deadline-wrap');
+  if (wrap) {
+    if (isCustom) wrap.classList.remove('hidden');
+    else wrap.classList.add('hidden');
+  }
+};
+
+window.resetActivitySubmissionForm = function() {
+  ['pdf', 'zip', 'jpg', 'png', 'docx', 'xlsx', 'pptx'].forEach(ext => {
+    const el = document.getElementById('sub-ext-' + ext);
+    if (el) el.checked = (ext === 'pdf');
+  });
+  if (document.getElementById('sub-ext-custom')) document.getElementById('sub-ext-custom').value = '';
+  if (document.getElementById('sub-max-files')) document.getElementById('sub-max-files').value = '1';
+  if (document.getElementById('sub-max-size')) document.getElementById('sub-max-size').value = '100';
+  if (document.getElementById('sub-max-attempts')) document.getElementById('sub-max-attempts').value = '3';
+  
+  const endRadio = document.querySelector('input[name="sub_deadline_mode"][value="activity_end"]');
+  if (endRadio) endRadio.checked = true;
+  toggleSubCustomDeadline(false);
+  if (document.getElementById('sub-deadline-date')) document.getElementById('sub-deadline-date').value = '';
+  if (document.getElementById('sub-deadline-time')) document.getElementById('sub-deadline-time').value = '';
+  if (document.getElementById('sub-allow-late')) document.getElementById('sub-allow-late').checked = false;
+
+  if (document.getElementById('sub-filename-template')) document.getElementById('sub-filename-template').value = '{MSSV}_{HO_TEN}_{LOAI}';
+  if (document.getElementById('sub-loai-val')) document.getElementById('sub-loai-val').value = 'THUYET_MINH';
+  const exactRadio = document.querySelector('input[name="sub_filename_mode"][value="exact"]');
+  if (exactRadio) exactRadio.checked = true;
+
+  if (document.getElementById('sub-vis-supervisor')) document.getElementById('sub-vis-supervisor').checked = true;
+  if (document.getElementById('sub-vis-reviewer')) document.getElementById('sub-vis-reviewer').checked = true;
+  if (document.getElementById('sub-vis-council')) document.getElementById('sub-vis-council').checked = true;
+
+  if (document.getElementById('sub-storage-provider')) document.getElementById('sub-storage-provider').value = 'google_drive';
+  if (document.getElementById('sub-drive-folder-id')) document.getElementById('sub-drive-folder-id').value = '';
+
+  updateFilenamePreviewInAdmin();
+};
+
+window.populateActivitySubmissionForm = function(cfg) {
+  if (!cfg) {
+    resetActivitySubmissionForm();
+    return;
+  }
+  const accepted = (cfg.acceptedExtensions || ['pdf']).map(e => e.toLowerCase());
+  ['pdf', 'zip', 'jpg', 'png', 'docx', 'xlsx', 'pptx'].forEach(ext => {
+    const el = document.getElementById('sub-ext-' + ext);
+    if (el) el.checked = accepted.includes(ext);
+  });
+  if (document.getElementById('sub-ext-custom')) document.getElementById('sub-ext-custom').value = cfg.customExtensions || '';
+  if (document.getElementById('sub-max-files')) document.getElementById('sub-max-files').value = cfg.maxFiles ?? 1;
+  if (document.getElementById('sub-max-size')) document.getElementById('sub-max-size').value = cfg.maxFileSizeMB ?? 100;
+  if (document.getElementById('sub-max-attempts')) document.getElementById('sub-max-attempts').value = cfg.maxAttempts ?? 3;
+
+  const isCustomDeadline = cfg.deadlineMode === 'custom' && Boolean(cfg.deadlineAt);
+  const dModeRadio = document.querySelector(`input[name="sub_deadline_mode"][value="${isCustomDeadline ? 'custom' : 'activity_end'}"]`);
+  if (dModeRadio) dModeRadio.checked = true;
+  toggleSubCustomDeadline(isCustomDeadline);
+
+  if (isCustomDeadline && cfg.deadlineAt) {
+    const parts = isoToVietnameseDateTime(cfg.deadlineAt);
+    if (document.getElementById('sub-deadline-date')) document.getElementById('sub-deadline-date').value = parts.date;
+    if (document.getElementById('sub-deadline-time')) document.getElementById('sub-deadline-time').value = parts.time;
+  } else {
+    if (document.getElementById('sub-deadline-date')) document.getElementById('sub-deadline-date').value = '';
+    if (document.getElementById('sub-deadline-time')) document.getElementById('sub-deadline-time').value = '';
+  }
+
+  if (document.getElementById('sub-allow-late')) document.getElementById('sub-allow-late').checked = Boolean(cfg.allowLateSubmission);
+
+  if (document.getElementById('sub-filename-template')) document.getElementById('sub-filename-template').value = cfg.filenameTemplate || '{MSSV}_{HO_TEN}_{LOAI}';
+  if (document.getElementById('sub-loai-val')) document.getElementById('sub-loai-val').value = cfg.fileTypeCategory || 'THUYET_MINH';
+  const fModeRadio = document.querySelector(`input[name="sub_filename_mode"][value="${cfg.filenameMode || 'exact'}"]`);
+  if (fModeRadio) fModeRadio.checked = true;
+
+  if (document.getElementById('sub-vis-supervisor')) document.getElementById('sub-vis-supervisor').checked = cfg.visibility?.supervisor !== false;
+  if (document.getElementById('sub-vis-reviewer')) document.getElementById('sub-vis-reviewer').checked = cfg.visibility?.reviewer !== false;
+  if (document.getElementById('sub-vis-council')) document.getElementById('sub-vis-council').checked = cfg.visibility?.council !== false;
+
+  if (document.getElementById('sub-storage-provider')) document.getElementById('sub-storage-provider').value = cfg.storageProvider || 'google_drive';
+  if (document.getElementById('sub-drive-folder-id')) document.getElementById('sub-drive-folder-id').value = cfg.driveFolderId || '';
+
+  updateFilenamePreviewInAdmin();
+};
+
+window.readActivitySubmissionForm = function() {
+  const accepted = [];
+  ['pdf', 'zip', 'jpg', 'png', 'docx', 'xlsx', 'pptx'].forEach(ext => {
+    const el = document.getElementById('sub-ext-' + ext);
+    if (el && el.checked) accepted.push(ext);
+  });
+  const customStr = (document.getElementById('sub-ext-custom')?.value || '').trim();
+  if (customStr) {
+    customStr.split(',').forEach(part => {
+      const clean = part.trim().toLowerCase().replace(/^\./, '');
+      if (clean && !accepted.includes(clean)) accepted.push(clean);
+    });
+  }
+  if (accepted.length === 0) accepted.push('pdf');
+
+  const maxFiles = parseInt(document.getElementById('sub-max-files')?.value, 10) || 1;
+  const maxFileSizeMB = parseInt(document.getElementById('sub-max-size')?.value, 10) || 100;
+  const maxAttempts = parseInt(document.getElementById('sub-max-attempts')?.value, 10) || 3;
+
+  const deadlineMode = document.querySelector('input[name="sub_deadline_mode"]:checked')?.value || 'activity_end';
+  let deadlineAt = null;
+  if (deadlineMode === 'custom') {
+    const dDate = document.getElementById('sub-deadline-date')?.value || '';
+    const dTime = document.getElementById('sub-deadline-time')?.value || '';
+    deadlineAt = parseVietnameseDateTimeToIso(dDate, dTime);
+  }
+
+  const allowLateSubmission = document.getElementById('sub-allow-late')?.checked === true;
+  const filenameTemplate = (document.getElementById('sub-filename-template')?.value || '').trim() || '{MSSV}_{HO_TEN}_{LOAI}';
+  const fileTypeCategory = (document.getElementById('sub-loai-val')?.value || '').trim() || 'THUYET_MINH';
+  const filenameMode = document.querySelector('input[name="sub_filename_mode"]:checked')?.value || 'exact';
+
+  const visSupervisor = document.getElementById('sub-vis-supervisor')?.checked !== false;
+  const visReviewer = document.getElementById('sub-vis-reviewer')?.checked !== false;
+  const visCouncil = document.getElementById('sub-vis-council')?.checked !== false;
+
+  const storageProvider = document.getElementById('sub-storage-provider')?.value || 'google_drive';
+  const driveFolderId = (document.getElementById('sub-drive-folder-id')?.value || '').trim();
+
+  return {
+    enabled: true,
+    acceptedExtensions: accepted,
+    customExtensions: customStr,
+    maxFiles,
+    maxFileSizeMB,
+    maxAttempts,
+    deadlineMode,
+    deadlineAt,
+    allowLateSubmission,
+    filenameTemplate,
+    filenameMode,
+    fileTypeCategory,
+    visibility: {
+      admin: true,
+      supervisor: visSupervisor,
+      reviewer: visReviewer,
+      council: visCouncil
+    },
+    storageProvider,
+    driveFolderId
+  };
+};
+
+// 3. EFFECTIVE DEADLINE, ATTEMPTS & RULES
+window.getEffectiveSubmissionRules = function(studentId, activity, round) {
+  const cfg = activity?.submissionConfig || {};
+  const override = round?.submissionOverrides?.[studentId]?.[activity?.id] || null;
+
+  // Base deadline
+  let baseDeadline = null;
+  if (cfg.deadlineMode === 'custom' && cfg.deadlineAt) {
+    baseDeadline = new Date(cfg.deadlineAt);
+  } else if (activity?.endAt) {
+    baseDeadline = new Date(activity.endAt);
+  }
+
+  // Effective deadline
+  let effectiveDeadline = baseDeadline;
+  let isExtended = false;
+  if (override?.allowUntil) {
+    effectiveDeadline = new Date(override.allowUntil);
+    isExtended = true;
+  }
+
+  // Attempts
+  const extraAttempts = (override && typeof override.extraAttempts === 'number') ? override.extraAttempts : 0;
+  const baseMaxAttempts = cfg.maxAttempts ?? 3;
+  const totalAllowedAttempts = baseMaxAttempts + extraAttempts;
+
+  // Submissions record
+  const subRecord = round?.activitySubmissions?.[activity?.id]?.[studentId] || null;
+  const completedAttempts = Array.isArray(subRecord?.attempts) ? subRecord.attempts.length : (subRecord?.currentSubmission ? 1 : 0);
+  const remainingAttempts = Math.max(0, totalAllowedAttempts - completedAttempts);
+
+  // Time status
+  const now = new Date();
+  const startAt = activity?.startAt ? new Date(activity.startAt) : null;
+  const isNotStarted = startAt ? (now < startAt) : false;
+  const isPastDeadline = effectiveDeadline ? (now > effectiveDeadline) : false;
+  const isNearDeadline = effectiveDeadline && !isPastDeadline && ((effectiveDeadline - now) <= 24 * 3600 * 1000);
+
+  const allowLate = Boolean(cfg.allowLateSubmission);
+  const canSubmit = !isNotStarted && (remainingAttempts > 0) && (!isPastDeadline || allowLate);
+  const isLate = isPastDeadline;
+
+  return {
+    baseDeadline,
+    effectiveDeadline,
+    isExtended,
+    extraAttempts,
+    baseMaxAttempts,
+    totalAllowedAttempts,
+    completedAttempts,
+    remainingAttempts,
+    isNotStarted,
+    isPastDeadline,
+    isNearDeadline,
+    isLate,
+    allowLate,
+    canSubmit,
+    currentSubmission: subRecord?.currentSubmission || null,
+    attemptsHistory: Array.isArray(subRecord?.attempts) ? subRecord.attempts : []
+  };
+};
+
+// 4. STORAGE PROVIDER ABSTRACTION & DRIVE READINESS
+window.uploadProvider = {
+  async upload({ file, student, activity, round, attempt, onProgress, abortSignal }) {
+    const providerType = activity?.submissionConfig?.storageProvider || 'google_drive';
+    if (window.__DEV_MOCK_UPLOADER === true) {
+      return await MockUploader.upload({ file, student, activity, round, attempt, onProgress, abortSignal });
+    }
+    if (providerType === 'google_drive') {
+      return await GoogleDriveTrustedUploader.upload({ file, student, activity, round, attempt, onProgress, abortSignal });
+    }
+    return {
+      success: false,
+      status: 'notConfigured',
+      error: 'Chưa cấu hình dịch vụ lưu trữ (Storage Provider).'
+    };
+  }
+};
+
+window.GoogleDriveTrustedUploader = {
+  async upload({ file, student, activity, round, attempt, onProgress, abortSignal }) {
+    const endpoint = window.IFA_CONFIG?.driveUploadEndpoint;
+    if (!endpoint) {
+      return {
+        success: false,
+        status: 'backendRequired',
+        error: 'Google Drive chưa được kết nối an toàn. Cần cấu hình dịch vụ tải tệp phía máy chủ (Trusted Backend Service).'
+      };
+    }
+    // Future Resumable Upload Implementation:
+    // 1. POST /upload-session
+    // 2. Chunks upload via resumable session URL
+    // 3. Finalize metadata
+    return {
+      success: false,
+      status: 'backendRequired',
+      error: 'Google Drive chưa được kết nối an toàn. Cần cấu hình dịch vụ tải tệp phía máy chủ (Trusted Backend Service).'
+    };
+  }
+};
+
+window.MockUploader = {
+  async upload({ file, student, activity, round, attempt, onProgress, abortSignal }) {
+    // Only used in DEV/TEST environment when window.__DEV_MOCK_UPLOADER === true
+    if (typeof onProgress === 'function') {
+      onProgress(30);
+      await new Promise(r => setTimeout(r, 20));
+      onProgress(75);
+      await new Promise(r => setTimeout(r, 20));
+      onProgress(100);
+    }
+    return {
+      success: true,
+      status: 'submitted',
+      providerFileId: 'mock_drive_file_' + Date.now(),
+      providerUrl: 'https://drive.google.com/file/d/mock_' + Date.now() + '/view',
+      storageProvider: 'google_drive_mock'
+    };
+  }
+};
+
+// 5. CLIENT-SIDE VALIDATION BEFORE UPLOAD
+window.validateFileSubmission = function(files, student, activity, round) {
+  const cfg = activity?.submissionConfig || {};
+  const rules = getEffectiveSubmissionRules(student?.studentId || student?.mssv, activity, round);
+
+  const errors = [];
+  if (!files || files.length === 0) {
+    errors.push('Vui lòng chọn ít nhất 1 file để nộp!');
+    return { valid: false, errors };
+  }
+
+  // Max files
+  const maxFiles = cfg.maxFiles || 1;
+  if (files.length > maxFiles) {
+    errors.push(`Số lượng file vượt quá mức cho phép (Tối đa: ${maxFiles} file, hiện chọn: ${files.length} file).`);
+  }
+
+  // Attempts check
+  if (rules.remainingAttempts <= 0) {
+    errors.push(`Bạn đã sử dụng hết ${rules.totalAllowedAttempts} lần nộp cho mốc này.`);
+  }
+
+  // Deadline check
+  if (rules.isPastDeadline && !rules.allowLate) {
+    errors.push('Đã hết hạn nộp bài và mốc này không cho phép nộp trễ.');
+  }
+
+  const maxBytes = (cfg.maxFileSizeMB || 100) * 1024 * 1024;
+  let expectedFilename = '';
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    // Size check
+    if (file.size > maxBytes) {
+      errors.push(`File "${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)} MB) vượt quá dung lượng tối đa ${cfg.maxFileSizeMB || 100} MB.`);
+    }
+
+    // Filename check
+    const fnCheck = validateFilename({
+      filename: file.name,
+      template: cfg.filenameTemplate,
+      student,
+      activity,
+      round,
+      fileTypeCategory: cfg.fileTypeCategory,
+      mode: cfg.filenameMode,
+      acceptedExtensions: cfg.acceptedExtensions
+    });
+
+    if (!fnCheck.valid) {
+      errors.push(fnCheck.error);
+    }
+    if (!expectedFilename && fnCheck.expectedFilename) {
+      expectedFilename = fnCheck.expectedFilename;
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    isLate: rules.isLate,
+    rules,
+    expectedFilename
+  };
+};
+
+// 6. STUDENT SUBMISSION PANEL RENDERING IN TIMELINE CARD
+window.renderStudentSubmissionPanel = function(act, round) {
+  const userMssv = state.userStudentId || (state.currentUser?.email ? state.currentUser.email.split('@')[0] : '');
+  const targetStudent = (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
+    studentId: userMssv,
+    studentName: state.currentUser?.displayName || 'Sinh viên'
+  };
+
+  const cfg = act.submissionConfig || {};
+  const rules = getEffectiveSubmissionRules(userMssv, act, round);
+
+  // Status Badge
+  let statusBadge = '';
+  if (rules.currentSubmission && rules.currentSubmission.status === 'submitted') {
+    statusBadge = rules.currentSubmission.isLate
+      ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">● Nộp trễ</span>'
+      : '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã nộp bài</span>';
+  } else if (rules.isNotStarted) {
+    statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300">○ Chưa mở nhận bài</span>';
+  } else if (rules.isPastDeadline) {
+    statusBadge = rules.allowLate
+      ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">● Đang nhận nộp trễ</span>'
+      : '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">✕ Đã hết hạn</span>';
+  } else if (rules.isNearDeadline) {
+    statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-400 animate-pulse">⚠️ Sắp hết hạn</span>';
+  } else {
+    statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-300">● Đang nhận bài</span>';
+  }
+
+  const deadlineStr = rules.effectiveDeadline ? fmtIsoToVietnameseDateTime(rules.effectiveDeadline.toISOString()) : 'Không giới hạn';
+  const expectedFn = generateExpectedFilename({
+    template: cfg.filenameTemplate,
+    student: targetStudent,
+    activity: act,
+    round,
+    fileTypeCategory: cfg.fileTypeCategory,
+    extension: (cfg.acceptedExtensions || ['pdf'])[0] || 'pdf',
+    mode: cfg.filenameMode
+  });
+
+  const acceptAttr = (cfg.acceptedExtensions || ['pdf']).map(e => '.' + e.replace(/^\./, '')).join(',');
+  const isMultiple = (cfg.maxFiles || 1) > 1;
+
+  // History html
+  let historyHtml = '';
+  if (rules.attemptsHistory.length > 0) {
+    historyHtml = `
+      <div class="mt-3 pt-3 border-t border-emerald-200/70 space-y-1.5">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="font-bold text-slate-700">Lịch sử các lần nộp bài:</span>
+          <span class="text-slate-500 font-mono text-[10px]">${rules.completedAttempts}/${rules.totalAllowedAttempts} lần</span>
+        </div>
+        <div class="space-y-1.5">
+          ${rules.attemptsHistory.map((att, idx) => {
+            const isLatest = idx === rules.attemptsHistory.length - 1;
+            const timeFormatted = att.submittedAt ? fmtIsoToVietnameseDateTime(att.submittedAt) : '--';
+            const fName = att.files?.[0]?.validatedName || att.files?.[0]?.originalName || 'file';
+            const fSize = att.files?.[0]?.size ? (att.files[0].size / (1024 * 1024)).toFixed(1) + ' MB' : '';
+            return `
+              <div class="p-2 bg-white rounded-lg border ${isLatest ? 'border-emerald-300 shadow-xs' : 'border-slate-200 opacity-80'} flex items-center justify-between text-xs">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-bold ${isLatest ? 'text-emerald-900' : 'text-slate-700'}">Lần ${att.attempt || (idx + 1)}</span>
+                    ${isLatest ? '<span class="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">Bản hiện tại</span>' : ''}
+                    ${att.isLate ? '<span class="text-[9px] bg-rose-100 text-rose-800 font-bold px-1 rounded">Nộp trễ</span>' : '<span class="text-[9px] bg-slate-100 text-slate-600 px-1 rounded">Đúng hạn</span>'}
+                    ${att.status === 'withdrawn' ? '<span class="text-[9px] bg-amber-100 text-amber-800 font-bold px-1 rounded">Đã rút</span>' : ''}
+                  </div>
+                  <span class="text-[11px] text-slate-600 font-mono block truncate max-w-xs mt-0.5">${fName} (${fSize})</span>
+                  <span class="text-[10px] text-slate-400 font-mono block">Biên nhận: ${att.receiptId || '--'} • ${timeFormatted}</span>
+                </div>
+                ${isLatest && att.status !== 'withdrawn' ? `
+                  <button type="button" onclick="withdrawStudentSubmission('${act.id}', ${att.attempt || 1})" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded text-[10px] font-bold transition-colors">
+                    Rút bài
+                  </button>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div id="sub-panel-${act.id}" class="mt-3 p-3.5 bg-emerald-50/70 border border-emerald-200 text-slate-800 rounded-2xl text-xs space-y-3 shadow-xs">
+      <div class="flex items-center justify-between gap-2 border-b border-emerald-200/70 pb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">📥</span>
+          <div>
+            <span class="font-black text-emerald-950 text-xs sm:text-sm block">Nộp bài trực tuyến</span>
+            <span class="text-[10px] text-emerald-800 font-mono">Hạn nộp: ${deadlineStr}</span>
+          </div>
+        </div>
+        ${statusBadge}
+      </div>
+
+      <!-- Constraints notice -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-white p-2.5 rounded-xl border border-slate-200/80">
+        <div>
+          <span class="text-[10px] text-slate-400 block uppercase font-bold">Định dạng</span>
+          <span class="font-bold text-slate-800">${(cfg.acceptedExtensions || ['pdf']).map(e => e.toUpperCase()).join(', ')}</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-400 block uppercase font-bold">Dung lượng tối đa</span>
+          <span class="font-bold text-slate-800">≤ ${cfg.maxFileSizeMB || 100} MB</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-400 block uppercase font-bold">Số file</span>
+          <span class="font-bold text-slate-800">${cfg.maxFiles || 1} file</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-400 block uppercase font-bold">Lượt nộp còn lại</span>
+          <span class="font-bold font-mono ${rules.remainingAttempts > 0 ? 'text-emerald-700' : 'text-rose-600'}">${rules.remainingAttempts} / ${rules.totalAllowedAttempts}</span>
+        </div>
+      </div>
+
+      <!-- Override notice if applicable -->
+      ${rules.isExtended ? `
+        <div class="p-2 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 font-semibold flex items-center gap-1.5">
+          <span>⭐</span>
+          <span>Bạn được gia hạn nộp bài riêng đến: <strong>${fmtIsoToVietnameseDateTime(rules.effectiveDeadline.toISOString())}</strong></span>
+        </div>
+      ` : ''}
+      ${rules.extraAttempts > 0 ? `
+        <div class="p-2 bg-blue-50 border border-blue-200 rounded-xl text-[11px] text-blue-900 font-semibold flex items-center gap-1.5">
+          <span>⭐</span>
+          <span>Bạn được cấp thêm <strong>${rules.extraAttempts}</strong> lần nộp bài.</span>
+        </div>
+      ` : ''}
+
+      <!-- Expected Filename Rule -->
+      <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+        <span class="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">Tên file yêu cầu:</span>
+        <div class="font-mono text-xs font-bold text-emerald-900 bg-white p-1.5 rounded border border-slate-200 select-all">
+          ${expectedFn}
+        </div>
+        <span class="text-[10px] text-slate-400 block italic">Quy tắc: ${cfg.filenameMode === 'prefix' ? 'Bắt đầu đúng mẫu trên (tiền tố)' : 'Khớp chính xác tên trên'} • Không dấu, viết hoa</span>
+      </div>
+
+      <!-- Upload Section -->
+      ${rules.canSubmit ? `
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <input type="file" id="sub-input-file-${act.id}" accept="${acceptAttr}" ${isMultiple ? 'multiple' : ''} onchange="onStudentFileSelected('${act.id}')" class="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer">
+          </div>
+          <div id="sub-selected-file-info-${act.id}" class="hidden p-2 bg-white rounded-lg border border-slate-200 text-[11px] font-mono text-slate-700">
+            <!-- Populated on file select -->
+          </div>
+
+          <!-- Upload Progress -->
+          <div id="sub-progress-wrap-${act.id}" class="hidden space-y-1">
+            <div class="flex items-center justify-between text-[11px] font-semibold">
+              <span id="sub-progress-text-${act.id}" class="text-emerald-800">Đang tải: 0%</span>
+              <button type="button" onclick="cancelStudentUpload('${act.id}')" class="text-rose-600 hover:underline font-bold text-[10px]">Hủy tải</button>
+            </div>
+            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+              <div id="sub-progress-bar-${act.id}" class="bg-emerald-600 h-2 transition-all duration-200" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Error notice box -->
+          <div id="sub-error-box-${act.id}" class="hidden p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-[11px] space-y-1">
+          </div>
+
+          <div class="flex items-center gap-2 pt-1">
+            <button type="button" onclick="checkStudentFileSubmission('${act.id}')" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-300 transition-colors">
+              🔍 Kiểm tra file
+            </button>
+            <button type="button" id="btn-submit-file-${act.id}" onclick="submitStudentFiles('${act.id}')" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-colors">
+              📤 Nộp bài (Lần ${rules.completedAttempts + 1}/${rules.totalAllowedAttempts})
+            </button>
+          </div>
+        </div>
+      ` : `
+        <div class="p-3 bg-slate-100 border border-slate-200 rounded-xl text-center text-slate-600 font-semibold text-xs">
+          ${rules.remainingAttempts <= 0
+            ? 'Bạn đã hết số lần nộp bài cho mốc này.'
+            : (rules.isPastDeadline ? 'Mốc này đã kết thúc hạn nộp bài.' : 'Mốc kế hoạch chưa mở nhận bài.')}
+        </div>
+      `}
+
+      ${historyHtml}
+    </div>
+  `;
+};
+
+window.onStudentFileSelected = function(actId) {
+  const fileInput = document.getElementById('sub-input-file-' + actId);
+  const infoEl = document.getElementById('sub-selected-file-info-' + actId);
+  const errBox = document.getElementById('sub-error-box-' + actId);
+  if (errBox) errBox.classList.add('hidden');
+
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    if (infoEl) infoEl.classList.add('hidden');
+    return;
+  }
+
+  const files = Array.from(fileInput.files);
+  const infoText = files.map(f => `• ${f.name} (${(f.size / (1024 * 1024)).toFixed(2)} MB)`).join('<br>');
+  if (infoEl) {
+    infoEl.innerHTML = infoText;
+    infoEl.classList.remove('hidden');
+  }
+};
+
+window.checkStudentFileSubmission = function(actId) {
+  const round = (state.rounds || []).find(r => r.id === state.selectedRoundId);
+  const act = (round?.activities || []).find(a => a.id === actId);
+  const fileInput = document.getElementById('sub-input-file-' + actId);
+  const errBox = document.getElementById('sub-error-box-' + actId);
+
+  if (!round || !act) return;
+  const files = fileInput?.files ? Array.from(fileInput.files) : [];
+  const userMssv = state.userStudentId || (state.currentUser?.email ? state.currentUser.email.split('@')[0] : '');
+  const targetStudent = (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
+    studentId: userMssv,
+    studentName: state.currentUser?.displayName || 'Sinh viên'
+  };
+
+  const valRes = validateFileSubmission(files, targetStudent, act, round);
+  if (!valRes.valid) {
+    if (errBox) {
+      errBox.innerHTML = `<strong>⚠️ Kiểm tra phát hiện lỗi:</strong><br>` + valRes.errors.map(e => `• ${e}`).join('<br>');
+      errBox.classList.remove('hidden');
+    }
+    showToast('Tệp nộp chưa đúng yêu cầu. Vui lòng kiểm tra lại!', 'warning');
+  } else {
+    if (errBox) errBox.classList.add('hidden');
+    showToast(`✅ File hợp lệ! Tên file chuẩn: ${valRes.expectedFilename}`, 'success');
+  }
+};
+
+window.cancelStudentUpload = function(actId) {
+  if (window._currentUploadAbort) {
+    window._currentUploadAbort.abort();
+    window._currentUploadAbort = null;
+  }
+  const progWrap = document.getElementById('sub-progress-wrap-' + actId);
+  if (progWrap) progWrap.classList.add('hidden');
+  showToast('Đã hủy quá trình tải tệp.', 'info');
+};
+
+window.submitStudentFiles = async function(actId) {
+  const round = (state.rounds || []).find(r => r.id === state.selectedRoundId);
+  const act = (round?.activities || []).find(a => a.id === actId);
+  const fileInput = document.getElementById('sub-input-file-' + actId);
+  const errBox = document.getElementById('sub-error-box-' + actId);
+  const submitBtn = document.getElementById('btn-submit-file-' + actId);
+  const progWrap = document.getElementById('sub-progress-wrap-' + actId);
+  const progText = document.getElementById('sub-progress-text-' + actId);
+  const progBar = document.getElementById('sub-progress-bar-' + actId);
+
+  if (!round || !act) return;
+  const files = fileInput?.files ? Array.from(fileInput.files) : [];
+  const userMssv = state.userStudentId || (state.currentUser?.email ? state.currentUser.email.split('@')[0] : '');
+  const targetStudent = (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
+    studentId: userMssv,
+    studentName: state.currentUser?.displayName || 'Sinh viên'
+  };
+
+  // Client-side Validation
+  const valRes = validateFileSubmission(files, targetStudent, act, round);
+  if (!valRes.valid) {
+    if (errBox) {
+      errBox.innerHTML = `<strong>⚠️ Lỗi nộp bài:</strong><br>` + valRes.errors.map(e => `• ${e}`).join('<br>');
+      errBox.classList.remove('hidden');
+    }
+    showToast('Tệp nộp không hợp lệ, không thể nộp bài!', 'error');
+    return;
+  }
+
+  if (errBox) errBox.classList.add('hidden');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span>⏳ Đang xử lý...</span>';
+  }
+  if (progWrap) progWrap.classList.remove('hidden');
+
+  const abortController = new AbortController();
+  window._currentUploadAbort = abortController;
+
+  try {
+    const file = files[0];
+    const attemptNum = valRes.rules.completedAttempts + 1;
+
+    // Call storage provider abstraction
+    const uploadRes = await uploadProvider.upload({
+      file,
+      student: targetStudent,
+      activity: act,
+      round,
+      attempt: attemptNum,
+      onProgress: (pct) => {
+        if (progText) progText.textContent = `Đang tải: ${pct}%`;
+        if (progBar) progBar.style.width = `${pct}%`;
+      },
+      abortSignal: abortController.signal
+    });
+
+    if (!uploadRes.success) {
+      // HONEST ERROR REPORTING: Never fake success
+      if (errBox) {
+        errBox.innerHTML = `<strong>⚠️ ${uploadRes.status === 'backendRequired' ? 'Bảo mật Google Drive:' : 'Lỗi tải lên:'}</strong><br>${uploadRes.error}`;
+        errBox.classList.remove('hidden');
+      }
+      showToast(uploadRes.error || 'Tải tệp không thành công', 'error');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = `📤 Nộp bài (Lần ${attemptNum}/${valRes.rules.totalAllowedAttempts})`;
+      }
+      if (progWrap) progWrap.classList.add('hidden');
+      return;
+    }
+
+    // Atomic metadata creation after transport success
+    const receiptId = 'REC-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    const submissionMetadata = {
+      studentId: userMssv,
+      studentName: targetStudent.studentName,
+      activityId: act.id,
+      activityTitle: act.title,
+      roundId: round.id,
+      attempt: attemptNum,
+      receiptId,
+      files: [
+        {
+          originalName: file.name,
+          validatedName: valRes.expectedFilename,
+          size: file.size,
+          mimeType: file.type || 'application/octet-stream',
+          storageProvider: uploadRes.storageProvider || 'google_drive',
+          providerFileId: uploadRes.providerFileId || null,
+          providerUrl: uploadRes.providerUrl || null
+        }
+      ],
+      submittedAt: new Date().toISOString(),
+      isLate: valRes.isLate,
+      status: 'submitted',
+      submittedBy: state.currentUser?.email || userMssv
+    };
+
+    if (!round.activitySubmissions) round.activitySubmissions = {};
+    if (!round.activitySubmissions[act.id]) round.activitySubmissions[act.id] = {};
+    const existingEntry = round.activitySubmissions[act.id][userMssv] || { attempts: [] };
+    const newAttempts = [...(existingEntry.attempts || []), submissionMetadata];
+
+    round.activitySubmissions[act.id][userMssv] = {
+      currentSubmission: submissionMetadata,
+      attempts: newAttempts
+    };
+
+    // Save metadata to Firestore round document
+    try {
+      const roundRef = doc(db, 'graduationRounds', round.id);
+      await updateDoc(roundRef, {
+        [`activitySubmissions.${act.id}.${userMssv}`]: {
+          currentSubmission: submissionMetadata,
+          attempts: newAttempts
+        },
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.warn('Could not update Firestore activitySubmissions directly:', e);
+    }
+
+    showToast(`✅ Nộp bài thành công! Mã biên nhận: ${receiptId}`, 'success');
+    loadStudentRoundActivities(round.id);
+  } catch (err) {
+    console.error('Submit error:', err);
+    if (errBox) {
+      errBox.innerHTML = `<strong>⚠️ Lỗi hệ thống:</strong><br>${err.message || 'Quá trình nộp bài bị gián đoạn'}`;
+      errBox.classList.remove('hidden');
+    }
+    showToast('Lỗi khi nộp bài: ' + (err.message || 'Không xác định'), 'error');
+  } finally {
+    window._currentUploadAbort = null;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+    }
+    if (progWrap) progWrap.classList.add('hidden');
+  }
+};
+
+window.withdrawStudentSubmission = async function(actId, attemptNum) {
+  const round = (state.rounds || []).find(r => r.id === state.selectedRoundId);
+  const act = (round?.activities || []).find(a => a.id === actId);
+  if (!round || !act) return;
+
+  const userMssv = state.userStudentId || (state.currentUser?.email ? state.currentUser.email.split('@')[0] : '');
+  const subEntry = round?.activitySubmissions?.[actId]?.[userMssv];
+  if (!subEntry || !subEntry.currentSubmission) {
+    showToast('Không tìm thấy bài nộp để rút!', 'warning');
+    return;
+  }
+
+  showConfirm(
+    'Xác nhận rút bài nộp?',
+    'Lịch sử nộp bài vẫn được lưu lại trong hệ thống nhưng bài nộp này sẽ được chuyển sang trạng thái "Đã rút". Bạn có thể nộp lại nếu còn lượt.',
+    async () => {
+      try {
+        const withdrawnSubmission = {
+          ...subEntry.currentSubmission,
+          status: 'withdrawn',
+          withdrawnAt: new Date().toISOString()
+        };
+
+        const updatedAttempts = (subEntry.attempts || []).map(att => {
+          if (att.receiptId === withdrawnSubmission.receiptId) {
+            return withdrawnSubmission;
+          }
+          return att;
+        });
+
+        round.activitySubmissions[actId][userMssv] = {
+          currentSubmission: withdrawnSubmission,
+          attempts: updatedAttempts
+        };
+
+        try {
+          const roundRef = doc(db, 'graduationRounds', round.id);
+          await updateDoc(roundRef, {
+            [`activitySubmissions.${actId}.${userMssv}`]: {
+              currentSubmission: withdrawnSubmission,
+              attempts: updatedAttempts
+            },
+            updatedAt: serverTimestamp()
+          });
+        } catch (e) {}
+
+        showToast('Đã rút bài nộp thành công!', 'info');
+        loadStudentRoundActivities(round.id);
+      } catch (err) {
+        showToast('Lỗi khi rút bài: ' + err.message, 'error');
+      }
+    }
+  );
+};
+
+// 7. ADMIN ACTIVITY SUBMISSIONS DASHBOARD
+window.openActivitySubmissionDashboard = function(roundId, actId) {
+  const round = (state.rounds || []).find(r => r.id === roundId);
+  const act = (round?.activities || []).find(a => a.id === actId);
+  if (!round || !act) {
+    showToast('Không tìm thấy thông tin mốc kế hoạch!', 'error');
+    return;
+  }
+
+  state._currentSubDash = { roundId, actId };
+
+  const titleEl = document.getElementById('sub-dash-title');
+  const subEl = document.getElementById('sub-dash-subtitle');
+  if (titleEl) titleEl.innerHTML = `<span>📥</span> Quản lý Sinh viên Nộp bài — ${act.title}`;
+  if (subEl) subEl.textContent = `Đợt: ${round.title} • Mốc: ${act.title}`;
+
+  const searchInput = document.getElementById('sub-dash-search');
+  if (searchInput) searchInput.value = '';
+  const filterSelect = document.getElementById('sub-dash-filter-status');
+  if (filterSelect) filterSelect.value = 'all';
+
+  renderAdminSubmissionsTable();
+  document.getElementById('modal-activity-submissions')?.classList.remove('hidden');
+};
+
+window.closeActivitySubmissionDashboard = function() {
+  document.getElementById('modal-activity-submissions')?.classList.add('hidden');
+  state._currentSubDash = null;
+};
+
+window.filterAdminSubmissionsTable = function() {
+  renderAdminSubmissionsTable();
+};
+
+window.renderAdminSubmissionsTable = function() {
+  if (!state._currentSubDash) return;
+  const { roundId, actId } = state._currentSubDash;
+  const round = (state.rounds || []).find(r => r.id === roundId);
+  const act = (round?.activities || []).find(a => a.id === actId);
+  const tbody = document.getElementById('sub-dash-tbody');
+  if (!round || !act || !tbody) return;
+
+  const registrations = state.adminReviewData?.registrations || [];
+  const eligible = (round.eligibleStudents || []).filter(s => s.eligible !== false);
+  const studentMap = new Map();
+
+  eligible.forEach(s => {
+    studentMap.set(s.studentId, {
+      studentId: s.studentId,
+      studentName: s.name || s.studentName || 'Sinh viên'
+    });
+  });
+  registrations.forEach(r => {
+    if (r.studentId) {
+      studentMap.set(r.studentId, {
+        studentId: r.studentId,
+        studentName: r.studentName || studentMap.get(r.studentId)?.studentName || 'Sinh viên'
+      });
+    }
+  });
+
+  const students = Array.from(studentMap.values());
+  const submissionsMap = round.activitySubmissions?.[actId] || {};
+
+  let totalCount = students.length;
+  let submittedCount = 0;
+  let missingCount = 0;
+  let lateCount = 0;
+
+  const items = students.map(st => {
+    const subRecord = submissionsMap[st.studentId] || null;
+    const current = subRecord?.currentSubmission || null;
+    const rules = getEffectiveSubmissionRules(st.studentId, act, round);
+
+    let status = 'missing';
+    if (current) {
+      if (current.status === 'withdrawn') status = 'withdrawn';
+      else if (current.isLate) status = 'late';
+      else status = 'submitted';
+    }
+
+    if (status === 'submitted') submittedCount++;
+    else if (status === 'late') { submittedCount++; lateCount++; }
+    else if (status === 'withdrawn') missingCount++;
+    else missingCount++;
+
+    return {
+      student: st,
+      subRecord,
+      current,
+      rules,
+      status
+    };
+  });
+
+  // Update Counters
+  if (document.getElementById('sub-dash-stat-total')) document.getElementById('sub-dash-stat-total').textContent = totalCount;
+  if (document.getElementById('sub-dash-stat-submitted')) document.getElementById('sub-dash-stat-submitted').textContent = submittedCount;
+  if (document.getElementById('sub-dash-stat-missing')) document.getElementById('sub-dash-stat-missing').textContent = missingCount;
+  if (document.getElementById('sub-dash-stat-late')) document.getElementById('sub-dash-stat-late').textContent = lateCount;
+
+  // Filter
+  const q = (document.getElementById('sub-dash-search')?.value || '').trim().toLowerCase();
+  const fStatus = document.getElementById('sub-dash-filter-status')?.value || 'all';
+
+  const filtered = items.filter(item => {
+    if (q) {
+      const matchMssv = item.student.studentId.toLowerCase().includes(q);
+      const matchName = item.student.studentName.toLowerCase().includes(q);
+      if (!matchMssv && !matchName) return false;
+    }
+    if (fStatus !== 'all') {
+      if (fStatus === 'submitted' && (item.status !== 'submitted' && item.status !== 'late')) return false;
+      if (fStatus === 'missing' && item.status !== 'missing') return false;
+      if (fStatus === 'late' && item.status !== 'late') return false;
+      if (fStatus === 'withdrawn' && item.status !== 'withdrawn') return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400">Không có sinh viên nào thỏa điều kiện lọc.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((item, idx) => {
+    const { student, current, rules, status } = item;
+    let statusPill = '';
+    if (status === 'submitted') {
+      statusPill = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã nộp</span>';
+    } else if (status === 'late') {
+      statusPill = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">● Nộp trễ</span>';
+    } else if (status === 'withdrawn') {
+      statusPill = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Đã rút bài</span>';
+    } else {
+      statusPill = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300">Chưa nộp</span>';
+    }
+
+    const councilAssign = (act.councilStudentAssignments || []).find(a => a.studentId === student.studentId);
+    const councilName = councilAssign?.councilCode || councilAssign?.councilId || '--';
+
+    const timeStr = current?.submittedAt ? fmtIsoToVietnameseDateTime(current.submittedAt) : '--';
+    const fName = current?.files?.[0]?.validatedName || current?.files?.[0]?.originalName || '--';
+    const fSize = current?.files?.[0]?.size ? (current.files[0].size / (1024 * 1024)).toFixed(1) + ' MB' : '';
+
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="p-2.5 text-center font-mono font-bold text-slate-400">#${idx + 1}</td>
+        <td class="p-2.5">
+          <span class="font-bold text-slate-900 block">${student.studentName}</span>
+          <span class="font-mono text-slate-500 text-[11px] block">${student.studentId}</span>
+        </td>
+        <td class="p-2.5 text-center font-bold text-indigo-700">${councilName}</td>
+        <td class="p-2.5 text-center whitespace-nowrap">${statusPill}</td>
+        <td class="p-2.5 text-center font-mono font-bold text-slate-700">${rules.completedAttempts}/${rules.totalAllowedAttempts}</td>
+        <td class="p-2.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">${timeStr}</td>
+        <td class="p-2.5 max-w-xs">
+          ${current ? `
+            <div class="truncate text-[11px] font-mono text-slate-800" title="${fName}">${fName}</div>
+            <div class="text-[10px] text-slate-400 font-mono">${fSize} ${current.receiptId ? '• ' + current.receiptId : ''}</div>
+          ` : '<span class="text-slate-300">--</span>'}
+        </td>
+        <td class="p-2.5 text-right whitespace-nowrap space-x-1">
+          ${current?.files?.[0]?.providerUrl ? `
+            <a href="${current.files[0].providerUrl}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded text-[11px] transition-colors inline-block">
+              👁️ Xem file
+            </a>
+          ` : ''}
+          ${rules.attemptsHistory.length > 0 ? `
+            <button type="button" onclick="openSubmissionHistoryModal('${student.studentId}', '${act.id}', '${round.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded text-[11px] transition-colors">
+              📜 Lịch sử (${rules.attemptsHistory.length})
+            </button>
+          ` : ''}
+          <button type="button" onclick="openSubmissionOverrideModal('${student.studentId}', '${act.id}', '${round.id}')" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold rounded text-[11px] transition-colors">
+            ⭐ Gia hạn/Lượt
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+// 8. DEADLINE & ATTEMPTS OVERRIDE MODAL
+window.openSubmissionOverrideModal = function(studentId, actId, roundId) {
+  const round = (state.rounds || []).find(r => r.id === roundId);
+  const act = (round?.activities || []).find(a => a.id === actId);
+  if (!round || !act) return;
+
+  state._currentOverride = { studentId, actId, roundId };
+
+  const stNameEl = document.getElementById('sub-override-student-name');
+  const actNameEl = document.getElementById('sub-override-activity-name');
+  if (stNameEl) stNameEl.textContent = `Sinh viên: ${studentId}`;
+  if (actNameEl) actNameEl.textContent = `Mốc Kế hoạch: ${act.title}`;
+
+  const existingOvr = round?.submissionOverrides?.[studentId]?.[actId];
+  if (existingOvr?.allowUntil) {
+    const parts = isoToVietnameseDateTime(existingOvr.allowUntil);
+    if (document.getElementById('sub-override-date')) document.getElementById('sub-override-date').value = parts.date;
+    if (document.getElementById('sub-override-time')) document.getElementById('sub-override-time').value = parts.time;
+  } else {
+    if (document.getElementById('sub-override-date')) document.getElementById('sub-override-date').value = '';
+    if (document.getElementById('sub-override-time')) document.getElementById('sub-override-time').value = '';
+  }
+
+  if (document.getElementById('sub-override-extra-attempts')) {
+    document.getElementById('sub-override-extra-attempts').value = existingOvr?.extraAttempts ?? 0;
+  }
+  if (document.getElementById('sub-override-reason')) {
+    document.getElementById('sub-override-reason').value = existingOvr?.reason || '';
+  }
+
+  document.getElementById('modal-submission-override')?.classList.remove('hidden');
+};
+
+window.closeSubmissionOverrideModal = function() {
+  document.getElementById('modal-submission-override')?.classList.add('hidden');
+  state._currentOverride = null;
+};
+
+window.saveSubmissionOverride = async function() {
+  if (!state._currentOverride) return;
+  const { studentId, actId, roundId } = state._currentOverride;
+  const round = (state.rounds || []).find(r => r.id === roundId);
+  const act = (round?.activities || []).find(a => a.id === actId);
+  if (!round || !act) return;
+
+  const oDate = document.getElementById('sub-override-date')?.value || '';
+  const oTime = document.getElementById('sub-override-time')?.value || '';
+  const allowUntil = (oDate && oTime) ? parseVietnameseDateTimeToIso(oDate, oTime) : null;
+  const extraAttempts = parseInt(document.getElementById('sub-override-extra-attempts')?.value, 10) || 0;
+  const reason = (document.getElementById('sub-override-reason')?.value || '').trim();
+
+  if (!reason) {
+    showToast('Vui lòng nhập lý do gia hạn / cấp thêm lượt nộp bài (* Bắt buộc)!', 'warning');
+    return;
+  }
+
+  const overrideData = {
+    allowUntil,
+    extraAttempts,
+    reason,
+    createdAt: new Date().toISOString(),
+    createdBy: state.currentUser?.email || 'admin'
+  };
+
+  if (!round.submissionOverrides) round.submissionOverrides = {};
+  if (!round.submissionOverrides[studentId]) round.submissionOverrides[studentId] = {};
+  round.submissionOverrides[studentId][actId] = overrideData;
+
+  // Save to Firestore
+  try {
+    const roundRef = doc(db, 'graduationRounds', round.id);
+    await updateDoc(roundRef, {
+      [`submissionOverrides.${studentId}.${actId}`]: overrideData,
+      updatedAt: serverTimestamp()
+    });
+  } catch (e) {
+    console.warn('Could not update Firestore submissionOverrides:', e);
+  }
+
+  // Audit log
+  if (typeof recordRoundAuditLog === 'function') {
+    await recordRoundAuditLog(round.id, {
+      type: 'admin_override',
+      action: 'Gia hạn / cấp lượt nộp bài',
+      target: `MSSV: ${studentId}, Mốc: ${act.title}`,
+      detail: `Gia hạn đến: ${allowUntil || 'Không'}, Cấp thêm: ${extraAttempts} lần. Lý do: ${reason}`,
+      by: state.currentUser?.email || 'admin'
+    });
+  }
+
+  showToast('Đã lưu quyết định gia hạn thành công!', 'success');
+  closeSubmissionOverrideModal();
+  renderAdminSubmissionsTable();
+};
+
+// 9. SUBMISSION HISTORY MODAL
+window.openSubmissionHistoryModal = function(studentId, actId, roundId) {
+  const round = (state.rounds || []).find(r => r.id === roundId);
+  const act = (round?.activities || []).find(a => a.id === actId);
+  if (!round || !act) return;
+
+  const stInfo = document.getElementById('sub-hist-student-info');
+  const actInfo = document.getElementById('sub-hist-activity-info');
+  const listEl = document.getElementById('sub-hist-list');
+
+  if (stInfo) stInfo.textContent = `Sinh viên: ${studentId}`;
+  if (actInfo) actInfo.textContent = `Mốc Kế hoạch: ${act.title}`;
+
+  const subRecord = round.activitySubmissions?.[actId]?.[studentId];
+  const history = Array.isArray(subRecord?.attempts) ? subRecord.attempts : [];
+
+  if (!listEl) return;
+  if (history.length === 0) {
+    listEl.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">Chưa có lịch sử nộp bài nào.</div>';
+  } else {
+    listEl.innerHTML = history.map((att, idx) => {
+      const isLatest = idx === history.length - 1;
+      const fName = att.files?.[0]?.validatedName || att.files?.[0]?.originalName || 'file';
+      const fSize = att.files?.[0]?.size ? (att.files[0].size / (1024 * 1024)).toFixed(2) + ' MB' : '';
+      const timeStr = att.submittedAt ? fmtIsoToVietnameseDateTime(att.submittedAt) : '--';
+      return `
+        <div class="p-3 bg-white rounded-xl border ${isLatest ? 'border-emerald-300 ring-1 ring-emerald-200 shadow-xs' : 'border-slate-200'} text-xs space-y-1">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="font-black text-sm text-slate-900">Lần nộp ${att.attempt || (idx + 1)}</span>
+              ${isLatest ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Bản hiện tại</span>' : ''}
+              ${att.isLate ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">Nộp trễ</span>' : '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">Đúng hạn</span>'}
+              ${att.status === 'withdrawn' ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Đã rút bài</span>' : ''}
+            </div>
+            <span class="font-mono text-[11px] text-slate-500">${timeStr}</span>
+          </div>
+          <div class="font-mono text-[11px] text-slate-800 bg-slate-50 p-2 rounded border border-slate-100 select-all">
+            📁 ${fName} (${fSize})
+          </div>
+          <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-0.5">
+            <span>Mã biên nhận: ${att.receiptId || '--'}</span>
+            <span>Nộp bởi: ${att.submittedBy || '--'}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('modal-submission-history')?.classList.remove('hidden');
+};
+
+window.closeSubmissionHistoryModal = function() {
+  document.getElementById('modal-submission-history')?.classList.add('hidden');
+};
+
+// 10. EXCEL EXPORT OF ACTIVITY SUBMISSIONS
+window.exportCurrentActivitySubmissionsToExcel = function() {
+  if (!state._currentSubDash) return;
+  const { roundId, actId } = state._currentSubDash;
+  const round = (state.rounds || []).find(r => r.id === roundId);
+  const act = (round?.activities || []).find(a => a.id === actId);
+  if (!round || !act) {
+    showToast('Không tìm thấy dữ liệu để xuất Excel!', 'error');
+    return;
+  }
+
+  const registrations = state.adminReviewData?.registrations || [];
+  const eligible = (round.eligibleStudents || []).filter(s => s.eligible !== false);
+  const studentMap = new Map();
+  eligible.forEach(s => studentMap.set(s.studentId, { studentId: s.studentId, studentName: s.name || s.studentName || 'Sinh viên' }));
+  registrations.forEach(r => { if (r.studentId) studentMap.set(r.studentId, { studentId: r.studentId, studentName: r.studentName || studentMap.get(r.studentId)?.studentName || 'Sinh viên' }); });
+
+  const submissionsMap = round.activitySubmissions?.[actId] || {};
+  const rows = [
+    [
+      'STT',
+      'MSSV',
+      'Họ và Tên',
+      'Hội đồng',
+      'Mốc Kế hoạch',
+      'Lần nộp',
+      'Thời gian nộp',
+      'Trạng thái',
+      'Trễ hạn',
+      'Tên file',
+      'Dung lượng (MB)',
+      'Mã biên nhận'
+    ]
+  ];
+
+  let stt = 1;
+  studentMap.forEach(st => {
+    const subRecord = submissionsMap[st.studentId] || null;
+    const current = subRecord?.currentSubmission || null;
+    const rules = getEffectiveSubmissionRules(st.studentId, act, round);
+    const councilAssign = (act.councilStudentAssignments || []).find(a => a.studentId === st.studentId);
+    const councilName = councilAssign?.councilCode || councilAssign?.councilId || '';
+
+    const timeStr = current?.submittedAt ? fmtIsoToVietnameseDateTime(current.submittedAt) : '';
+    const fName = current?.files?.[0]?.validatedName || current?.files?.[0]?.originalName || '';
+    const fSizeMB = current?.files?.[0]?.size ? (current.files[0].size / (1024 * 1024)).toFixed(2) : '';
+
+    let statusText = 'Chưa nộp';
+    if (current) {
+      if (current.status === 'withdrawn') statusText = 'Đã rút bài';
+      else if (current.isLate) statusText = 'Nộp trễ';
+      else statusText = 'Đã nộp';
+    }
+
+    rows.push([
+      stt++,
+      sanitizeExcelCell(st.studentId),
+      sanitizeExcelCell(st.studentName),
+      sanitizeExcelCell(councilName),
+      sanitizeExcelCell(act.title),
+      `${rules.completedAttempts}/${rules.totalAllowedAttempts}`,
+      sanitizeExcelCell(timeStr),
+      sanitizeExcelCell(statusText),
+      current ? (current.isLate ? 'Nộp trễ' : 'Đúng hạn') : '',
+      sanitizeExcelCell(fName),
+      fSizeMB ? parseFloat(fSizeMB) : '',
+      sanitizeExcelCell(current?.receiptId || '')
+    ]);
+  });
+
+  if (typeof window.XLSX === 'undefined') {
+    showToast('Thư viện Excel chưa được tải!', 'error');
+    return;
+  }
+
+  const wb = window.XLSX.utils.book_new();
+  const ws = window.XLSX.utils.aoa_to_sheet(rows);
+  const sheetName = sanitizeSheetName('NOP_BAI_' + (act.slug || act.id));
+  window.XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  const cleanActTitle = slugify(act.title);
+  const dateStr = new Date().toISOString().slice(0, 10).split('-').reverse().join('-');
+  const fileName = `Submissions_${cleanActTitle}_${dateStr}.xlsx`;
+
+  window.XLSX.writeFile(wb, fileName);
+  showToast('Đã xuất danh sách nộp bài sang Excel thành công!', 'success');
+};
+
+// 11. ROLE-BASED ACCESS CONTROL HELPER
+window.canAccessStudentSubmission = function(userEmail, userRole, studentId, activity, round) {
+  if (!activity || !activity.submissionConfig) return false;
+  if (userRole === 'admin' || state.isAdmin) return true;
+  if (userRole === 'student') {
+    const studentUser = state.userStudentId || (userEmail ? userEmail.split('@')[0] : '');
+    return String(studentId).toLowerCase() === String(studentUser).toLowerCase();
+  }
+  const vis = activity.submissionConfig.visibility || { supervisor: true, reviewer: true, council: true };
+  if (vis.supervisor) {
+    const reg = (state.adminReviewData?.registrations || []).find(r => r.studentId === studentId);
+    if (reg && typeof getOfficialSupervisors === 'function') {
+      const isSupervised = getOfficialSupervisors(reg).some(s => (s.supervisorEmail || s.email) === userEmail);
+      if (isSupervised) return true;
+    }
+  }
+  if (vis.reviewer) {
+    const reg = (state.adminReviewData?.registrations || []).find(r => r.studentId === studentId);
+    if (reg && reg.reviewerEmail === userEmail) return true;
+  }
+  if (vis.council && Array.isArray(activity.councils)) {
+    const councilOfStudent = (activity.councilStudentAssignments || []).find(a => a.studentId === studentId);
+    if (councilOfStudent) {
+      const council = activity.councils.find(c => c.id === councilOfStudent.councilId);
+      if (council && Array.isArray(council.members) && council.members.some(m => m.email === userEmail)) {
+        return true;
+      }
+    }
+  }
+  return false;
 };
 
