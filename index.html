@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.4.0</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.5.0</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -599,10 +599,7 @@
             <span>Danh sách SV khoa</span>
           </button>
 
-          <button onclick="switchAdminTab('eligible-students')" id="atab-btn-eligible-students" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
-            <span>Danh sách SV đủ điều kiện</span>
-          </button>
+<!-- Legacy sidebar item eligible-students moved into round config -->
           
           <button onclick="switchAdminTab('registrations')" id="atab-btn-registrations" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
             <span class="w-2 h-2 rounded-full bg-slate-400"></span>
@@ -614,10 +611,7 @@
             <span>Danh sách GVHD</span>
           </button>
           
-          <button onclick="switchAdminTab('round-supervisors')" id="atab-btn-round-supervisors" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
-            <span>GVHD của đợt</span>
-          </button>
+<!-- Legacy sidebar item round-supervisors moved into round config -->
           
           <button onclick="switchAdminTab('review')" id="atab-btn-review" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
             <span class="w-2 h-2 rounded-full bg-amber-500"></span>
@@ -896,56 +890,180 @@
       </div>
 
       
-      <!-- ADMIN TAB: FACULTY STUDENTS (DANH SÁCH SV KHOA) -->
+      <!-- ADMIN TAB: FACULTY STUDENTS (DANH SÁCH SV KHOA - DỮ LIỆU NỀN) -->
       <div id="atab-panel-faculty-students" class="hidden space-y-6">
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <!-- TOP HEADER & STATUS -->
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
             <div>
-              <h2 class="text-lg font-black text-slate-900 flex items-center gap-2">
-                <span>Danh sách Sinh viên Khoa</span>
-                <span class="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold border border-indigo-200">Master Dataset</span>
-              </h2>
-              <p class="text-xs text-slate-500 mt-0.5">Dữ liệu sinh viên toàn khoa MTCN phục vụ đối chiếu, phân công và kiểm tra điều kiện</p>
+              <div class="flex items-center gap-2.5">
+                <h2 class="text-lg font-black text-slate-900">Danh sách Sinh viên Toàn khoa</h2>
+                <span class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-bold border border-indigo-200">Dữ liệu nền (IFAA Standard)</span>
+              </div>
+              <div id="faculty-dataset-status-wrap" class="flex flex-wrap items-center gap-2 mt-1">
+                <span id="faculty-dataset-status-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">
+                  <span id="faculty-dataset-status-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                  <span id="faculty-dataset-status-text">Đang kết nối dữ liệu nền...</span>
+                </span>
+                <span id="faculty-dataset-meta-info" class="text-xs text-slate-500"></span>
+              </div>
             </div>
+            
+            <!-- TOOLBAR BUTTONS -->
             <div class="flex flex-wrap items-center gap-2">
-              <label class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors">
-                <span>📥 Tải lên Excel / CSV</span>
+              <label class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors">
+                <span>📥 Upload danh sách</span>
                 <input type="file" id="faculty-students-file-input" accept=".xlsx,.xls,.csv" onchange="handleFacultyStudentsUpload(event)" class="hidden">
               </label>
+              <button type="button" onclick="rebuildFacultyDataset()" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-indigo-200 transition-colors" title="Đồng bộ & nén lại dữ liệu nền">
+                <span>🔄 Tạo lại dữ liệu nền</span>
+              </button>
               <button type="button" onclick="downloadFacultyStudentsTemplate()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors">
                 <span>📄 File mẫu</span>
               </button>
-              <button type="button" onclick="clearAllFacultyStudents()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors">
+              <button type="button" onclick="exportFacultyStudentsExcel()" class="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-emerald-200 transition-colors">
+                <span>📊 Xuất Excel</span>
+              </button>
+              <button type="button" onclick="clearAllFacultyStudents()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-rose-200 transition-colors">
                 <span>🗑️ Xóa tất cả</span>
               </button>
             </div>
           </div>
 
-          <!-- FILTERS & STATS -->
-          <div class="flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
-            <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-              <div class="relative flex-1 sm:w-64">
-                <input type="text" id="faculty-search-input" oninput="renderFacultyStudentsTable()" placeholder="Tìm theo MSSV hoặc Họ tên..." class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                <span class="absolute left-2.5 top-2 text-slate-400">🔍</span>
-              </div>
-              <select id="faculty-major-filter" onchange="renderFacultyStudentsTable()" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs">
-                <option value="">-- Tất cả ngành --</option>
-              </select>
-              <select id="faculty-class-filter" onchange="renderFacultyStudentsTable()" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs">
-                <option value="">-- Tất cả lớp --</option>
-              </select>
+          <!-- FORM THÊM / CẬP NHẬT SV -->
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                <span>👤 Thêm / Cập nhật sinh viên</span>
+              </span>
+              <span class="text-[11px] text-slate-500">Nhập MSSV đã có để cập nhật, MSSV mới để thêm vào danh sách</span>
             </div>
-            <div class="text-slate-600 shrink-0 font-medium">
-              Tổng số: <strong id="faculty-students-total-count" class="text-indigo-700 font-black">0</strong> sinh viên 
-              (<span id="faculty-students-filtered-count">0</span> hiển thị)
+            <form id="form-faculty-student" onsubmit="saveSingleFacultyStudent(event)" class="space-y-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <div>
+                  <label class="font-bold text-slate-700 block mb-1">MSSV *</label>
+                  <input type="text" id="faculty-form-mssv" required placeholder="52000888" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase">
+                </div>
+                <div>
+                  <label class="font-bold text-slate-700 block mb-1">Họ và tên *</label>
+                  <input type="text" id="faculty-form-name" required placeholder="Nguyễn Văn A" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="font-bold text-slate-700 block mb-1">Giới tính</label>
+                  <select id="faculty-form-gender" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <option value="">-- Chưa xác định --</option>
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="font-bold text-slate-700 block mb-1">Ngành</label>
+                  <select id="faculty-form-major" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <option value="Thiết kế nội thất">Thiết kế nội thất</option>
+                    <option value="Thiết kế đồ họa">Thiết kế đồ họa</option>
+                    <option value="Thiết kế thời trang">Thiết kế thời trang</option>
+                    <option value="Thiết kế công nghiệp">Thiết kế công nghiệp</option>
+                    <option value="Nghệ thuật số">Nghệ thuật số</option>
+                    <option value="Khác">Khác</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <label class="font-bold text-slate-700 block mb-1">Lớp</label>
+                  <input type="text" id="faculty-form-class" placeholder="20050201" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="font-bold text-slate-700 block mb-1">Email cá nhân / SV</label>
+                  <input type="email" id="faculty-form-email" placeholder="email@student.tdtu.edu.vn" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="font-bold text-slate-700 block mb-1">Số điện thoại</label>
+                  <div class="flex gap-2">
+                    <input type="tel" id="faculty-form-phone" placeholder="0901234567" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <button type="submit" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold text-xs shrink-0 transition-colors">
+                      <span>Tạo / Cập nhật</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- BỘ LỌC & TÌM KIẾM (CLIENT-SIDE) -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+              <div class="lg:col-span-2">
+                <label class="font-bold text-slate-700 block mb-1">Tìm sinh viên:</label>
+                <div class="relative">
+                  <input type="text" id="faculty-search-input" onkeydown="if(event.key==='Enter') searchFacultyStudents()" placeholder="MSSV hoặc họ tên..." class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                  <span class="absolute left-2.5 top-2.5 text-slate-400">🔍</span>
+                </div>
+              </div>
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Giới tính:</label>
+                <select id="faculty-gender-filter" onchange="searchFacultyStudents()" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs">
+                  <option value="">-- Tất cả --</option>
+                  <option value="Nam">Nam</option>
+                  <option value="Nữ">Nữ</option>
+                </select>
+              </div>
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Hiển thị theo ngành:</label>
+                <select id="faculty-major-filter" onchange="searchFacultyStudents()" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs">
+                  <option value="">-- Tất cả ngành --</option>
+                  <option value="Thiết kế nội thất">Thiết kế nội thất</option>
+                  <option value="Thiết kế đồ họa">Thiết kế đồ họa</option>
+                  <option value="Thiết kế thời trang">Thiết kế thời trang</option>
+                  <option value="Thiết kế công nghiệp">Thiết kế công nghiệp</option>
+                  <option value="Nghệ thuật số">Nghệ thuật số</option>
+                </select>
+              </div>
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Hiển thị theo lớp:</label>
+                <select id="faculty-class-filter" onchange="searchFacultyStudents()" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs">
+                  <option value="">-- Tất cả lớp --</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- ACTION BUTTONS & PAGE SIZE -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="searchFacultyStudents()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center gap-1 shadow-sm transition-colors">
+                  <span>🔍 Tìm kiếm</span>
+                </button>
+                <button type="button" onclick="loadAndRenderFacultyStudents()" class="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold flex items-center gap-1 transition-colors">
+                  <span>📋 Lấy danh sách</span>
+                </button>
+                <button type="button" onclick="resetFacultyStudentFilters()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-semibold transition-colors">
+                  <span>✕ Xóa bộ lọc</span>
+                </button>
+              </div>
+
+              <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-slate-500 font-medium">Số SV mỗi trang:</span>
+                  <select id="faculty-page-size" onchange="changeFacultyPageSize(this.value)" class="p-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700">
+                    <option value="15" selected>15</option>
+                    <option value="30">30</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </div>
+                <div class="text-slate-600 font-semibold">
+                  Tổng số: <strong id="faculty-students-total-count" class="text-indigo-700 font-black">0</strong> SV
+                  (<span id="faculty-students-filtered-count">0</span> phù hợp)
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- TABLE -->
-          <div class="border border-slate-200 rounded-xl overflow-hidden">
-            <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+          <!-- TABLE CONTAINER -->
+          <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+            <div class="overflow-x-auto max-h-[560px] overflow-y-auto">
               <table class="w-full text-left text-xs border-collapse">
-                <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10">
+                <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10 uppercase text-[11px] tracking-wide">
                   <tr>
                     <th class="p-3">MSSV</th>
                     <th class="p-3">Họ và tên</th>
@@ -953,19 +1071,37 @@
                     <th class="p-3">Ngành</th>
                     <th class="p-3">Lớp</th>
                     <th class="p-3">Email</th>
+                    <th class="p-3">Điện thoại</th>
                     <th class="p-3 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody id="faculty-students-tbody" class="divide-y divide-slate-100">
-                  <tr><td colspan="7" class="p-8 text-center text-slate-400">Đang tải danh sách sinh viên khoa...</td></tr>
+                  <tr>
+                    <td colspan="8" class="p-8 text-center text-slate-400">
+                      Danh sách chưa được hiển thị (0 sinh viên). Bấm <b>"Lấy danh sách"</b> hoặc nhập từ khóa để tìm kiếm.
+                    </td>
+                  </tr>
                 </tbody>
               </table>
+            </div>
+
+            <!-- PAGINATION CONTROLS -->
+            <div id="faculty-pagination-bar" class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+              <span id="faculty-page-info" class="text-slate-600 font-medium">Trang 0 / 0</span>
+              <div class="flex items-center gap-1.5">
+                <button type="button" id="faculty-btn-prev" onclick="prevFacultyStudentPage()" disabled class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                  ◀ Trước
+                </button>
+                <button type="button" id="faculty-btn-next" onclick="nextFacultyStudentPage()" disabled class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                  Sau ▶
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-
+      
       <!-- ADMIN TAB: ELIGIBLE STUDENTS (EXCEL) -->
       <div id="atab-panel-eligible-students" class="hidden space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl">
@@ -1215,180 +1351,316 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Studio v1.4.0</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Studio v1.5.0</p>
     </div>
   </footer>
 
   <!-- MODALS CONTAINER -->
 
-  <!-- 1. CREATE / EDIT ROUND MODAL -->
+  <!-- 1. CREATE / EDIT ROUND MODAL (4 SECTIONS: A-D) -->
   <div id="modal-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-      <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0">
-        <h3 id="modal-round-title" class="font-bold text-base text-tdtu-blue">Tạo Đợt Đồ án Tốt nghiệp</h3>
-        <button type="button" onclick="closeRoundModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+    <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+      <!-- MODAL HEADER -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-slate-50">
+        <div>
+          <h3 id="modal-round-title" class="font-bold text-base text-tdtu-blue">Tạo Đợt Đồ án Tốt nghiệp</h3>
+          <p class="text-[11px] text-slate-500 mt-0.5">Hồ sơ cấu hình hoàn chỉnh: Thông tin, SV đủ điều kiện, GVHD và Trạng thái đợt</p>
+        </div>
+        <button type="button" onclick="closeRoundModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-lg">✕</button>
+      </div>
+
+      <!-- 4 SECTIONS TABS HEADER -->
+      <div class="flex border-b border-slate-200 bg-white px-6 shrink-0 text-xs font-bold">
+        <button type="button" id="round-tab-btn-info" onclick="switchRoundModalTab('info')" class="py-3 px-4 border-b-2 border-tdtu-blue text-tdtu-blue flex items-center gap-1.5 transition-colors">
+          <span>📌 A. Thông tin đợt</span>
+        </button>
+        <button type="button" id="round-tab-btn-eligible" onclick="switchRoundModalTab('eligible')" class="py-3 px-4 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition-colors">
+          <span>🎓 B. SV đủ điều kiện</span>
+          <span id="round-tab-eligible-count" class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-slate-100 text-slate-600">0</span>
+        </button>
+        <button type="button" id="round-tab-btn-supervisors" onclick="switchRoundModalTab('supervisors')" class="py-3 px-4 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition-colors">
+          <span>👨‍🏫 C. GVHD của đợt</span>
+          <span id="round-tab-sup-count" class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-black bg-slate-100 text-slate-600">0</span>
+        </button>
+        <button type="button" id="round-tab-btn-config" onclick="switchRoundModalTab('config')" class="py-3 px-4 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition-colors">
+          <span>⚙️ D. Cấu hình & Trạng thái</span>
+        </button>
       </div>
 
       <form id="form-round" onsubmit="saveRound(event)" class="flex flex-col flex-1 overflow-hidden">
-        <div class="p-5 space-y-4 text-xs overflow-y-auto flex-1">
-          <input type="hidden" id="round-form-id">
-          
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Tên đợt tốt nghiệp *</label>
-            <input type="text" id="round-form-title" required placeholder="Ví dụ: Đồ án Tốt nghiệp - Đợt 1 (2026-2027)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
-          </div>
+        <input type="hidden" id="round-form-id">
 
-          <div class="grid grid-cols-2 gap-3">
+        <!-- TAB BODY CONTAINER -->
+        <div class="p-6 space-y-4 text-xs overflow-y-auto flex-1">
+
+          <!-- ============================================================ -->
+          <!-- SECTION A: THÔNG TIN ĐỢT -->
+          <!-- ============================================================ -->
+          <div id="round-modal-panel-info" class="space-y-4">
             <div>
-              <label class="font-bold text-slate-700 block mb-1">Năm học *</label>
-              <input type="text" id="round-form-year" required placeholder="2026-2027" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
-            </div>
-            <div>
-              <label class="font-bold text-slate-700 block mb-1">Mã ngắn đợt (URL-safe) *</label>
-              <input type="text" id="round-form-name" required placeholder="T122026" oninput="this.value = this.value.replace(/[^a-zA-Z0-9_-]/g, '')" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none">
-              <span class="text-[10px] text-slate-400 mt-0.5 block">Dùng cho link: ?x=MãĐợt</span>
-            </div>
-          </div>
-
-          <!-- 24H TIME PICKERS: Mở & Đóng -->
-          <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-            <span class="font-bold text-slate-700 block uppercase tracking-wide text-[11px]">Thời gian mở & đóng đợt (Hệ 24h)</span>
-            
-            <!-- Open Time -->
-            <div>
-              <label class="font-semibold text-slate-600 block mb-1">Thời gian mở:</label>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <input type="date" id="round-open-date" required class="p-2 border border-slate-300 rounded-lg text-xs bg-white">
-                <div class="flex items-center gap-1">
-                  <span class="text-[11px] text-slate-500">Giờ:</span>
-                  <select id="round-open-hour" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white">
-                    <option value="00" >00:00</option><option value="01" >01:00</option><option value="02" >02:00</option><option value="03" >03:00</option><option value="04" >04:00</option><option value="05" >05:00</option><option value="06" >06:00</option><option value="07" >07:00</option><option value="08" selected>08:00</option><option value="09" >09:00</option><option value="10" >10:00</option><option value="11" >11:00</option><option value="12" >12:00</option><option value="13" >13:00</option><option value="14" >14:00</option><option value="15" >15:00</option><option value="16" >16:00</option><option value="17" >17:00</option><option value="18" >18:00</option><option value="19" >19:00</option><option value="20" >20:00</option><option value="21" >21:00</option><option value="22" >22:00</option><option value="23" >23:00</option>
-                  </select>
-                </div>
-                <div class="flex items-center gap-1">
-                  <span class="text-[11px] text-slate-500">Phút:</span>
-                  <select id="round-open-minute" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white">
-                    <option value="00">00</option>
-                    <option value="15">15</option>
-                    <option value="30">30</option>
-                    <option value="45">45</option>
-                    <option value="59">59</option>
-                  </select>
-                </div>
-              </div>
+              <label class="font-bold text-slate-700 block mb-1">Tên đợt tốt nghiệp *</label>
+              <input type="text" id="round-form-title" required placeholder="Ví dụ: Đồ án Tốt nghiệp - Đợt 1 (2026-2027)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
             </div>
 
-            <!-- Close Time -->
-            <div>
-              <label class="font-semibold text-slate-600 block mb-1">Thời gian đóng:</label>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <input type="date" id="round-close-date" required class="p-2 border border-slate-300 rounded-lg text-xs bg-white">
-                <div class="flex items-center gap-1">
-                  <span class="text-[11px] text-slate-500">Giờ:</span>
-                  <select id="round-close-hour" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white">
-                    <option value="00" >00:00</option><option value="01" >01:00</option><option value="02" >02:00</option><option value="03" >03:00</option><option value="04" >04:00</option><option value="05" >05:00</option><option value="06" >06:00</option><option value="07" >07:00</option><option value="08" >08:00</option><option value="09" >09:00</option><option value="10" >10:00</option><option value="11" >11:00</option><option value="12" >12:00</option><option value="13" >13:00</option><option value="14" >14:00</option><option value="15" >15:00</option><option value="16" >16:00</option><option value="17" selected>17:00</option><option value="18" >18:00</option><option value="19" >19:00</option><option value="20" >20:00</option><option value="21" >21:00</option><option value="22" >22:00</option><option value="23" >23:00</option>
-                  </select>
-                </div>
-                <div class="flex items-center gap-1">
-                  <span class="text-[11px] text-slate-500">Phút:</span>
-                  <select id="round-close-minute" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white">
-                    <option value="00">00</option>
-                    <option value="15">15</option>
-                    <option value="30" selected>30</option>
-                    <option value="45">45</option>
-                    <option value="59">59</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="font-bold text-slate-700 block mb-1">Số lượng nguyện vọng</label>
-              <select id="round-form-pref-count" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white">
-                <option value="3">3 Nguyện vọng</option>
-                <option value="4">4 Nguyện vọng</option>
-                <option value="5">5 Nguyện vọng</option>
-              </select>
-            </div>
-            <div>
-              <label class="font-bold text-slate-700 block mb-1">Chế độ chọn</label>
-              <select id="round-form-selection-mode" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white">
-                <option value="cards">Thẻ (Cards Grid)</option>
-                <option value="wizard">Từng bước (Wizard)</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Trạng thái đợt</label>
-            <select id="round-form-status" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white">
-              <option value="draft">Bản nháp (Draft)</option>
-              <option value="upcoming">Sắp mở (Upcoming)</option>
-              <option value="open" selected>Đang mở đăng ký (Open)</option>
-              <option value="closed">Đã đóng đăng ký (Closed)</option>
-              <option value="reviewing">Đang xét duyệt (Reviewing)</option>
-              <option value="published">Đã công bố kết quả (Published)</option>
-            </select>
-          </div>
-
-          
-          <!-- TÙY CHỌN HIỂN THỊ LIÊN HỆ GVHD -->
-          <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-            <span class="font-bold text-slate-800 text-xs block">Hiển thị liên hệ GVHD cho sinh viên</span>
-            <div class="flex flex-col sm:flex-row gap-3 text-xs text-slate-700">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="round-form-show-email-after-publish" checked class="rounded text-blue-600">
-                <span>Hiện Email sau khi công bố kết quả</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="round-form-show-phone-after-publish" checked class="rounded text-blue-600">
-                <span>Hiện SĐT sau khi công bố kết quả</span>
-              </label>
-            </div>
-            <p class="text-[11px] text-slate-400 italic">Trong giai đoạn đăng ký và xét duyệt, Email và SĐT của GVHD được tự động ẩn.</p>
-          </div>
-
-          <!-- SECTION: CHỌN GVHD NGAY KHI TẠO ĐỢT -->
-          <div class="border-t border-slate-200 pt-3">
-            <div class="flex items-center justify-between mb-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <span class="font-bold text-slate-800 text-xs uppercase tracking-wide">Giảng viên Hướng dẫn của đợt</span>
-                <p class="text-[11px] text-slate-400">Đã chọn: <span id="round-selected-sup-count" class="font-bold text-tdtu-blue">0</span> GVHD</p>
+                <label class="font-bold text-slate-700 block mb-1">Năm học *</label>
+                <input type="text" id="round-form-year" required placeholder="2026-2027" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
               </div>
-              <button type="button" onclick="toggleRoundSupPicker()" id="btn-toggle-sup-picker" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-tdtu-blue rounded-lg font-bold text-xs flex items-center gap-1 border border-blue-200 transition-colors">
-                <span>+ Chọn GVHD</span>
-              </button>
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Mã ngắn đợt (URL-safe slug) *</label>
+                <input type="text" id="round-form-name" required placeholder="dot-12-2026" oninput="this.value = this.value.replace(/[^a-zA-Z0-9_-]/g, '')" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <span class="text-[10px] text-slate-400 mt-0.5 block">Đường link sinh viên truy cập: ?x=MãĐợt</span>
+              </div>
             </div>
 
-            <div id="round-sup-picker-container" class="hidden border border-slate-200 rounded-xl p-2.5 max-h-48 overflow-y-auto space-y-1.5 bg-slate-50">
-              <!-- Populated dynamically -->
+            <!-- 24H TIME PICKERS: Mở & Đóng -->
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <span class="font-bold text-slate-700 block uppercase tracking-wide text-[11px]">Thời gian mở & đóng đợt (Hệ 24h)</span>
+              
+              <!-- Open Time -->
+              <div>
+                <label class="font-semibold text-slate-600 block mb-1">Thời gian mở:</label>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input type="date" id="round-open-date" required class="p-2 border border-slate-300 rounded-lg text-xs bg-white">
+                  <div class="flex items-center gap-1">
+                    <span class="text-[11px] text-slate-500">Giờ:</span>
+                    <select id="round-open-hour" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white">
+                      <option value="00">00:00</option><option value="01">01:00</option><option value="02">02:00</option><option value="03">03:00</option><option value="04">04:00</option><option value="05">05:00</option><option value="06">06:00</option><option value="07">07:00</option><option value="08" selected>08:00</option><option value="09">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option>
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <span class="text-[11px] text-slate-500">Phút:</span>
+                    <select id="round-open-minute" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white">
+                      <option value="00" selected>00</option>
+                      <option value="15">15</option>
+                      <option value="30">30</option>
+                      <option value="45">45</option>
+                      <option value="59">59</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Close Time -->
+              <div>
+                <label class="font-semibold text-slate-600 block mb-1">Thời gian đóng:</label>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input type="date" id="round-close-date" required class="p-2 border border-slate-300 rounded-lg text-xs bg-white">
+                  <div class="flex items-center gap-1">
+                    <span class="text-[11px] text-slate-500">Giờ:</span>
+                    <select id="round-close-hour" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white">
+                      <option value="00">00:00</option><option value="01">01:00</option><option value="02">02:00</option><option value="03">03:00</option><option value="04">04:00</option><option value="05">05:00</option><option value="06">06:00</option><option value="07">07:00</option><option value="08">08:00</option><option value="09">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17" selected>17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option>
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <span class="text-[11px] text-slate-500">Phút:</span>
+                    <select id="round-close-minute" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white">
+                      <option value="00">00</option>
+                      <option value="15">15</option>
+                      <option value="30" selected>30</option>
+                      <option value="45">45</option>
+                      <option value="59">59</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div id="round-selected-sup-tags" class="flex flex-wrap gap-1.5 mt-2">
-              <!-- Selected tags -->
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Số lượng nguyện vọng</label>
+                <select id="round-form-pref-count" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white">
+                  <option value="3">3 Nguyện vọng</option>
+                  <option value="4">4 Nguyện vọng</option>
+                  <option value="5">5 Nguyện vọng</option>
+                </select>
+              </div>
+              <div>
+                <label class="font-bold text-slate-700 block mb-1">Chế độ chọn</label>
+                <select id="round-form-selection-mode" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white">
+                  <option value="cards">Thẻ (Cards Grid)</option>
+                  <option value="wizard">Từng bước (Wizard)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- TÙY CHỌN HIỂN THỊ LIÊN HỆ GVHD -->
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+              <span class="font-bold text-slate-800 text-xs block">Hiển thị liên hệ GVHD cho sinh viên</span>
+              <div class="flex flex-col sm:flex-row gap-4 text-xs text-slate-700">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="round-form-show-email-after-publish" checked class="rounded text-blue-600">
+                  <span>Hiện Email sau khi công bố kết quả</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="round-form-show-phone-after-publish" checked class="rounded text-blue-600">
+                  <span>Hiện SĐT sau khi công bố kết quả</span>
+                </label>
+              </div>
+              <p class="text-[11px] text-slate-400 italic">Trong giai đoạn đăng ký và xét duyệt, Email và SĐT của GVHD được tự động bảo mật.</p>
             </div>
           </div>
 
-          <div class="space-y-1.5 pt-2 border-t border-slate-200 text-slate-700">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" id="round-form-allow-edit" checked class="rounded text-blue-600">
-              <span>Cho phép SV chỉnh sửa đơn khi đợt đang mở</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" id="round-form-allow-topic-edit" checked class="rounded text-blue-600">
-              <span>Cho phép SV sửa tên đề tài</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" id="round-form-allow-pref-edit" checked class="rounded text-blue-600">
-              <span>Cho phép SV đổi thứ tự nguyện vọng</span>
-            </label>
+          <!-- ============================================================ -->
+          <!-- SECTION B: SINH VIÊN ĐỦ ĐIỀU KIỆN (RIÊNG CHO ĐỢT) -->
+          <!-- ============================================================ -->
+          <div id="round-modal-panel-eligible" class="hidden space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-indigo-50 p-3.5 rounded-xl border border-indigo-100">
+              <div>
+                <span class="text-xs font-bold text-indigo-900 block">Sinh viên đủ điều kiện tham gia đợt này</span>
+                <p class="text-[11px] text-indigo-700 mt-0.5">Chỉ sinh viên có trong danh sách này mới được phép đăng ký nguyện vọng</p>
+              </div>
+              <div class="text-right shrink-0">
+                <span class="text-xs text-slate-600 font-semibold">Đã chọn:</span>
+                <span id="round-eligible-count-badge" class="px-2.5 py-1 bg-indigo-600 text-white rounded-lg font-mono font-black text-xs">0 SV</span>
+              </div>
+            </div>
+
+            <!-- CONTROLS: TÌM TỪ KHOA & IMPORT EXCEL ĐỢT -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <div class="flex flex-col sm:flex-row gap-2 items-center">
+                <!-- Search faculty dataset to add -->
+                <div class="relative flex-1 w-full">
+                  <input type="text" id="round-add-student-input" oninput="suggestFacultyStudentsForRound(this.value)" placeholder="Nhập MSSV hoặc Họ tên để tìm từ SV Khoa..." class="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                  <span class="absolute left-2.5 top-2.5 text-slate-400">🔍</span>
+                  <!-- Suggestions popup -->
+                  <div id="round-student-suggestions" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto z-20 text-xs divide-y divide-slate-100"></div>
+                </div>
+
+                <!-- Excel Upload for this round -->
+                <label class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 cursor-pointer shrink-0 shadow-sm transition-colors">
+                  <span>📥 Upload Excel đợt</span>
+                  <input type="file" id="round-eligible-file-input" accept=".xlsx,.xls,.csv" onchange="handleRoundEligibleUpload(event)" class="hidden">
+                </label>
+
+                <!-- Clear all eligible students of this round -->
+                <button type="button" onclick="clearRoundModalEligibleStudents()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg font-semibold text-xs shrink-0 border border-rose-200 transition-colors">
+                  <span>Xóa hết</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- ELIGIBLE STUDENTS TABLE -->
+            <div class="border border-slate-200 rounded-xl overflow-hidden">
+              <div class="max-h-60 overflow-y-auto overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                  <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 sticky top-0 z-10 text-[11px] uppercase">
+                    <tr>
+                      <th class="p-2.5 w-12 text-center">STT</th>
+                      <th class="p-2.5">MSSV</th>
+                      <th class="p-2.5">Họ và tên</th>
+                      <th class="p-2.5">Ngành</th>
+                      <th class="p-2.5">Lớp</th>
+                      <th class="p-2.5 text-right w-16">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody id="round-eligible-students-tbody" class="divide-y divide-slate-100">
+                    <tr><td colspan="6" class="p-6 text-center text-slate-400">Chưa có sinh viên nào trong đợt này.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
+
+          <!-- ============================================================ -->
+          <!-- SECTION C: GIẢNG VIÊN HƯỚNG DẪN CỦA ĐỢT -->
+          <!-- ============================================================ -->
+          <div id="round-modal-panel-supervisors" class="hidden space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-blue-50 p-3.5 rounded-xl border border-blue-100">
+              <div>
+                <span class="text-xs font-bold text-tdtu-blue block">Giảng viên Hướng dẫn tham gia đợt này</span>
+                <p class="text-[11px] text-blue-700 mt-0.5">Chọn giảng viên từ danh sách toàn khoa và thiết lập chỉ tiêu (Quota) riêng cho đợt</p>
+              </div>
+              <div class="text-right shrink-0">
+                <span class="text-xs text-slate-600 font-semibold">Đã chọn:</span>
+                <span id="round-sup-count-badge" class="px-2.5 py-1 bg-tdtu-blue text-white rounded-lg font-mono font-black text-xs">0 GVHD</span>
+              </div>
+            </div>
+
+            <!-- CONTROLS & SEARCH -->
+            <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+              <div class="relative flex-1 sm:w-64">
+                <input type="text" id="round-sup-search-input" oninput="filterRoundModalSupervisors(this.value)" placeholder="Tìm GVHD theo họ tên, bộ môn..." class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <span class="absolute left-2.5 top-2 text-slate-400">🔍</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="selectAllRoundModalSupervisors(true)" class="px-2.5 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-lg font-semibold text-xs transition-colors">
+                  Chọn tất cả
+                </button>
+                <button type="button" onclick="selectAllRoundModalSupervisors(false)" class="px-2.5 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-lg font-semibold text-xs transition-colors">
+                  Bỏ chọn tất cả
+                </button>
+              </div>
+            </div>
+
+            <!-- SUPERVISORS LIST WITH QUOTA -->
+            <div id="round-supervisors-picker-list" class="max-h-64 overflow-y-auto space-y-2 border border-slate-200 rounded-xl p-2.5 bg-slate-50">
+              <!-- Dynamically rendered -->
+            </div>
+          </div>
+
+          <!-- ============================================================ -->
+          <!-- SECTION D: CẤU HÌNH & TRẠNG THÁI -->
+          <!-- ============================================================ -->
+          <div id="round-modal-panel-config" class="hidden space-y-4">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Trạng thái đợt</label>
+              <select id="round-form-status" onchange="updateRoundModalConfigSummary()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold">
+                <option value="draft">Bản nháp (Draft)</option>
+                <option value="upcoming">Sắp mở (Upcoming)</option>
+                <option value="open" selected>Đang mở đăng ký (Open)</option>
+                <option value="closed">Đã đóng đăng ký (Closed)</option>
+                <option value="reviewing">Đang xét duyệt (Reviewing)</option>
+                <option value="published">Đã công bố kết quả (Published)</option>
+              </select>
+            </div>
+
+            <!-- PERMISSIONS CHECKBOXES -->
+            <div class="space-y-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700">
+              <span class="font-bold text-slate-800 text-xs block mb-1">Quyền của Sinh viên khi đợt mở</span>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="round-form-allow-edit" checked class="rounded text-blue-600">
+                <span>Cho phép SV chỉnh sửa đơn khi đợt đang mở</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="round-form-allow-topic-edit" checked class="rounded text-blue-600">
+                <span>Cho phép SV sửa tên đề tài</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="round-form-allow-pref-edit" checked class="rounded text-blue-600">
+                <span>Cho phép SV đổi thứ tự nguyện vọng</span>
+              </label>
+            </div>
+
+            <!-- CONFIGURATION STATUS CARD -->
+            <div class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm space-y-2.5">
+              <span class="font-bold text-slate-800 text-xs block uppercase tracking-wide">Kiểm tra điều kiện cấu hình:</span>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="flex items-center gap-2">
+                  <span>🎓 Sinh viên:</span>
+                  <span id="round-summary-eligible-status" class="font-bold text-amber-600">0 SV (⚠️ Chưa có)</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span>👨‍🏫 GVHD:</span>
+                  <span id="round-summary-sup-status" class="font-bold text-amber-600">0 GV (⚠️ Chưa có)</span>
+                </div>
+              </div>
+              <div id="round-config-alert" class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold leading-relaxed">
+                ⚠️ Đợt chưa hoàn tất cấu hình (thiếu SV hoặc GVHD). Bạn vẫn có thể bấm "Lưu Đợt" dưới dạng bản nháp để bổ sung sau.
+              </div>
+            </div>
+          </div>
+
         </div>
 
-        <div class="flex justify-end gap-2 p-4 bg-slate-50 border-t border-slate-100 shrink-0">
-          <button type="button" onclick="closeRoundModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Hủy</button>
-          <button type="submit" class="px-6 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md transition-colors">Lưu Đợt</button>
+        <!-- MODAL FOOTER -->
+        <div class="flex items-center justify-between px-6 py-4 bg-slate-50 border-t border-slate-100 shrink-0">
+          <span class="text-[11px] text-slate-400">💡 Có thể lưu đợt chưa hoàn tất để cấu hình sau</span>
+          <div class="flex gap-2">
+            <button type="button" onclick="closeRoundModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Hủy</button>
+            <button type="submit" class="px-6 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md transition-colors">Lưu Đợt</button>
+          </div>
         </div>
       </form>
     </div>
@@ -1434,7 +1706,7 @@
                 <option value="Thiết kế đồ họa">Thiết kế đồ họa</option>
                 <option value="Thiết kế thời trang">Thiết kế thời trang</option>
                 <option value="Thiết kế công nghiệp">Thiết kế công nghiệp</option>
-                <option value="Mỹ thuật cơ bản">Mỹ thuật cơ bản</option>
+                <option value="Nghệ thuật số">Nghệ thuật số</option>
                 <option value="__other__">Khác...</option>
               </select>
               <input type="text" id="sup-form-dept-custom" placeholder="Nhập tên bộ môn khác..." class="hidden mt-1.5 w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">

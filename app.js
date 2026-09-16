@@ -1,4 +1,4 @@
-/** IFA+ Graduation Studio v1.4.0 **/
+/** IFA+ Graduation Studio v1.5.0 **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -128,18 +128,7 @@ window.slugify = function(text) {
     .replace(/^-+|-+$/g, '');
 };
 
-window.copyRoundLink = function(slugOrId) {
-  const url = `${window.location.origin}${window.location.pathname}?round=${slugOrId}`;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(() => {
-      showToast('Đã sao chép đường dẫn đợt tốt nghiệp!', 'success');
-    }).catch(() => {
-      prompt('Sao chép đường dẫn đợt tốt nghiệp:', url);
-    });
-  } else {
-    prompt('Sao chép đường dẫn đợt tốt nghiệp:', url);
-  }
-};
+// Removed legacy copyRoundLink. Now unified at ?x=
 
 /**
  * IFA+ Graduation — App Logic & Firestore Integration
@@ -215,11 +204,12 @@ export const fmtDateRange24h = (d1, d2) => {
 };
 
 window.copyRoundLink = function(roundId, shortCode) {
-  const code = shortCode || roundId;
-  const link = `https://tknt-tdtu.web.app/graduation/?x=${encodeURIComponent(code)}`;
+  const r = (state.rounds || []).find(x => x.id === roundId);
+  const code = r?.slug || r?.shortCode || shortCode || roundId;
+  const link = `${window.location.origin}${window.location.pathname}?x=${encodeURIComponent(code)}`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(link).then(() => {
-      alert('Đã sao chép link đợt:\n' + link);
+      showToast('Đã sao chép link đợt: ' + link, 'success');
     }).catch(() => {
       prompt('Link đợt tốt nghiệp:', link);
     });
@@ -780,7 +770,7 @@ async function loadRounds() {
     renderRoundsDropdowns();
     renderAdminRoundsTable();
 
-    // Check ?x=SHORTCODE or ?round=ID URL parameter
+    // Check ?x=SHORTCODE URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     const xCode = urlParams.get('x') || urlParams.get('round') || urlParams.get('e');
 
@@ -1890,6 +1880,7 @@ window.switchAdminTab = function(tabKey) {
   });
 
   if (tabKey === 'overview') loadAdminStats();
+  else if (tabKey === 'faculty-students') openFacultyStudentsTab();
   else if (tabKey === 'review') { if (state.selectedRoundId) loadAdminReviewData(state.selectedRoundId); }
   else if (tabKey === 'rounds') renderAdminRoundsTable();
   else if (tabKey === 'supervisors-master') loadAdminSupervisorsMaster();
@@ -1907,6 +1898,48 @@ window.setActiveRound = async function(roundId) {
   try {
     const targetRound = state.rounds.find(r => r.id === roundId);
     if (!targetRound) return;
+
+    // VALIDATION BEFORE ACTIVATION:
+    const missingItems = [];
+
+    // 1. Time validity
+    const openTime = targetRound.openAtDate ? new Date(targetRound.openAtDate).getTime() : 0;
+    const closeTime = targetRound.closeAtDate ? new Date(targetRound.closeAtDate).getTime() : 0;
+    if (!openTime || !closeTime || openTime >= closeTime) {
+      missingItems.push('Thời gian mở/đóng đợt chưa hợp lệ');
+    }
+
+    // 2. Minimum 1 Eligible Student
+    let elCount = targetRound.eligibleCount;
+    if (typeof elCount !== 'number') {
+      try {
+        const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents'));
+        elCount = snap.docs.length;
+        targetRound.eligibleCount = elCount;
+      } catch (e) { elCount = 0; }
+    }
+    if (elCount < 1) {
+      missingItems.push('Chưa có sinh viên đủ điều kiện');
+    }
+
+    // 3. Minimum 1 Supervisor
+    let supCount = targetRound.supervisorCount;
+    if (typeof supCount !== 'number') {
+      try {
+        const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'supervisors'));
+        supCount = snap.docs.length;
+        targetRound.supervisorCount = supCount;
+      } catch (e) { supCount = 0; }
+    }
+    if (supCount < 1) {
+      missingItems.push('Chưa có giảng viên hướng dẫn');
+    }
+
+    if (missingItems.length > 0) {
+      const msg = 'Đợt chưa hoàn tất cấu hình:\n\n• ' + missingItems.join('\n• ');
+      showToast(msg, 'warning', 6000);
+      return;
+    }
 
     // 1. Deactivate other rounds in local state
     state.rounds.forEach(r => {
@@ -2056,7 +2089,7 @@ function renderAdminTrashTable() {
   }).join('');
 }
 
-// --- ADMIN: ROUNDS CRUD ---
+// --- ADMIN: ROUNDS TABLE ---
 function renderAdminRoundsTable() {
   const tbody = document.getElementById('admin-rounds-tbody');
   if (!tbody) return;
@@ -2071,7 +2104,29 @@ function renderAdminRoundsTable() {
   tbody.innerHTML = activeRounds.map(r => {
     const timeRangeStr = fmtDateRange24h(r.openAtDate, r.closeAtDate);
     const isCurrentActive = Boolean(r.isActive);
-    const shortCode = r.shortCode || r.roundName || r.id;
+    const shortCode = r.shortCode || r.roundName || r.slug || r.id;
+
+    // Determine configuration status
+    const isIncomplete = (r.configStatus === 'incomplete') || (typeof r.eligibleCount === 'number' && r.eligibleCount === 0) || (typeof r.supervisorCount === 'number' && r.supervisorCount === 0);
+
+    let statusColHtml = '';
+    if (isCurrentActive) {
+      statusColHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-blue-100 text-blue-800 border border-blue-300">● Đợt hiện hành</span>';
+    } else if (isIncomplete) {
+      statusColHtml = `
+        <div>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300" title="Thiếu SV đủ điều kiện hoặc GVHD">⚠️ Chưa hoàn tất</span>
+          <button onclick="setActiveRound('${r.id}')" class="mt-1 block text-[11px] text-slate-500 hover:text-slate-800 underline">Kích hoạt</button>
+        </div>
+      `;
+    } else {
+      statusColHtml = `
+        <div>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Sẵn sàng</span>
+          <button onclick="setActiveRound('${r.id}')" class="mt-1 block text-[11px] text-blue-600 hover:text-blue-800 font-semibold underline">Đặt làm hiện hành</button>
+        </div>
+      `;
+    }
 
     return `
       <tr class="hover:bg-slate-50 transition-colors">
@@ -2081,16 +2136,13 @@ function renderAdminRoundsTable() {
         </td>
         <td class="p-3.5 text-slate-600 font-semibold">${r.academicYear}</td>
         <td class="p-3.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">${timeRangeStr}</td>
-        <td class="p-3.5 font-bold text-slate-800">${r.supervisorsCount || '--'}</td>
-        <td class="p-3.5 font-bold text-slate-800">${r.registrationsCount || '--'}</td>
+        <td class="p-3.5 font-bold text-slate-800">${typeof r.supervisorCount === 'number' ? r.supervisorCount : (r.supervisorsCount || '--')}</td>
+        <td class="p-3.5 font-bold text-slate-800">${typeof r.eligibleCount === 'number' ? r.eligibleCount : (r.registrationsCount || '--')}</td>
         <td class="p-3.5">
           <span class="badge badge-${r.status}">${r.status}</span>
         </td>
         <td class="p-3.5">
-          ${isCurrentActive 
-            ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">● Đợt hiện hành</span>' 
-            : `<button onclick="setActiveRound('${r.id}')" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors border border-slate-300">Đặt làm hiện hành</button>`
-          }
+          ${statusColHtml}
         </td>
         <td class="p-3.5">
           <button onclick="copyRoundLink('${r.id}', '${shortCode}')" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-tdtu-blue rounded-lg font-bold text-xs flex items-center gap-1 border border-blue-200 transition-colors" title="Sao chép link ?x=${shortCode}">
@@ -2106,6 +2158,95 @@ function renderAdminRoundsTable() {
   }).join('');
 }
 
+// ============================================================================
+// ROUND CONFIGURATION: 4 SECTIONS (A: INFO, B: ELIGIBLE, C: SUPERVISORS, D: CONFIG)
+// ============================================================================
+
+state.roundModalEligibleStudents = [];
+state.roundModalSupervisors = new Map(); // supId -> { supervisorId, name, email, department, photoUrl, maxQuota }
+
+window.switchRoundModalTab = function(tabKey) {
+  ['info', 'eligible', 'supervisors', 'config'].forEach(k => {
+    const btn = document.getElementById('round-tab-btn-' + k);
+    const panel = document.getElementById('round-modal-panel-' + k);
+    if (btn) {
+      if (k === tabKey) {
+        btn.classList.remove('border-transparent', 'text-slate-500');
+        btn.classList.add('border-tdtu-blue', 'text-tdtu-blue');
+      } else {
+        btn.classList.remove('border-tdtu-blue', 'text-tdtu-blue');
+        btn.classList.add('border-transparent', 'text-slate-500');
+      }
+    }
+    if (panel) {
+      if (k === tabKey) panel.classList.remove('hidden');
+      else panel.classList.add('hidden');
+    }
+  });
+
+  updateRoundModalConfigSummary();
+};
+
+function updateRoundModalBadges() {
+  const elCountBadge = document.getElementById('round-tab-eligible-count');
+  const elCountCard = document.getElementById('round-eligible-count-badge');
+  const supCountBadge = document.getElementById('round-tab-sup-count');
+  const supCountCard = document.getElementById('round-sup-count-badge');
+
+  const elCount = state.roundModalEligibleStudents.length;
+  const supCount = state.roundModalSupervisors.size;
+
+  if (elCountBadge) elCountBadge.textContent = elCount;
+  if (elCountCard) elCountCard.textContent = `${elCount} SV`;
+  if (supCountBadge) supCountBadge.textContent = supCount;
+  if (supCountCard) supCountCard.textContent = `${supCount} GVHD`;
+
+  updateRoundModalConfigSummary();
+}
+
+function updateRoundModalConfigSummary() {
+  const elStatus = document.getElementById('round-summary-eligible-status');
+  const supStatus = document.getElementById('round-summary-sup-status');
+  const alertBox = document.getElementById('round-config-alert');
+
+  const elCount = state.roundModalEligibleStudents.length;
+  const supCount = state.roundModalSupervisors.size;
+
+  if (elStatus) {
+    if (elCount > 0) {
+      elStatus.className = 'font-bold text-emerald-600';
+      elStatus.textContent = `${elCount} SV (✓ Đạt)`;
+    } else {
+      elStatus.className = 'font-bold text-amber-600';
+      elStatus.textContent = '0 SV (⚠️ Chưa có)';
+    }
+  }
+
+  if (supStatus) {
+    if (supCount > 0) {
+      supStatus.className = 'font-bold text-emerald-600';
+      supStatus.textContent = `${supCount} GV (✓ Đạt)`;
+    } else {
+      supStatus.className = 'font-bold text-amber-600';
+      supStatus.textContent = '0 GV (⚠️ Chưa có)';
+    }
+  }
+
+  if (alertBox) {
+    if (elCount > 0 && supCount > 0) {
+      alertBox.className = 'p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold leading-relaxed';
+      alertBox.innerHTML = '✓ Đợt đã hoàn tất cấu hình đầy đủ. Sẵn sàng kích hoạt thành Đợt hiện hành khi cần.';
+    } else {
+      alertBox.className = 'p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold leading-relaxed';
+      const missing = [];
+      if (elCount === 0) missing.push('SV đủ điều kiện');
+      if (supCount === 0) missing.push('GVHD tham gia');
+      alertBox.innerHTML = `⚠️ Đợt chưa hoàn tất cấu hình (còn thiếu ${missing.join(' & ')}). Bạn vẫn có thể bấm <b>"Lưu Đợt"</b> dưới dạng bản nháp để bổ sung sau.`;
+    }
+  }
+}
+
+// Open Create Round Modal
 window.openCreateRoundModal = function() {
   document.getElementById('form-round').reset();
   document.getElementById('round-form-id').value = '';
@@ -2125,29 +2266,42 @@ window.openCreateRoundModal = function() {
   if (document.getElementById('round-close-hour')) document.getElementById('round-close-hour').value = '17';
   if (document.getElementById('round-close-minute')) document.getElementById('round-close-minute').value = '30';
 
-  // Reset selected supervisors
-  state.createRoundSelectedSupIds = new Set();
-  updateSelectedRoundSupUI();
-  const pickerCont = document.getElementById('round-sup-picker-container');
-  if (pickerCont) pickerCont.classList.add('hidden');
+  // Reset state collections
+  state.roundModalEligibleStudents = [];
+  state.roundModalSupervisors = new Map();
 
+  // Pre-populate supervisors list from Master Pool
+  renderRoundModalSupervisorsList();
+  renderRoundModalEligibleTable();
+  updateRoundModalBadges();
+
+  switchRoundModalTab('info');
   document.getElementById('modal-round').classList.remove('hidden');
 };
 
+// Open Edit Round Modal
 window.editRoundModal = async function(roundId) {
   const r = state.rounds.find(x => x.id === roundId);
-  if (!r) return;
+  if (!r) {
+    showToast('Không tìm thấy thông tin đợt tốt nghiệp!', 'error');
+    return;
+  }
 
   document.getElementById('round-form-id').value = r.id;
   document.getElementById('round-form-title').value = r.title || '';
   document.getElementById('round-form-year').value = r.academicYear || '';
-  document.getElementById('round-form-name').value = r.shortCode || r.roundName || '';
+  document.getElementById('round-form-name').value = r.slug || r.shortCode || r.roundName || '';
   document.getElementById('round-form-status').value = r.status || 'draft';
   document.getElementById('round-form-pref-count').value = r.preferenceCount || '3';
   document.getElementById('round-form-selection-mode').value = r.selectionMode || 'cards';
   document.getElementById('round-form-allow-edit').checked = r.allowStudentEdit !== false;
   document.getElementById('round-form-allow-topic-edit').checked = r.allowTopicEdit !== false;
   document.getElementById('round-form-allow-pref-edit').checked = r.allowPreferenceEdit !== false;
+
+  const emailToggle = document.getElementById('round-form-show-email-after-publish');
+  if (emailToggle) emailToggle.checked = (r.showEmailAfterPublish !== false);
+  const phoneToggle = document.getElementById('round-form-show-phone-after-publish');
+  if (phoneToggle) phoneToggle.checked = (r.showPhoneAfterPublish !== false);
 
   const pad = n => String(n).padStart(2, '0');
   if (r.openAtDate) {
@@ -2163,47 +2317,39 @@ window.editRoundModal = async function(roundId) {
     if (document.getElementById('round-close-minute')) document.getElementById('round-close-minute').value = pad(cd.getMinutes());
   }
 
-  // Pre-load existing round supervisors
-  state.createRoundSelectedSupIds = new Set();
+  // Load Eligible Students for this round
+  state.roundModalEligibleStudents = [];
   try {
-    const snap = await getDocs(collection(db, 'graduationRounds', r.id, 'supervisors'));
-    snap.docs.forEach(d => state.createRoundSelectedSupIds.add(d.id));
+    const snap = await getDocs(collection(db, 'graduationRounds', r.id, 'eligibleStudents'));
+    state.roundModalEligibleStudents = snap.docs.map(d => ({
+      studentId: d.id,
+      mssv: d.id,
+      ...d.data()
+    }));
   } catch (e) {
-    console.warn('Could not pre-load supervisors for edit modal:', e);
+    console.warn('Could not load eligible students for round modal:', e);
   }
-  updateSelectedRoundSupUI();
+
+  // Load Supervisors for this round
+  state.roundModalSupervisors = new Map();
+  try {
+    const supSnap = await getDocs(collection(db, 'graduationRounds', r.id, 'supervisors'));
+    supSnap.docs.forEach(d => {
+      state.roundModalSupervisors.set(d.id, {
+        supervisorId: d.id,
+        ...d.data()
+      });
+    });
+  } catch (e) {
+    console.warn('Could not load supervisors for round modal:', e);
+  }
+
+  renderRoundModalEligibleTable();
+  renderRoundModalSupervisorsList();
+  updateRoundModalBadges();
 
   document.getElementById('modal-round-title').textContent = 'Chỉnh sửa Đợt Đồ án Tốt nghiệp';
-  document.getElementById('modal-round').classList.remove('hidden');
-};
-
-
-window.editRoundModal = function(roundId) {
-  const r = state.rounds.find(x => x.id === roundId);
-  if (!r) return;
-
-  document.getElementById('round-form-id').value = r.id;
-  document.getElementById('round-form-title').value = r.title || '';
-  document.getElementById('round-form-year').value = r.academicYear || '';
-  document.getElementById('round-form-name').value = r.roundName || '';
-  document.getElementById('round-form-status').value = r.status || 'draft';
-  document.getElementById('round-form-pref-count').value = r.preferenceCount || '3';
-  document.getElementById('round-form-selection-mode').value = r.selectionMode || 'cards';
-  document.getElementById('round-form-allow-edit').checked = r.allowStudentEdit !== false;
-  document.getElementById('round-form-allow-topic-edit').checked = r.allowTopicEdit !== false;
-  document.getElementById('round-form-allow-pref-edit').checked = r.allowPreferenceEdit !== false;
-
-  const toInputDatetime = d => {
-    if (!d) return '';
-    const date = new Date(d);
-    const pad = n => String(n).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-  };
-
-  document.getElementById('round-form-open-at').value = toInputDatetime(r.openAtDate);
-  document.getElementById('round-form-close-at').value = toInputDatetime(r.closeAtDate);
-
-  document.getElementById('modal-round-title').textContent = 'Chỉnh sửa Đợt Đồ án Tốt nghiệp';
+  switchRoundModalTab('info');
   document.getElementById('modal-round').classList.remove('hidden');
 };
 
@@ -2211,13 +2357,335 @@ window.closeRoundModal = function() {
   document.getElementById('modal-round').classList.add('hidden');
 };
 
+// ============================================================================
+// TAB B: ELIGIBLE STUDENTS HELPERS
+// ============================================================================
+function renderRoundModalEligibleTable() {
+  const tbody = document.getElementById('round-eligible-students-tbody');
+  if (!tbody) return;
+
+  const list = state.roundModalEligibleStudents || [];
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Chưa có sinh viên nào trong đợt này.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map((s, idx) => `
+    <tr class="hover:bg-slate-50 transition-colors">
+      <td class="p-2.5 text-center text-slate-400 font-mono">${idx + 1}</td>
+      <td class="p-2.5 font-mono font-bold text-slate-900">${s.studentId || s.mssv}</td>
+      <td class="p-2.5 font-bold text-slate-800">${s.name || s.fullName || '--'}</td>
+      <td class="p-2.5 text-slate-600">${s.major || '--'}</td>
+      <td class="p-2.5 font-mono text-slate-600">${s.className || s.studentClass || '--'}</td>
+      <td class="p-2.5 text-right">
+        <button type="button" onclick="removeRoundModalEligibleStudent('${s.studentId || s.mssv}')" class="text-rose-600 hover:text-rose-800 font-bold text-xs hover:underline">Xóa</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+window.removeRoundModalEligibleStudent = function(studentId) {
+  state.roundModalEligibleStudents = state.roundModalEligibleStudents.filter(s => (s.studentId || s.mssv) !== studentId);
+  renderRoundModalEligibleTable();
+  updateRoundModalBadges();
+};
+
+window.clearRoundModalEligibleStudents = function() {
+  if (state.roundModalEligibleStudents.length === 0) return;
+  state.roundModalEligibleStudents = [];
+  renderRoundModalEligibleTable();
+  updateRoundModalBadges();
+  showToast('Đã xóa toàn bộ sinh viên khỏi đợt.', 'info');
+};
+
+window.suggestFacultyStudentsForRound = async function(query) {
+  const box = document.getElementById('round-student-suggestions');
+  if (!box) return;
+  const q = String(query || '').trim().toLowerCase();
+  if (q.length < 2) {
+    box.classList.add('hidden');
+    return;
+  }
+
+  let rows = state.facultyStudents;
+  if (!rows || rows.length === 0) {
+    rows = await ensureFacultyDatasetLoaded().catch(() => []);
+  }
+
+  const matches = (rows || []).filter(s =>
+    (s.mssv && s.mssv.toLowerCase().includes(q)) ||
+    (s.fullName && s.fullName.toLowerCase().includes(q)) ||
+    (s.name && s.name.toLowerCase().includes(q))
+  ).slice(0, 8);
+
+  if (matches.length === 0) {
+    box.innerHTML = '<div class="p-3 text-center text-slate-400">Không tìm thấy sinh viên phù hợp trong SV Khoa</div>';
+    box.classList.remove('hidden');
+    return;
+  }
+
+  box.innerHTML = matches.map(s => {
+    const isAdded = state.roundModalEligibleStudents.some(x => (x.studentId || x.mssv) === s.mssv);
+    return `
+      <div onclick="addFacultyStudentToRound('${s.mssv}')" class="p-2.5 hover:bg-indigo-50 cursor-pointer flex items-center justify-between transition-colors">
+        <div>
+          <span class="font-bold font-mono text-slate-900 mr-2">${s.mssv}</span>
+          <span class="font-semibold text-slate-800">${s.fullName || s.name}</span>
+          <span class="text-[11px] text-slate-500 block">${s.major || ''} • ${s.className || s.studentClass || ''}</span>
+        </div>
+        <div>
+          ${isAdded ? '<span class="text-emerald-600 font-bold text-xs">✓ Đã thêm</span>' : '<span class="text-indigo-600 font-bold text-xs">+ Chọn</span>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+  box.classList.remove('hidden');
+};
+
+window.addFacultyStudentToRound = function(mssv) {
+  const box = document.getElementById('round-student-suggestions');
+  const input = document.getElementById('round-add-student-input');
+  if (box) box.classList.add('hidden');
+  if (input) input.value = '';
+
+  if (state.roundModalEligibleStudents.some(s => (s.studentId || s.mssv) === mssv)) {
+    showToast(`Sinh viên ${mssv} đã có trong danh sách đợt!`, 'warning');
+    return;
+  }
+
+  const s = (state.facultyStudents || []).find(x => x.mssv === mssv);
+  if (!s) return;
+
+  state.roundModalEligibleStudents.push({
+    studentId: s.mssv,
+    mssv: s.mssv,
+    name: s.fullName || s.name || '',
+    fullName: s.fullName || s.name || '',
+    gender: s.gender || '',
+    major: s.major || '',
+    className: s.className || s.studentClass || '',
+    studentClass: s.className || s.studentClass || '',
+    email: s.email || `${s.mssv.toLowerCase()}@student.tdtu.edu.vn`,
+    phone: s.phone || '',
+    eligible: true
+  });
+
+  renderRoundModalEligibleTable();
+  updateRoundModalBadges();
+  showToast(`✓ Đã thêm sinh viên ${mssv} vào đợt!`, 'success');
+};
+
+window.handleRoundEligibleUpload = async function(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  try {
+    const data = new Uint8Array(await file.arrayBuffer());
+    const workbook = XLSX.read(data, { type: 'array' });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+    if (!rawRows || rawRows.length === 0) {
+      showToast('File Excel rỗng.', 'error');
+      return;
+    }
+
+    const keys = Object.keys(rawRows[0]);
+    const cleanHeader = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const findKey = (...aliases) => keys.find(k => aliases.includes(cleanHeader(k)));
+
+    const mssvKey = findKey('masv', 'maso', 'mssv', 'masinhvien', 'studentid');
+    const fullNameKey = findKey('hoten', 'hovaten', 'fullname', 'name');
+    const familyKey = findKey('holot', 'hodem', 'ho', 'familyname');
+    const givenKey = findKey('ten', 'firstname');
+    const genderKey = findKey('gioitinh', 'phai', 'gender');
+    const majorKey = findKey('nganh', 'nganhhoc', 'chuyennganh', 'major');
+    const classKey = findKey('lop', 'lophoc', 'lopquanly', 'class');
+    const emailKey = findKey('email', 'thudientu', 'mail');
+    const phoneKey = findKey('sodienthoai', 'dienthoai', 'sdt', 'phone');
+
+    if (!mssvKey) {
+      showToast('File cần có cột MSSV (Mã SV / Mã số).', 'error');
+      return;
+    }
+
+    let addedCount = 0;
+    const existingMssv = new Set(state.roundModalEligibleStudents.map(s => s.studentId || s.mssv));
+
+    rawRows.forEach(row => {
+      const rawMssv = String(row[mssvKey] || '').trim().toUpperCase();
+      if (!rawMssv || rawMssv.length < 5 || existingMssv.has(rawMssv)) return;
+
+      let fullName = '';
+      if (fullNameKey && String(row[fullNameKey] || '').trim()) {
+        fullName = String(row[fullNameKey]).trim();
+      } else {
+        const fam = familyKey ? String(row[familyKey] || '').trim() : '';
+        const giv = givenKey ? String(row[givenKey] || '').trim() : '';
+        fullName = [fam, giv].filter(Boolean).join(' ');
+      }
+      fullName = fullName.replace(/\s+/g, ' ');
+
+      const gender = genderKey ? String(row[genderKey] || '').trim() : '';
+      const major = majorKey ? String(row[majorKey] || '').trim() : '';
+      const className = classKey ? String(row[classKey] || '').trim() : '';
+      let email = emailKey ? String(row[emailKey] || '').trim().toLowerCase() : '';
+      if (!email) email = `${rawMssv.toLowerCase()}@student.tdtu.edu.vn`;
+      const phone = phoneKey ? String(row[phoneKey] || '').trim() : '';
+
+      state.roundModalEligibleStudents.push({
+        studentId: rawMssv,
+        mssv: rawMssv,
+        name: fullName || rawMssv,
+        fullName: fullName || rawMssv,
+        gender,
+        major,
+        className,
+        studentClass: className,
+        email,
+        phone,
+        eligible: true
+      });
+
+      existingMssv.add(rawMssv);
+      addedCount++;
+    });
+
+    renderRoundModalEligibleTable();
+    updateRoundModalBadges();
+    showToast(`✓ Đã thêm ${addedCount} sinh viên đủ điều kiện vào đợt!`, 'success');
+  } catch (err) {
+    showToast('Lỗi đọc file: ' + err.message, 'error');
+  } finally {
+    event.target.value = '';
+  }
+};
+
+// ============================================================================
+// TAB C: SUPERVISORS HELPERS
+// ============================================================================
+function renderRoundModalSupervisorsList(filter = '') {
+  const container = document.getElementById('round-supervisors-picker-list');
+  if (!container) return;
+
+  const allSups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
+    ? state.supervisorsMaster
+    : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
+
+  const q = String(filter || '').trim().toLowerCase();
+  const filtered = allSups.filter(s =>
+    !q ||
+    (s.name && s.name.toLowerCase().includes(q)) ||
+    (s.department && s.department.toLowerCase().includes(q)) ||
+    (s.email && s.email.toLowerCase().includes(q))
+  );
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-slate-400">Không tìm thấy giảng viên phù hợp.</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(s => {
+    const isSelected = state.roundModalSupervisors.has(s.id);
+    const roundData = isSelected ? state.roundModalSupervisors.get(s.id) : null;
+    const quota = roundData?.maxQuota || 5;
+
+    return `
+      <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
+        <label class="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+          <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleRoundModalSupervisor('${s.id}', this.checked)" class="rounded text-tdtu-blue w-4 h-4">
+          <img src="${s.photoUrl || 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><circle cx=\'12\' cy=\'8\' r=\'4\' fill=\'%23cbd5e1\'/><path fill=\'%23cbd5e1\' d=\'M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z\'/></svg>'}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0">
+          <div class="min-w-0 flex-1">
+            <span class="font-bold text-slate-800 text-xs block truncate">${s.name}</span>
+            <span class="text-[11px] text-slate-500 block truncate">${s.department || 'Thiết kế nội thất'} • ${s.email}</span>
+          </div>
+        </label>
+        <div class="flex items-center gap-1.5 ml-3 shrink-0">
+          <span class="text-[11px] text-slate-500 font-semibold">Chỉ tiêu (Quota):</span>
+          <input type="number" min="1" max="50" value="${quota}" ${!isSelected ? 'disabled' : ''} onchange="updateRoundModalSupervisorQuota('${s.id}', this.value)" class="w-14 p-1 border border-slate-300 rounded-lg text-xs font-mono font-bold text-center bg-white disabled:opacity-40 disabled:bg-slate-100">
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.filterRoundModalSupervisors = function(val) {
+  renderRoundModalSupervisorsList(val);
+};
+
+window.toggleRoundModalSupervisor = function(supId, isChecked) {
+  const allSups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
+    ? state.supervisorsMaster
+    : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
+
+  const s = allSups.find(x => x.id === supId);
+  if (!s) return;
+
+  if (isChecked) {
+    state.roundModalSupervisors.set(supId, {
+      supervisorId: supId,
+      name: s.name,
+      email: s.email,
+      department: s.department || 'Thiết kế nội thất',
+      photoUrl: s.photoUrl || '',
+      maxQuota: 5,
+      active: true
+    });
+  } else {
+    state.roundModalSupervisors.delete(supId);
+  }
+
+  renderRoundModalSupervisorsList(document.getElementById('round-sup-search-input')?.value || '');
+  updateRoundModalBadges();
+};
+
+window.updateRoundModalSupervisorQuota = function(supId, val) {
+  const q = parseInt(val, 10) || 5;
+  if (state.roundModalSupervisors.has(supId)) {
+    const item = state.roundModalSupervisors.get(supId);
+    item.maxQuota = Math.max(1, Math.min(50, q));
+    state.roundModalSupervisors.set(supId, item);
+  }
+};
+
+window.selectAllRoundModalSupervisors = function(select) {
+  const allSups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
+    ? state.supervisorsMaster
+    : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
+
+  if (select) {
+    allSups.forEach(s => {
+      if (!state.roundModalSupervisors.has(s.id)) {
+        state.roundModalSupervisors.set(s.id, {
+          supervisorId: s.id,
+          name: s.name,
+          email: s.email,
+          department: s.department || 'Thiết kế nội thất',
+          photoUrl: s.photoUrl || '',
+          maxQuota: 5,
+          active: true
+        });
+      }
+    });
+  } else {
+    state.roundModalSupervisors.clear();
+  }
+
+  renderRoundModalSupervisorsList(document.getElementById('round-sup-search-input')?.value || '');
+  updateRoundModalBadges();
+};
+
+// ============================================================================
+// SAVE ROUND (HANDLES COMPLETE & INCOMPLETE CONFIG)
+// ============================================================================
 window.saveRound = async function(e) {
   if (e && typeof e.preventDefault === 'function') e.preventDefault();
+
   const id = document.getElementById('round-form-id')?.value;
   const title = document.getElementById('round-form-title')?.value.trim();
   const academicYear = document.getElementById('round-form-year')?.value.trim();
   let roundName = document.getElementById('round-form-name')?.value.trim();
-  
+
   // Normalize shortCode to URL-safe
   const shortCode = (roundName || '').replace(/[^a-zA-Z0-9_-]/g, '');
   roundName = shortCode;
@@ -2238,13 +2706,16 @@ window.saveRound = async function(e) {
   const allowTopicEdit = document.getElementById('round-form-allow-topic-edit')?.checked !== false;
   const allowPreferenceEdit = document.getElementById('round-form-allow-pref-edit')?.checked !== false;
 
+  const showEmailAfterPublish = document.getElementById('round-form-show-email-after-publish')?.checked !== false;
+  const showPhoneAfterPublish = document.getElementById('round-form-show-phone-after-publish')?.checked !== false;
+
   if (!title || !academicYear || !roundName || !openDateStr || !closeDateStr) {
     showToast('Vui lòng nhập đầy đủ các trường bắt buộc (*)', 'warning');
+    switchRoundModalTab('info');
     return;
   }
 
   const submitBtn = document.querySelector('#form-round button[type="submit"]');
-  const origText = submitBtn ? submitBtn.innerHTML : 'Lưu Đợt';
   if (submitBtn) {
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span>⏳ Đang lưu...</span>';
@@ -2256,11 +2727,16 @@ window.saveRound = async function(e) {
   const [cy, cm, cd] = closeDateStr.split('-').map(Number);
   const closeDate = new Date(cy, cm - 1, cd, Number(closeHour), Number(closeMin), 0);
 
+  const elCount = state.roundModalEligibleStudents.length;
+  const supCount = state.roundModalSupervisors.size;
+  const configStatus = (elCount > 0 && supCount > 0) ? 'ready' : 'incomplete';
+
   const payload = {
     title,
     academicYear,
     roundName: shortCode,
     shortCode: shortCode,
+    slug: shortCode,
     openAt: openDate,
     closeAt: closeDate,
     preferenceCount,
@@ -2269,6 +2745,11 @@ window.saveRound = async function(e) {
     allowStudentEdit,
     allowTopicEdit,
     allowPreferenceEdit,
+    showEmailAfterPublish,
+    showPhoneAfterPublish,
+    configStatus,
+    eligibleCount: elCount,
+    supervisorCount: supCount,
     deleted: false,
     updatedAt: serverTimestamp()
   };
@@ -2280,33 +2761,50 @@ window.saveRound = async function(e) {
     } else {
       payload.createdAt = serverTimestamp();
       payload.createdBy = state.user?.email || '';
-      payload.isActive = (state.rounds.length === 0); // If first round, make active
+      payload.isActive = false; // Always start non-active until explicitly activated
       const docRef = await addDoc(collection(db, 'graduationRounds'), payload);
       savedId = docRef.id;
     }
 
-    // Attach selected supervisors to subcollection graduationRounds/{savedId}/supervisors
-    if (state.createRoundSelectedSupIds && state.createRoundSelectedSupIds.size > 0) {
-      const allSups = state.supervisorsMaster && state.supervisorsMaster.length > 0 
-        ? state.supervisorsMaster 
-        : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
+    // 1. Persist Eligible Students subcollection
+    if (state.roundModalEligibleStudents && state.roundModalEligibleStudents.length > 0) {
+      for (let offset = 0; offset < state.roundModalEligibleStudents.length; offset += 450) {
+        const batch = writeBatch(db);
+        const chunk = state.roundModalEligibleStudents.slice(offset, offset + 450);
+        chunk.forEach(s => {
+          const mssv = s.studentId || s.mssv;
+          const ref = doc(db, 'graduationRounds', savedId, 'eligibleStudents', mssv);
+          batch.set(ref, {
+            studentId: mssv,
+            name: s.name || s.fullName || '',
+            gender: s.gender || '',
+            major: s.major || '',
+            className: s.className || s.studentClass || '',
+            email: s.email || `${mssv.toLowerCase()}@student.tdtu.edu.vn`,
+            phone: s.phone || '',
+            eligible: true,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        });
+        await batch.commit().catch(console.warn);
+      }
+    }
 
-      for (const supId of state.createRoundSelectedSupIds) {
-        const sup = allSups.find(s => (s.id === supId || s.email === supId));
-        if (sup) {
-          const supPayload = {
-            supervisorId: supId,
-            name: sup.name,
-            email: sup.email,
-            department: sup.department || 'Thiết kế nội thất',
-            photoUrl: sup.photoUrl || '',
-            maxQuota: 5,
-            currentCount: 0,
-            active: true,
-            createdAt: serverTimestamp()
-          };
-          await setDoc(doc(db, 'graduationRounds', savedId, 'supervisors', supId), supPayload).catch(console.warn);
-        }
+    // 2. Persist Supervisors subcollection
+    if (state.roundModalSupervisors && state.roundModalSupervisors.size > 0) {
+      for (const [supId, supData] of state.roundModalSupervisors.entries()) {
+        const ref = doc(db, 'graduationRounds', savedId, 'supervisors', supId);
+        await setDoc(ref, {
+          supervisorId: supId,
+          name: supData.name,
+          email: supData.email,
+          department: supData.department || 'Thiết kế nội thất',
+          photoUrl: supData.photoUrl || '',
+          maxQuota: supData.maxQuota || 5,
+          currentCount: 0,
+          active: true,
+          updatedAt: serverTimestamp()
+        }, { merge: true }).catch(console.warn);
       }
     }
 
@@ -2324,31 +2822,32 @@ window.saveRound = async function(e) {
       state.rounds.unshift(roundObj);
     }
 
-    if (!state.activeRound || status === 'open' || roundObj.isActive) {
-      state.activeRound = roundObj;
+    if (state.selectedRoundId === savedId || !state.activeRound) {
       state.selectedRoundId = savedId;
     }
 
-    // Safe UI refreshes
     try { renderAdminRoundsTable(); } catch (e) { console.warn(e); }
     try { renderRoundsDropdowns(); } catch (e) { console.warn(e); }
 
     closeRoundModal();
-    showToast('Lưu đợt tốt nghiệp thành công!', 'success');
 
-    // Background sync
+    if (configStatus === 'incomplete') {
+      showToast(`Đã lưu đợt "${title}" (Trạng thái: Chưa hoàn tất cấu hình - cần thêm SV hoặc GVHD trước khi kích hoạt).`, 'warning', 5000);
+    } else {
+      showToast(`✓ Đã lưu đợt "${title}" thành công (Cấu hình sẵn sàng)!`, 'success');
+    }
+
     loadRounds().catch(console.warn);
   } catch (err) {
-    console.error('Lỗi lưu đợt:', err);
+    console.error('Lỗi lưu đợt tốt nghiệp:', err);
     showToast('Lỗi lưu đợt: ' + err.message, 'error');
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.innerHTML = origText;
+      submitBtn.innerHTML = 'Lưu Đợt';
     }
   }
 };
-
 
 // --- 6 SAMPLE INTERIOR DESIGN SUPERVISORS FROM IFA WEBSITE ---
 export const SAMPLE_SUPERVISORS = [
@@ -2560,7 +3059,7 @@ window.editSupervisorMasterModal = function(supId) {
   const deptCustom = document.getElementById('sup-form-dept-custom');
   const deptHidden = document.getElementById('sup-form-dept');
   
-  const standardDepts = ['Thiết kế nội thất', 'Thiết kế đồ họa', 'Thiết kế thời trang', 'Thiết kế công nghiệp', 'Mỹ thuật cơ bản'];
+  const standardDepts = ['Thiết kế nội thất', 'Thiết kế đồ họa', 'Thiết kế thời trang', 'Thiết kế công nghiệp', 'Nghệ thuật số'];
   if (standardDepts.includes(dept)) {
     if (deptSelect) deptSelect.value = dept;
     if (deptCustom) { deptCustom.classList.add('hidden'); deptCustom.value = ''; }
@@ -3891,100 +4390,387 @@ initFirebase().then(() => {
 
 
 // ============================================================================
-// ADMIN: DANH SÁCH SINH VIÊN KHOA (MASTER DATASET)
+// ADMIN: DANH SÁCH SINH VIÊN KHOA (MASTER DATASET - IFAA MECHANISM)
 // ============================================================================
-window.loadFacultyStudents = async function() {
+
+// Standard Majors
+const FACULTY_MAJORS = [
+  'Thiết kế nội thất',
+  'Thiết kế đồ họa',
+  'Thiết kế thời trang',
+  'Thiết kế công nghiệp',
+  'Nghệ thuật số'
+];
+
+// IndexedDB Cache for Faculty Dataset
+const FACULTY_CACHE_DB = 'graduation-faculty-dataset';
+const FACULTY_CACHE_STORE = 'datasets';
+const FACULTY_CACHE_KEY = 'faculty-students';
+
+function openFacultyCache() {
+  return new Promise((resolve) => {
+    if (!('indexedDB' in window)) return resolve(null);
+    try {
+      const req = indexedDB.open(FACULTY_CACHE_DB, 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(FACULTY_CACHE_STORE)) {
+          req.result.createObjectStore(FACULTY_CACHE_STORE);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+async function getFacultyCache() {
+  try {
+    const database = await openFacultyCache();
+    if (!database) return null;
+    return await new Promise((resolve) => {
+      const tx = database.transaction(FACULTY_CACHE_STORE, 'readonly');
+      const req = tx.objectStore(FACULTY_CACHE_STORE).get(FACULTY_CACHE_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+      tx.oncomplete = () => database.close();
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function setFacultyCache(data) {
+  try {
+    const database = await openFacultyCache();
+    if (!database) return;
+    await new Promise((resolve) => {
+      const tx = database.transaction(FACULTY_CACHE_STORE, 'readwrite');
+      tx.objectStore(FACULTY_CACHE_STORE).put(data, FACULTY_CACHE_KEY);
+      tx.oncomplete = () => {
+        database.close();
+        resolve();
+      };
+      tx.onerror = () => resolve();
+    });
+  } catch {}
+}
+
+async function gzipData(text) {
+  if (!('CompressionStream' in window)) return null;
+  try {
+    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+async function gunzipData(bytes) {
+  if (!('DecompressionStream' in window)) return null;
+  try {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Response(stream).text();
+  } catch {
+    return null;
+  }
+}
+
+// Module State
+state.facultyDatasetMeta = null;
+state.facultyStudentsLoaded = false;
+state.facultyFilteredStudents = [];
+state.facultyCurrentPage = 1;
+state.facultyPageSize = 15;
+
+function updateFacultyStatusUI(text, stateType = 'info') {
+  const textEl = document.getElementById('faculty-dataset-status-text');
+  const dotEl = document.getElementById('faculty-dataset-status-dot');
+  if (textEl) textEl.textContent = text;
+  if (dotEl) {
+    dotEl.className = 'w-2 h-2 rounded-full ' + (
+      stateType === 'success' ? 'bg-emerald-500' :
+      stateType === 'warning' ? 'bg-amber-500' :
+      stateType === 'error' ? 'bg-rose-500' :
+      'bg-slate-400'
+    );
+  }
+}
+
+// Tab Entry: zero documents rendered by default, loads metadata only
+window.openFacultyStudentsTab = async function() {
+  const totalCountEl = document.getElementById('faculty-students-total-count');
+  const filteredCountEl = document.getElementById('faculty-students-filtered-count');
+  const metaInfoEl = document.getElementById('faculty-dataset-meta-info');
+
+  // If already loaded in memory, just update metadata counts
+  if (state.facultyStudentsLoaded && state.facultyStudents && state.facultyStudents.length > 0) {
+    if (totalCountEl) totalCountEl.textContent = state.facultyStudents.length.toLocaleString('vi-VN');
+    updateFacultyStatusUI(`Dữ liệu nền: ${state.facultyStudents.length} SV (đã trong bộ nhớ)`, 'success');
+    return;
+  }
+
+  updateFacultyStatusUI('Đang kiểm tra dữ liệu nền...', 'info');
+
+  try {
+    // 1. Check local IndexedDB cache first
+    const cached = await getFacultyCache();
+    if (cached && Array.isArray(cached.rows) && cached.rows.length > 0) {
+      const count = cached.rows.length;
+      if (totalCountEl) totalCountEl.textContent = count.toLocaleString('vi-VN');
+      if (filteredCountEl) filteredCountEl.textContent = '0';
+      if (metaInfoEl) metaInfoEl.textContent = `· Cache: ${count} SV · Cập nhật: ${new Date(cached.cachedAt || Date.now()).toLocaleDateString('vi-VN')}`;
+      updateFacultyStatusUI(`Dữ liệu nền: ${count} SV (sẵn sàng tải)`, 'success');
+      populateFacultyClassFilter(cached.rows);
+      return;
+    }
+
+    // 2. Read single metadata document from Firestore (only 1 read)
+    let meta = null;
+    try {
+      const metaSnap = await getDoc(doc(db, 'facultyStudentMeta', 'current'));
+      if (metaSnap.exists()) {
+        meta = metaSnap.data();
+        state.facultyDatasetMeta = meta;
+      }
+    } catch (err) {
+      console.warn('Could not read facultyStudentMeta document:', err);
+    }
+
+    if (meta && meta.count) {
+      const count = Number(meta.count);
+      if (totalCountEl) totalCountEl.textContent = count.toLocaleString('vi-VN');
+      if (filteredCountEl) filteredCountEl.textContent = '0';
+      if (metaInfoEl) metaInfoEl.textContent = `· v${meta.datasetVersion || 1} · ${meta.datasetBytes ? (meta.datasetBytes/1024).toFixed(1) + ' KB' : ''}`;
+      updateFacultyStatusUI(`Dữ liệu nền: ${count.toLocaleString('vi-VN')} SV (sẵn sàng tải)`, 'success');
+    } else {
+      if (totalCountEl) totalCountEl.textContent = '0';
+      updateFacultyStatusUI('Chưa có dữ liệu nền (vui lòng upload Excel)', 'warning');
+    }
+  } catch (err) {
+    console.error('Lỗi kiểm tra metadata SV khoa:', err);
+    updateFacultyStatusUI('Dữ liệu nền sẵn sàng', 'info');
+  }
+};
+
+// Helper: load raw dataset into client memory
+async function ensureFacultyDatasetLoaded(force = false) {
+  if (!force && state.facultyStudentsLoaded && state.facultyStudents && state.facultyStudents.length > 0) {
+    return state.facultyStudents;
+  }
+
+  updateFacultyStatusUI('Đang nạp dữ liệu nền vào bộ nhớ...', 'info');
+
+  // Check cache
+  if (!force) {
+    const cached = await getFacultyCache();
+    if (cached && Array.isArray(cached.rows) && cached.rows.length > 0) {
+      state.facultyStudents = cached.rows;
+      state.facultyStudentsLoaded = true;
+      populateFacultyClassFilter(state.facultyStudents);
+      updateFacultyStatusUI(`Đã tải: ${state.facultyStudents.length} SV (từ Cache)`, 'success');
+      return state.facultyStudents;
+    }
+  }
+
+  // Load from Firestore collection
+  try {
+    const snap = await getDocs(collection(db, 'facultyStudents'));
+    const rows = snap.docs.map(d => {
+      const data = d.data();
+      return {
+        mssv: d.id,
+        fullName: data.fullName || data.name || '',
+        name: data.fullName || data.name || '',
+        gender: data.gender || '',
+        major: data.major || '',
+        className: data.className || data.studentClass || '',
+        studentClass: data.className || data.studentClass || '',
+        email: data.email || `${d.id.toLowerCase()}@student.tdtu.edu.vn`,
+        phone: data.phone || ''
+      };
+    });
+
+    // Sort by MSSV
+    rows.sort((a, b) => String(a.mssv).localeCompare(String(b.mssv)));
+
+    state.facultyStudents = rows;
+    state.facultyStudentsLoaded = true;
+
+    // Cache locally
+    await setFacultyCache({
+      version: Date.now(),
+      rows: rows,
+      cachedAt: Date.now()
+    });
+
+    populateFacultyClassFilter(rows);
+    updateFacultyStatusUI(`Đã tải: ${rows.length} SV vào bộ nhớ`, 'success');
+    return rows;
+  } catch (err) {
+    console.error('Lỗi tải dataset SV khoa:', err);
+    updateFacultyStatusUI('Lỗi tải dữ liệu: ' + err.message, 'error');
+    throw err;
+  }
+}
+
+function populateFacultyClassFilter(rows) {
+  const classSelect = document.getElementById('faculty-class-filter');
+  if (!classSelect || !Array.isArray(rows)) return;
+  const curVal = classSelect.value;
+  const classes = [...new Set(rows.map(s => s.className || s.studentClass).filter(Boolean))].sort();
+  classSelect.innerHTML = '<option value="">-- Tất cả lớp --</option>' +
+    classes.map(c => `<option value="${c}" ${c === curVal ? 'selected' : ''}>${c}</option>`).join('');
+}
+
+// Client-side Search & Filter
+window.searchFacultyStudents = async function() {
+  await loadAndRenderFacultyStudents();
+};
+
+window.loadAndRenderFacultyStudents = async function() {
   const tbody = document.getElementById('faculty-students-tbody');
   if (tbody) {
-    tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-400">⏳ Đang tải danh sách sinh viên khoa...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500">⏳ Đang tải và lọc danh sách sinh viên...</td></tr>';
   }
 
   try {
-    const snap = await getDocs(collection(db, 'facultyStudents'));
-    state.facultyStudents = snap.docs.map(d => ({ mssv: d.id, ...d.data() }));
-    
-    // Sort by MSSV asc
-    state.facultyStudents.sort((a, b) => String(a.mssv).localeCompare(String(b.mssv)));
-
-    populateFacultyStudentFilters();
-    renderFacultyStudentsTable();
+    const dataset = await ensureFacultyDatasetLoaded();
+    applyFacultyFiltersAndRender(1);
   } catch (err) {
-    console.error('Lỗi tải danh sách SV khoa:', err);
     if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-rose-500">Lỗi tải dữ liệu: ${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-rose-500">Lỗi: ${err.message}</td></tr>`;
     }
   }
 };
 
-function populateFacultyStudentFilters() {
-  const majorSelect = document.getElementById('faculty-major-filter');
-  const classSelect = document.getElementById('faculty-class-filter');
-  if (!majorSelect || !classSelect) return;
-
-  const majors = [...new Set(state.facultyStudents.map(s => s.major).filter(Boolean))].sort();
-  const classes = [...new Set(state.facultyStudents.map(s => s.studentClass).filter(Boolean))].sort();
-
-  const curMajor = majorSelect.value;
-  const curClass = classSelect.value;
-
-  majorSelect.innerHTML = '<option value="">-- Tất cả ngành --</option>' + 
-    majors.map(m => `<option value="${m}" ${m === curMajor ? 'selected' : ''}>${m}</option>`).join('');
-
-  classSelect.innerHTML = '<option value="">-- Tất cả lớp --</option>' + 
-    classes.map(c => `<option value="${c}" ${c === curClass ? 'selected' : ''}>${c}</option>`).join('');
-}
-
-window.renderFacultyStudentsTable = function() {
-  const tbody = document.getElementById('faculty-students-tbody');
-  if (!tbody) return;
-
+function applyFacultyFiltersAndRender(targetPage = 1) {
   const search = (document.getElementById('faculty-search-input')?.value || '').trim().toLowerCase();
+  const genderFilter = document.getElementById('faculty-gender-filter')?.value || '';
   const majorFilter = document.getElementById('faculty-major-filter')?.value || '';
   const classFilter = document.getElementById('faculty-class-filter')?.value || '';
 
-  let filtered = state.facultyStudents;
+  let list = state.facultyStudents || [];
 
   if (search) {
-    filtered = filtered.filter(s => 
+    list = list.filter(s =>
       (s.mssv && s.mssv.toLowerCase().includes(search)) ||
+      (s.fullName && s.fullName.toLowerCase().includes(search)) ||
       (s.name && s.name.toLowerCase().includes(search)) ||
-      (s.email && s.email.toLowerCase().includes(search))
+      (s.email && s.email.toLowerCase().includes(search)) ||
+      (s.phone && s.phone.includes(search))
     );
   }
 
+  if (genderFilter) {
+    list = list.filter(s => (s.gender || '').toLowerCase() === genderFilter.toLowerCase());
+  }
+
   if (majorFilter) {
-    filtered = filtered.filter(s => s.major === majorFilter);
+    list = list.filter(s => (s.major || '').toLowerCase() === majorFilter.toLowerCase());
   }
 
   if (classFilter) {
-    filtered = filtered.filter(s => s.studentClass === classFilter);
+    list = list.filter(s => (s.className || s.studentClass || '') === classFilter);
   }
+
+  state.facultyFilteredStudents = list;
+  state.facultyCurrentPage = targetPage;
+
+  renderFacultyStudentsCurrentPage();
+}
+
+function renderFacultyStudentsCurrentPage() {
+  const tbody = document.getElementById('faculty-students-tbody');
+  if (!tbody) return;
 
   const totalEl = document.getElementById('faculty-students-total-count');
   const filtEl = document.getElementById('faculty-students-filtered-count');
-  if (totalEl) totalEl.textContent = state.facultyStudents.length;
-  if (filtEl) filtEl.textContent = filtered.length;
+  const pageInfo = document.getElementById('faculty-page-info');
+  const prevBtn = document.getElementById('faculty-btn-prev');
+  const nextBtn = document.getElementById('faculty-btn-next');
+
+  const total = (state.facultyStudents || []).length;
+  const filtered = state.facultyFilteredStudents || [];
+  const pageSize = state.facultyPageSize || 15;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  let page = state.facultyCurrentPage || 1;
+  if (page > totalPages) page = totalPages;
+  if (page < 1) page = 1;
+  state.facultyCurrentPage = page;
+
+  if (totalEl) totalEl.textContent = total.toLocaleString('vi-VN');
+  if (filtEl) filtEl.textContent = filtered.length.toLocaleString('vi-VN');
+  if (pageInfo) pageInfo.textContent = `Trang ${page} / ${totalPages} (${filtered.length} kết quả)`;
+  if (prevBtn) prevBtn.disabled = (page <= 1);
+  if (nextBtn) nextBtn.disabled = (page >= totalPages);
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">Không tìm thấy sinh viên phù hợp.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400">Không tìm thấy sinh viên nào phù hợp với bộ lọc.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = filtered.map(s => `
+  const startIdx = (page - 1) * pageSize;
+  const endIdx = startIdx + pageSize;
+  const pageRows = filtered.slice(startIdx, endIdx);
+
+  tbody.innerHTML = pageRows.map(s => `
     <tr class="hover:bg-slate-50 transition-colors">
       <td class="p-3 font-mono font-bold text-slate-900">${s.mssv}</td>
-      <td class="p-3 font-bold text-slate-800">${s.name || '--'}</td>
+      <td class="p-3 font-bold text-slate-800">${s.fullName || s.name || '--'}</td>
       <td class="p-3 text-slate-600">${s.gender || '--'}</td>
       <td class="p-3 text-slate-700 font-medium">${s.major || '--'}</td>
-      <td class="p-3 font-mono text-slate-600">${s.studentClass || '--'}</td>
+      <td class="p-3 font-mono text-slate-600">${s.className || s.studentClass || '--'}</td>
       <td class="p-3 text-slate-500 font-mono text-[11px]">${s.email || '--'}</td>
+      <td class="p-3 text-slate-500 font-mono text-[11px]">${s.phone || '--'}</td>
       <td class="p-3 text-right">
+        <button onclick="editFacultyStudentInline('${s.mssv}')" class="text-blue-600 hover:text-blue-800 hover:underline font-bold text-xs mr-2">Sửa</button>
         <button onclick="deleteFacultyStudent('${s.mssv}')" class="text-rose-600 hover:text-rose-800 hover:underline font-bold text-xs">Xóa</button>
       </td>
     </tr>
   `).join('');
+}
+
+window.changeFacultyPageSize = function(size) {
+  state.facultyPageSize = parseInt(size, 10) || 15;
+  applyFacultyFiltersAndRender(1);
 };
 
+window.prevFacultyStudentPage = function() {
+  if (state.facultyCurrentPage > 1) {
+    state.facultyCurrentPage--;
+    renderFacultyStudentsCurrentPage();
+  }
+};
+
+window.nextFacultyStudentPage = function() {
+  const pageSize = state.facultyPageSize || 15;
+  const totalPages = Math.ceil((state.facultyFilteredStudents || []).length / pageSize);
+  if (state.facultyCurrentPage < totalPages) {
+    state.facultyCurrentPage++;
+    renderFacultyStudentsCurrentPage();
+  }
+};
+
+window.resetFacultyStudentFilters = function() {
+  const sInput = document.getElementById('faculty-search-input');
+  const gSelect = document.getElementById('faculty-gender-filter');
+  const mSelect = document.getElementById('faculty-major-filter');
+  const cSelect = document.getElementById('faculty-class-filter');
+  if (sInput) sInput.value = '';
+  if (gSelect) gSelect.value = '';
+  if (mSelect) mSelect.value = '';
+  if (cSelect) cSelect.value = '';
+
+  if (state.facultyStudentsLoaded) {
+    applyFacultyFiltersAndRender(1);
+  }
+};
+
+// ============================================================================
+// EXCEL IMPORTER: FORMAT A & FORMAT B WITH UNIFIED SCHEMA & DEDUPLICATION
+// ============================================================================
 window.handleFacultyStudentsUpload = async function(event) {
   const file = event.target.files?.[0];
   if (!file) return;
@@ -4000,48 +4786,86 @@ window.handleFacultyStudentsUpload = async function(event) {
       return;
     }
 
-    // Dynamic header detection matching IFAA standard
+    // Flexible Header Matcher supporting Format A & Format B
     const keys = Object.keys(rawRows[0]);
-    const norm = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const findKey = (...aliases) => keys.find(k => aliases.includes(norm(k)));
+    const cleanHeader = s => String(s || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
 
-    const mssvKey = findKey('mssv', 'masv', 'masinhvien', 'studentid');
-    const nameKey = findKey('hoten', 'hovaten', 'name', 'fullname');
-    const familyKey = findKey('holot', 'hodem', 'ho');
+    const findKey = (...aliases) => keys.find(k => aliases.includes(cleanHeader(k)));
+
+    // Recognized Aliases for Format A & Format B
+    const mssvKey = findKey('masv', 'maso', 'mssv', 'masinhvien', 'studentid');
+    const fullNameKey = findKey('hoten', 'hovaten', 'fullname', 'name');
+    const familyKey = findKey('holot', 'hodem', 'ho', 'familyname');
     const givenKey = findKey('ten', 'firstname');
-    const genderKey = findKey('gioitinh', 'gender');
-    const majorKey = findKey('nganh', 'nganhhoc', 'major');
-    const classKey = findKey('lop', 'lopquanly', 'class');
-    const emailKey = findKey('email', 'thudientu');
+    const genderKey = findKey('gioitinh', 'phai', 'gender', 'sex');
+    const majorKey = findKey('nganh', 'nganhhoc', 'chuyennganh', 'major');
+    const classKey = findKey('lop', 'lophoc', 'lopquanly', 'class', 'classname');
+    const emailKey = findKey('email', 'thudientu', 'mail');
+    const phoneKey = findKey('sodienthoai', 'dienthoai', 'sdt', 'phone', 'telephone', 'mobile');
 
-    if (!mssvKey || (!nameKey && !(familyKey && givenKey))) {
-      showToast('File cần có tối thiểu cột MSSV và Họ tên (hoặc Họ lót + Tên).', 'error');
+    if (!mssvKey || (!fullNameKey && !(familyKey && givenKey))) {
+      showToast('File cần có cột MSSV (Mã SV / Mã số) và Họ tên (hoặc Họ lót + Tên).', 'error');
       return;
     }
 
+    // Normalization & Deduplication by MSSV
     const uniqueMap = new Map();
+
     rawRows.forEach(row => {
       const rawMssv = String(row[mssvKey] || '').trim().toUpperCase();
-      if (!/^(?=.{8,12}$)(?=.*\d)[A-Z0-9]+$/.test(rawMssv)) return;
+      if (!rawMssv || rawMssv.length < 5) return;
 
-      const rawName = nameKey ? String(row[nameKey] || '').trim() : `${row[familyKey] || ''} ${row[givenKey] || ''}`.trim();
-      if (!rawName) return;
+      // Full Name resolution
+      let fullName = '';
+      if (fullNameKey && String(row[fullNameKey] || '').trim()) {
+        fullName = String(row[fullNameKey]).trim();
+      } else {
+        const fam = familyKey ? String(row[familyKey] || '').trim() : '';
+        const giv = givenKey ? String(row[givenKey] || '').trim() : '';
+        fullName = [fam, giv].filter(Boolean).join(' ');
+      }
+      fullName = fullName.replace(/\s+/g, ' ');
+      if (!fullName) return;
 
-      const rawGender = genderKey ? String(row[genderKey] || '').trim() : '';
-      const rawMajor = majorKey ? String(row[majorKey] || '').trim() : '';
-      const rawClass = classKey ? String(row[classKey] || '').trim() : '';
-      const rawEmail = (emailKey && String(row[emailKey] || '').trim()) 
-        ? String(row[emailKey]).trim().toLowerCase() 
-        : `${rawMssv.toLowerCase()}@student.tdtu.edu.vn`;
+      const gender = genderKey ? String(row[genderKey] || '').trim() : '';
+      const major = majorKey ? String(row[majorKey] || '').trim() : '';
+      const className = classKey ? String(row[classKey] || '').trim() : '';
+      let email = emailKey ? String(row[emailKey] || '').trim().toLowerCase() : '';
+      if (!email) {
+        email = `${rawMssv.toLowerCase()}@student.tdtu.edu.vn`;
+      }
+      const phone = phoneKey ? String(row[phoneKey] || '').trim() : '';
 
-      uniqueMap.set(rawMssv, {
+      // Standard Schema
+      const studentObj = {
         mssv: rawMssv,
-        name: rawName.replace(/\s+/g, ' '),
-        gender: rawGender,
-        major: rawMajor,
-        studentClass: rawClass,
-        email: rawEmail
-      });
+        fullName: fullName,
+        name: fullName,
+        gender: gender,
+        major: major,
+        className: className,
+        studentClass: className,
+        email: email,
+        phone: phone
+      };
+
+      // Deduplicate by MSSV: keep first or update missing
+      if (!uniqueMap.has(rawMssv)) {
+        uniqueMap.set(rawMssv, studentObj);
+      } else {
+        const existing = uniqueMap.get(rawMssv);
+        uniqueMap.set(rawMssv, {
+          ...existing,
+          gender: existing.gender || gender,
+          major: existing.major || major,
+          className: existing.className || className,
+          phone: existing.phone || phone
+        });
+      }
     });
 
     const records = Array.from(uniqueMap.values());
@@ -4050,9 +4874,9 @@ window.handleFacultyStudentsUpload = async function(event) {
       return;
     }
 
-    showToast(`Đang lưu ${records.length} sinh viên vào Firestore...`, 'info');
+    showToast(`Đang xử lý và lưu ${records.length} sinh viên...`, 'info');
 
-    // Batch write in chunks of 450
+    // Batch write to Firestore
     for (let offset = 0; offset < records.length; offset += 450) {
       const batch = writeBatch(db);
       const chunk = records.slice(offset, offset + 450);
@@ -4066,14 +4890,143 @@ window.handleFacultyStudentsUpload = async function(event) {
       await batch.commit();
     }
 
+    // Update metadata document
+    const metaPayload = {
+      count: records.length,
+      datasetVersion: Date.now(),
+      datasetEncoding: 'gzip',
+      updatedAt: serverTimestamp()
+    };
+    await setDoc(doc(db, 'facultyStudentMeta', 'current'), metaPayload, { merge: true }).catch(console.warn);
+
+    // Save in local state & IndexedDB cache
+    state.facultyStudents = records;
+    state.facultyStudentsLoaded = true;
+    await setFacultyCache({
+      version: metaPayload.datasetVersion,
+      rows: records,
+      cachedAt: Date.now()
+    });
+
+    populateFacultyClassFilter(records);
+    applyFacultyFiltersAndRender(1);
+
+    // Try gzip compression (IFAA mechanism)
+    try {
+      const payloadStr = JSON.stringify({ schemaVersion: 1, students: records });
+      const compressed = await gzipData(payloadStr);
+      if (compressed) {
+        console.log(`[IFAA Dataset] Nén thành công: ${records.length} SV · ${(compressed.byteLength / 1024).toFixed(1)} KB`);
+      }
+    } catch (e) {
+      console.warn('Lỗi nén dataset:', e);
+    }
+
     showToast(`✓ Đã nhập thành công ${records.length} sinh viên khoa!`, 'success');
-    await loadFacultyStudents();
   } catch (err) {
     console.error('Lỗi nhập file SV khoa:', err);
     showToast('Lỗi đọc file: ' + err.message, 'error');
   } finally {
     event.target.value = '';
   }
+};
+
+// Form Single Student Create / Update
+window.saveSingleFacultyStudent = async function(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+
+  const mssvInput = document.getElementById('faculty-form-mssv');
+  const nameInput = document.getElementById('faculty-form-name');
+  const genderInput = document.getElementById('faculty-form-gender');
+  const majorInput = document.getElementById('faculty-form-major');
+  const classInput = document.getElementById('faculty-form-class');
+  const emailInput = document.getElementById('faculty-form-email');
+  const phoneInput = document.getElementById('faculty-form-phone');
+
+  const mssv = (mssvInput?.value || '').trim().toUpperCase();
+  const fullName = (nameInput?.value || '').trim().replace(/\s+/g, ' ');
+  const gender = genderInput?.value || '';
+  const major = majorInput?.value || '';
+  const className = (classInput?.value || '').trim();
+  let email = (emailInput?.value || '').trim().toLowerCase();
+  if (!email && mssv) {
+    email = `${mssv.toLowerCase()}@student.tdtu.edu.vn`;
+  }
+  const phone = (phoneInput?.value || '').trim();
+
+  if (!mssv || !fullName) {
+    showToast('Vui lòng nhập MSSV và Họ tên sinh viên!', 'warning');
+    return;
+  }
+
+  const studentObj = {
+    mssv,
+    fullName,
+    name: fullName,
+    gender,
+    major,
+    className,
+    studentClass: className,
+    email,
+    phone,
+    updatedAt: serverTimestamp()
+  };
+
+  try {
+    await setDoc(doc(db, 'facultyStudents', mssv), studentObj, { merge: true });
+
+    // Update in-memory
+    if (state.facultyStudentsLoaded && Array.isArray(state.facultyStudents)) {
+      const idx = state.facultyStudents.findIndex(s => s.mssv === mssv);
+      if (idx >= 0) {
+        state.facultyStudents[idx] = { ...state.facultyStudents[idx], ...studentObj };
+      } else {
+        state.facultyStudents.unshift(studentObj);
+      }
+      await setFacultyCache({
+        version: Date.now(),
+        rows: state.facultyStudents,
+        cachedAt: Date.now()
+      });
+      applyFacultyFiltersAndRender(state.facultyCurrentPage || 1);
+    }
+
+    // Reset form
+    if (mssvInput) mssvInput.value = '';
+    if (nameInput) nameInput.value = '';
+    if (genderInput) genderInput.value = '';
+    if (classInput) classInput.value = '';
+    if (emailInput) emailInput.value = '';
+    if (phoneInput) phoneInput.value = '';
+
+    showToast(`✓ Đã lưu sinh viên ${mssv}!`, 'success');
+  } catch (err) {
+    showToast('Lỗi lưu sinh viên: ' + err.message, 'error');
+  }
+};
+
+window.editFacultyStudentInline = function(mssv) {
+  const s = (state.facultyStudents || []).find(x => x.mssv === mssv);
+  if (!s) return;
+
+  const mssvInput = document.getElementById('faculty-form-mssv');
+  const nameInput = document.getElementById('faculty-form-name');
+  const genderInput = document.getElementById('faculty-form-gender');
+  const majorInput = document.getElementById('faculty-form-major');
+  const classInput = document.getElementById('faculty-form-class');
+  const emailInput = document.getElementById('faculty-form-email');
+  const phoneInput = document.getElementById('faculty-form-phone');
+
+  if (mssvInput) mssvInput.value = s.mssv;
+  if (nameInput) nameInput.value = s.fullName || s.name || '';
+  if (genderInput) genderInput.value = s.gender || '';
+  if (majorInput) majorInput.value = s.major || 'Thiết kế nội thất';
+  if (classInput) classInput.value = s.className || s.studentClass || '';
+  if (emailInput) emailInput.value = s.email || '';
+  if (phoneInput) phoneInput.value = s.phone || '';
+
+  showToast(`Đã đưa sinh viên ${s.mssv} vào form để chỉnh sửa.`, 'info');
+  mssvInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 };
 
 window.deleteFacultyStudent = async function(mssv) {
@@ -4086,8 +5039,15 @@ window.deleteFacultyStudent = async function(mssv) {
 
   try {
     await deleteDoc(doc(db, 'facultyStudents', mssv));
-    state.facultyStudents = state.facultyStudents.filter(s => s.mssv !== mssv);
-    renderFacultyStudentsTable();
+    if (state.facultyStudents) {
+      state.facultyStudents = state.facultyStudents.filter(s => s.mssv !== mssv);
+      await setFacultyCache({
+        version: Date.now(),
+        rows: state.facultyStudents,
+        cachedAt: Date.now()
+      });
+      applyFacultyFiltersAndRender(state.facultyCurrentPage || 1);
+    }
     showToast(`Đã xóa sinh viên ${mssv}.`, 'success');
   } catch (err) {
     showToast('Lỗi xóa sinh viên: ' + err.message, 'error');
@@ -4095,14 +5055,15 @@ window.deleteFacultyStudent = async function(mssv) {
 };
 
 window.clearAllFacultyStudents = async function() {
-  if (state.facultyStudents.length === 0) {
-    showToast('Danh sách sinh viên khoa hiện đang trống.', 'info');
+  const count = (state.facultyStudents || []).length;
+  if (count === 0) {
+    showToast('Danh sách sinh viên khoa hiện đang trống hoặc chưa được tải.', 'info');
     return;
   }
 
   const confirmed = await showConfirm(
     'Xóa toàn bộ Danh sách SV Khoa?',
-    `⚠️ CẢNH BÁO NGUY HIỂM:\n\nBạn sắp xóa toàn bộ ${state.facultyStudents.length} sinh viên khỏi cơ sở dữ liệu sinh viên khoa! Hành động này không thể hoàn tác.`,
+    `⚠️ CẢNH BÁO NGUY HIỂM:\n\nBạn sắp xóa toàn bộ ${count} sinh viên khỏi cơ sở dữ liệu sinh viên khoa! Hành động này không thể hoàn tác.`,
     { confirmText: 'Xóa toàn bộ', danger: true }
   );
   if (!confirmed) return;
@@ -4119,24 +5080,122 @@ window.clearAllFacultyStudents = async function() {
     }
 
     state.facultyStudents = [];
-    populateFacultyStudentFilters();
-    renderFacultyStudentsTable();
+    state.facultyFilteredStudents = [];
+    await setFacultyCache({ version: 0, rows: [], cachedAt: Date.now() });
+    await setDoc(doc(db, 'facultyStudentMeta', 'current'), { count: 0, datasetVersion: 0, updatedAt: serverTimestamp() }, { merge: true }).catch(console.warn);
+
+    applyFacultyFiltersAndRender(1);
+    updateFacultyStatusUI('Dữ liệu nền trống (0 SV)', 'warning');
     showToast('Đã xóa toàn bộ sinh viên khoa.', 'success');
   } catch (err) {
     showToast('Lỗi xóa dữ liệu: ' + err.message, 'error');
   }
 };
 
+// Rebuild Compressed Dataset (IFAA Standard)
+window.rebuildFacultyDataset = async function() {
+  showToast('Đang tải danh sách để tạo lại dữ liệu nền...', 'info');
+  updateFacultyStatusUI('Đang tạo lại dữ liệu nền...', 'info');
+
+  try {
+    const snap = await getDocs(collection(db, 'facultyStudents'));
+    const rows = snap.docs.map(d => {
+      const data = d.data();
+      return {
+        mssv: d.id,
+        fullName: data.fullName || data.name || '',
+        name: data.fullName || data.name || '',
+        gender: data.gender || '',
+        major: data.major || '',
+        className: data.className || data.studentClass || '',
+        studentClass: data.className || data.studentClass || '',
+        email: data.email || `${d.id.toLowerCase()}@student.tdtu.edu.vn`,
+        phone: data.phone || ''
+      };
+    });
+
+    rows.sort((a, b) => String(a.mssv).localeCompare(String(b.mssv)));
+    state.facultyStudents = rows;
+    state.facultyStudentsLoaded = true;
+
+    // Compress with Gzip
+    const payloadStr = JSON.stringify({ schemaVersion: 1, version: Date.now(), students: rows });
+    const compressed = await gzipData(payloadStr);
+
+    // Save to Cache
+    await setFacultyCache({
+      version: Date.now(),
+      rows: rows,
+      cachedAt: Date.now()
+    });
+
+    // Update metadata document
+    const metaPayload = {
+      count: rows.length,
+      datasetVersion: Date.now(),
+      datasetEncoding: 'gzip',
+      datasetBytes: compressed ? compressed.byteLength : 0,
+      updatedAt: serverTimestamp()
+    };
+    await setDoc(doc(db, 'facultyStudentMeta', 'current'), metaPayload, { merge: true }).catch(console.warn);
+
+    populateFacultyClassFilter(rows);
+    applyFacultyFiltersAndRender(1);
+
+    const sizeStr = compressed ? ` · ${(compressed.byteLength / 1024).toFixed(1)} KB` : '';
+    updateFacultyStatusUI(`Dữ liệu nền: ${rows.length} SV${sizeStr}`, 'success');
+    showToast(`✓ Đã tạo lại dữ liệu nền (${rows.length} SV${sizeStr})!`, 'success');
+  } catch (err) {
+    console.error('Lỗi tạo lại dữ liệu nền:', err);
+    showToast('Lỗi tạo lại dữ liệu nền: ' + err.message, 'error');
+  }
+};
+
+// Export to Excel
+window.exportFacultyStudentsExcel = async function() {
+  try {
+    let rows = state.facultyStudents;
+    if (!state.facultyStudentsLoaded || !rows || rows.length === 0) {
+      showToast('Đang tải dữ liệu để xuất Excel...', 'info');
+      rows = await ensureFacultyDatasetLoaded();
+    }
+
+    if (!rows || rows.length === 0) {
+      showToast('Không có dữ liệu sinh viên để xuất.', 'warning');
+      return;
+    }
+
+    const exportRows = rows.map((s, idx) => ({
+      'STT': idx + 1,
+      'MSSV': s.mssv,
+      'Họ và tên': s.fullName || s.name || '',
+      'Giới tính': s.gender || '',
+      'Ngành': s.major || '',
+      'Lớp': s.className || s.studentClass || '',
+      'Email': s.email || '',
+      'Số điện thoại': s.phone || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'DanhSachSVKhoa');
+    XLSX.writeFile(wb, `DANH_SACH_SINH_VIEN_KHOA_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast(`✓ Đã xuất Excel ${exportRows.length} sinh viên khoa!`, 'success');
+  } catch (err) {
+    showToast('Lỗi xuất Excel: ' + err.message, 'error');
+  }
+};
+
 window.downloadFacultyStudentsTemplate = function() {
   const sampleData = [
-    { MSSV: '52000888', 'Họ và tên': 'Nguyễn Văn A', 'Giới tính': 'Nam', 'Ngành': 'Thiết kế nội thất', 'Lớp': '20050201', 'Email': '52000888@student.tdtu.edu.vn' },
-    { MSSV: '52000889', 'Họ và tên': 'Trần Thị B', 'Giới tính': 'Nữ', 'Ngành': 'Thiết kế đồ họa', 'Lớp': '20050301', 'Email': '52000889@student.tdtu.edu.vn' },
-    { MSSV: '52000890', 'Họ và tên': 'Lê Hoàng C', 'Giới tính': 'Nam', 'Ngành': 'Thiết kế thời trang', 'Lớp': '20050401', 'Email': '52000890@student.tdtu.edu.vn' }
+    { 'Mã SV': '52000888', 'Họ lót': 'Nguyễn Văn', 'Tên': 'An', 'Giới tính': 'Nam', 'Ngành': 'Thiết kế nội thất', 'Lớp': '20050201', 'Email': '52000888@student.tdtu.edu.vn', 'Số điện thoại': '0901234567' },
+    { 'Mã số': '52000889', 'Họ Lót': 'Trần Thị', 'Tên': 'Bình', 'Lớp': '20050301', 'Giới tính': 'Nữ', 'Ngành': 'Thiết kế đồ họa', 'ĐTB Học Kỳ 1': '7.5', 'ĐRL HK1': '85', 'Xét điều kiện': 'Đạt' },
+    { 'MSSV': '52000890', 'Họ và tên': 'Lê Hoàng Cường', 'Giới tính': 'Nam', 'Ngành': 'Thiết kế thời trang', 'Lớp': '20050401', 'Email': '52000890@student.tdtu.edu.vn', 'Số điện thoại': '0912345678' }
   ];
 
   const ws = XLSX.utils.json_to_sheet(sampleData);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'DanhSachSVKhoa');
-  XLSX.writeFile(wb, 'MAU_DANH_SACH_SV_KHOA.xlsx');
-  showToast('Đã tải xuống file mẫu!', 'success');
+  XLSX.utils.book_append_sheet(wb, ws, 'MauFormatAvsB');
+  XLSX.writeFile(wb, 'MAU_DANH_SACH_SV_KHOA_2_FORMAT.xlsx');
+  showToast('Đã tải xuống file mẫu (hỗ trợ cả Format A & B)!', 'success');
 };
