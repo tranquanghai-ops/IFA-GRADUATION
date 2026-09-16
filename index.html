@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation Beta</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v2.0.0-beta.1</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v2.1.0-beta.1</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -191,6 +191,51 @@
       </div>
 
       <!-- OFFICIAL RESULT CARD (When round published) -->
+      <!-- STUDENT FINAL SCORE & RANKING CARD (v2.1.0-beta.1) -->
+      <div id="student-final-score-card" class="hidden card-surface bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 text-white p-6 rounded-2xl shadow-xl border border-purple-400/30 space-y-4">
+        <div class="flex items-center justify-between border-b border-white/20 pb-4">
+          <div class="flex items-center gap-3">
+            <span class="text-3xl">🎓</span>
+            <div>
+              <span class="badge bg-amber-400 text-slate-900 font-extrabold text-xs mb-1">KẾT QUẢ ĐỒ ÁN TỐT NGHIỆP</span>
+              <h2 class="text-lg sm:text-xl font-black text-white">ĐIỂM TỔNG KẾT & XẾP HẠNG CHÍNH THỨC</h2>
+            </div>
+          </div>
+          <div id="student-final-score-title-badge" class="hidden">
+            <!-- Thủ khoa / Á khoa badge -->
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div class="p-3 bg-white/10 rounded-xl border border-white/10">
+            <span class="text-[11px] text-purple-200 block">Điểm GVHD</span>
+            <span id="st-card-gvhd-score" class="text-base font-mono font-black text-white">--</span>
+          </div>
+          <div class="p-3 bg-white/10 rounded-xl border border-white/10">
+            <span class="text-[11px] text-purple-200 block">Điểm Thuyết minh (TM)</span>
+            <span id="st-card-tm-score" class="text-base font-mono font-black text-white">--</span>
+          </div>
+          <div class="p-3 bg-white/10 rounded-xl border border-white/10">
+            <span class="text-[11px] text-purple-200 block">Điểm Bảo vệ (HĐ)</span>
+            <span id="st-card-defense-score" class="text-base font-mono font-black text-white">--</span>
+          </div>
+          <div class="p-3 bg-amber-400/20 border border-amber-400/40 rounded-xl">
+            <span class="text-[11px] text-amber-300 block font-bold">ĐIỂM TỔNG KẾT</span>
+            <span id="st-card-final-score" class="text-xl font-mono font-black text-amber-300">--</span>
+          </div>
+        </div>
+
+        <div id="st-card-ranking-wrap" class="hidden pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+          <div>
+            <span class="text-slate-300">Thứ hạng toàn đợt:</span>
+            <span id="st-card-rank-display" class="font-black font-mono text-base text-white ml-2">--</span>
+          </div>
+          <div id="st-card-title-display" class="font-black text-amber-300 text-sm">
+            <!-- Danh hiệu -->
+          </div>
+        </div>
+      </div>
+
       <div id="official-result-card" class="hidden card-surface bg-gradient-to-br from-indigo-900 via-blue-900 to-slate-900 text-white p-6 rounded-2xl shadow-xl border border-blue-400/30">
         <div class="flex items-center gap-3 border-b border-white/20 pb-4 mb-4">
           <span class="text-3xl">🎉</span>
@@ -1605,6 +1650,15 @@
           <button type="button" onclick="switchAdminScoringSubTab('reviewer-assignment')" id="ascore-tab-btn-reviewer-assignment" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
             📖 Phân công GVPB Thuyết minh
           </button>
+          <button type="button" onclick="switchAdminScoringSubTab('final-score-config')" id="ascore-tab-btn-final-score-config" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+            ⚙️ Cấu hình Điểm Tổng kết
+          </button>
+          <button type="button" onclick="switchAdminScoringSubTab('ranking')" id="ascore-tab-btn-ranking" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+            🏆 Xếp hạng Toàn Đợt & Danh hiệu
+          </button>
+          <button type="button" onclick="switchAdminScoringSubTab('export')" id="ascore-tab-btn-export" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+            📥 Xuất Dữ liệu Excel
+          </button>
         </div>
 
         <!-- SUB-TAB 1: BẢNG TỔNG HỢP ĐIỂM -->
@@ -1736,6 +1790,337 @@
           </div>
         </div>
 
+        <!-- SUB-TAB 5: CẤU HÌNH ĐIỂM TỔNG KẾT (v2.1.0-beta.1) -->
+        <div id="ascore-panel-final-score-config" class="hidden space-y-4">
+          <div class="card-surface p-5 bg-white space-y-5">
+            <div class="flex items-center justify-between pb-3 border-b flex-wrap gap-2">
+              <div>
+                <h3 class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <span>⚙️</span> Cấu hình Công thức Điểm Tổng kết
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Admin chủ động thiết lập tỷ trọng (%) cho từng thành phần điểm. Không sử dụng công thức mặc định suy đoán.</p>
+              </div>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="chk-admin-final-score-enabled" onchange="validateFinalScoreWeights()" class="rounded text-tdtu-blue">
+                <span class="font-bold text-xs text-indigo-700">Kích hoạt Tính Điểm Tổng kết</span>
+              </label>
+            </div>
+
+            <!-- Weight inputs -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="p-4 bg-emerald-50/50 rounded-xl border border-emerald-200 space-y-2">
+                <label class="font-bold text-slate-800 text-xs block">1. Điểm GVHD (%)</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="cfg-weight-supervisor" min="0" max="100" step="1" value="20" oninput="validateFinalScoreWeights()" class="w-full p-2 border border-slate-300 rounded-xl font-mono text-sm font-black text-emerald-900 bg-white">
+                  <span class="font-bold text-slate-600">%</span>
+                </div>
+                <p class="text-[10px] text-slate-500">Nguồn: Điểm chính thức từ Giảng viên hướng dẫn</p>
+              </div>
+
+              <div class="p-4 bg-blue-50/50 rounded-xl border border-blue-200 space-y-2">
+                <label class="font-bold text-slate-800 text-xs block">2. Điểm Thuyết minh (%)</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="cfg-weight-thesis" min="0" max="100" step="1" value="20" oninput="validateFinalScoreWeights()" class="w-full p-2 border border-slate-300 rounded-xl font-mono text-sm font-black text-blue-900 bg-white">
+                  <span class="font-bold text-slate-600">%</span>
+                </div>
+                <p class="text-[10px] text-slate-500">Nguồn: Trung bình (TM HD + TM PB) / 2</p>
+              </div>
+
+              <div class="p-4 bg-purple-50/50 rounded-xl border border-purple-200 space-y-2">
+                <label class="font-bold text-slate-800 text-xs block">3. Điểm Bảo vệ Hội đồng (%)</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="cfg-weight-defense" min="0" max="100" step="1" value="60" oninput="validateFinalScoreWeights()" class="w-full p-2 border border-slate-300 rounded-xl font-mono text-sm font-black text-purple-900 bg-white">
+                  <span class="font-bold text-slate-600">%</span>
+                </div>
+                <p class="text-[10px] text-slate-500">Nguồn: Điểm BV chính thức sau hiệu chỉnh & khách mời</p>
+              </div>
+            </div>
+
+            <!-- Total weights calculation & validation box -->
+            <div class="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs" id="cfg-weights-status-box">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-700">Tổng trọng số:</span>
+                <span id="cfg-weights-total-display" class="font-mono text-sm font-black text-slate-900">100%</span>
+              </div>
+              <div id="cfg-weights-msg" class="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                <span>✓</span> Hợp lệ (Tổng trọng số bằng 100%)
+              </div>
+            </div>
+
+            <!-- Additional Settings: Ranking, Titles, Publication -->
+            <div class="pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div class="space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <h4 class="font-bold text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <span>🎖️</span> Thiết lập Danh hiệu Thủ khoa / Á khoa
+                </h4>
+                <div>
+                  <label class="font-bold text-slate-700 block mb-1">Số lượng Á khoa:</label>
+                  <input type="number" id="cfg-runner-up-count" min="0" max="10" step="1" value="2" class="w-24 p-2 border border-slate-300 rounded-xl font-mono font-bold bg-white">
+                  <p class="text-[10px] text-slate-500 mt-1">Hạng 1 là Thủ khoa; các thứ hạng tiếp theo tương ứng số lượng này sẽ là Á khoa.</p>
+                </div>
+                <div>
+                  <label class="font-bold text-slate-700 block mb-1">Quy tắc xử lý Đồng điểm tuyệt đối (True Tie):</label>
+                  <div class="space-y-1 text-slate-700">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="cfg_tie_rule" value="co_title" checked>
+                      <span>Tự động công nhận Đồng Thủ khoa / Đồng Á khoa</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="cfg_tie_rule" value="manual_order">
+                      <span>Cho phép Admin quyết định thứ tự thủ công</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <h4 class="font-bold text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <span>📢</span> Cấu hình Công bố cho Sinh viên
+                </h4>
+                <div class="space-y-2">
+                  <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" id="chk-publish-final-score" class="rounded text-tdtu-blue mt-0.5">
+                    <div>
+                      <span class="font-bold text-slate-800">Công bố Điểm tổng kết cho Sinh viên</span>
+                      <p class="text-[10px] text-slate-500">Sinh viên sẽ thấy Điểm tổng kết trong portal của mình.</p>
+                    </div>
+                  </label>
+                  <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" id="chk-publish-ranking" class="rounded text-tdtu-blue mt-0.5">
+                    <div>
+                      <span class="font-bold text-slate-800">Công bố Xếp hạng & Danh hiệu cho Sinh viên</span>
+                      <p class="text-[10px] text-slate-500">Sinh viên sẽ thấy Thứ hạng toàn đợt và Danh hiệu (Thủ khoa/Á khoa).</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-end pt-3 border-t">
+              <button type="button" onclick="saveAdminFinalScoreConfig()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-xs">
+                💾 Lưu Cấu hình Điểm Tổng kết
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 6: XẾP HẠNG TOÀN ĐỢT & DANH HIỆU (v2.1.0-beta.1) -->
+        <div id="ascore-panel-ranking" class="hidden space-y-4">
+          <!-- Top Action Bar -->
+          <div class="card-surface p-4 bg-white flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2 flex-wrap">
+              <button type="button" onclick="executeCalculateRanking()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-xs flex items-center gap-1.5">
+                <span>⚡</span> <span>Tính Xếp hạng</span>
+              </button>
+              <button type="button" id="btn-finalize-round-results" onclick="finalizeRoundResults()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs shadow-xs flex items-center gap-1.5">
+                <span>🔒</span> <span>Chốt kết quả Đợt</span>
+              </button>
+              <button type="button" id="btn-reopen-round-results" onclick="openReopenRoundModal()" class="hidden px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow-xs flex items-center gap-1.5">
+                <span>🔓</span> <span>Mở lại kết quả Đợt</span>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-3 text-xs">
+              <span id="ranking-status-badge" class="badge bg-slate-100 text-slate-700 font-bold text-[11px]">Chưa tính</span>
+              <span id="ranking-calc-time" class="text-[10px] text-slate-400 font-mono"></span>
+            </div>
+          </div>
+
+          <!-- Stale Ranking Warning -->
+          <div id="ranking-stale-warning" class="hidden p-3.5 bg-amber-50 border-2 border-amber-300 rounded-2xl flex items-center justify-between shadow-xs">
+            <div class="flex items-center gap-2 text-xs font-bold text-amber-900">
+              <span class="text-base">⚠️</span>
+              <span>Điểm số thành phần đã có thay đổi kể từ lần tính xếp hạng gần nhất. Vui lòng tính lại để đảm bảo thứ hạng chính xác.</span>
+            </div>
+            <button type="button" onclick="executeCalculateRanking()" class="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shrink-0">
+              Tính lại ngay
+            </button>
+          </div>
+
+          <!-- True Tie Alert & Manual Tie Order Box (if true tie detected) -->
+          <div id="ranking-tie-alert-box" class="hidden p-4 bg-purple-50 border-2 border-purple-300 rounded-2xl space-y-3">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- Filters & Search -->
+          <div class="card-surface p-3 bg-slate-50 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="font-bold text-slate-700 mr-1">Hiển thị:</span>
+              <button type="button" onclick="filterRankingTop(5)" class="ranking-top-btn px-2.5 py-1 rounded-lg border font-bold text-slate-600 hover:bg-white transition-colors" data-top="5">Top 5</button>
+              <button type="button" onclick="filterRankingTop(10)" class="ranking-top-btn px-2.5 py-1 rounded-lg border font-bold text-slate-600 hover:bg-white transition-colors" data-top="10">Top 10</button>
+              <button type="button" onclick="filterRankingTop(15)" class="ranking-top-btn px-2.5 py-1 rounded-lg border font-bold text-slate-600 hover:bg-white transition-colors" data-top="15">Top 15</button>
+              <button type="button" onclick="filterRankingTop(20)" class="ranking-top-btn px-2.5 py-1 rounded-lg border font-bold text-slate-600 hover:bg-white transition-colors" data-top="20">Top 20</button>
+              <button type="button" onclick="filterRankingTop('all')" class="ranking-top-btn active px-2.5 py-1 rounded-lg border font-bold bg-indigo-600 text-white border-indigo-600" data-top="all">Tất cả</button>
+            </div>
+            <input type="text" id="ranking-search-input" oninput="renderRankingTables()" placeholder="Tìm MSSV, họ tên..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+          </div>
+
+          <!-- Table 1: Ranked Students -->
+          <div class="card-surface space-y-2">
+            <div class="p-3 bg-slate-50/80 border-b flex items-center justify-between">
+              <h4 class="font-black text-xs text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <span>🏆</span> BẢNG XẾP HẠNG TOÀN ĐỢT (<span id="ranking-count-badge">0</span> sinh viên)
+              </h4>
+              <span class="text-[11px] text-slate-500 font-mono">Sắp xếp theo Điểm Tổng kết thực tế (Raw Float)</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                  <tr>
+                    <th class="p-3 text-center">Hạng</th>
+                    <th class="p-3">MSSV</th>
+                    <th class="p-3">Họ và tên</th>
+                    <th class="p-3 text-center">GVHD</th>
+                    <th class="p-3 text-center">TM</th>
+                    <th class="p-3 text-center">Bảo vệ</th>
+                    <th class="p-3 text-center bg-indigo-50/80 text-indigo-950 font-black">Điểm Tổng kết</th>
+                    <th class="p-3 text-center">Điểm chi tiết</th>
+                    <th class="p-3 text-center">Danh hiệu</th>
+                  </tr>
+                </thead>
+                <tbody id="ranking-ranked-tbody" class="divide-y divide-slate-100">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Table 2: Incomplete Students -->
+          <div id="ranking-incomplete-section" class="card-surface space-y-2">
+            <div class="p-3 bg-amber-50/80 border-b border-amber-100 flex items-center justify-between">
+              <h4 class="font-black text-xs text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                <span>⏳</span> DANH SÁCH CHƯA ĐỦ ĐIỂM TỔNG KẾT (<span id="ranking-incomplete-count-badge">0</span> sinh viên)
+              </h4>
+              <span class="text-[10px] text-amber-800">Không tham gia xếp hạng chính thức cho đến khi đủ tất cả điểm</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-amber-50 text-amber-900 font-bold uppercase border-b text-[11px]">
+                  <tr>
+                    <th class="p-3 text-center">#</th>
+                    <th class="p-3">MSSV</th>
+                    <th class="p-3">Họ và tên</th>
+                    <th class="p-3">Điểm hiện có</th>
+                    <th class="p-3">Thành phần còn thiếu</th>
+                  </tr>
+                </thead>
+                <tbody id="ranking-incomplete-tbody" class="divide-y divide-slate-100">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 7: XUẤT DỮ LIỆU EXCEL (v2.1.0-beta.1) -->
+        <div id="ascore-panel-export" class="hidden space-y-5">
+          <div class="card-surface p-5 bg-white space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b flex-wrap gap-2">
+              <div>
+                <h3 class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <span>📥</span> Xuất Dữ liệu Excel Tổng hợp & Chi tiết
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Tải về báo cáo định dạng Excel (.xlsx) chuẩn hóa, giữ nguyên giá trị số thực và cấu trúc cột thống nhất.</p>
+              </div>
+            </div>
+
+            <!-- Export Mode Radio -->
+            <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+              <label class="font-bold text-slate-800 block">Chế độ xuất điểm Bảo vệ:</label>
+              <div class="flex items-center gap-6 flex-wrap">
+                <label class="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
+                  <input type="radio" name="export_scores_mode" value="selected" checked class="text-tdtu-blue">
+                  <span>Điểm được chọn (Mặc định — Chỉ các điểm chính thức tham gia tính toán)</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
+                  <input type="radio" name="export_scores_mode" value="all" class="text-tdtu-blue">
+                  <span>Tất cả điểm (Bao gồm điểm Khách mời/DN không lấy, kèm trạng thái LẤY/BỎ)</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Export Action Cards Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Card 1: Xuất Tổng kết Đợt -->
+              <div class="p-4 bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-indigo-200 space-y-3 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center gap-2 text-indigo-950 font-bold text-xs">
+                    <span class="text-lg">📊</span>
+                    <span>1. XUẤT TỔNG KẾT TOÀN ĐỢT TN</span>
+                  </div>
+                  <p class="text-[11px] text-slate-600 mt-1">Workbook đầy đủ bao gồm các sheet: TONG_KET, XEP_HANG, SO_KHAO, GVHD, TM, BAO_VE, AUDIT.</p>
+                </div>
+                <button type="button" onclick="exportRoundSummaryToExcel()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-xs transition-colors">
+                  Tải Excel Tổng kết Đợt (.xlsx)
+                </button>
+              </div>
+
+              <!-- Card 2: Xuất Toàn bộ Hội đồng theo Mốc -->
+              <div class="p-4 bg-gradient-to-br from-purple-50 to-white rounded-xl border border-purple-200 space-y-3 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center gap-2 text-purple-950 font-bold text-xs">
+                    <span class="text-lg">🏛️</span>
+                    <span>2. XUẤT TOÀN BỘ HỘI ĐỒNG TRONG MỐC</span>
+                  </div>
+                  <p class="text-[11px] text-slate-600 mt-1">Một workbook duy nhất, mỗi sheet là 1 Hội đồng (HĐ1, HĐ2...) với cấu trúc cột đồng nhất tuyệt đối.</p>
+                  <div class="mt-2">
+                    <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Chọn Mốc kế hoạch có Hội đồng:</label>
+                    <select id="export-activity-select" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                      <!-- Populated dynamically -->
+                    </select>
+                  </div>
+                </div>
+                <button type="button" onclick="exportActivityCouncilsToExcel()" class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs shadow-xs transition-colors">
+                  Tải Excel Toàn Mốc (.xlsx)
+                </button>
+              </div>
+
+              <!-- Card 3: Xuất Điểm Hội đồng cụ thể -->
+              <div class="p-4 bg-gradient-to-br from-emerald-50 to-white rounded-xl border border-emerald-200 space-y-3 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center gap-2 text-emerald-950 font-bold text-xs">
+                    <span class="text-lg">📑</span>
+                    <span>3. XUẤT ĐIỂM TỪNG HỘI ĐỒNG</span>
+                  </div>
+                  <p class="text-[11px] text-slate-600 mt-1">Xuất phiếu điểm chi tiết của 1 Hội đồng cụ thể, đặt tên theo chuẩn: {Activity}_{Council}_{DD-MM-YYYY}.xlsx.</p>
+                  <div class="mt-2 grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Mốc:</label>
+                      <select id="export-council-activity-select" onchange="onExportCouncilActivityChange(this.value)" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                        <!-- Populated dynamically -->
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Hội đồng:</label>
+                      <select id="export-single-council-select" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs bg-white">
+                        <!-- Populated dynamically -->
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <button type="button" onclick="exportSingleCouncilToExcel()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-xs transition-colors">
+                  Tải Excel Hội đồng này (.xlsx)
+                </button>
+              </div>
+
+              <!-- Card 4: Xuất Nhật ký Kiểm toán -->
+              <div class="p-4 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 space-y-3 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center gap-2 text-slate-800 font-bold text-xs">
+                    <span class="text-lg">📋</span>
+                    <span>4. XUẤT NHẬT KÝ KIỂM TOÁN (AUDIT LOGS)</span>
+                  </div>
+                  <p class="text-[11px] text-slate-600 mt-1">Xuất toàn bộ lịch sử điều chỉnh điểm sau hội đồng, mở lại hội đồng, thay đổi xếp hạng và lý do.</p>
+                </div>
+                <button type="button" onclick="exportAuditLogsToExcel()" class="w-full py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-xs transition-colors">
+                  Tải Excel Nhật ký Kiểm toán (.xlsx)
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
       </div>
 
       <!-- ADMIN TAB: TRASH -->
@@ -1778,7 +2163,7 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v2.0.0-beta.1</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v2.1.0-beta.1</p>
     </div>
   </footer>
 
@@ -3532,6 +3917,114 @@
 
       <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
         <button type="button" onclick="closeGuestPasscodeModal()" class="px-4 py-1.5 bg-slate-200 text-slate-700 rounded-xl font-bold">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================================
+       MODAL: REOPEN FINALIZED ROUND RESULTS (ADMIN ONLY) (v2.1.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-reopen-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-rose-50 flex items-center justify-between">
+        <h4 class="font-black text-sm text-rose-950 flex items-center gap-1.5">
+          <span>🔓</span> Mở lại Kết quả Đợt Tốt nghiệp
+        </h4>
+        <button type="button" onclick="closeReopenRoundModal()" class="text-rose-700 hover:text-rose-950 font-bold p-1">✕</button>
+      </div>
+      <div class="p-5 space-y-3">
+        <p class="text-slate-700 text-xs leading-relaxed">Đợt tốt nghiệp đang ở trạng thái <strong>Đã chốt kết quả (Finalized)</strong>. Khi mở lại, bảng xếp hạng sẽ chuyển về trạng thái có thể tính toán lại.</p>
+        <div>
+          <label class="font-bold text-slate-800 block mb-1">Lý do mở lại bắt buộc (Audit Trail Reason) <span class="text-rose-500">*</span></label>
+          <textarea id="reopen-round-reason" rows="3" placeholder="Ghi rõ lý do mở lại kết quả đợt tốt nghiệp..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs"></textarea>
+        </div>
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button type="button" onclick="closeReopenRoundModal()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-600">Hủy</button>
+        <button type="button" onclick="confirmReopenRound()" class="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-xs">Xác nhận Mở lại</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================
+       MODAL: STUDENT FINAL SCORE FORMULA & DETAIL (v2.1.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-final-score-detail" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-indigo-50 flex items-center justify-between">
+        <div>
+          <h4 class="font-black text-sm text-indigo-950 flex items-center gap-1.5">
+            <span>📊</span> Chi tiết Điểm Tổng kết & Công thức
+          </h4>
+          <p id="fs-detail-student-meta" class="text-[11px] text-indigo-800 mt-0.5 font-bold">Sinh viên: ...</p>
+        </div>
+        <button type="button" onclick="closeFinalScoreDetailModal()" class="text-indigo-800 hover:text-indigo-950 font-bold p-1">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <!-- Components breakdown -->
+        <div class="space-y-2">
+          <div class="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-emerald-950 block">1. Điểm GVHD (<span id="fs-detail-w-gvhd">20</span>%)</span>
+              <span class="text-[10px] text-slate-500">Giảng viên hướng dẫn chính thức</span>
+            </div>
+            <div class="text-right">
+              <span id="fs-detail-gvhd-val" class="font-black font-mono text-sm text-emerald-900">8.70</span>
+              <span id="fs-detail-gvhd-raw" class="hidden text-[10px] text-slate-400 font-mono block">Raw: 8.7</span>
+            </div>
+          </div>
+
+          <div class="p-3 bg-blue-50/60 rounded-xl border border-blue-200 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-blue-950 block">2. Điểm Thuyết minh (<span id="fs-detail-w-tm">20</span>%)</span>
+              <span class="text-[10px] text-slate-500">Trung bình (TM HD + TM PB) / 2</span>
+            </div>
+            <div class="text-right">
+              <span id="fs-detail-tm-val" class="font-black font-mono text-sm text-blue-900">8.62</span>
+              <span id="fs-detail-tm-raw" class="hidden text-[10px] text-slate-400 font-mono block">Raw: 8.615</span>
+            </div>
+          </div>
+
+          <div class="p-3 bg-purple-50/60 rounded-xl border border-purple-200 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-purple-950 block">3. Điểm Bảo vệ Hội đồng (<span id="fs-detail-w-def">60</span>%)</span>
+              <span class="text-[10px] text-slate-500">Điểm Hội đồng chính thức (sau hiệu chỉnh & khách mời)</span>
+            </div>
+            <div class="text-right">
+              <span id="fs-detail-def-val" class="font-black font-mono text-sm text-purple-900">9.13</span>
+              <span id="fs-detail-def-raw" class="hidden text-[10px] text-slate-400 font-mono block">Raw: 9.128333...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formula display -->
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 font-mono text-[11px]">
+          <span class="font-bold text-slate-500 block text-[10px]">CÔNG THỨC ÁP DỤNG:</span>
+          <p id="fs-detail-formula-text" class="text-slate-800 font-semibold leading-relaxed">
+            Điểm = (GVHD × 20%) + (TM × 20%) + (Bảo vệ × 60%)
+          </p>
+        </div>
+
+        <!-- Final Score Result -->
+        <div class="p-4 bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl text-white flex items-center justify-between">
+          <div>
+            <span class="text-[11px] font-bold text-blue-100 uppercase tracking-wider block">KẾT QUẢ ĐIỂM TỔNG KẾT</span>
+            <span id="fs-detail-raw-toggle-hint" class="text-[10px] text-blue-200">Không làm tròn số trung gian trong toàn bộ phép tính</span>
+          </div>
+          <div class="text-right">
+            <span id="fs-detail-display-score" class="font-black font-mono text-2xl text-white">8.91</span>
+            <span id="fs-detail-raw-score" class="hidden text-[11px] font-mono text-blue-200 block">Raw: 8.912733...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <button type="button" id="btn-toggle-raw-precision" onclick="toggleRawPrecisionInDetailModal()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-bold hover:bg-slate-100 text-[11px]">
+          🔍 Hiện điểm chi tiết (Full Raw)
+        </button>
+        <button type="button" onclick="closeFinalScoreDetailModal()" class="px-4 py-1.5 bg-slate-200 text-slate-700 rounded-xl font-bold">Đóng</button>
       </div>
     </div>
   </div>
