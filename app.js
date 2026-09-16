@@ -1,4 +1,4 @@
-/** IFA+ Graduation Studio v1.5.2 **/
+/** IFA+ Graduation Beta Studio v1.6.0-beta.1 **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -342,7 +342,7 @@ async function initFirebase() {
 
 // --- AUTH & ROLES ---
 export async function setupAuthListener() {
-  showLoading('Đang khởi tạo IFA+ Graduation...');
+  showLoading('Đang khởi tạo IFA+ Graduation Beta...');
 
   // Fallback an toàn: Loading overlay bắt buộc phải ẩn sau tối đa 6 giây
   const safetyTimer = setTimeout(() => {
@@ -795,6 +795,10 @@ async function loadRounds() {
     // Check ?x=SHORTCODE URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     const xCode = urlParams.get('x') || urlParams.get('round') || urlParams.get('e');
+    const aCode = urlParams.get('a');
+    if (aCode) {
+      state.targetActivitySlug = aCode;
+    }
 
     let targetRound = null;
     if (xCode) {
@@ -850,6 +854,8 @@ function renderRoundsDropdowns() {
   if (selectAdminStudent) selectAdminStudent.innerHTML = optionsHtml;
   if (selectAdminReg) selectAdminReg.innerHTML = optionsHtml;
   if (selectAdminReview) selectAdminReview.innerHTML = optionsHtml;
+  const selectAdminTimeline = document.getElementById('admin-timeline-round-select');
+  if (selectAdminTimeline) selectAdminTimeline.innerHTML = optionsHtml;
 }
 
 window.onRoundSelected = function(roundId) {
@@ -870,6 +876,7 @@ export async function selectRound(roundId) {
   if (state.isSupervisor) {
     loadSupervisorReviewData(roundId);
   }
+  await loadStudentRoundActivities(roundId);
 }
 
 function renderRoundHeader() {
@@ -1893,7 +1900,7 @@ window.switchAdminTab = function(tabKey) {
     if (dot) dot.classList.replace('bg-slate-400', 'bg-blue-400');
   }
 
-  ['overview', 'review', 'rounds', 'faculty-students', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash'].forEach(t => {
+  ['overview', 'review', 'rounds', 'faculty-students', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash', 'timeline'].forEach(t => {
     const p = document.getElementById('atab-panel-' + t);
     if (p) {
       if (t === tabKey) p.classList.remove('hidden');
@@ -1911,6 +1918,14 @@ window.switchAdminTab = function(tabKey) {
   else if (tabKey === 'registrations' && state.selectedRoundId) loadAdminRegistrations(state.selectedRoundId);
   else if (tabKey === 'preview-student') preparePreviewStudentDropdown();
   else if (tabKey === 'trash') renderAdminTrashTable();
+  else if (tabKey === 'timeline') {
+    const roundId = state.selectedRoundId || (state.rounds && state.rounds[0] ? state.rounds[0].id : null);
+    if (roundId) {
+      const sel = document.getElementById('admin-timeline-round-select');
+      if (sel) sel.value = roundId;
+      loadAdminRoundActivities(roundId);
+    }
+  }
 };
 
 
@@ -2171,7 +2186,8 @@ function renderAdminRoundsTable() {
             <span>📋 Link</span>
           </button>
         </td>
-        <td class="p-3.5 text-right space-x-2 whitespace-nowrap">
+        <td class="p-3.5 text-right space-x-1.5 whitespace-nowrap">
+          <button onclick="openRoundTimeline('${r.id}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold text-xs border border-indigo-200 transition-colors" title="Kế hoạch mốc thời gian">📅 Kế hoạch</button>
           <button onclick="editRoundModal('${r.id}')" class="text-blue-600 hover:underline font-bold text-xs">Sửa</button>
           <button onclick="softDeleteRound('${r.id}')" class="text-rose-600 hover:underline font-bold text-xs">Xóa</button>
         </td>
@@ -5295,4 +5311,682 @@ window.downloadFacultyStudentsTemplate = function() {
   XLSX.utils.book_append_sheet(wb, ws, 'MauFormatAvsB');
   XLSX.writeFile(wb, 'MAU_DANH_SACH_SV_KHOA_2_FORMAT.xlsx');
   showToast('Đã tải xuống file mẫu (hỗ trợ cả Format A & B)!', 'success');
+};
+
+
+// ============================================================================
+// MODULE: TIMELINE / KẾ HOẠCH ĐỢT TỐT NGHIỆP (IFA+ GRADUATION BETA v1.6.0)
+// ============================================================================
+
+export const ACTIVITY_TYPES = {
+  announcement: { label: 'Thông báo', icon: '📢', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  submission: { label: 'Nộp bài', icon: '📥', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  review: { label: 'Duyệt hội đồng', icon: '📋', color: 'bg-amber-50 text-amber-800 border-amber-200' },
+  preliminary: { label: 'Sơ khảo', icon: '🔍', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  thesis: { label: 'Chấm thuyết minh', icon: '📖', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  defense: { label: 'Bảo vệ', icon: '🎓', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+  other: { label: 'Khác', icon: '📌', color: 'bg-slate-100 text-slate-700 border-slate-200' }
+};
+
+export function getActivityStatus(act) {
+  const now = new Date();
+  const start = act.startAt ? new Date(act.startAt) : null;
+  const end = act.endAt ? new Date(act.endAt) : null;
+
+  if (end && !isNaN(end.getTime()) && now > end) {
+    return 'past'; // Đã kết thúc
+  }
+  if (start && !isNaN(start.getTime()) && now < start) {
+    return 'upcoming'; // Sắp tới
+  }
+  if ((start && now >= start && (!end || now <= end)) || (!start && end && now <= end)) {
+    return 'ongoing'; // Đang diễn ra
+  }
+  return 'neutral'; // Không có hạn / Kế hoạch
+}
+
+export function fmtActivityTime(start, end) {
+  if (!start && !end) return 'Chưa ấn định thời gian';
+  if (start && end) return fmtDateRange24h(start, end);
+  if (start) return 'Bắt đầu: ' + fmt24h(start);
+  if (end) return 'Hạn cuối: ' + fmt24h(end);
+  return '--';
+}
+
+export function normalizeActivity(a, roundId, idx = 0) {
+  const title = String(a.title || '').trim();
+  const slug = String(a.slug || (title ? slugify(title) : '') || ('act-' + (idx + 1))).trim();
+  const id = String(a.id || slug).trim();
+  return {
+    id,
+    roundId: String(a.roundId || roundId).trim(),
+    title,
+    activityType: a.activityType || 'other',
+    description: a.description || '',
+    startAt: a.startAt || '',
+    endAt: a.endAt || '',
+    location: a.location || '',
+    order: typeof a.order === 'number' ? a.order : (idx + 1),
+    visibility: a.visibility !== false,
+    showAfterExpired: a.showAfterExpired !== false,
+    submissionEnabled: Boolean(a.submissionEnabled),
+    slug,
+    createdAt: a.createdAt || new Date().toISOString(),
+    updatedAt: a.updatedAt || new Date().toISOString()
+  };
+}
+
+// 1. OPEN ADMIN TIMELINE FOR A ROUND
+window.openRoundTimeline = function(roundId) {
+  switchAdminTab('timeline');
+  const sel = document.getElementById('admin-timeline-round-select');
+  if (sel) {
+    sel.value = roundId;
+    loadAdminRoundActivities(roundId);
+  }
+};
+
+// 2. LOAD & RENDER ADMIN TIMELINE ACTIVITIES TABLE
+window.loadAdminRoundActivities = async function(roundId) {
+  const tbody = document.getElementById('admin-timeline-activities-tbody');
+  const statsBadge = document.getElementById('admin-timeline-stats-badge');
+  if (!tbody) return;
+
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) {
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400">Không tìm thấy thông tin đợt tốt nghiệp.</td></tr>';
+    if (statsBadge) statsBadge.textContent = '0 mốc';
+    return;
+  }
+
+  // Load from targetRound.activities or subcollection
+  let list = Array.isArray(targetRound.activities) ? targetRound.activities : [];
+  try {
+    const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'activities'));
+    if (snap && !snap.empty) {
+      list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+  } catch (e) {
+    // Subcollection not permitted or empty, fallback cleanly to round.activities
+  }
+
+  // Normalize and sort by order
+  const normalized = list.map((a, idx) => normalizeActivity(a, roundId, idx)).sort((a, b) => (a.order || 0) - (b.order || 0));
+  targetRound.activities = normalized;
+  state.roundActivities = normalized;
+
+  // Calculate stats
+  let ongoingCount = 0, upcomingCount = 0, pastCount = 0;
+  normalized.forEach(a => {
+    const s = getActivityStatus(a);
+    if (s === 'ongoing') ongoingCount++;
+    else if (s === 'upcoming') upcomingCount++;
+    else if (s === 'past') pastCount++;
+  });
+
+  if (statsBadge) {
+    statsBadge.textContent = `${normalized.length} mốc (${ongoingCount} đang diễn ra, ${upcomingCount} sắp tới, ${pastCount} đã kết thúc)`;
+  }
+
+  if (normalized.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" class="p-10 text-center text-slate-400">
+          <span class="text-2xl block mb-1">📅</span>
+          Đợt "<strong>${targetRound.title}</strong>" chưa có mốc kế hoạch nào.<br>
+          <button type="button" onclick="openCreateActivityModal()" class="mt-3 px-4 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl font-bold text-xs border border-blue-200 transition-colors">
+            + Thêm mốc đầu tiên
+          </button>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = normalized.map((act, idx) => {
+    const typeMeta = ACTIVITY_TYPES[act.activityType] || ACTIVITY_TYPES.other;
+    const status = getActivityStatus(act);
+    const timeStr = fmtActivityTime(act.startAt, act.endAt);
+
+    let statusBadge = '';
+    if (status === 'ongoing') {
+      statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">● Đang diễn ra</span>';
+    } else if (status === 'upcoming') {
+      statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">○ Sắp tới</span>';
+    } else if (status === 'past') {
+      statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300">✓ Đã kết thúc</span>';
+    } else {
+      statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Kế hoạch</span>';
+    }
+
+    const visBadge = act.visibility !== false
+      ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">👁️ Hiện</span>'
+      : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">🔒 Ẩn</span>';
+
+    const subBadge = act.submissionEnabled
+      ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200" title="Chức năng nộp bài (Beta)">📥 Có</span>'
+      : '<span class="text-slate-300 font-bold">--</span>';
+
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="p-3 text-center whitespace-nowrap">
+          <div class="flex items-center justify-center gap-1">
+            <span class="font-mono font-bold text-slate-400 text-xs w-5">#${idx + 1}</span>
+            <div class="flex flex-col">
+              <button type="button" onclick="moveActivity('${act.id}', 'up')" ${idx === 0 ? 'disabled' : ''} class="text-[10px] text-slate-400 hover:text-slate-800 disabled:opacity-20 leading-none">▲</button>
+              <button type="button" onclick="moveActivity('${act.id}', 'down')" ${idx === normalized.length - 1 ? 'disabled' : ''} class="text-[10px] text-slate-400 hover:text-slate-800 disabled:opacity-20 leading-none">▼</button>
+            </div>
+          </div>
+        </td>
+        <td class="p-3">
+          <div class="flex items-center gap-1.5 mb-1">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${typeMeta.color}">
+              <span>${typeMeta.icon}</span> ${typeMeta.label}
+            </span>
+          </div>
+          <span class="font-bold text-slate-900 text-xs block">${act.title}</span>
+          ${act.description ? `<p class="text-[11px] text-slate-500 mt-0.5 line-clamp-1 truncate max-w-xs" title="${act.description}">${act.description}</p>` : ''}
+        </td>
+        <td class="p-3 font-mono text-[11px] text-slate-700 whitespace-nowrap">
+          ${timeStr}
+        </td>
+        <td class="p-3 text-slate-600 text-[11px] max-w-[140px] truncate" title="${act.location || ''}">
+          ${act.location || '<span class="text-slate-300">--</span>'}
+        </td>
+        <td class="p-3 text-center whitespace-nowrap">
+          ${statusBadge}
+        </td>
+        <td class="p-3 text-center whitespace-nowrap">
+          ${visBadge}
+        </td>
+        <td class="p-3 text-center whitespace-nowrap">
+          ${subBadge}
+        </td>
+        <td class="p-3 text-right whitespace-nowrap space-x-1">
+          <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Sao chép link mốc ?x=...&a=...">🔗 Link</button>
+          <button type="button" onclick="toggleActivityVisibility('${act.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Ẩn/Hiện đối với sinh viên">${act.visibility !== false ? 'Ẩn' : 'Hiện'}</button>
+          <button type="button" onclick="editActivityModal('${act.id}')" class="px-2 py-1 text-blue-600 hover:underline font-bold text-xs">Sửa</button>
+          <button type="button" onclick="deleteActivity('${act.id}')" class="px-2 py-1 text-rose-600 hover:underline font-bold text-xs">Xóa</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+// 3. CREATE & EDIT ACTIVITY MODAL HANDLERS
+window.openCreateActivityModal = function() {
+  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  if (!roundId) {
+    showToast('Vui lòng chọn đợt tốt nghiệp trước khi thêm mốc kế hoạch!', 'warning');
+    return;
+  }
+
+  document.getElementById('form-activity').reset();
+  document.getElementById('activity-form-id').value = '';
+  document.getElementById('activity-form-round-id').value = roundId;
+  document.getElementById('activity-form-visibility').checked = true;
+  document.getElementById('activity-form-show-expired').checked = true;
+  document.getElementById('activity-form-submission').checked = false;
+  document.getElementById('activity-form-type').value = 'review';
+
+  document.getElementById('modal-activity-title').textContent = 'Thêm Mốc Kế hoạch Đợt TN';
+  document.getElementById('modal-activity').classList.remove('hidden');
+};
+
+window.editActivityModal = function(actId) {
+  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const list = targetRound?.activities || state.roundActivities || [];
+  const act = list.find(a => a.id === actId);
+  if (!act) {
+    showToast('Không tìm thấy thông tin mốc kế hoạch!', 'error');
+    return;
+  }
+
+  document.getElementById('activity-form-id').value = act.id;
+  document.getElementById('activity-form-round-id').value = roundId;
+  document.getElementById('activity-form-title').value = act.title || '';
+  document.getElementById('activity-form-type').value = act.activityType || 'other';
+  document.getElementById('activity-form-location').value = act.location || '';
+  document.getElementById('activity-form-start').value = act.startAt || '';
+  document.getElementById('activity-form-end').value = act.endAt || '';
+  document.getElementById('activity-form-description').value = act.description || '';
+  document.getElementById('activity-form-visibility').checked = act.visibility !== false;
+  document.getElementById('activity-form-show-expired').checked = act.showAfterExpired !== false;
+  document.getElementById('activity-form-submission').checked = Boolean(act.submissionEnabled);
+
+  document.getElementById('modal-activity-title').textContent = 'Chỉnh sửa Mốc Kế hoạch';
+  document.getElementById('modal-activity').classList.remove('hidden');
+};
+
+window.closeActivityModal = function() {
+  document.getElementById('modal-activity').classList.add('hidden');
+};
+
+// 4. SAVE ACTIVITY (PERSISTENCE)
+window.saveActivity = async function(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+
+  const roundId = document.getElementById('activity-form-round-id')?.value || state.selectedRoundId;
+  const id = document.getElementById('activity-form-id')?.value?.trim();
+  const title = document.getElementById('activity-form-title')?.value?.trim();
+  const activityType = document.getElementById('activity-form-type')?.value || 'other';
+  const location = document.getElementById('activity-form-location')?.value?.trim() || '';
+  const startAt = document.getElementById('activity-form-start')?.value || '';
+  const endAt = document.getElementById('activity-form-end')?.value || '';
+  const description = document.getElementById('activity-form-description')?.value?.trim() || '';
+  const visibility = document.getElementById('activity-form-visibility')?.checked !== false;
+  const showAfterExpired = document.getElementById('activity-form-show-expired')?.checked !== false;
+  const submissionEnabled = document.getElementById('activity-form-submission')?.checked === true;
+
+  if (!title) {
+    showToast('Vui lòng nhập tên mốc kế hoạch (*)', 'warning');
+    return;
+  }
+
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) {
+    showToast('Không tìm thấy đợt tốt nghiệp tương ứng!', 'error');
+    return;
+  }
+
+  const submitBtn = document.querySelector('#form-activity button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span>⏳ Đang lưu...</span>';
+  }
+
+  try {
+    let activities = Array.isArray(targetRound.activities) ? [...targetRound.activities] : [];
+    const slug = id || (slugify(title) || ('act-' + Date.now()));
+    const actId = id || slug;
+
+    const activityData = {
+      id: actId,
+      roundId,
+      title,
+      activityType,
+      location,
+      startAt,
+      endAt,
+      description,
+      visibility,
+      showAfterExpired,
+      submissionEnabled,
+      slug,
+      updatedAt: new Date().toISOString()
+    };
+
+    const existingIdx = activities.findIndex(a => a.id === actId);
+    if (existingIdx >= 0) {
+      activityData.order = activities[existingIdx].order || (existingIdx + 1);
+      activityData.createdAt = activities[existingIdx].createdAt || activityData.updatedAt;
+      activities[existingIdx] = activityData;
+    } else {
+      activityData.order = activities.length + 1;
+      activityData.createdAt = activityData.updatedAt;
+      activities.push(activityData);
+    }
+
+    // Save to Firestore round document (works under deployed security rules)
+    const roundRef = doc(db, 'graduationRounds', roundId);
+    await updateDoc(roundRef, {
+      activities,
+      updatedAt: serverTimestamp()
+    });
+
+    // Also sync to subcollection if supported
+    try {
+      const actRef = doc(db, 'graduationRounds', roundId, 'activities', actId);
+      await setDoc(actRef, activityData, { merge: true }).catch(() => {});
+    } catch (subErr) {
+      // Ignored
+    }
+
+    targetRound.activities = activities;
+    state.roundActivities = activities;
+
+    closeActivityModal();
+    loadAdminRoundActivities(roundId);
+    if (state.selectedRoundId === roundId) {
+      loadStudentRoundActivities(roundId);
+    }
+
+    showToast(`✓ Đã lưu mốc "${title}" thành công!`, 'success');
+  } catch (err) {
+    console.error('Lỗi lưu mốc kế hoạch:', err);
+    showToast('Lỗi lưu mốc: ' + err.message, 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = 'Lưu Mốc';
+    }
+  }
+};
+
+// 5. DELETE ACTIVITY
+window.deleteActivity = async function(actId) {
+  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) return;
+
+  const activities = targetRound.activities || [];
+  const act = activities.find(a => a.id === actId);
+  if (!act) return;
+
+  const confirmed = await showConfirm(
+    'Xóa mốc kế hoạch',
+    `Bạn có chắc chắn muốn xóa mốc "${act.title}" khỏi kế hoạch đợt này không?`,
+    { confirmText: 'Xóa vĩnh viễn', danger: true }
+  );
+  if (!confirmed) return;
+
+  try {
+    const updated = activities.filter(a => a.id !== actId).map((a, idx) => ({ ...a, order: idx + 1 }));
+    const roundRef = doc(db, 'graduationRounds', roundId);
+    await updateDoc(roundRef, {
+      activities: updated,
+      updatedAt: serverTimestamp()
+    });
+
+    try {
+      await deleteDoc(doc(db, 'graduationRounds', roundId, 'activities', actId)).catch(() => {});
+    } catch (e) {}
+
+    targetRound.activities = updated;
+    state.roundActivities = updated;
+
+    loadAdminRoundActivities(roundId);
+    if (state.selectedRoundId === roundId) {
+      loadStudentRoundActivities(roundId);
+    }
+    showToast(`Đã xóa mốc "${act.title}".`, 'info');
+  } catch (err) {
+    console.error('Lỗi xóa mốc:', err);
+    showToast('Lỗi xóa mốc: ' + err.message, 'error');
+  }
+};
+
+// 6. TOGGLE VISIBILITY
+window.toggleActivityVisibility = async function(actId) {
+  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) return;
+
+  const activities = targetRound.activities || [];
+  const act = activities.find(a => a.id === actId);
+  if (!act) return;
+
+  act.visibility = (act.visibility === false) ? true : false;
+
+  try {
+    const roundRef = doc(db, 'graduationRounds', roundId);
+    await updateDoc(roundRef, {
+      activities,
+      updatedAt: serverTimestamp()
+    });
+
+    loadAdminRoundActivities(roundId);
+    if (state.selectedRoundId === roundId) {
+      loadStudentRoundActivities(roundId);
+    }
+    showToast(act.visibility ? `Đã hiển thị mốc "${act.title}" cho sinh viên.` : `Đã ẩn mốc "${act.title}" đối với sinh viên.`, 'info');
+  } catch (err) {
+    showToast('Lỗi cập nhật: ' + err.message, 'error');
+  }
+};
+
+// 7. MOVE ACTIVITY (REORDER UP/DOWN)
+window.moveActivity = async function(actId, direction) {
+  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) return;
+
+  const activities = targetRound.activities || [];
+  const idx = activities.findIndex(a => a.id === actId);
+  if (idx < 0) return;
+
+  if (direction === 'up' && idx > 0) {
+    const temp = activities[idx];
+    activities[idx] = activities[idx - 1];
+    activities[idx - 1] = temp;
+  } else if (direction === 'down' && idx < activities.length - 1) {
+    const temp = activities[idx];
+    activities[idx] = activities[idx + 1];
+    activities[idx + 1] = temp;
+  } else {
+    return;
+  }
+
+  // Re-index orders
+  activities.forEach((a, i) => a.order = i + 1);
+
+  try {
+    const roundRef = doc(db, 'graduationRounds', roundId);
+    await updateDoc(roundRef, {
+      activities,
+      updatedAt: serverTimestamp()
+    });
+
+    loadAdminRoundActivities(roundId);
+    if (state.selectedRoundId === roundId) {
+      loadStudentRoundActivities(roundId);
+    }
+  } catch (err) {
+    showToast('Lỗi đổi thứ tự: ' + err.message, 'error');
+  }
+};
+
+// 8. COPY ACTIVITY LINK
+window.copyActivityLink = function(roundId, activitySlug) {
+  const r = (state.rounds || []).find(x => x.id === roundId);
+  const rCode = r?.slug || r?.shortCode || roundId;
+  const link = `${window.location.origin}${window.location.pathname}?x=${encodeURIComponent(rCode)}&a=${encodeURIComponent(activitySlug)}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(() => {
+      showToast('✓ Đã sao chép liên kết mốc: ' + link, 'success');
+    }).catch(() => {
+      prompt('Link mốc kế hoạch:', link);
+    });
+  } else {
+    prompt('Link mốc kế hoạch:', link);
+  }
+};
+
+// 9. STUDENT TIMELINE RENDERING
+state.showAllActivities = false;
+
+window.toggleStudentTimelineViewAll = function() {
+  state.showAllActivities = !state.showAllActivities;
+  if (state.selectedRoundId) {
+    loadStudentRoundActivities(state.selectedRoundId);
+  }
+};
+
+window.loadStudentRoundActivities = async function(roundId) {
+  const container = document.getElementById('student-timeline-list');
+  const actionWrap = document.getElementById('student-timeline-header-actions');
+  if (!container) return;
+
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) {
+    container.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">Chưa có thông tin đợt tốt nghiệp.</div>';
+    if (actionWrap) actionWrap.innerHTML = '';
+    return;
+  }
+
+  // Load activities
+  let list = Array.isArray(targetRound.activities) ? targetRound.activities : [];
+  if (list.length === 0) {
+    try {
+      const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'activities'));
+      if (snap && !snap.empty) {
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+    } catch (e) {}
+  }
+
+  // If not admin, strictly filter visible activities (visibility !== false)
+  const visible = list
+    .map((a, idx) => normalizeActivity(a, roundId, idx))
+    .filter(a => state.isAdmin || a.visibility !== false)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  if (visible.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+        <span class="text-2xl block mb-1">📅</span>
+        <span class="font-bold text-slate-700 text-xs block">Kế hoạch đợt tốt nghiệp đang được cập nhật</span>
+        <p class="text-[11px] text-slate-400 mt-0.5">Khoa sẽ sớm công bố lộ trình và các mốc kiểm tra cho đợt này.</p>
+      </div>
+    `;
+    if (actionWrap) actionWrap.innerHTML = '';
+    return;
+  }
+
+  // Determine main items vs collapsed expired items
+  const mainItems = [];
+  const collapsedPastItems = [];
+
+  visible.forEach(act => {
+    const status = getActivityStatus(act);
+    const isExpiredAndHidden = (status === 'past' && act.showAfterExpired === false && !state.showAllActivities);
+    if (isExpiredAndHidden) {
+      collapsedPastItems.push(act);
+    } else {
+      mainItems.push(act);
+    }
+  });
+
+  // Action button in header
+  if (actionWrap) {
+    if (collapsedPastItems.length > 0) {
+      actionWrap.innerHTML = `
+        <button type="button" onclick="toggleStudentTimelineViewAll()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors flex items-center gap-1.5">
+          <span>👁️ Xem toàn bộ (${visible.length})</span>
+        </button>
+      `;
+    } else if (state.showAllActivities && visible.length > mainItems.length) {
+      actionWrap.innerHTML = `
+        <button type="button" onclick="toggleStudentTimelineViewAll()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors flex items-center gap-1.5">
+          <span>▲ Thu gọn mốc đã qua</span>
+        </button>
+      `;
+    } else {
+      actionWrap.innerHTML = '';
+    }
+  }
+
+  function renderActivityCard(act) {
+    const typeMeta = ACTIVITY_TYPES[act.activityType] || ACTIVITY_TYPES.other;
+    const status = getActivityStatus(act);
+    const timeStr = fmtActivityTime(act.startAt, act.endAt);
+
+    let markerHtml = '';
+    let cardBorder = 'border-slate-200';
+    let statusPill = '';
+
+    if (status === 'ongoing') {
+      markerHtml = '<div class="w-7 h-7 rounded-full bg-emerald-50 border-2 border-emerald-500 text-emerald-600 flex items-center justify-center text-xs font-black shadow-sm shrink-0 pulse-timer">●</div>';
+      cardBorder = 'border-emerald-300 bg-emerald-50/20';
+      statusPill = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-600 text-white shadow-sm">● Đang diễn ra</span>';
+    } else if (status === 'upcoming') {
+      markerHtml = '<div class="w-7 h-7 rounded-full bg-amber-50 border-2 border-amber-400 text-amber-600 flex items-center justify-center text-xs font-black shadow-sm shrink-0">○</div>';
+      cardBorder = 'border-amber-200/80 bg-white';
+      statusPill = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">○ Sắp tới</span>';
+    } else if (status === 'past') {
+      markerHtml = '<div class="w-7 h-7 rounded-full bg-slate-200 border-2 border-slate-300 text-slate-600 flex items-center justify-center text-xs font-bold shrink-0">✓</div>';
+      cardBorder = 'border-slate-200/70 bg-slate-50/50 opacity-90';
+      statusPill = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200 text-slate-700">✓ Đã kết thúc</span>';
+    } else {
+      markerHtml = '<div class="w-7 h-7 rounded-full bg-blue-50 border-2 border-blue-300 text-blue-600 flex items-center justify-center text-xs font-bold shrink-0">📌</div>';
+      cardBorder = 'border-slate-200 bg-white';
+      statusPill = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Kế hoạch</span>';
+    }
+
+    return `
+      <div id="activity-card-${act.slug}" data-activity-id="${act.id}" class="flex items-start gap-3.5 p-4 rounded-2xl border ${cardBorder} transition-all duration-300 relative">
+        ${markerHtml}
+        <div class="flex-1 min-w-0">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <div class="flex flex-wrap items-center gap-1.5">
+              ${statusPill}
+              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${typeMeta.color}">
+                <span>${typeMeta.icon}</span> ${typeMeta.label}
+              </span>
+            </div>
+            <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="text-[11px] font-semibold text-slate-400 hover:text-tdtu-blue flex items-center gap-1 transition-colors" title="Sao chép link mốc này">
+              <span>🔗 Link</span>
+            </button>
+          </div>
+
+          <h3 class="text-sm sm:text-base font-black text-slate-900 tracking-tight">${act.title}</h3>
+
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 mt-1.5 font-medium">
+            <div class="flex items-center gap-1 font-mono text-[11px] text-slate-700">
+              <span>🕒</span> ${timeStr}
+            </div>
+            ${act.location ? `
+              <div class="flex items-center gap-1 text-[11px] text-slate-600">
+                <span>📍</span> ${act.location}
+              </div>
+            ` : ''}
+          </div>
+
+          ${act.description ? `
+            <div class="mt-2 text-xs text-slate-600 whitespace-pre-line leading-relaxed bg-white/80 p-3 rounded-xl border border-slate-100">
+              ${act.description}
+            </div>
+          ` : ''}
+
+          ${act.submissionEnabled ? `
+            <div class="mt-2.5 flex items-center gap-2 p-2.5 bg-emerald-50/80 border border-emerald-200 text-emerald-900 rounded-xl text-xs">
+              <span class="text-base">📥</span>
+              <div class="flex-1">
+                <span class="font-bold block">Nộp bài — Chưa mở ở phiên bản Beta này</span>
+                <span class="text-[11px] text-emerald-700 block">Chức năng nộp bài trực tuyến sẽ được mở trong các phiên bản cập nhật tiếp theo.</span>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  let htmlContent = '';
+
+  // Main items
+  if (mainItems.length > 0) {
+    htmlContent += mainItems.map(renderActivityCard).join('');
+  }
+
+  // Collapsed past items
+  if (collapsedPastItems.length > 0) {
+    htmlContent += `
+      <div class="pt-2">
+        <button type="button" onclick="toggleStudentTimelineViewAll()" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border border-slate-200 transition-colors">
+          <span>▼ Xem các mốc đã qua (${collapsedPastItems.length})</span>
+        </button>
+      </div>
+    `;
+  }
+
+  container.innerHTML = htmlContent;
+
+  // Check URL &a= parameter highlighting
+  if (state.targetActivitySlug) {
+    const targetSlug = state.targetActivitySlug;
+    setTimeout(() => {
+      const el = document.getElementById('activity-card-' + targetSlug)
+        || document.getElementById('activity-card-' + slugify(targetSlug));
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-4', 'ring-amber-400', 'bg-amber-50/70');
+        setTimeout(() => {
+          el.classList.remove('ring-4', 'ring-amber-400', 'bg-amber-50/70');
+        }, 3500);
+      }
+      state.targetActivitySlug = null;
+    }, 300);
+  }
 };
