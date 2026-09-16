@@ -1,4 +1,4 @@
-/** IFA+ Graduation Studio v1.5.0 **/
+/** IFA+ Graduation Studio v1.5.1 **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -127,6 +127,34 @@ window.slugify = function(text) {
     .replace(/[\s_]+/g, '-')
     .replace(/^-+|-+$/g, '');
 };
+
+// Canonical supervisor ID resolver
+export function getSupervisorId(s) {
+  if (!s) return '';
+  return String(s.id || s.supervisorId || s.email || (s.name ? slugify(s.name) : '')).trim();
+}
+window.getSupervisorId = getSupervisorId;
+
+// Toggle "Mở ngay" checkbox
+window.toggleRoundOpenImmediately = function(openNow) {
+  const dateInput = document.getElementById('round-open-date');
+  const hourSelect = document.getElementById('round-open-hour');
+  const minSelect = document.getElementById('round-open-minute');
+  if (dateInput) {
+    dateInput.disabled = !!openNow;
+    if (openNow) {
+      dateInput.removeAttribute('required');
+      const now = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      dateInput.value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+    } else {
+      dateInput.setAttribute('required', 'required');
+    }
+  }
+  if (hourSelect) hourSelect.disabled = !!openNow;
+  if (minSelect) minSelect.disabled = !!openNow;
+};
+
 
 // Removed legacy copyRoundLink. Now unified at ?x=
 
@@ -298,19 +326,13 @@ export function hideLoading() {
 
 // --- INITIALIZATION ---
 async function initFirebase() {
-  let config = {
+  const config = {
     apiKey: "AIzaSyA7HDp4XThUSN2XO3m0GoBGnYf-nFjvM_M",
     authDomain: "tknt-tdtu.firebaseapp.com",
     projectId: "tknt-tdtu",
     storageBucket: "tknt-tdtu.firebasestorage.app",
     messagingSenderId: "52631763904"
   };
-  try {
-    const res = await fetch('/__/firebase/init.json');
-    if (res.ok) config = await res.json();
-  } catch (e) {
-    console.warn('[IFA-Graduation] Fallback firebase config used.');
-  }
   app = getApps().length > 0 ? getApp() : initializeApp(config);
   auth = getAuth(app);
   db = getFirestore(app);
@@ -2259,6 +2281,10 @@ window.openCreateRoundModal = function() {
   const nextMonth = new Date(today.getTime() + 30 * 24 * 3600 * 1000);
   const nextMonthStr = `${nextMonth.getFullYear()}-${pad(nextMonth.getMonth()+1)}-${pad(nextMonth.getDate())}`;
 
+  const openImm = document.getElementById('round-form-open-immediately');
+  if (openImm) openImm.checked = false;
+  toggleRoundOpenImmediately(false);
+
   if (document.getElementById('round-open-date')) document.getElementById('round-open-date').value = todayStr;
   if (document.getElementById('round-close-date')) document.getElementById('round-close-date').value = nextMonthStr;
   if (document.getElementById('round-open-hour')) document.getElementById('round-open-hour').value = '08';
@@ -2304,6 +2330,12 @@ window.editRoundModal = async function(roundId) {
   if (phoneToggle) phoneToggle.checked = (r.showPhoneAfterPublish !== false);
 
   const pad = n => String(n).padStart(2, '0');
+
+  const openImm = document.getElementById('round-form-open-immediately');
+  const isImmediately = (r.openImmediately === true);
+  if (openImm) openImm.checked = isImmediately;
+  toggleRoundOpenImmediately(isImmediately);
+
   if (r.openAtDate) {
     const od = new Date(r.openAtDate);
     if (document.getElementById('round-open-date')) document.getElementById('round-open-date').value = `${od.getFullYear()}-${pad(od.getMonth()+1)}-${pad(od.getDate())}`;
@@ -2335,10 +2367,15 @@ window.editRoundModal = async function(roundId) {
   try {
     const supSnap = await getDocs(collection(db, 'graduationRounds', r.id, 'supervisors'));
     supSnap.docs.forEach(d => {
-      state.roundModalSupervisors.set(d.id, {
-        supervisorId: d.id,
-        ...d.data()
-      });
+      const data = d.data();
+      const supId = String(d.id || data.supervisorId || data.email || '').trim();
+      if (supId) {
+        state.roundModalSupervisors.set(supId, {
+          id: supId,
+          supervisorId: supId,
+          ...data
+        });
+      }
     });
   } catch (e) {
     console.warn('Could not load supervisors for round modal:', e);
@@ -2586,14 +2623,15 @@ function renderRoundModalSupervisorsList(filter = '') {
   }
 
   container.innerHTML = filtered.map(s => {
-    const isSelected = state.roundModalSupervisors.has(s.id);
-    const roundData = isSelected ? state.roundModalSupervisors.get(s.id) : null;
+    const supId = getSupervisorId(s);
+    const isSelected = state.roundModalSupervisors.has(supId);
+    const roundData = isSelected ? state.roundModalSupervisors.get(supId) : null;
     const quota = roundData?.maxQuota || 5;
 
     return `
       <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
         <label class="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
-          <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleRoundModalSupervisor('${s.id}', this.checked)" class="rounded text-tdtu-blue w-4 h-4">
+          <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleRoundModalSupervisor('${supId}', this.checked)" class="rounded text-tdtu-blue w-4 h-4">
           <img src="${s.photoUrl || 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><circle cx=\'12\' cy=\'8\' r=\'4\' fill=\'%23cbd5e1\'/><path fill=\'%23cbd5e1\' d=\'M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z\'/></svg>'}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0">
           <div class="min-w-0 flex-1">
             <span class="font-bold text-slate-800 text-xs block truncate">${s.name}</span>
@@ -2602,7 +2640,7 @@ function renderRoundModalSupervisorsList(filter = '') {
         </label>
         <div class="flex items-center gap-1.5 ml-3 shrink-0">
           <span class="text-[11px] text-slate-500 font-semibold">Chỉ tiêu (Quota):</span>
-          <input type="number" min="1" max="50" value="${quota}" ${!isSelected ? 'disabled' : ''} onchange="updateRoundModalSupervisorQuota('${s.id}', this.value)" class="w-14 p-1 border border-slate-300 rounded-lg text-xs font-mono font-bold text-center bg-white disabled:opacity-40 disabled:bg-slate-100">
+          <input type="number" min="1" max="50" value="${quota}" ${!isSelected ? 'disabled' : ''} onchange="updateRoundModalSupervisorQuota('${supId}', this.value)" class="w-14 p-1 border border-slate-300 rounded-lg text-xs font-mono font-bold text-center bg-white disabled:opacity-40 disabled:bg-slate-100">
         </div>
       </div>
     `;
@@ -2614,15 +2652,17 @@ window.filterRoundModalSupervisors = function(val) {
 };
 
 window.toggleRoundModalSupervisor = function(supId, isChecked) {
+  if (!supId || supId === 'undefined') return;
   const allSups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
     ? state.supervisorsMaster
     : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
 
-  const s = allSups.find(x => x.id === supId);
+  const s = allSups.find(x => getSupervisorId(x) === supId);
   if (!s) return;
 
   if (isChecked) {
     state.roundModalSupervisors.set(supId, {
+      id: supId,
       supervisorId: supId,
       name: s.name,
       email: s.email,
@@ -2640,6 +2680,7 @@ window.toggleRoundModalSupervisor = function(supId, isChecked) {
 };
 
 window.updateRoundModalSupervisorQuota = function(supId, val) {
+  if (!supId || supId === 'undefined') return;
   const q = parseInt(val, 10) || 5;
   if (state.roundModalSupervisors.has(supId)) {
     const item = state.roundModalSupervisors.get(supId);
@@ -2655,9 +2696,12 @@ window.selectAllRoundModalSupervisors = function(select) {
 
   if (select) {
     allSups.forEach(s => {
-      if (!state.roundModalSupervisors.has(s.id)) {
-        state.roundModalSupervisors.set(s.id, {
-          supervisorId: s.id,
+      const supId = getSupervisorId(s);
+      if (!supId || supId === 'undefined') return;
+      if (!state.roundModalSupervisors.has(supId)) {
+        state.roundModalSupervisors.set(supId, {
+          id: supId,
+          supervisorId: supId,
           name: s.name,
           email: s.email,
           department: s.department || 'Thiết kế nội thất',
@@ -2681,7 +2725,7 @@ window.selectAllRoundModalSupervisors = function(select) {
 window.saveRound = async function(e) {
   if (e && typeof e.preventDefault === 'function') e.preventDefault();
 
-  const id = document.getElementById('round-form-id')?.value;
+  const id = document.getElementById('round-form-id')?.value?.trim();
   const title = document.getElementById('round-form-title')?.value.trim();
   const academicYear = document.getElementById('round-form-year')?.value.trim();
   let roundName = document.getElementById('round-form-name')?.value.trim();
@@ -2690,7 +2734,8 @@ window.saveRound = async function(e) {
   const shortCode = (roundName || '').replace(/[^a-zA-Z0-9_-]/g, '');
   roundName = shortCode;
 
-  // Read 24H time components
+  // Read "Mở ngay" flag and 24H time components
+  const openImmediately = document.getElementById('round-form-open-immediately')?.checked === true;
   const openDateStr = document.getElementById('round-open-date')?.value;
   const openHour = document.getElementById('round-open-hour')?.value || '08';
   const openMin = document.getElementById('round-open-minute')?.value || '00';
@@ -2709,7 +2754,7 @@ window.saveRound = async function(e) {
   const showEmailAfterPublish = document.getElementById('round-form-show-email-after-publish')?.checked !== false;
   const showPhoneAfterPublish = document.getElementById('round-form-show-phone-after-publish')?.checked !== false;
 
-  if (!title || !academicYear || !roundName || !openDateStr || !closeDateStr) {
+  if (!title || !academicYear || !roundName || (!openImmediately && !openDateStr) || !closeDateStr) {
     showToast('Vui lòng nhập đầy đủ các trường bắt buộc (*)', 'warning');
     switchRoundModalTab('info');
     return;
@@ -2721,14 +2766,19 @@ window.saveRound = async function(e) {
     submitBtn.innerHTML = '<span>⏳ Đang lưu...</span>';
   }
 
-  const [oy, om, od] = openDateStr.split('-').map(Number);
-  const openDate = new Date(oy, om - 1, od, Number(openHour), Number(openMin), 0);
+  let openDate;
+  if (openImmediately) {
+    openDate = new Date();
+  } else {
+    const [oy, om, od] = openDateStr.split('-').map(Number);
+    openDate = new Date(oy, om - 1, od, Number(openHour), Number(openMin), 0);
+  }
 
   const [cy, cm, cd] = closeDateStr.split('-').map(Number);
   const closeDate = new Date(cy, cm - 1, cd, Number(closeHour), Number(closeMin), 0);
 
-  const elCount = state.roundModalEligibleStudents.length;
-  const supCount = state.roundModalSupervisors.size;
+  const elCount = (state.roundModalEligibleStudents || []).length;
+  const supCount = (state.roundModalSupervisors ? state.roundModalSupervisors.size : 0);
   const configStatus = (elCount > 0 && supCount > 0) ? 'ready' : 'incomplete';
 
   const payload = {
@@ -2737,6 +2787,7 @@ window.saveRound = async function(e) {
     roundName: shortCode,
     shortCode: shortCode,
     slug: shortCode,
+    openImmediately: !!openImmediately,
     openAt: openDate,
     closeAt: closeDate,
     preferenceCount,
@@ -2766,13 +2817,19 @@ window.saveRound = async function(e) {
       savedId = docRef.id;
     }
 
-    // 1. Persist Eligible Students subcollection
+    if (!savedId) {
+      throw new Error('Không thể xác định mã ID đợt tốt nghiệp');
+    }
+
+    // 1. Persist Eligible Students subcollection (strictly guarded against undefined)
     if (state.roundModalEligibleStudents && state.roundModalEligibleStudents.length > 0) {
       for (let offset = 0; offset < state.roundModalEligibleStudents.length; offset += 450) {
         const batch = writeBatch(db);
         const chunk = state.roundModalEligibleStudents.slice(offset, offset + 450);
+        let validBatchCount = 0;
         chunk.forEach(s => {
-          const mssv = s.studentId || s.mssv;
+          const mssv = String(s.studentId || s.mssv || s.id || '').trim();
+          if (!mssv || mssv === 'undefined') return;
           const ref = doc(db, 'graduationRounds', savedId, 'eligibleStudents', mssv);
           batch.set(ref, {
             studentId: mssv,
@@ -2785,19 +2842,24 @@ window.saveRound = async function(e) {
             eligible: true,
             updatedAt: serverTimestamp()
           }, { merge: true });
+          validBatchCount++;
         });
-        await batch.commit().catch(console.warn);
+        if (validBatchCount > 0) {
+          await batch.commit().catch(console.warn);
+        }
       }
     }
 
-    // 2. Persist Supervisors subcollection
+    // 2. Persist Supervisors subcollection (strictly guarded against undefined supId)
     if (state.roundModalSupervisors && state.roundModalSupervisors.size > 0) {
-      for (const [supId, supData] of state.roundModalSupervisors.entries()) {
+      for (const [rawSupId, supData] of state.roundModalSupervisors.entries()) {
+        const supId = String(rawSupId || supData.supervisorId || supData.id || supData.email || '').trim();
+        if (!supId || supId === 'undefined') continue;
         const ref = doc(db, 'graduationRounds', savedId, 'supervisors', supId);
         await setDoc(ref, {
           supervisorId: supId,
-          name: supData.name,
-          email: supData.email,
+          name: supData.name || '',
+          email: supData.email || '',
           department: supData.department || 'Thiết kế nội thất',
           photoUrl: supData.photoUrl || '',
           maxQuota: supData.maxQuota || 5,
@@ -2815,7 +2877,7 @@ window.saveRound = async function(e) {
       openAtDate: openDate,
       closeAtDate: closeDate
     };
-    const existingIdx = state.rounds.findIndex(r => r.id === savedId);
+    const existingIdx = (state.rounds || []).findIndex(r => r.id === savedId);
     if (existingIdx >= 0) {
       state.rounds[existingIdx] = { ...state.rounds[existingIdx], ...roundObj };
     } else {
@@ -2849,13 +2911,15 @@ window.saveRound = async function(e) {
   }
 };
 
-// --- 6 SAMPLE INTERIOR DESIGN SUPERVISORS FROM IFA WEBSITE ---
+// --- 6 SAMPLE INTERIOR DESIGN SUPERVISORS (SAFE STATIC IDs & NO LOCAL NETWORK PNA PROMPTS) ---
 export const SAMPLE_SUPERVISORS = [
   {
+    id: "sup_hoangleduy",
+    supervisorId: "sup_hoangleduy",
     name: "ThS. NCS. Hoàng Lê Duy",
     email: "hoangleduy@tdtu.edu.vn",
     department: "Thiết kế nội thất",
-    photoUrl: "https://ifa.tdtu.edu.vn/sites/default/files/A%20Di.jpg",
+    photoUrl: "",
     expertise: "Quyền Trưởng Khoa - Trưởng ngành Thiết kế nội thất",
     phone: "",
     bio: "",
@@ -2865,10 +2929,12 @@ export const SAMPLE_SUPERVISORS = [
     showPhone: false
   },
   {
+    id: "sup_ngovanduc",
+    supervisorId: "sup_ngovanduc",
     name: "NTK Ngô Văn Đức",
     email: "ngovanduc@tdtu.edu.vn",
     department: "Thiết kế nội thất",
-    photoUrl: "https://ifa.tdtu.edu.vn/sites/default/files/B11.jpg",
+    photoUrl: "",
     expertise: "Giảng viên ngành Nội thất",
     phone: "",
     bio: "",
@@ -2878,10 +2944,12 @@ export const SAMPLE_SUPERVISORS = [
     showPhone: false
   },
   {
+    id: "sup_tomailinh",
+    supervisorId: "sup_tomailinh",
     name: "NTK Tô Mai Lĩnh",
     email: "tomailinh@tdtu.edu.vn",
     department: "Thiết kế nội thất",
-    photoUrl: "https://ifa.tdtu.edu.vn/sites/default/files/C10.jpg",
+    photoUrl: "",
     expertise: "Giảng viên ngành Thiết kế nội thất",
     phone: "",
     bio: "",
@@ -2891,10 +2959,12 @@ export const SAMPLE_SUPERVISORS = [
     showPhone: false
   },
   {
+    id: "sup_hongocle",
+    supervisorId: "sup_hongocle",
     name: "ThS. Hồ Ngọc Lệ",
     email: "hongocle@tdtu.edu.vn",
     department: "Thiết kế nội thất",
-    photoUrl: "https://ifa.tdtu.edu.vn/sites/default/files/C9.jpg",
+    photoUrl: "",
     expertise: "Giảng viên ngành Thiết kế nội thất",
     phone: "",
     bio: "",
@@ -2904,10 +2974,12 @@ export const SAMPLE_SUPERVISORS = [
     showPhone: false
   },
   {
+    id: "sup_nguyenminhhieu",
+    supervisorId: "sup_nguyenminhhieu",
     name: "TS. Nguyễn Minh Hiếu",
     email: "nguyenminhhieu@tdtu.edu.vn",
     department: "Thiết kế nội thất",
-    photoUrl: "https://ifa.tdtu.edu.vn/sites/default/files/C11.jpg",
+    photoUrl: "",
     expertise: "Giảng viên ngành Thiết kế nội thất",
     phone: "",
     bio: "",
@@ -2917,10 +2989,12 @@ export const SAMPLE_SUPERVISORS = [
     showPhone: false
   },
   {
+    id: "sup_truongthithuydiem",
+    supervisorId: "sup_truongthithuydiem",
     name: "ThS. Trương Thị Thuý Diễm",
     email: "truongthithuydiem@tdtu.edu.vn",
     department: "Thiết kế nội thất",
-    photoUrl: "https://ifa.tdtu.edu.vn/sites/default/files/Die%CC%82%CC%83m_0.jpg",
+    photoUrl: "",
     expertise: "Giảng viên bộ môn Thiết kế nội thất",
     phone: "",
     bio: "",

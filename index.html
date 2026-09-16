@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.5.0</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.5.1</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -893,50 +893,33 @@
       <!-- ADMIN TAB: FACULTY STUDENTS (DANH SÁCH SV KHOA - DỮ LIỆU NỀN) -->
       <div id="atab-panel-faculty-students" class="hidden space-y-6">
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
-          <!-- TOP HEADER & STATUS -->
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-            <div>
-              <div class="flex items-center gap-2.5">
-                <h2 class="text-lg font-black text-slate-900">Danh sách Sinh viên Toàn khoa</h2>
-                <span class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-bold border border-indigo-200">Dữ liệu nền (IFAA Standard)</span>
+          <!-- 1. TOP: HEADER & DATASET STATUS -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div class="flex items-center gap-2.5">
+                  <h2 class="text-lg font-black text-slate-900">Danh sách Sinh viên Toàn khoa</h2>
+                  <span class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full font-bold border border-indigo-200">Dữ liệu nền (IFAA Standard)</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-1">Quản lý kho dữ liệu sinh viên toàn khoa MTCN theo chuẩn IFAA. Dùng làm dữ liệu đối soát và nạp vào các đợt tốt nghiệp.</p>
               </div>
-              <div id="faculty-dataset-status-wrap" class="flex flex-wrap items-center gap-2 mt-1">
-                <span id="faculty-dataset-status-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700">
+              <div id="faculty-dataset-status-wrap" class="flex flex-wrap items-center gap-2">
+                <span id="faculty-dataset-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                   <span id="faculty-dataset-status-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
                   <span id="faculty-dataset-status-text">Đang kết nối dữ liệu nền...</span>
                 </span>
-                <span id="faculty-dataset-meta-info" class="text-xs text-slate-500"></span>
+                <span id="faculty-dataset-meta-info" class="text-xs text-slate-500 font-medium"></span>
               </div>
-            </div>
-            
-            <!-- TOOLBAR BUTTONS -->
-            <div class="flex flex-wrap items-center gap-2">
-              <label class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors">
-                <span>📥 Upload danh sách</span>
-                <input type="file" id="faculty-students-file-input" accept=".xlsx,.xls,.csv" onchange="handleFacultyStudentsUpload(event)" class="hidden">
-              </label>
-              <button type="button" onclick="rebuildFacultyDataset()" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-indigo-200 transition-colors" title="Đồng bộ & nén lại dữ liệu nền">
-                <span>🔄 Tạo lại dữ liệu nền</span>
-              </button>
-              <button type="button" onclick="downloadFacultyStudentsTemplate()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors">
-                <span>📄 File mẫu</span>
-              </button>
-              <button type="button" onclick="exportFacultyStudentsExcel()" class="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-emerald-200 transition-colors">
-                <span>📊 Xuất Excel</span>
-              </button>
-              <button type="button" onclick="clearAllFacultyStudents()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-rose-200 transition-colors">
-                <span>🗑️ Xóa tất cả</span>
-              </button>
             </div>
           </div>
 
-          <!-- FORM THÊM / CẬP NHẬT SV -->
-          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <div class="flex items-center justify-between mb-3">
+          <!-- 2. MIDDLE: FORM THÊM / CẬP NHẬT SINH VIÊN (CLEAN DESKTOP GRID) -->
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-200/60 pb-2.5">
               <span class="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
                 <span>👤 Thêm / Cập nhật sinh viên</span>
               </span>
-              <span class="text-[11px] text-slate-500">Nhập MSSV đã có để cập nhật, MSSV mới để thêm vào danh sách</span>
+              <span class="text-[11px] text-slate-500">Nhập MSSV đã có để cập nhật thông tin, MSSV mới để thêm vào danh sách</span>
             </div>
             <form id="form-faculty-student" onsubmit="saveSingleFacultyStudent(event)" class="space-y-3">
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
@@ -981,13 +964,39 @@
                   <label class="font-bold text-slate-700 block mb-1">Số điện thoại</label>
                   <div class="flex gap-2">
                     <input type="tel" id="faculty-form-phone" placeholder="0901234567" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                    <button type="submit" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold text-xs shrink-0 transition-colors">
-                      <span>Tạo / Cập nhật</span>
+                    <button type="submit" class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-lg font-bold text-xs shrink-0 shadow-sm transition-colors">
+                      <span>✓ Lưu sinh viên</span>
                     </button>
                   </div>
                 </div>
               </div>
             </form>
+          </div>
+
+          <!-- 3. LOWER: TOOLBAR ACTION BUTTONS (DATASET ACTIONS) -->
+          <div class="bg-white border border-slate-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">Thao tác dữ liệu:</span>
+              <span class="text-[11px] text-slate-400">Import file Excel, nén dataset hoặc sao lưu</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors">
+                <span>📥 Upload danh sách</span>
+                <input type="file" id="faculty-students-file-input" accept=".xlsx,.xls,.csv" onchange="handleFacultyStudentsUpload(event)" class="hidden">
+              </label>
+              <button type="button" onclick="rebuildFacultyDataset()" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-indigo-200 transition-colors" title="Đồng bộ & nén lại dữ liệu nền">
+                <span>🔄 Tạo lại dữ liệu nền</span>
+              </button>
+              <button type="button" onclick="downloadFacultyStudentsTemplate()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors">
+                <span>📄 File mẫu</span>
+              </button>
+              <button type="button" onclick="exportFacultyStudentsExcel()" class="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-emerald-200 transition-colors">
+                <span>📊 Xuất Excel</span>
+              </button>
+              <button type="button" onclick="clearAllFacultyStudents()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-xs flex items-center gap-1 border border-rose-200 transition-colors">
+                <span>🗑️ Xóa tất cả</span>
+              </button>
+            </div>
           </div>
 
           <!-- BỘ LỌC & TÌM KIẾM (CLIENT-SIDE) -->
@@ -1351,7 +1360,7 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Studio v1.5.0</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Studio v1.5.1</p>
     </div>
   </footer>
 
@@ -1420,9 +1429,15 @@
               
               <!-- Open Time -->
               <div>
-                <label class="font-semibold text-slate-600 block mb-1">Thời gian mở:</label>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="font-semibold text-slate-600 block">Thời gian mở:</label>
+                  <label class="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-lg border border-blue-200 transition-colors">
+                    <input type="checkbox" id="round-form-open-immediately" onchange="toggleRoundOpenImmediately(this.checked)" class="rounded text-tdtu-blue">
+                    <span>Mở ngay</span>
+                  </label>
+                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <input type="date" id="round-open-date" required class="p-2 border border-slate-300 rounded-lg text-xs bg-white">
+                  <input type="date" id="round-open-date" required class="p-2 border border-slate-300 rounded-lg text-xs bg-white disabled:bg-slate-100 disabled:opacity-50">
                   <div class="flex items-center gap-1">
                     <span class="text-[11px] text-slate-500">Giờ:</span>
                     <select id="round-open-hour" class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-mono font-bold bg-white">
