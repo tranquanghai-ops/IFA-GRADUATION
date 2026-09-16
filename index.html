@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation Beta</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v2.3.5-beta.1</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v2.3.6-beta.1</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -268,6 +268,7 @@
 
       <!-- ALREADY REGISTERED STATUS CARD -->
       <div id="already-registered-card" class="hidden card-surface bg-emerald-50/70 border border-emerald-200 p-5 sm:p-6 rounded-2xl shadow-sm">
+        <div id="reg-card-eligibility-banner" class="hidden mb-4"></div>
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-emerald-200/80">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-xl font-bold shadow-md">
@@ -822,11 +823,6 @@
             <span>📊 Quản lý Điểm & Sơ khảo / TM</span>
           </button>
           
-          <button onclick="switchAdminTab('scoring-dashboard')" id="atab-btn-scoring-dashboard" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-            <span>📊 Quản lý Điểm & Sơ khảo / TM</span>
-          </button>
-          
           <button onclick="switchAdminTab('preview-student')" id="atab-btn-preview-student" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
             <span class="w-2 h-2 rounded-full bg-blue-500"></span>
             <span>Kết quả phân công</span>
@@ -1219,7 +1215,7 @@
               </div>
               <div class="flex items-center gap-2">
                 <button type="button" onclick="syncFacultyDatasetFromIFAA()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors">
-                  <span>🔄 Đồng bộ từ IFAA</span>
+                  <span>🔄 Làm mới từ IFAA</span>
                 </button>
                 <button type="button" onclick="exportFacultyStudentsExcel()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors">
                   <span>📊 Xuất Excel</span>
@@ -1487,16 +1483,32 @@
 
       <!-- ADMIN TAB: REGISTRATIONS -->
       <div id="atab-panel-registrations" class="hidden space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl">
-          <div class="flex items-center gap-2">
-            <label for="admin-round-reg-select" class="text-xs font-bold text-slate-700">Đợt tốt nghiệp:</label>
-            <select id="admin-round-reg-select" onchange="loadAdminRegistrations(this.value)" class="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none">
-            </select>
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2">
+              <label for="admin-round-reg-select" class="text-xs font-bold text-slate-700">Đợt tốt nghiệp:</label>
+              <select id="admin-round-reg-select" onchange="loadAdminRegistrations(this.value)" class="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none">
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <label for="admin-reg-filter-status" class="text-xs font-bold text-slate-700">Lọc điều kiện:</label>
+              <select id="admin-reg-filter-status" onchange="filterAdminRegistrationsTable()" class="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none">
+                <option value="all">Tất cả nguyện vọng</option>
+                <option value="eligible">Đủ điều kiện</option>
+                <option value="pending">Chờ xét (Pre-eligibility)</option>
+                <option value="not_eligible">Không đủ điều kiện</option>
+              </select>
+            </div>
           </div>
 
-          <button onclick="exportRegistrationsCSV()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto">
-            📄 Xuất CSV / Excel
-          </button>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" id="btn-apply-official-eligibility" onclick="applyOfficialEligibilityToRegistrations()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5" title="Đối chiếu danh sách đủ điều kiện của đợt với các nguyện vọng đang chờ xét (không xóa dữ liệu đăng ký)">
+              <span>⚖️ Áp dụng DS đủ điều kiện</span>
+            </button>
+            <button onclick="exportRegistrationsCSV()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all">
+              📄 Xuất CSV / Excel
+            </button>
+          </div>
         </div>
 
         <div class="card-surface overflow-hidden">
@@ -1511,6 +1523,7 @@
                   <th class="p-3.5">Nguyện vọng 1</th>
                   <th class="p-3.5">Nguyện vọng 2</th>
                   <th class="p-3.5">Nguyện vọng 3</th>
+                  <th class="p-3.5 text-center">Điều kiện</th>
                   <th class="p-3.5">Trạng thái xét</th>
                   <th class="p-3.5">Thời gian nộp</th>
                 </tr>
@@ -2271,6 +2284,19 @@
                 <span class="text-xs text-slate-600 font-semibold">Đã chọn:</span>
                 <span id="round-eligible-count-badge" class="px-2.5 py-1 bg-indigo-600 text-white rounded-lg font-mono font-black text-xs">0 SV</span>
               </div>
+            </div>
+
+            <!-- PRE-ELIGIBILITY REGISTRATION TOGGLE (v2.3.6) -->
+            <div class="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl space-y-1.5">
+              <label class="flex items-start gap-2.5 cursor-pointer">
+                <input type="checkbox" id="round-allow-pre-eligibility" class="mt-0.5 rounded text-amber-600 focus:ring-amber-500 w-4 h-4">
+                <div>
+                  <span class="font-bold text-amber-950 text-xs block">Cho phép SV đăng ký trước khi có danh sách đủ điều kiện chính thức</span>
+                  <p class="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                    Khi bật tùy chọn này: Sinh viên toàn khoa có thể đăng ký nguyện vọng với trạng thái <b>"Chờ xét" (pending)</b>. Đợt có thể lưu và mở đăng ký ngay cả khi danh sách đủ điều kiện đang để trống (0 SV). Quản trị viên sẽ nạp danh sách chính thức và áp dụng đối soát sau.
+                  </p>
+                </div>
+              </label>
             </div>
 
             <!-- CONTROLS: TÌM TỪ KHOA & IMPORT EXCEL ĐỢT -->

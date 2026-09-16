@@ -41,7 +41,7 @@ export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   }).length;
 }
 
-/** IFA+ Graduation Beta Studio v2.3.5-beta.1 (Phase B Activated) **/
+/** IFA+ Graduation Beta Studio v2.3.6-beta.1 (UAT Hotfix #1) **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -1033,18 +1033,29 @@ async function checkStudentEligibilityAndRegistration(roundId) {
   }
 
   try {
-    const elDoc = await getDoc(doc(db, 'graduationRounds', roundId, 'eligibleStudents', mssv));
-    state.isEligible = elDoc.exists() && elDoc.data().eligible !== false;
+    const roundData = state.activeRound || state.rounds?.find(r => r.id === roundId);
+    const allowPre = Boolean(roundData?.allowRegistrationBeforeEligibility && !roundData?.eligibilityFinalized);
 
-    if (!state.isEligible) {
+    const elDoc = await getDoc(doc(db, 'graduationRounds', roundId, 'eligibleStudents', mssv));
+    const isOfficiallyEligible = elDoc.exists() && elDoc.data().eligible !== false;
+
+    if (isOfficiallyEligible) {
+      state.isEligible = true;
+      state.eligibilityState = 'eligible';
+      nonEligibleAlert.classList.add('hidden');
+    } else if (allowPre) {
+      state.isEligible = 'pending';
+      state.eligibilityState = 'pending';
+      nonEligibleAlert.classList.add('hidden');
+    } else {
+      state.isEligible = false;
+      state.eligibilityState = 'not_eligible';
       nonEligibleAlert.classList.remove('hidden');
       alreadyRegCard.classList.add('hidden');
       reviewInProgressCard.classList.add('hidden');
       officialResultCard.classList.add('hidden');
       flowContainer.classList.add('hidden');
       return;
-    } else {
-      nonEligibleAlert.classList.add('hidden');
     }
 
     const regDoc = await getDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv));
@@ -1171,6 +1182,60 @@ function renderStudentOfficialResult(reg) {
 function renderStudentExistingRegistration(reg) {
   document.getElementById('reg-card-topic').textContent = reg.topicTitle;
   document.getElementById('reg-card-type').textContent = reg.projectType;
+
+  const bannerEl = document.getElementById('reg-card-eligibility-banner');
+  const statusEl = document.getElementById('reg-card-status');
+  if (bannerEl) {
+    if (reg.eligibilityStatus === 'pending') {
+      bannerEl.className = 'mb-4 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-start gap-2.5';
+      bannerEl.innerHTML = `
+        <span class="text-base">ℹ️</span>
+        <div>
+          <span class="font-bold block">Trạng thái điều kiện: Chờ kết quả xét từ Nhà trường / Khoa</span>
+          <p class="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+            Đăng ký nguyện vọng của bạn đã được ghi nhận vào hệ thống. Trạng thái điều kiện đang là <b>Chờ xét</b>. Sau khi Nhà trường/Khoa ban hành danh sách chính thức, hệ thống sẽ đối chiếu và chuyển hồ sơ sang GVHD xét duyệt.
+          </p>
+        </div>
+      `;
+      bannerEl.classList.remove('hidden');
+      if (statusEl) {
+        statusEl.textContent = 'Đã ghi nhận (Chờ xét điều kiện)';
+        statusEl.className = 'font-bold text-amber-700 text-sm';
+      }
+    } else if (reg.eligibilityStatus === 'not_eligible') {
+      bannerEl.className = 'mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 text-xs flex items-start gap-2.5';
+      bannerEl.innerHTML = `
+        <span class="text-base">⚠️</span>
+        <div>
+          <span class="font-bold block">Kết quả xét duyệt: Không đủ điều kiện làm ĐATN đợt này</span>
+          <p class="text-[11px] text-rose-800 mt-0.5 leading-relaxed">
+            Theo danh sách chính thức từ Nhà trường/Khoa, bạn chưa đủ điều kiện làm ĐATN trong đợt này. Nguyện vọng đăng ký không được chuyển sang GVHD xét duyệt.
+          </p>
+        </div>
+      `;
+      bannerEl.classList.remove('hidden');
+      if (statusEl) {
+        statusEl.textContent = 'Không đủ điều kiện';
+        statusEl.className = 'font-bold text-rose-700 text-sm';
+      }
+    } else {
+      bannerEl.className = 'mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs flex items-start gap-2.5';
+      bannerEl.innerHTML = `
+        <span class="text-base">✓</span>
+        <div>
+          <span class="font-bold block">Trạng thái điều kiện: Đủ điều kiện làm ĐATN</span>
+          <p class="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">
+            Hồ sơ của bạn đã được xác nhận đủ điều kiện và đang tham gia quy trình xét duyệt của GVHD.
+          </p>
+        </div>
+      `;
+      bannerEl.classList.remove('hidden');
+      if (statusEl) {
+        statusEl.textContent = 'Đã ghi nhận (Đủ điều kiện)';
+        statusEl.className = 'font-bold text-emerald-700 text-sm';
+      }
+    }
+  }
 
   const dateStr = reg.submittedAt ? (reg.submittedAt.toDate ? reg.submittedAt.toDate() : new Date(reg.submittedAt)).toLocaleString('vi-VN') : '--';
   document.getElementById('reg-card-time').textContent = `Thời gian nộp: ${dateStr}`;
@@ -1556,6 +1621,9 @@ window.submitRegistration = async function() {
   btn.innerHTML = '<span>⏳ Đang ghi nhận đăng ký...</span>';
 
   try {
+    const isPending = (state.isEligible === 'pending' || state.eligibilityState === 'pending');
+    const eligibilityStatus = isPending ? 'pending' : 'eligible';
+
     const payload = {
       studentId: mssv,
       studentName: state.user?.displayName || mssv,
@@ -1571,7 +1639,8 @@ window.submitRegistration = async function() {
       submittedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       status: 'submitted',
-      reviewStatus: 'waiting'
+      reviewStatus: 'waiting',
+      eligibilityStatus: eligibilityStatus
     };
 
     await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload);
@@ -1634,9 +1703,9 @@ export async function loadSupervisorReviewData(roundId) {
     const isLocked = Boolean(state.activeRound?.reviewLocks && state.activeRound?.reviewLocks['round_' + currentReviewRound]);
     const isCompleted = state.supervisorRoundProgress['round_' + currentReviewRound]?.status === 'completed';
 
-    // Filter Candidates who picked this supervisor at rank == currentReviewRound AND not accepted yet
+    // Filter Candidates who picked this supervisor at rank == currentReviewRound AND not accepted yet AND not ineligible
     const candidates = allRegistrations.filter(r => {
-      if (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') return false;
+      if (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned' || r.eligibilityStatus === 'not_eligible') return false;
       const pref = (r.preferences || []).find(p => p.rank === currentReviewRound);
       return pref && (pref.supervisorId === currentSup.id || pref.supervisorId === currentSup.supervisorId);
     });
@@ -2245,7 +2314,8 @@ function renderAdminRoundsTable() {
     const shortCode = r.shortCode || r.roundName || r.slug || r.id;
 
     // Determine configuration status
-    const isIncomplete = (r.configStatus === 'incomplete') || (typeof r.eligibleCount === 'number' && r.eligibleCount === 0) || (typeof r.supervisorCount === 'number' && r.supervisorCount === 0);
+    const isPreEligible = Boolean(r.allowRegistrationBeforeEligibility);
+    const isIncomplete = (r.configStatus === 'incomplete') || (!isPreEligible && typeof r.eligibleCount === 'number' && r.eligibleCount === 0) || (typeof r.supervisorCount === 'number' && r.supervisorCount === 0);
 
     let statusColHtml = '';
     if (isCurrentActive) {
@@ -2269,7 +2339,10 @@ function renderAdminRoundsTable() {
     return `
       <tr class="hover:bg-slate-50 transition-colors">
         <td class="p-3.5">
-          <span class="font-bold text-slate-900 block">${r.title}</span>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="font-bold text-slate-900">${r.title}</span>
+            ${isPreEligible ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-bold" title="Cho phép đăng ký trước danh sách đủ điều kiện">Chờ xét ĐK</span>' : ''}
+          </div>
           <span class="text-[10px] font-mono text-slate-400 block mt-0.5">Mã: ${shortCode}</span>
         </td>
         <td class="p-3.5 text-slate-600 font-semibold">${r.academicYear}</td>
@@ -2372,13 +2445,16 @@ function updateRoundModalConfigSummary() {
   }
 
   if (alertBox) {
-    if (elCount > 0 && supCount > 0) {
+    const allowPre = document.getElementById('round-allow-pre-eligibility')?.checked === true;
+    if (supCount > 0 && (elCount > 0 || allowPre)) {
       alertBox.className = 'p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold leading-relaxed';
-      alertBox.innerHTML = '✓ Đợt đã hoàn tất cấu hình đầy đủ. Sẵn sàng kích hoạt thành Đợt hiện hành khi cần.';
+      alertBox.innerHTML = (allowPre && elCount === 0)
+        ? '✓ Đợt bật chế độ <b>Đăng ký trước điều kiện (Pre-eligibility)</b>. Sẵn sàng lưu và mở đăng ký để SV nộp nguyện vọng (trạng thái Chờ xét).'
+        : '✓ Đợt đã hoàn tất cấu hình đầy đủ. Sẵn sàng kích hoạt thành Đợt hiện hành khi cần.';
     } else {
       alertBox.className = 'p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold leading-relaxed';
       const missing = [];
-      if (elCount === 0) missing.push('SV đủ điều kiện');
+      if (elCount === 0 && !allowPre) missing.push('SV đủ điều kiện');
       if (supCount === 0) missing.push('GVHD tham gia');
       alertBox.innerHTML = `⚠️ Đợt chưa hoàn tất cấu hình (còn thiếu ${missing.join(' & ')}). Bạn vẫn có thể bấm <b>"Lưu Đợt"</b> dưới dạng bản nháp để bổ sung sau.`;
     }
@@ -2390,6 +2466,12 @@ window.openCreateRoundModal = function() {
   document.getElementById('form-round').reset();
   document.getElementById('round-form-id').value = '';
   document.getElementById('modal-round-title').textContent = 'Tạo Đợt Đồ án Tốt nghiệp Mới';
+
+  const preEl = document.getElementById('round-allow-pre-eligibility');
+  if (preEl) {
+    preEl.checked = false;
+    preEl.onchange = () => updateRoundModalBadges();
+  }
 
   // Default dates
   const today = new Date();
@@ -2440,6 +2522,12 @@ window.editRoundModal = async function(roundId) {
   document.getElementById('round-form-allow-edit').checked = r.allowStudentEdit !== false;
   document.getElementById('round-form-allow-topic-edit').checked = r.allowTopicEdit !== false;
   document.getElementById('round-form-allow-pref-edit').checked = r.allowPreferenceEdit !== false;
+
+  const preEl = document.getElementById('round-allow-pre-eligibility');
+  if (preEl) {
+    preEl.checked = (r.allowRegistrationBeforeEligibility === true);
+    preEl.onchange = () => updateRoundModalBadges();
+  }
 
   const emailToggle = document.getElementById('round-form-show-email-after-publish');
   if (emailToggle) emailToggle.checked = (r.showEmailAfterPublish !== false);
@@ -2918,9 +3006,10 @@ window.saveRound = async function(e) {
   const [cy, cm, cd] = closeDateStr.split('-').map(Number);
   const closeDate = new Date(cy, cm - 1, cd, Number(closeHour), Number(closeMin), 0);
 
+  const allowRegistrationBeforeEligibility = document.getElementById('round-allow-pre-eligibility')?.checked === true;
   const elCount = (state.roundModalEligibleStudents || []).length;
   const supCount = (state.roundModalSupervisors ? state.roundModalSupervisors.size : 0);
-  const configStatus = (elCount > 0 && supCount > 0) ? 'ready' : 'incomplete';
+  const configStatus = (supCount > 0 && (elCount > 0 || allowRegistrationBeforeEligibility)) ? 'ready' : 'incomplete';
 
   const payload = {
     title,
@@ -2939,6 +3028,8 @@ window.saveRound = async function(e) {
     allowPreferenceEdit,
     showEmailAfterPublish,
     showPhoneAfterPublish,
+    allowRegistrationBeforeEligibility: !!allowRegistrationBeforeEligibility,
+    eligibilityFinalized: !allowRegistrationBeforeEligibility,
     configStatus,
     eligibleCount: elCount,
     supervisorCount: supCount,
@@ -3953,10 +4044,25 @@ window.loadAdminRegistrations = async function(roundId) {
   try {
     const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'registrations'));
     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderAdminRegistrationsTable(list);
+    state.currentAdminRegistrations = list;
+    filterAdminRegistrationsTable();
   } catch (e) {
     console.error('Error loading registrations:', e);
   }
+};
+
+window.filterAdminRegistrationsTable = function() {
+  const filter = document.getElementById('admin-reg-filter-status')?.value || 'all';
+  const list = state.currentAdminRegistrations || [];
+  let filtered = list;
+  if (filter === 'eligible') {
+    filtered = list.filter(r => r.eligibilityStatus === 'eligible' || (!r.eligibilityStatus && r.status === 'submitted'));
+  } else if (filter === 'pending') {
+    filtered = list.filter(r => r.eligibilityStatus === 'pending');
+  } else if (filter === 'not_eligible') {
+    filtered = list.filter(r => r.eligibilityStatus === 'not_eligible');
+  }
+  renderAdminRegistrationsTable(filtered);
 };
 
 function renderAdminRegistrationsTable(list) {
@@ -3964,13 +4070,27 @@ function renderAdminRegistrationsTable(list) {
   if (!tbody) return;
 
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-slate-400">Chưa có sinh viên nào đăng ký trong đợt này.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="p-6 text-center text-slate-400">Không có nguyện vọng đăng ký nào phù hợp bộ lọc.</td></tr>';
     return;
   }
 
   tbody.innerHTML = list.map(r => {
     const getSupName = rank => (r.preferences || []).find(p => p.rank === rank)?.supervisorName || '--';
     const subDate = r.submittedAt ? (r.submittedAt.toDate ? r.submittedAt.toDate() : new Date(r.submittedAt)) : null;
+
+    let elBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Đủ ĐK</span>';
+    if (r.eligibilityStatus === 'pending') {
+      elBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300" title="Chờ nạp danh sách đủ điều kiện chính thức">Chờ xét</span>';
+    } else if (r.eligibilityStatus === 'not_eligible') {
+      elBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300" title="Không có trong danh sách đủ điều kiện">Không đủ ĐK</span>';
+    }
+
+    let reviewBadge = '<span class="text-slate-500 font-semibold text-xs">Chờ duyệt</span>';
+    if (r.reviewStatus === 'accepted') {
+      reviewBadge = '<span class="text-emerald-700 font-bold text-xs">✓ Đã tiếp nhận</span>';
+    } else if (r.reviewStatus === 'rejected') {
+      reviewBadge = '<span class="text-rose-600 font-bold text-xs">Chuyển NV sau</span>';
+    }
 
     return `
       <tr class="hover:bg-slate-50">
@@ -3981,6 +4101,8 @@ function renderAdminRegistrationsTable(list) {
         <td class="p-3.5 font-bold text-slate-700">${getSupName(1)}</td>
         <td class="p-3.5 text-slate-600">${getSupName(2)}</td>
         <td class="p-3.5 text-slate-600">${getSupName(3)}</td>
+        <td class="p-3.5 text-center">${elBadge}</td>
+        <td class="p-3.5">${reviewBadge}</td>
         <td class="p-3.5 text-[11px] text-slate-400">${subDate ? subDate.toLocaleString('vi-VN') : '--'}</td>
       </tr>
     `;
@@ -3998,10 +4120,14 @@ window.exportRegistrationsCSV = function() {
       return;
     }
 
-    const headers = ['MSSV', 'Họ và tên', 'Email', 'Tên đề tài', 'Loại hình đồ án', 'Nguyện vọng 1', 'Nguyện vọng 2', 'Nguyện vọng 3', 'Thời gian nộp'];
+    const headers = ['MSSV', 'Họ và tên', 'Email', 'Tên đề tài', 'Loại hình đồ án', 'Nguyện vọng 1', 'Nguyện vọng 2', 'Nguyện vọng 3', 'Điều kiện', 'Trạng thái xét', 'Thời gian nộp'];
     const rows = list.map(r => {
       const getSup = rank => (r.preferences || []).find(p => p.rank === rank)?.supervisorName || '';
       const dt = r.submittedAt ? (r.submittedAt.toDate ? r.submittedAt.toDate() : new Date(r.submittedAt)).toLocaleString('vi-VN') : '';
+      let elText = 'Đủ điều kiện';
+      if (r.eligibilityStatus === 'pending') elText = 'Chờ xét';
+      else if (r.eligibilityStatus === 'not_eligible') elText = 'Không đủ điều kiện';
+
       return [
         r.studentId || '',
         r.studentName || '',
@@ -4011,6 +4137,8 @@ window.exportRegistrationsCSV = function() {
         `"${getSup(1)}"`,
         `"${getSup(2)}"`,
         `"${getSup(3)}"`,
+        `"${elText}"`,
+        `"${r.reviewStatus || 'Chờ duyệt'}"`,
         dt
       ];
     });
@@ -4025,6 +4153,95 @@ window.exportRegistrationsCSV = function() {
     link.click();
     document.body.removeChild(link);
   });
+};
+
+window.applyOfficialEligibilityToRegistrations = async function() {
+  const roundId = document.getElementById('admin-round-reg-select')?.value;
+  if (!roundId) {
+    showToast('Vui lòng chọn đợt tốt nghiệp cần áp dụng.', 'warning');
+    return;
+  }
+  const round = state.rounds?.find(r => r.id === roundId) || state.activeRound;
+
+  const btn = document.getElementById('btn-apply-official-eligibility');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ Đang đối soát...</span>';
+  }
+
+  try {
+    // 1. Fetch official eligible students subcollection
+    const elSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents'));
+    if (elSnap.empty) {
+      showToast('⚠️ Đợt này chưa có danh sách sinh viên đủ điều kiện chính thức. Vui lòng nạp danh sách SV tại Cấu hình Đợt trước.', 'warning', 6000);
+      return;
+    }
+    const eligibleMap = new Set(elSnap.docs.filter(d => d.data().eligible !== false).map(d => d.id));
+
+    // 2. Fetch all registrations of the round
+    const regSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'registrations'));
+    if (regSnap.empty) {
+      showToast('Đợt này chưa có sinh viên nào nộp đăng ký.', 'info');
+      return;
+    }
+
+    let eligibleCount = 0;
+    let notEligibleCount = 0;
+    let unchangedCount = 0;
+
+    // Process in batches of 450
+    const docs = regSnap.docs;
+    for (let offset = 0; offset < docs.length; offset += 450) {
+      const batch = writeBatch(db);
+      const chunk = docs.slice(offset, offset + 450);
+      let batchOps = 0;
+
+      chunk.forEach(docSnap => {
+        const reg = docSnap.data();
+        const studentId = docSnap.id;
+        const isEligible = eligibleMap.has(studentId);
+        const newStatus = isEligible ? 'eligible' : 'not_eligible';
+
+        if (reg.eligibilityStatus !== newStatus) {
+          batch.update(docSnap.ref, {
+            eligibilityStatus: newStatus,
+            eligibilityVerifiedAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+          batchOps++;
+          if (isEligible) eligibleCount++;
+          else notEligibleCount++;
+        } else {
+          unchangedCount++;
+        }
+      });
+
+      if (batchOps > 0) {
+        await batch.commit();
+      }
+    }
+
+    // 3. Mark round as eligibilityFinalized: true
+    await updateDoc(doc(db, 'graduationRounds', roundId), {
+      eligibilityFinalized: true,
+      updatedAt: serverTimestamp()
+    }).catch(console.warn);
+
+    if (round) {
+      round.eligibilityFinalized = true;
+    }
+
+    showToast(`✓ Đã áp dụng DS đủ điều kiện thành công: ${eligibleCount} Đủ ĐK, ${notEligibleCount} Không đủ ĐK (Không xóa bất kỳ nguyện vọng nào)!`, 'success', 6000);
+    await loadAdminRegistrations(roundId);
+  } catch (err) {
+    console.error('Lỗi khi áp dụng danh sách đủ điều kiện:', err);
+    showToast('Lỗi khi áp dụng danh sách đủ điều kiện: ' + err.message, 'error', 5000);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>⚖️ Áp dụng DS đủ điều kiện</span>';
+    }
+  }
 };
 
 
@@ -4700,6 +4917,8 @@ export const IFAA_FIREBASE_CONFIG = {
   appId: "1:633545868576:web:c1509233a2b5046b320345"
 };
 
+export const DEFAULT_IFAA_DATASET_URL = "https://firebasestorage.googleapis.com/v0/b/ifa-activities.firebasestorage.app/o/datasets%2Ffaculty-students.json.gz?alt=media&token=9a1e615e-3d20-48e7-8c9e-967e21140a21";
+
 let ifaaAppInstance = null;
 let ifaaFirestoreInstance = null;
 let ifaaStorageInstance = null;
@@ -4923,19 +5142,31 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
   // 2. Local IndexedDB Cache
   const cached = await getFacultyCache();
 
-  // 3. Read metadata from IFAA Firestore
+  // 3. Read metadata: Try primary tknt-tdtu first, then secondary ifaaDb
   let meta = null;
   try {
-    const { db: ifaaDb } = getIFAAFirebase();
-    if (ifaaDb) {
-      const metaSnap = await getDoc(doc(ifaaDb, 'facultyStudentMeta', 'current'));
-      if (metaSnap.exists()) {
-        meta = metaSnap.data();
-        state.facultyDatasetMeta = meta;
-      }
+    const primarySnap = await getDoc(doc(db, 'facultyStudentMeta', 'current')).catch(() => null);
+    if (primarySnap && primarySnap.exists()) {
+      meta = primarySnap.data();
+      state.facultyDatasetMeta = meta;
     }
   } catch (err) {
-    console.warn('[IFAA ReadOnly] Không thể đọc facultyStudentMeta từ IFAA:', err.message);
+    // ignore
+  }
+
+  if (!meta) {
+    try {
+      const { db: ifaaDb } = getIFAAFirebase();
+      if (ifaaDb) {
+        const metaSnap = await getDoc(doc(ifaaDb, 'facultyStudentMeta', 'current')).catch(() => null);
+        if (metaSnap && metaSnap.exists()) {
+          meta = metaSnap.data();
+          state.facultyDatasetMeta = meta;
+        }
+      }
+    } catch (err) {
+      console.warn('[IFAA ReadOnly] Không thể đọc facultyStudentMeta từ IFAA:', err.message);
+    }
   }
 
   const currentVersion = Number(meta?.datasetVersion || meta?.version || 0);
@@ -4947,7 +5178,7 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
       state.facultyStudentsMap = new Map(cached.rows.map(s => [s.mssv, s]));
       state.facultyStudentsLoaded = true;
       populateFacultyClassFilter(cached.rows);
-      updateFacultyStatusUI(`Dữ liệu IFAA: ${cached.rows.length} SV (từ Cache)`, 'success');
+      updateFacultyStatusUI(`Dữ liệu IFAA: ${cached.rows.length.toLocaleString('vi-VN')} SV (từ Cache)`, 'success');
       return cached.rows;
     }
   }
@@ -4956,20 +5187,32 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
   updateFacultyStatusUI('Đang tải dữ liệu từ IFA+ Activities...', 'info');
   let bytes = null;
 
-  // Method A: Download via datasetUrl (if public token present)
-  if (meta?.datasetUrl) {
+  // Compile candidate URLs: meta.datasetUrl first, then default tokenized Storage URL
+  const candidateUrls = [];
+  if (meta?.datasetUrl && typeof meta.datasetUrl === 'string') {
+    candidateUrls.push(meta.datasetUrl);
+  }
+  if (DEFAULT_IFAA_DATASET_URL && !candidateUrls.includes(DEFAULT_IFAA_DATASET_URL)) {
+    candidateUrls.push(DEFAULT_IFAA_DATASET_URL);
+  }
+
+  for (const url of candidateUrls) {
+    if (bytes) break;
     try {
-      const res = await fetch(meta.datasetUrl, { cache: 'no-store' });
+      const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const buffer = await res.arrayBuffer();
-        bytes = new Uint8Array(buffer);
+        if (buffer && buffer.byteLength > 0) {
+          bytes = new Uint8Array(buffer);
+          break;
+        }
       }
     } catch (e) {
-      console.warn('[IFAA ReadOnly] Lỗi tải từ datasetUrl:', e);
+      console.warn('[IFAA ReadOnly] Lỗi tải từ URL:', url, e.message);
     }
   }
 
-  // Method B: Download via Firebase Storage SDK (read-only)
+  // Method B: Download via Firebase Storage SDK (read-only fallback)
   if (!bytes) {
     try {
       const { storage: ifaaStorage } = getIFAAFirebase();
@@ -4983,48 +5226,56 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
   }
 
   // 6. Decompress & Parse
-  if (bytes) {
+  if (bytes && bytes.length > 0) {
     try {
       const text = await gunzipData(bytes);
       const parsed = JSON.parse(text);
       const rows = normalizeFacultyRows(parsed);
       rows.sort((a, b) => String(a.mssv).localeCompare(String(b.mssv)));
 
-      state.facultyStudents = rows;
-      state.facultyStudentsMap = new Map(rows.map(s => [s.mssv, s]));
-      state.facultyStudentsLoaded = true;
+      if (rows.length > 0) {
+        state.facultyStudents = rows;
+        state.facultyStudentsMap = new Map(rows.map(s => [s.mssv, s]));
+        state.facultyStudentsLoaded = true;
 
-      // Save to IndexedDB
-      await setFacultyCache({
-        version: currentVersion || Date.now(),
-        rows: rows,
-        cachedAt: Date.now(),
-        count: rows.length
-      });
+        // Save to IndexedDB
+        await setFacultyCache({
+          version: currentVersion || Date.now(),
+          rows: rows,
+          cachedAt: Date.now(),
+          count: rows.length
+        });
 
-      populateFacultyClassFilter(rows);
-      updateFacultyStatusUI(`Dữ liệu IFAA: ${rows.length} SV (Đã đồng bộ)`, 'success');
-      return rows;
+        populateFacultyClassFilter(rows);
+        updateFacultyStatusUI(`Dữ liệu IFAA: ${rows.length.toLocaleString('vi-VN')} SV (Đã làm mới)`, 'success');
+        return rows;
+      }
     } catch (err) {
-      console.error('[IFAA ReadOnly] Lỗi xử lý dữ liệu IFAA:', err);
+      console.error('[IFAA ReadOnly] Lỗi giải nén / phân tích dữ liệu IFAA:', err);
     }
   }
 
-  // 7. Offline fallback to cached rows if available
+  // 7. Fallback to cached rows if available
   if (cached && Array.isArray(cached.rows) && cached.rows.length > 0) {
     state.facultyStudents = cached.rows;
     state.facultyStudentsMap = new Map(cached.rows.map(s => [s.mssv, s]));
     state.facultyStudentsLoaded = true;
     populateFacultyClassFilter(cached.rows);
-    updateFacultyStatusUI(`Dữ liệu IFAA: ${cached.rows.length} SV (Cache ngoại tuyến)`, 'warning');
+    updateFacultyStatusUI(`Dữ liệu IFAA: ${cached.rows.length.toLocaleString('vi-VN')} SV (Bản lưu offline)`, 'warning');
+    if (force) {
+      showToast(`Không thể cập nhật từ IFAA. Đang sử dụng dữ liệu đã lưu gần nhất: ${cached.rows.length.toLocaleString('vi-VN')} sinh viên.`, 'warning', 5000);
+    }
     return cached.rows;
   }
 
-  // 8. Graceful empty state (never throw to break callers)
+  // 8. Error handling when both live download and cache failed
   state.facultyStudents = [];
   state.facultyStudentsMap = new Map();
   state.facultyStudentsLoaded = true;
-  updateFacultyStatusUI('Chưa có dữ liệu nền từ IFAA', 'warning');
+  updateFacultyStatusUI('Chưa thể kết nối nguồn dữ liệu IFAA', 'warning');
+  if (force) {
+    throw new Error('Không thể tải dữ liệu sinh viên từ IFAA. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.');
+  }
   return [];
 }
 
@@ -5033,14 +5284,19 @@ window.ensureFacultyDatasetLoaded = async function(force = false) {
 };
 
 window.syncFacultyDatasetFromIFAA = async function() {
-  showToast('🔄 Đang đồng bộ danh mục sinh viên từ IFA+ Activities...', 'info');
-  updateFacultyStatusUI('Đang đồng bộ từ IFAA...', 'info');
+  showToast('🔄 Đang làm mới danh mục sinh viên từ IFA+ Activities...', 'info');
+  updateFacultyStatusUI('Đang làm mới từ IFAA...', 'info');
   try {
     const rows = await loadFacultyDatasetFromIFAA({ force: true });
+    if (!rows || rows.length === 0) {
+      showToast('⚠️ Không tìm thấy sinh viên nào từ IFAA.', 'warning');
+      updateFacultyStatusUI('Dữ liệu IFAA trống', 'warning');
+      return;
+    }
     applyFacultyFiltersAndRender(1);
-    showToast(`✓ Đã đồng bộ thành công ${rows.length} sinh viên từ IFAA!`, 'success');
+    showToast(`✓ Đã đồng bộ thành công ${rows.length.toLocaleString('vi-VN')} sinh viên từ IFAA!`, 'success', 5000);
   } catch (err) {
-    showToast('Lỗi đồng bộ dữ liệu: ' + err.message, 'error');
+    showToast('Lỗi đồng bộ dữ liệu: ' + err.message, 'error', 5000);
   }
 };
 
