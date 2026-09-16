@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation Beta</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.7.0-beta.1</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.8.0-beta.1</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -1471,7 +1471,7 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v1.7.0-beta.1</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v1.8.0-beta.1</p>
     </div>
   </footer>
 
@@ -2136,7 +2136,7 @@
   <!-- TOAST CONTAINER -->
   <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
-  <!-- CREATE / EDIT ACTIVITY MODAL (v1.7.0-beta.1) -->
+  <!-- CREATE / EDIT ACTIVITY MODAL (v1.8.0-beta.1) -->
   <div id="modal-activity" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
@@ -2344,11 +2344,62 @@
                 <input type="checkbox" id="activity-form-council-enabled" onchange="toggleActivityCouncilFields(this.checked)" class="rounded text-tdtu-blue">
                 <span class="font-bold text-xs text-indigo-700">⚖️ Có Hội đồng đánh giá / chấm điểm (councilEnabled)</span>
               </label>
-              <div id="activity-council-extra-fields" class="hidden pl-6 space-y-2">
+              <div id="activity-council-extra-fields" class="hidden pl-6 space-y-3">
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" id="activity-form-show-order" class="rounded text-tdtu-blue">
                   <span class="font-semibold text-xs text-slate-600">Cho Sinh viên xem thứ tự trình bày (showPresentationOrderToStudents)</span>
                 </label>
+
+                <!-- SCORING CONFIGURATION (v1.8.0-beta.1) -->
+                <div class="border-t border-slate-200 pt-2.5 space-y-2">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="activity-form-scoring-enabled" onchange="toggleActivityScoringConfig(this.checked)" class="rounded text-tdtu-blue">
+                    <span class="font-bold text-xs text-emerald-700">📝 Cho phép chấm điểm tại mốc này (scoringEnabled)</span>
+                  </label>
+                  
+                  <div id="activity-scoring-config-panel" class="hidden pl-2 space-y-3 bg-emerald-50/50 p-3 rounded-xl border border-emerald-200">
+                    <div>
+                      <label class="font-bold text-slate-700 block mb-1 text-xs">Kiểu chấm điểm:</label>
+                      <div class="flex items-center gap-4 text-xs font-semibold">
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="activity_scoring_mode" value="numeric" checked onchange="switchActivityScoringMode('numeric')">
+                          <span>Điểm số (Numeric)</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="activity_scoring_mode" value="letter" onchange="switchActivityScoringMode('letter')">
+                          <span>Điểm chữ (Letter Grade)</span>
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <!-- Numeric Config -->
+                    <div id="activity-scoring-numeric-wrap" class="grid grid-cols-3 gap-2">
+                      <div>
+                        <label class="text-[11px] font-bold text-slate-600 block mb-0.5">Điểm tối thiểu</label>
+                        <input type="number" id="activity-scoring-min" value="0" step="0.5" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold">
+                      </div>
+                      <div>
+                        <label class="text-[11px] font-bold text-slate-600 block mb-0.5">Điểm tối đa</label>
+                        <input type="number" id="activity-scoring-max" value="10" step="0.5" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold">
+                      </div>
+                      <div>
+                        <label class="text-[11px] font-bold text-slate-600 block mb-0.5">Bước điểm (step)</label>
+                        <input type="number" id="activity-scoring-step" value="0.1" step="0.05" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold">
+                      </div>
+                    </div>
+
+                    <!-- Letter Config -->
+                    <div id="activity-scoring-letter-wrap" class="hidden space-y-2">
+                      <div class="flex items-center justify-between">
+                        <label class="text-[11px] font-bold text-slate-700">Danh sách mức điểm chữ:</label>
+                        <button type="button" onclick="openAddLetterOptionModal()" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shadow-xs">+ Thêm mức điểm</button>
+                      </div>
+                      <div id="activity-scoring-letter-list" class="space-y-1.5 max-h-48 overflow-y-auto">
+                        <!-- Rendered dynamically -->
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -2461,7 +2512,7 @@
   </div>
 
   <!-- ============================================================================
-       MODAL: ACTIVITY COUNCIL MANAGEMENT (v1.7.0-beta.1)
+       MODAL: ACTIVITY COUNCIL MANAGEMENT (v1.8.0-beta.1)
        ============================================================================ -->
   <div id="modal-activity-councils" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
     <div class="bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[94vh] overflow-hidden border border-slate-200">
@@ -2725,6 +2776,149 @@
         <button id="modal-confirm-btn-cancel" type="button" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors">Hủy</button>
         <button id="modal-confirm-btn-ok" type="button" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md transition-colors">Xác nhận</button>
       </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================================
+       MODAL: LETTER OPTION EDITOR (v1.8.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-add-letter-option" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+        <h4 id="modal-letter-option-title" class="font-bold text-slate-900 text-sm">Mức điểm chữ</h4>
+        <button type="button" onclick="closeLetterOptionModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+      </div>
+      <div class="p-4 space-y-3 text-xs">
+        <input type="hidden" id="letter-option-id">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Mã mức điểm (Key) <span class="text-rose-500">*</span></label>
+          <input type="text" id="letter-option-key" placeholder="Ví dụ: A, B+, Đạt..." class="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Nhãn hiển thị (Label) <span class="text-rose-500">*</span></label>
+          <input type="text" id="letter-option-label" placeholder="Ví dụ: A — Tốt, B — Khá..." class="w-full p-2 border border-slate-300 rounded-lg text-xs">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Mô tả / Ghi chú (Description)</label>
+          <input type="text" id="letter-option-desc" placeholder="Ví dụ: Xuất sắc, Đạt yêu cầu..." class="w-full p-2 border border-slate-300 rounded-lg text-xs">
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 p-3 bg-slate-50 border-t border-slate-100 text-xs font-bold">
+        <button type="button" onclick="closeLetterOptionModal()" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg">Hủy</button>
+        <button type="button" onclick="saveLetterOption()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs">Lưu mức điểm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================
+       MODAL: COUNCIL WORKSPACE / ĐIỀU HÀNH & CHẤM ĐIỂM HỘI ĐỒNG (v1.8.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-council-workspace" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-6xl w-full shadow-2xl flex flex-col max-h-[96vh] overflow-hidden border border-slate-200">
+      
+      <!-- Top Header -->
+      <div class="flex flex-wrap items-center justify-between p-3.5 sm:p-4 border-b border-slate-200 bg-slate-50/80 shrink-0 gap-2">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-indigo-100 text-indigo-700 rounded-xl text-lg font-black shrink-0">🏛️</div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 id="cws-council-name" class="font-black text-sm sm:text-base text-slate-900 tracking-tight">HỘI ĐỒNG HĐ1</h3>
+              <span id="cws-council-status-badge" class="badge bg-amber-100 text-amber-800 font-bold text-[10px]">Chuẩn bị</span>
+              <span id="cws-my-role-badge" class="badge bg-blue-100 text-blue-800 font-bold text-[10px]">Ủy viên</span>
+            </div>
+            <p id="cws-council-meta" class="text-[11px] text-slate-500 mt-0.5">📍 Phòng: D501A • 📅 25/09/2026 (08:00 - 11:30)</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Secretary / Admin Council State Controls -->
+          <div id="cws-session-controls" class="hidden items-center gap-1.5">
+            <button type="button" id="btn-start-council-session" onclick="startCouncilSession()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
+              <span>▶ Bắt đầu Hội đồng</span>
+            </button>
+            <button type="button" id="btn-end-council-session" onclick="endCouncilSession()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
+              <span>⏹ Kết thúc Hội đồng</span>
+            </button>
+          </div>
+          <button type="button" onclick="closeCouncilWorkspace()" class="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors">✕ Đóng</button>
+        </div>
+      </div>
+
+      <!-- Main Body: 2 Columns Responsive -->
+      <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
+        
+        <!-- LEFT COLUMN: DANH SÁCH SINH VIÊN -->
+        <div class="w-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col bg-slate-50/40 shrink-0">
+          <div class="p-3 border-b border-slate-200 bg-white space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                <span>👥</span> DANH SÁCH BÁO CÁO (<span id="cws-student-count-badge">0</span>)
+              </span>
+              <span id="cws-presenting-indicator" class="text-[10px] font-bold text-emerald-600 hidden">● 1 đang trình bày</span>
+            </div>
+            <input type="text" id="cws-student-search" oninput="filterCouncilWorkspaceStudents(this.value)" placeholder="Tìm MSSV, họ tên, đề tài..." class="w-full p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          
+          <div id="cws-students-list" class="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: WORKSPACE FOR SELECTED STUDENT -->
+        <div class="flex-1 flex flex-col overflow-y-auto p-4 sm:p-6 space-y-4 bg-white">
+          
+          <!-- BANNER: HỘI ĐỒNG HIỆN ĐANG TRÌNH BÀY -->
+          <div id="cws-presenting-banner" class="hidden p-3.5 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-center justify-between shadow-xs">
+            <div class="flex items-center gap-3">
+              <span class="flex h-3 w-3 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+              </span>
+              <div>
+                <div class="text-[10px] font-black uppercase text-rose-700 tracking-wider">Hội đồng hiện đang trình bày</div>
+                <div id="cws-presenting-banner-text" class="font-black text-slate-900 text-xs sm:text-sm">Trần Văn B (12345678)</div>
+              </div>
+            </div>
+            <button type="button" onclick="goToCurrentPresentingStudent()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1 shrink-0">
+              <span>↩ Quay lại SV đang trình bày</span>
+            </button>
+          </div>
+
+          <!-- SELECTED STUDENT DETAILS CARD -->
+          <div id="cws-selected-student-card" class="p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- SECRETARY CONTROLS FOR THIS STUDENT -->
+          <div id="cws-secretary-actions" class="hidden p-3 bg-indigo-50/60 border border-indigo-200 rounded-xl flex items-center justify-between gap-2">
+            <span class="font-bold text-indigo-950 text-xs flex items-center gap-1.5">
+              <span>⚡</span> Điều hành báo cáo (Thư ký / Admin):
+            </span>
+            <div id="cws-secretary-buttons" class="flex items-center gap-2">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- SCORING CARD (LETTER / NUMERIC) -->
+          <div id="cws-scoring-section" class="p-4 sm:p-5 bg-white border border-slate-200 rounded-2xl space-y-4 shadow-xs">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- PROGRESS OF SCORERS IN COUNCIL (PRIVACY PRESERVED) -->
+          <div id="cws-scorers-progress-section" class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- ADMIN REAL-TIME MONITOR (ONLY FOR ADMIN) -->
+          <div id="cws-admin-monitor-section" class="hidden p-4 bg-indigo-50/40 border border-indigo-200 rounded-2xl space-y-3">
+            <!-- Rendered dynamically -->
+          </div>
+
+        </div>
+
+      </div>
+
     </div>
   </div>
 

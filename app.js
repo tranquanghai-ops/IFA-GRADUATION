@@ -41,7 +41,7 @@ export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   }).length;
 }
 
-/** IFA+ Graduation Beta Studio v1.7.0-beta.1 **/
+/** IFA+ Graduation Beta Studio v1.8.0-beta.1 **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -5775,6 +5775,32 @@ export function normalizeActivity(a, roundId, idx = 0) {
     { key: 'secretary', label: 'Thư ký', name: 'Thư ký Hội đồng', type: 'mandatory' }
   ];
 
+  // Default Letter Options & Scoring Config (v1.8.0-beta.1)
+  const defaultLetterOptions = [
+    { id: 'opt_a', key: 'A', label: 'A — Tốt', description: 'Tốt / Xuất sắc' },
+    { id: 'opt_b', key: 'B', label: 'B — Khá', description: 'Khá' },
+    { id: 'opt_c', key: 'C', label: 'C — Đạt', description: 'Đạt yêu cầu' },
+    { id: 'opt_d', key: 'D', label: 'D — Chưa đạt', description: 'Chưa đạt / Cần hoàn thiện lại' }
+  ];
+
+  const scoringConfig = a.scoringConfig ? {
+    enabled: Boolean(a.scoringConfig.enabled),
+    mode: a.scoringConfig.mode === 'letter' ? 'letter' : 'numeric',
+    letterOptions: (Array.isArray(a.scoringConfig.letterOptions) && a.scoringConfig.letterOptions.length > 0)
+      ? a.scoringConfig.letterOptions
+      : defaultLetterOptions,
+    numericConfig: {
+      min: typeof a.scoringConfig.numericConfig?.min === 'number' ? a.scoringConfig.numericConfig.min : 0,
+      max: typeof a.scoringConfig.numericConfig?.max === 'number' ? a.scoringConfig.numericConfig.max : 10,
+      step: typeof a.scoringConfig.numericConfig?.step === 'number' ? a.scoringConfig.numericConfig.step : 0.1
+    }
+  } : {
+    enabled: false,
+    mode: 'numeric',
+    letterOptions: defaultLetterOptions,
+    numericConfig: { min: 0, max: 10, step: 0.1 }
+  };
+
   return {
     id,
     roundId: String(a.roundId || roundId).trim(),
@@ -5794,6 +5820,7 @@ export function normalizeActivity(a, roundId, idx = 0) {
     councilStructure: (a.councilStructure && Array.isArray(a.councilStructure.slots)) ? a.councilStructure : { slots: defaultSlots },
     councils: Array.isArray(a.councils) ? a.councils : [],
     councilStudentAssignments: Array.isArray(a.councilStudentAssignments) ? a.councilStudentAssignments : [],
+    scoringConfig,
     slug,
     createdAt: a.createdAt || new Date().toISOString(),
     updatedAt: a.updatedAt || new Date().toISOString()
@@ -5975,6 +6002,18 @@ window.openCreateActivityModal = function() {
   if (document.getElementById('activity-form-show-order')) {
     document.getElementById('activity-form-show-order').checked = false;
   }
+  if (document.getElementById('activity-form-scoring-enabled')) {
+    document.getElementById('activity-form-scoring-enabled').checked = false;
+    toggleActivityScoringConfig(false);
+  }
+  state._currentActivityLetterOptions = [
+    { id: 'opt_a', key: 'A', label: 'A — Tốt', description: 'Tốt / Xuất sắc' },
+    { id: 'opt_b', key: 'B', label: 'B — Khá', description: 'Khá' },
+    { id: 'opt_c', key: 'C', label: 'C — Đạt', description: 'Đạt yêu cầu' },
+    { id: 'opt_d', key: 'D', label: 'D — Chưa đạt', description: 'Chưa đạt / Cần hoàn thiện lại' }
+  ];
+  switchActivityScoringMode('numeric');
+  renderActivityLetterOptions();
 
   document.getElementById('modal-activity-title').textContent = 'Thêm Mốc Kế hoạch Đợt TN';
   document.getElementById('modal-activity').classList.remove('hidden');
@@ -6027,6 +6066,27 @@ window.editActivityModal = function(actId) {
   if (document.getElementById('activity-form-show-order')) {
     document.getElementById('activity-form-show-order').checked = Boolean(act.showPresentationOrderToStudents);
   }
+  const scoringEnabled = Boolean(act.scoringConfig?.enabled);
+  if (document.getElementById('activity-form-scoring-enabled')) {
+    document.getElementById('activity-form-scoring-enabled').checked = scoringEnabled;
+    toggleActivityScoringConfig(scoringEnabled);
+  }
+  const sMode = act.scoringConfig?.mode || 'numeric';
+  switchActivityScoringMode(sMode);
+  if (act.scoringConfig?.numericConfig) {
+    if (document.getElementById('activity-scoring-min')) document.getElementById('activity-scoring-min').value = act.scoringConfig.numericConfig.min ?? 0;
+    if (document.getElementById('activity-scoring-max')) document.getElementById('activity-scoring-max').value = act.scoringConfig.numericConfig.max ?? 10;
+    if (document.getElementById('activity-scoring-step')) document.getElementById('activity-scoring-step').value = act.scoringConfig.numericConfig.step ?? 0.1;
+  }
+  state._currentActivityLetterOptions = Array.isArray(act.scoringConfig?.letterOptions) && act.scoringConfig.letterOptions.length > 0
+    ? JSON.parse(JSON.stringify(act.scoringConfig.letterOptions))
+    : [
+        { id: 'opt_a', key: 'A', label: 'A — Tốt', description: 'Tốt / Xuất sắc' },
+        { id: 'opt_b', key: 'B', label: 'B — Khá', description: 'Khá' },
+        { id: 'opt_c', key: 'C', label: 'C — Đạt', description: 'Đạt yêu cầu' },
+        { id: 'opt_d', key: 'D', label: 'D — Chưa đạt', description: 'Chưa đạt / Cần hoàn thiện lại' }
+      ];
+  renderActivityLetterOptions();
 
   document.getElementById('modal-activity-title').textContent = 'Chỉnh sửa Mốc Kế hoạch';
   document.getElementById('modal-activity').classList.remove('hidden');
@@ -6360,6 +6420,18 @@ window.saveActivity = async function(e) {
 
     const councilEnabled = document.getElementById('activity-form-council-enabled')?.checked === true;
     const showPresentationOrderToStudents = document.getElementById('activity-form-show-order')?.checked === true;
+    const scoringEnabled = document.getElementById('activity-form-scoring-enabled')?.checked === true;
+    const scoringMode = document.querySelector('input[name="activity_scoring_mode"]:checked')?.value || 'numeric';
+    const sMin = parseFloat(document.getElementById('activity-scoring-min')?.value) || 0;
+    const sMax = parseFloat(document.getElementById('activity-scoring-max')?.value) || 10;
+    const sStep = parseFloat(document.getElementById('activity-scoring-step')?.value) || 0.1;
+
+    const scoringConfig = {
+      enabled: scoringEnabled,
+      mode: scoringMode,
+      letterOptions: state._currentActivityLetterOptions || [],
+      numericConfig: { min: sMin, max: sMax, step: sStep }
+    };
 
     // Preserve existing council data if editing
     const existingAct = activities.find(a => a.id === actId);
@@ -6379,6 +6451,7 @@ window.saveActivity = async function(e) {
       submissionEnabled,
       councilEnabled,
       showPresentationOrderToStudents,
+      scoringConfig,
       councilStructure: existingAct?.councilStructure || {
         slots: [
           { key: 'chair', label: 'Chủ tịch', name: 'Chủ tịch Hội đồng', type: 'mandatory' },
@@ -7053,7 +7126,7 @@ window.removeSupportSupervisor = async function(studentId, supervisorId, supervi
 
 
 // ============================================================================
-// COUNCIL / HỘI ĐỒNG FOUNDATION MODULE (v1.7.0-beta.1)
+// COUNCIL / HỘI ĐỒNG FOUNDATION MODULE (v1.8.0-beta.1)
 // ============================================================================
 
 window.toggleActivityCouncilFields = function(checked) {
@@ -7258,6 +7331,7 @@ function renderCouncilCards(act) {
             <span>🔗 Link</span>
           </button>
           <div class="space-x-1.5">
+            <button type="button" onclick="openCouncilWorkspace('${state.activeCouncilManagement.roundId}', '${act.id}', '${c.id}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs">▶ Vào phòng HĐ</button>
             <button type="button" onclick="copyCouncil('${c.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Sao chép Hội đồng">📋 Sao chép</button>
             <button type="button" onclick="editCouncilModal('${c.id}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 transition-colors">Sửa / Thành viên</button>
             <button type="button" onclick="deleteCouncil('${c.id}')" class="px-2 py-1 text-rose-600 hover:underline font-bold text-xs">Xóa</button>
@@ -7954,7 +8028,12 @@ function renderStudentCouncilTimelineInfo(act) {
             <span class="font-bold text-blue-900 text-xs flex items-center gap-1.5">
               <span>🏛️</span> Thầy/Cô được phân công: <strong>${c.name}</strong> (${slotObj?.name || slotObj?.label || 'Thành viên'})
             </span>
-            <p class="text-[11px] text-blue-700">📍 Phòng: ${c.room || 'Đang cập nhật'} • 📅 Ngày: ${c.date || '--'} (${c.startTime || '--'} – ${c.endTime || '--'})</p>
+            <div class="flex items-center justify-between gap-2 pt-1">
+              <p class="text-[11px] text-blue-700">📍 Phòng: ${c.room || 'Đang cập nhật'} • 📅 Ngày: ${c.date || '--'} (${c.startTime || '--'} – ${c.endTime || '--'})</p>
+              <button type="button" onclick="openCouncilWorkspace('${targetRound?.id}', '${act.id}', '${c.id}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0">
+                🏛️ Vào phòng Hội đồng & Chấm điểm
+              </button>
+            </div>
           </div>
         `;
         break;
@@ -8008,3 +8087,1297 @@ function renderStudentCouncilTimelineInfo(act) {
     ${memberBannerHtml}
   `;
 }
+
+
+
+// ============================================================================
+// IFA+ GRADUATION BETA v1.8.0-beta.1: SCORING CONFIG & COUNCIL OPERATION MODULE
+// ============================================================================
+
+// 1. SCORING CONFIG HELPERS
+window.toggleActivityScoringConfig = function(enabled) {
+  const panel = document.getElementById('activity-scoring-config-panel');
+  if (panel) {
+    if (enabled) panel.classList.remove('hidden');
+    else panel.classList.add('hidden');
+  }
+};
+
+window.switchActivityScoringMode = function(mode) {
+  const numWrap = document.getElementById('activity-scoring-numeric-wrap');
+  const letterWrap = document.getElementById('activity-scoring-letter-wrap');
+  const rNum = document.querySelector('input[name="activity_scoring_mode"][value="numeric"]');
+  const rLet = document.querySelector('input[name="activity_scoring_mode"][value="letter"]');
+  
+  if (mode === 'letter') {
+    if (rLet) rLet.checked = true;
+    if (numWrap) numWrap.classList.add('hidden');
+    if (letterWrap) letterWrap.classList.remove('hidden');
+  } else {
+    if (rNum) rNum.checked = true;
+    if (numWrap) numWrap.classList.remove('hidden');
+    if (letterWrap) letterWrap.classList.add('hidden');
+  }
+};
+
+window.renderActivityLetterOptions = function() {
+  const container = document.getElementById('activity-scoring-letter-list');
+  if (!container) return;
+  const list = state._currentActivityLetterOptions || [];
+  if (list.length === 0) {
+    container.innerHTML = '<div class="p-3 text-center text-slate-400">Chưa có mức điểm chữ nào. Bấm "+ Thêm mức điểm".</div>';
+    return;
+  }
+  container.innerHTML = list.map((opt, idx) => `
+    <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-mono text-xs">${opt.key}</span>
+        <span class="font-bold text-slate-800 text-xs">${opt.label}</span>
+        ${opt.description ? `<span class="text-[10px] text-slate-400">(${opt.description})</span>` : ''}
+      </div>
+      <div class="flex items-center gap-1.5 text-[11px]">
+        <button type="button" onclick="editLetterOption('${opt.id}')" class="text-blue-600 hover:underline font-bold">Sửa</button>
+        <button type="button" onclick="deleteLetterOption('${opt.id}')" class="text-rose-600 hover:underline font-bold">Xóa</button>
+      </div>
+    </div>
+  `).join('');
+};
+
+window.openAddLetterOptionModal = function() {
+  document.getElementById('letter-option-id').value = '';
+  document.getElementById('letter-option-key').value = '';
+  document.getElementById('letter-option-label').value = '';
+  document.getElementById('letter-option-desc').value = '';
+  document.getElementById('modal-letter-option-title').textContent = 'Thêm mức điểm chữ mới';
+  document.getElementById('modal-add-letter-option')?.classList.remove('hidden');
+};
+
+window.closeLetterOptionModal = function() {
+  document.getElementById('modal-add-letter-option')?.classList.add('hidden');
+};
+
+window.editLetterOption = function(id) {
+  const opt = (state._currentActivityLetterOptions || []).find(o => o.id === id);
+  if (!opt) return;
+  document.getElementById('letter-option-id').value = opt.id;
+  document.getElementById('letter-option-key').value = opt.key;
+  document.getElementById('letter-option-label').value = opt.label;
+  document.getElementById('letter-option-desc').value = opt.description || '';
+  document.getElementById('modal-letter-option-title').textContent = 'Chỉnh sửa mức điểm chữ';
+  document.getElementById('modal-add-letter-option')?.classList.remove('hidden');
+};
+
+window.deleteLetterOption = function(id) {
+  state._currentActivityLetterOptions = (state._currentActivityLetterOptions || []).filter(o => o.id !== id);
+  renderActivityLetterOptions();
+};
+
+window.saveLetterOption = function() {
+  const id = document.getElementById('letter-option-id')?.value?.trim();
+  const key = document.getElementById('letter-option-key')?.value?.trim();
+  const label = document.getElementById('letter-option-label')?.value?.trim();
+  const desc = document.getElementById('letter-option-desc')?.value?.trim() || '';
+
+  if (!key || !label) {
+    showToast('Vui lòng nhập đầy đủ Mã mức điểm và Nhãn hiển thị', 'warning');
+    return;
+  }
+
+  state._currentActivityLetterOptions = state._currentActivityLetterOptions || [];
+  if (id) {
+    const idx = state._currentActivityLetterOptions.findIndex(o => o.id === id);
+    if (idx >= 0) {
+      state._currentActivityLetterOptions[idx] = { id, key, label, description: desc };
+    }
+  } else {
+    const newId = 'opt_' + Date.now().toString(36);
+    state._currentActivityLetterOptions.push({ id: newId, key, label, description: desc });
+  }
+
+  closeLetterOptionModal();
+  renderActivityLetterOptions();
+};
+
+// 2. AUTHORIZATION & REQUIRED SCORERS HELPERS
+export function checkCouncilAuthorization(round, act, council, user) {
+  if (!round || !act || !council) return { authorized: false, reason: 'Không tìm thấy dữ liệu Hội đồng' };
+  
+  // Admin always has full access
+  if (state.isAdmin) {
+    return {
+      authorized: true,
+      role: 'admin',
+      roleName: 'Quản trị viên',
+      slotKey: null,
+      canScore: true,
+      isSecretary: true,
+      isAdmin: true
+    };
+  }
+
+  if (!user || !user.email) {
+    return { authorized: false, reason: 'Vui lòng đăng nhập để truy cập Hội đồng.' };
+  }
+
+  const userEmail = user.email.toLowerCase().trim();
+  const membersBySlot = council.membersBySlot || {};
+  const slots = act.councilStructure?.slots || [];
+
+  for (const s of slots) {
+    const assigned = membersBySlot[s.key];
+    if (assigned && assigned.memberEmail && assigned.memberEmail.toLowerCase().trim() === userEmail) {
+      const isSec = (s.key === 'secretary' || s.label === 'Thư ký');
+      return {
+        authorized: true,
+        role: s.key,
+        roleName: s.name || s.label || 'Thành viên Hội đồng',
+        slotKey: s.key,
+        canScore: true,
+        isSecretary: isSec,
+        isAdmin: false
+      };
+    }
+  }
+
+  // Student is strictly denied
+  return {
+    authorized: false,
+    reason: 'Bạn không phải thành viên của Hội đồng này.'
+  };
+}
+
+export function getRequiredScorers(council, act) {
+  const slots = act?.councilStructure?.slots || [];
+  return slots.filter(s => s.type === 'mandatory');
+}
+
+export function getGuestScorers(council, act) {
+  const slots = act?.councilStructure?.slots || [];
+  return slots.filter(s => s.type === 'guest');
+}
+
+// 3. COUNCIL WORKSPACE OPEN & REAL-TIME LISTENER
+window.openCouncilWorkspace = async function(roundId, activityId, councilId, autoSelectedStudentId = null) {
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+
+  if (!targetRound || !act || !council) {
+    showToast('Không tìm thấy thông tin Hội đồng được yêu cầu.', 'error');
+    return;
+  }
+
+  // AUTHORIZATION CHECK
+  const authCheck = checkCouncilAuthorization(targetRound, act, council, state.user);
+  if (!authCheck.authorized) {
+    showToast(authCheck.reason || 'Bạn không có quyền truy cập Hội đồng này.', 'error');
+    return;
+  }
+
+  state.activeCouncilWorkspace = {
+    roundId,
+    activityId,
+    councilId,
+    auth: authCheck
+  };
+
+  state.councilLocalDrafts = state.councilLocalDrafts || {};
+  state.councilScores = state.councilScores || {};
+
+  // Load existing scores from round doc & subcollection
+  await loadCouncilScores(roundId, activityId, councilId);
+
+  // Setup initial selected student
+  const assignments = act.councilStudentAssignments || [];
+  const councilStudents = assignments
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const presentingStudent = councilStudents.find(a => a.presentationStatus === 'presenting');
+
+  if (autoSelectedStudentId) {
+    state.activeCouncilSelectedStudentId = autoSelectedStudentId;
+  } else if (presentingStudent) {
+    state.activeCouncilSelectedStudentId = presentingStudent.studentId;
+  } else if (councilStudents.length > 0) {
+    state.activeCouncilSelectedStudentId = councilStudents[0].studentId;
+  } else {
+    state.activeCouncilSelectedStudentId = null;
+  }
+
+  // Render UI
+  renderCouncilWorkspaceFull();
+
+  // Show modal
+  document.getElementById('modal-council-workspace')?.classList.remove('hidden');
+
+  // Real-time Firestore Listener
+  setupCouncilRealtimeSync(roundId, activityId, councilId);
+};
+
+window.closeCouncilWorkspace = function() {
+  if (state.activeCouncilUnsubscribe) {
+    try { state.activeCouncilUnsubscribe(); } catch (e) {}
+    state.activeCouncilUnsubscribe = null;
+  }
+  document.getElementById('modal-council-workspace')?.classList.add('hidden');
+};
+
+function setupCouncilRealtimeSync(roundId, activityId, councilId) {
+  if (state.activeCouncilUnsubscribe) {
+    state.activeCouncilUnsubscribe();
+    state.activeCouncilUnsubscribe = null;
+  }
+
+  try {
+    const roundRef = doc(db, 'graduationRounds', roundId);
+    state.activeCouncilUnsubscribe = onSnapshot(roundRef, (snap) => {
+      if (!snap.exists()) return;
+      const updatedData = { id: snap.id, ...snap.data() };
+      
+      // Update in state.rounds
+      const rIdx = (state.rounds || []).findIndex(r => r.id === roundId);
+      if (rIdx >= 0) state.rounds[rIdx] = updatedData;
+
+      // Update nested scores if present
+      if (updatedData.councilScores) {
+        state.councilScores = { ...(state.councilScores || {}), ...updatedData.councilScores };
+      }
+
+      // Re-render Council Workspace WITHOUT changing selected student!
+      renderCouncilWorkspacePartialSync();
+    }, (err) => {
+      console.warn('Realtime council listener notice:', err);
+    });
+  } catch (err) {
+    console.warn('Firestore onSnapshot setup notice:', err);
+  }
+}
+
+async function loadCouncilScores(roundId, activityId, councilId) {
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (targetRound?.councilScores) {
+    state.councilScores = { ...(state.councilScores || {}), ...targetRound.councilScores };
+  }
+
+  // Best effort query subcollection reviewDecisions
+  try {
+    const q = query(
+      collection(db, 'graduationRounds', roundId, 'reviewDecisions'),
+      where('councilId', '==', councilId)
+    );
+    const snap = await getDocs(q);
+    if (snap && !snap.empty) {
+      snap.docs.forEach(d => {
+        const data = d.data();
+        const k = `${data.activityId}_${data.councilId}_${data.studentId}_${data.scorerId}`;
+        state.councilScores[k] = data;
+      });
+    }
+  } catch (e) {
+    // Graceful fallback to nested or memory
+  }
+}
+
+// 4. WORKSPACE RENDERING METHODS
+function renderCouncilWorkspaceFull() {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!targetRound || !act || !council) return;
+
+  // Header Elements
+  document.getElementById('cws-council-name').textContent = council.name;
+  document.getElementById('cws-council-meta').textContent = `📍 Phòng: ${council.room || 'Đang cập nhật'} • 📅 ${council.date || '--'} (${council.startTime || '--'} – ${council.endTime || '--'})`;
+
+  // Status Badge
+  const statusBadge = document.getElementById('cws-council-status-badge');
+  if (statusBadge) {
+    const cStat = council.status || 'preparing';
+    if (cStat === 'active' || cStat === 'ongoing') {
+      statusBadge.className = 'badge bg-emerald-500 text-white font-black animate-pulse text-[10px]';
+      statusBadge.textContent = '● Đang diễn ra';
+    } else if (cStat === 'ended' || cStat === 'completed') {
+      statusBadge.className = 'badge bg-slate-200 text-slate-700 font-bold text-[10px]';
+      statusBadge.textContent = '✓ Đã kết thúc';
+    } else {
+      statusBadge.className = 'badge bg-amber-100 text-amber-800 font-bold text-[10px]';
+      statusBadge.textContent = 'Chuẩn bị';
+    }
+  }
+
+  // Role Badge
+  const roleBadge = document.getElementById('cws-my-role-badge');
+  if (roleBadge) {
+    roleBadge.textContent = auth.roleName || 'Thành viên';
+  }
+
+  // Session Controls (Secretary / Admin)
+  const sessionControls = document.getElementById('cws-session-controls');
+  if (sessionControls) {
+    if (auth.isAdmin || auth.isSecretary) {
+      sessionControls.classList.remove('hidden');
+      sessionControls.classList.add('flex');
+      const startBtn = document.getElementById('btn-start-council-session');
+      const endBtn = document.getElementById('btn-end-council-session');
+      const cStat = council.status || 'preparing';
+      if (startBtn) startBtn.classList.toggle('hidden', cStat === 'active' || cStat === 'ongoing');
+      if (endBtn) endBtn.classList.toggle('hidden', cStat === 'ended' || cStat === 'completed');
+    } else {
+      sessionControls.classList.add('hidden');
+    }
+  }
+
+  renderCouncilStudentList();
+  renderCouncilSelectedStudentDetails();
+}
+
+function renderCouncilWorkspacePartialSync() {
+  // Update student list badges & counts
+  renderCouncilStudentList();
+
+  // Update presenting banner
+  renderPresentingBanner();
+
+  // Update secretary controls for current student
+  renderSecretaryControls();
+
+  // Update scorers completion progress & admin monitor
+  renderScorersProgress();
+  renderAdminMonitor();
+}
+
+function renderCouncilStudentList() {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!targetRound || !act) return;
+
+  const assignments = act.councilStudentAssignments || [];
+  const councilStudents = assignments
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const countBadge = document.getElementById('cws-student-count-badge');
+  if (countBadge) countBadge.textContent = councilStudents.length;
+
+  const presentingAsgn = councilStudents.find(a => a.presentationStatus === 'presenting');
+  const presentingInd = document.getElementById('cws-presenting-indicator');
+  if (presentingInd) {
+    if (presentingAsgn) {
+      presentingInd.classList.remove('hidden');
+      presentingInd.textContent = `● #${presentingAsgn.order} đang trình bày`;
+    } else {
+      presentingInd.classList.add('hidden');
+    }
+  }
+
+  const container = document.getElementById('cws-students-list');
+  if (!container) return;
+
+  if (councilStudents.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-slate-400">Hội đồng này chưa có sinh viên nào.</div>';
+    return;
+  }
+
+  const myScorerId = state.user?.uid || state.user?.email;
+  const scoringEnabled = Boolean(act.scoringConfig?.enabled);
+
+  container.innerHTML = councilStudents.map((asgn) => {
+    const sid = asgn.studentId;
+    const sObj = findStudentInRound(sid);
+    const sName = sObj?.fullName || sObj?.studentName || sid;
+    const isSelected = (sid === state.activeCouncilSelectedStudentId);
+    const isPresenting = (asgn.presentationStatus === 'presenting');
+    const isPresented = (asgn.presentationStatus === 'presented');
+
+    // Presentation badge
+    let presBadge = '<span class="text-[10px] text-slate-400">Chờ</span>';
+    if (isPresenting) {
+      presBadge = '<span class="badge bg-emerald-500 text-white font-black text-[9px] animate-pulse">🔴 Đang trình bày</span>';
+    } else if (isPresented) {
+      presBadge = '<span class="badge bg-indigo-100 text-indigo-800 font-bold text-[9px]">✓ Đã xong</span>';
+    }
+
+    // Scoring status badge for this member
+    let scoreBadge = '';
+    if (scoringEnabled) {
+      const scoreKey = `${activityId}_${councilId}_${sid}_${myScorerId}`;
+      const myScore = state.councilScores?.[scoreKey];
+      const hasDraft = Boolean(state.councilLocalDrafts?.[sid]);
+
+      if (myScore?.status === 'completed') {
+        scoreBadge = '<span class="text-[10px] text-emerald-700 font-bold">✓ Bạn đã chấm</span>';
+      } else if (myScore?.status === 'draft' || hasDraft) {
+        scoreBadge = '<span class="text-[10px] text-amber-600 font-bold">● Đã lưu tạm</span>';
+      } else {
+        scoreBadge = '<span class="text-[10px] text-slate-400">Chưa chấm</span>';
+      }
+    }
+
+    return `
+      <div onclick="selectCouncilStudent('${sid}')" class="p-2.5 rounded-xl border transition-all cursor-pointer ${isSelected ? 'bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-500 shadow-xs' : 'bg-white border-slate-200 hover:border-slate-300'}">
+        <div class="flex items-center justify-between gap-1">
+          <span class="font-mono font-bold text-xs ${isSelected ? 'text-indigo-900' : 'text-slate-600'}">#${asgn.order || '--'}</span>
+          ${presBadge}
+        </div>
+        <div class="font-bold text-slate-900 text-xs truncate mt-0.5">${sName}</div>
+        <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono mt-0.5">
+          <span>${sid}</span>
+          ${scoreBadge}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.filterCouncilWorkspaceStudents = function(q) {
+  const query = String(q || '').toLowerCase().trim();
+  const cards = document.querySelectorAll('#cws-students-list > div');
+  cards.forEach(card => {
+    const text = card.textContent.toLowerCase();
+    card.classList.toggle('hidden', query.length > 0 && !text.includes(query));
+  });
+};
+
+// 5. SELECT STUDENT & FLEXIBLE NAVIGATION (CRITICAL BUSINESS RULE)
+window.selectCouncilStudent = function(studentId) {
+  // PRESERVE UNSAVED INPUTS from current student
+  const oldSid = state.activeCouncilSelectedStudentId;
+  if (oldSid && oldSid !== studentId) {
+    const valInput = document.getElementById('cws-score-input-numeric');
+    const commentInput = document.getElementById('cws-score-comment');
+    if (valInput || commentInput) {
+      const currentVal = valInput ? valInput.value : state.councilLocalDrafts?.[oldSid]?.value;
+      const currentComm = commentInput ? commentInput.value : '';
+      if (currentVal || currentComm) {
+        state.councilLocalDrafts = state.councilLocalDrafts || {};
+        state.councilLocalDrafts[oldSid] = {
+          value: currentVal,
+          comment: currentComm
+        };
+      }
+    }
+  }
+
+  // SET NEW SELECTED STUDENT (NEVER changes current presenting student)
+  state.activeCouncilSelectedStudentId = studentId;
+
+  renderCouncilStudentList();
+  renderCouncilSelectedStudentDetails();
+};
+
+window.goToCurrentPresentingStudent = function() {
+  const { roundId, activityId, councilId } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const assignments = act?.councilStudentAssignments || [];
+  const pres = assignments.find(a => a.councilId === councilId && a.presentationStatus === 'presenting');
+  if (pres) {
+    selectCouncilStudent(pres.studentId);
+  } else {
+    showToast('Hội đồng hiện chưa có sinh viên nào đang trình bày.', 'info');
+  }
+};
+
+// 6. RENDER SELECTED STUDENT DETAILS & SCORING
+function renderCouncilSelectedStudentDetails() {
+  const sid = state.activeCouncilSelectedStudentId;
+  const card = document.getElementById('cws-selected-student-card');
+  if (!card) return;
+
+  if (!sid) {
+    card.innerHTML = '<div class="p-8 text-center text-slate-400">Vui lòng chọn một sinh viên trong danh sách để xem thông tin và chấm điểm.</div>';
+    document.getElementById('cws-secretary-actions')?.classList.add('hidden');
+    document.getElementById('cws-scoring-section')?.classList.add('hidden');
+    document.getElementById('cws-scorers-progress-section')?.classList.add('hidden');
+    document.getElementById('cws-admin-monitor-section')?.classList.add('hidden');
+    return;
+  }
+
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const sObj = findStudentInRound(sid);
+  const asgn = (act?.councilStudentAssignments || []).find(a => a.councilId === councilId && a.studentId === sid);
+
+  const sName = sObj?.fullName || sObj?.studentName || sid;
+  const sTopic = sObj?.topicTitle || '--';
+
+  // Format Official Supervisors (using officialSupervisors helper with legacy fallback)
+  const supervisorsHtml = formatStudentSupervisorsForDisplay(sObj);
+
+  // Presenting status badge
+  const isPresenting = (asgn?.presentationStatus === 'presenting');
+  const isPresented = (asgn?.presentationStatus === 'presented');
+  let statusBadgeHtml = '<span class="badge bg-slate-100 text-slate-600 font-bold text-xs">Chờ trình bày</span>';
+  if (isPresenting) {
+    statusBadgeHtml = '<span class="badge bg-emerald-500 text-white font-black text-xs animate-pulse">🔴 ĐANG TRÌNH BÀY</span>';
+  } else if (isPresented) {
+    statusBadgeHtml = '<span class="badge bg-indigo-100 text-indigo-800 font-bold text-xs">✓ Đã trình bày</span>';
+  }
+
+  card.innerHTML = `
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-mono font-black text-xs px-2 py-0.5 bg-white border border-slate-300 rounded-lg">#${asgn?.order || '--'}</span>
+          <h2 class="font-black text-base sm:text-lg text-slate-900">${sName}</h2>
+          ${statusBadgeHtml}
+        </div>
+        <p class="font-mono text-xs text-slate-500 mt-0.5 font-bold">MSSV: ${sid}</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-200 text-xs">
+      <div>
+        <span class="text-[11px] font-bold text-slate-400 block mb-0.5">TÊN ĐỀ TÀI:</span>
+        <p class="font-semibold text-slate-800 leading-snug">${sTopic}</p>
+      </div>
+      <div>
+        <span class="text-[11px] font-bold text-slate-400 block mb-0.5">GIẢNG VIÊN HƯỚNG DẪN:</span>
+        <div class="font-semibold text-slate-800">${supervisorsHtml}</div>
+      </div>
+    </div>
+  `;
+
+  // Update presenting banner
+  renderPresentingBanner();
+
+  // Render Secretary Actions
+  renderSecretaryControls();
+
+  // Render Scoring Section
+  renderScoringSection();
+
+  // Render Progress
+  renderScorersProgress();
+
+  // Render Admin Monitor
+  renderAdminMonitor();
+}
+
+function formatStudentSupervisorsForDisplay(reg) {
+  if (!reg) return 'GVHD: Chưa phân công';
+  const officials = getOfficialSupervisors(reg);
+  if (!officials || officials.length === 0) {
+    const legacy = reg.acceptedSupervisorName || reg.supervisorName || reg.finalSupervisorName;
+    return legacy ? `GVHD: ${legacy}` : 'GVHD: Chưa phân công';
+  }
+  if (officials.length === 1) {
+    return `GVHD: ${officials[0].supervisorName || 'Giảng viên'}`;
+  }
+  return officials.map(s => {
+    const role = (s.role === 'primary') ? 'GVHD chính' : 'GVHD hỗ trợ';
+    return `<div>${s.supervisorName || 'Giảng viên'} <span class="text-indigo-600 font-mono text-[10px]">(${role})</span></div>`;
+  }).join('');
+}
+
+// 7. BANNER: CURRENT PRESENTING STUDENT
+function renderPresentingBanner() {
+  const { roundId, activityId, councilId } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const assignments = act?.councilStudentAssignments || [];
+
+  const pres = assignments.find(a => a.councilId === councilId && a.presentationStatus === 'presenting');
+  const banner = document.getElementById('cws-presenting-banner');
+  const bannerText = document.getElementById('cws-presenting-banner-text');
+  if (!banner) return;
+
+  const currentSid = state.activeCouncilSelectedStudentId;
+
+  if (pres && pres.studentId !== currentSid) {
+    const sObj = findStudentInRound(pres.studentId);
+    const sName = sObj?.fullName || sObj?.studentName || pres.studentId;
+    if (bannerText) bannerText.textContent = `#${pres.order || ''} ${sName} (${pres.studentId})`;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
+// 8. SECRETARY PRESENTATION CONTROLS
+function renderSecretaryControls() {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const container = document.getElementById('cws-secretary-actions');
+  const btnWrap = document.getElementById('cws-secretary-buttons');
+  if (!container || !btnWrap) return;
+
+  // Only Secretary or Admin
+  if (!auth.isAdmin && !auth.isSecretary) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  const sid = state.activeCouncilSelectedStudentId;
+  const asgn = (act?.councilStudentAssignments || []).find(a => a.councilId === councilId && a.studentId === sid);
+  if (!asgn) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  container.classList.remove('hidden');
+
+  if (asgn.presentationStatus === 'presenting') {
+    btnWrap.innerHTML = `
+      <button type="button" onclick="finishStudentPresentation('${sid}')" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
+        <span>✓ Hoàn tất lượt</span>
+      </button>
+      <button type="button" onclick="resetStudentPresentation('${sid}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold" title="Đặt lại trạng thái Chờ">
+        ↺
+      </button>
+    `;
+  } else {
+    btnWrap.innerHTML = `
+      <button type="button" onclick="startStudentPresentation('${sid}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
+        <span>▶ Bắt đầu trình bày</span>
+      </button>
+      ${asgn.presentationStatus === 'presented' ? `
+        <button type="button" onclick="resetStudentPresentation('${sid}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold" title="Đặt lại trạng thái Chờ">
+          ↺ Đặt lại Chờ
+        </button>
+      ` : ''}
+    `;
+  }
+}
+
+window.startStudentPresentation = async function(targetSid) {
+  const { roundId, activityId, councilId } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const assignments = act.councilStudentAssignments || [];
+  const currentPres = assignments.find(a => a.councilId === councilId && a.presentationStatus === 'presenting');
+
+  if (currentPres && currentPres.studentId !== targetSid) {
+    const curObj = findStudentInRound(currentPres.studentId);
+    const targetObj = findStudentInRound(targetSid);
+    const curName = curObj?.fullName || curObj?.studentName || currentPres.studentId;
+    const targetName = targetObj?.fullName || targetObj?.studentName || targetSid;
+
+    const confirmed = await showConfirm(
+      'Chuyển lượt trình bày',
+      `${curName} đang trình bày. Bạn có muốn kết thúc lượt của sinh viên này và chuyển sang ${targetName}?`,
+      { confirmText: 'Đồng ý chuyển', danger: false }
+    );
+    if (!confirmed) return;
+
+    currentPres.presentationStatus = 'presented';
+  }
+
+  const targetAsgn = assignments.find(a => a.councilId === councilId && a.studentId === targetSid);
+  if (targetAsgn) {
+    targetAsgn.presentationStatus = 'presenting';
+  }
+
+  await persistActivityCouncilChanges(targetRound);
+  renderCouncilWorkspacePartialSync();
+  renderSecretaryControls();
+  showToast(`Đã bắt đầu lượt trình bày của sinh viên #${targetAsgn?.order || ''}`, 'success');
+};
+
+window.finishStudentPresentation = async function(sid) {
+  const { roundId, activityId, councilId } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const asgn = (act.councilStudentAssignments || []).find(a => a.councilId === councilId && a.studentId === sid);
+  if (asgn) {
+    asgn.presentationStatus = 'presented';
+  }
+
+  await persistActivityCouncilChanges(targetRound);
+  renderCouncilWorkspacePartialSync();
+  renderSecretaryControls();
+  showToast('✓ Đã hoàn tất lượt trình bày của sinh viên.', 'info');
+};
+
+window.resetStudentPresentation = async function(sid) {
+  const { roundId, activityId, councilId } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const asgn = (act.councilStudentAssignments || []).find(a => a.councilId === councilId && a.studentId === sid);
+  if (asgn) {
+    asgn.presentationStatus = 'waiting';
+  }
+
+  await persistActivityCouncilChanges(targetRound);
+  renderCouncilWorkspacePartialSync();
+  renderSecretaryControls();
+};
+
+// 9. COUNCIL SESSION CONTROLS (START / END)
+window.startCouncilSession = async function() {
+  const { roundId, activityId, councilId } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  council.status = 'active';
+  await persistActivityCouncilChanges(targetRound);
+  renderCouncilWorkspaceFull();
+  showToast(`Hội đồng "${council.name}" đã bắt đầu làm việc!`, 'success');
+};
+
+window.endCouncilSession = async function() {
+  const { roundId, activityId, councilId } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  // Check required scorers completion
+  const reqSlots = getRequiredScorers(council, act);
+  const assignments = (act?.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+  
+  let uncompletedCount = 0;
+  for (const asgn of assignments) {
+    for (const s of reqSlots) {
+      const assignedMem = council.membersBySlot?.[s.key];
+      if (assignedMem && (assignedMem.memberId || assignedMem.memberEmail)) {
+        const scorerId = assignedMem.memberId || assignedMem.memberEmail;
+        const k = `${activityId}_${councilId}_${asgn.studentId}_${scorerId}`;
+        const sc = state.councilScores?.[k];
+        if (sc?.status !== 'completed') {
+          uncompletedCount++;
+        }
+      }
+    }
+  }
+
+  let confirmMsg = `Xác nhận kết thúc buổi làm việc của Hội đồng "${council.name}"?`;
+  if (uncompletedCount > 0) {
+    confirmMsg = `Còn ${uncompletedCount} lượt chấm bắt buộc chưa hoàn tất. Bạn có chắc chắn muốn kết thúc Hội đồng không?`;
+  }
+
+  const confirmed = await showConfirm('Kết thúc Hội đồng', confirmMsg, { confirmText: 'Kết thúc Hội đồng', danger: uncompletedCount > 0 });
+  if (!confirmed) return;
+
+  council.status = 'ended';
+  await persistActivityCouncilChanges(targetRound);
+  renderCouncilWorkspaceFull();
+  showToast(`Đã kết thúc phiên làm việc của Hội đồng "${council.name}".`, 'info');
+};
+
+// 10. SCORING CARD RENDERING & ACTIONS
+function renderScoringSection() {
+  const container = document.getElementById('cws-scoring-section');
+  if (!container) return;
+
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+
+  if (!act?.scoringConfig?.enabled) {
+    container.classList.add('hidden');
+    return;
+  }
+  container.classList.remove('hidden');
+
+  const sid = state.activeCouncilSelectedStudentId;
+  const myScorerId = state.user?.uid || state.user?.email;
+  const scoreKey = `${activityId}_${councilId}_${sid}_${myScorerId}`;
+  const savedScore = state.councilScores?.[scoreKey];
+  const draft = state.councilLocalDrafts?.[sid];
+
+  // Resolve current working values
+  const currentVal = draft?.value !== undefined ? draft.value : (savedScore?.value ?? '');
+  const currentComment = draft?.comment !== undefined ? draft.comment : (savedScore?.comment ?? '');
+  const isCompleted = (savedScore?.status === 'completed' && !draft);
+  const councilEnded = (council.status === 'ended' || council.status === 'completed');
+
+  const mode = act.scoringConfig.mode || 'numeric';
+
+  let inputHtml = '';
+  if (mode === 'letter') {
+    const opts = act.scoringConfig.letterOptions || [];
+    inputHtml = `
+      <div>
+        <label class="font-bold text-slate-800 text-xs block mb-1.5">Mức điểm / Đánh giá (*):</label>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          ${opts.map(o => {
+            const isSelected = String(currentVal) === String(o.key);
+            return `
+              <button type="button" ${isCompleted ? 'disabled' : ''} onclick="onSelectLetterScore('${o.key}')" class="p-2.5 rounded-xl border text-left transition-all ${isSelected ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500 font-black text-emerald-950' : 'bg-white border-slate-200 hover:border-slate-300 font-semibold text-slate-700'} ${isCompleted ? 'opacity-80 cursor-not-allowed' : ''}">
+                <span class="text-sm block font-mono font-black text-emerald-700">${o.key}</span>
+                <span class="text-[11px] block mt-0.5">${o.label}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+        <input type="hidden" id="cws-score-input-letter" value="${currentVal}">
+      </div>
+    `;
+  } else {
+    const nCfg = act.scoringConfig.numericConfig || { min: 0, max: 10, step: 0.1 };
+    inputHtml = `
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <label class="font-bold text-slate-800 text-xs">Điểm đánh giá (*) [Thang điểm ${nCfg.min} – ${nCfg.max}]:</label>
+          <span class="text-[11px] text-slate-400 font-mono">Bước điểm: ${nCfg.step}</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="number" id="cws-score-input-numeric" value="${currentVal}" min="${nCfg.min}" max="${nCfg.max}" step="${nCfg.step}" oninput="onScoreInputChange(this.value)" ${isCompleted ? 'disabled' : ''} placeholder="${nCfg.min} – ${nCfg.max}" class="w-36 p-2 border border-slate-300 rounded-xl font-mono text-sm font-black text-slate-900 ${isCompleted ? 'bg-slate-100' : 'bg-white focus:ring-2 focus:ring-blue-500'}">
+          <span class="text-xs text-slate-500 font-semibold">/ ${nCfg.max} điểm</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // Action buttons
+  let actionsHtml = '';
+  if (isCompleted) {
+    actionsHtml = `
+      <div class="flex items-center justify-between gap-2 p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl">
+        <span class="font-bold text-emerald-800 text-xs flex items-center gap-1.5">
+          <span>✓</span> Bạn đã hoàn tất chấm lúc ${fmt24h(savedScore.completedAt || savedScore.updatedAt)}
+        </span>
+        ${!councilEnded ? `
+          <button type="button" onclick="reopenCurrentScore()" class="px-3 py-1.5 bg-white hover:bg-slate-100 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-xs">
+            ✏️ Mở lại để sửa
+          </button>
+        ` : ''}
+      </div>
+    `;
+  } else {
+    actionsHtml = `
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+        <span id="cws-score-draft-time" class="text-[11px] text-slate-400 font-mono">
+          ${savedScore?.status === 'draft' ? `Đã lưu tạm lúc ${fmt24h(savedScore.updatedAt)}` : ''}
+        </span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="saveCurrentScore(false)" class="px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors">
+            💾 Lưu tạm
+          </button>
+          <button type="button" onclick="saveCurrentScore(true)" class="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors">
+            ✓ Hoàn tất chấm
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    <div class="flex items-center justify-between">
+      <h3 class="font-black text-sm text-slate-900 tracking-tight flex items-center gap-1.5">
+        <span>📝</span> PHIẾU CHẤM ĐIỂM CỦA BẠN
+      </h3>
+      <span class="badge bg-slate-100 text-slate-600 font-bold text-[10px]">
+        Vai trò: ${auth.roleName}
+      </span>
+    </div>
+
+    ${inputHtml}
+
+    <div>
+      <label class="font-bold text-slate-800 text-xs block mb-1">Nhận xét chuyên môn (không bắt buộc):</label>
+      <textarea id="cws-score-comment" rows="3" ${isCompleted ? 'disabled' : ''} oninput="onScoreCommentChange(this.value)" placeholder="Góp ý chuyên môn, ưu khuyết điểm cho sinh viên..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs ${isCompleted ? 'bg-slate-100 text-slate-600' : 'bg-white focus:ring-2 focus:ring-blue-500'}">${escapeHtml(currentComment)}</textarea>
+    </div>
+
+    ${actionsHtml}
+
+    <p class="text-[10px] text-slate-400 italic">🔒 Điểm và nhận xét của bạn được bảo mật riêng tư, các thành viên khác trong Hội đồng và Sinh viên không thể xem chi tiết điểm này.</p>
+  `;
+}
+
+window.onSelectLetterScore = function(key) {
+  const input = document.getElementById('cws-score-input-letter');
+  if (input) input.value = key;
+  onScoreInputChange(key);
+  renderScoringSection();
+};
+
+window.onScoreInputChange = function(val) {
+  const sid = state.activeCouncilSelectedStudentId;
+  if (!sid) return;
+  state.councilLocalDrafts = state.councilLocalDrafts || {};
+  state.councilLocalDrafts[sid] = state.councilLocalDrafts[sid] || {};
+  state.councilLocalDrafts[sid].value = val;
+};
+
+window.onScoreCommentChange = function(comm) {
+  const sid = state.activeCouncilSelectedStudentId;
+  if (!sid) return;
+  state.councilLocalDrafts = state.councilLocalDrafts || {};
+  state.councilLocalDrafts[sid] = state.councilLocalDrafts[sid] || {};
+  state.councilLocalDrafts[sid].comment = comm;
+};
+
+// 11. SAVE & REOPEN SCORE (CONCURRENCY & PRIVACY)
+window.saveCurrentScore = async function(isCompleted) {
+  const sid = state.activeCouncilSelectedStudentId;
+  if (!sid) return;
+
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!act || !council) return;
+
+  const mode = act.scoringConfig?.mode || 'numeric';
+  let val = '';
+  if (mode === 'letter') {
+    val = document.getElementById('cws-score-input-letter')?.value || state.councilLocalDrafts?.[sid]?.value || '';
+  } else {
+    val = document.getElementById('cws-score-input-numeric')?.value || state.councilLocalDrafts?.[sid]?.value || '';
+  }
+  const comment = document.getElementById('cws-score-comment')?.value || state.councilLocalDrafts?.[sid]?.comment || '';
+
+  if (isCompleted) {
+    if (val === '' || val === null || val === undefined) {
+      showToast('Vui lòng chọn hoặc nhập điểm trước khi hoàn tất chấm!', 'warning');
+      return;
+    }
+    if (mode === 'numeric') {
+      const num = parseFloat(val);
+      const min = act.scoringConfig.numericConfig?.min ?? 0;
+      const max = act.scoringConfig.numericConfig?.max ?? 10;
+      if (isNaN(num) || num < min || num > max) {
+        showToast(`Điểm phải nằm trong thang điểm từ ${min} đến ${max}!`, 'warning');
+        return;
+      }
+    }
+
+    const sObj = findStudentInRound(sid);
+    const sName = sObj?.fullName || sObj?.studentName || sid;
+    const confirmed = await showConfirm(
+      'Xác nhận hoàn tất chấm',
+      `Xác nhận hoàn tất chấm sinh viên "${sName}" (${sid}) với kết quả: ${val}?`,
+      { confirmText: 'Hoàn tất chấm', danger: false }
+    );
+    if (!confirmed) return;
+  }
+
+  const scorerId = state.user?.uid || state.user?.email;
+  const scorerEmail = (state.user?.email || '').toLowerCase().trim();
+  const scorerName = state.user?.displayName || auth.roleName || 'Thành viên Hội đồng';
+  const scoreKey = `${activityId}_${councilId}_${sid}_${scorerId}`;
+
+  const existing = state.councilScores?.[scoreKey] || {};
+  const scoreRecord = {
+    activityId,
+    councilId,
+    studentId: sid,
+    scorerId,
+    scorerEmail,
+    scorerName,
+    decidedBy: scorerEmail,
+    supervisorEmail: scorerEmail,
+    slotKey: auth.slotKey || 'admin',
+    role: auth.role || 'member',
+    mode,
+    value: mode === 'numeric' ? parseFloat(val) : String(val),
+    comment: String(comment || '').trim(),
+    status: isCompleted ? 'completed' : 'draft',
+    createdAt: existing.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    completedAt: isCompleted ? (existing.completedAt || new Date().toISOString()) : null
+  };
+
+  // 1. In-memory update
+  state.councilScores[scoreKey] = scoreRecord;
+  delete state.councilLocalDrafts[sid];
+
+  // 2. Persist to Firestore: Concurrency-safe atomic key update
+  try {
+    const roundRef = doc(db, 'graduationRounds', roundId);
+    
+    // Best-effort subcollection write (authorized for both admin and staff under reviewDecisions)
+    try {
+      const decRef = doc(db, 'graduationRounds', roundId, 'reviewDecisions', scoreKey);
+      await setDoc(decRef, scoreRecord, { merge: true }).catch(() => {});
+    } catch (subErr) {}
+
+    // Atomic dot-notation update on graduationRounds document (preserves other scorers)
+    if (state.isAdmin) {
+      await updateDoc(roundRef, {
+        [`councilScores.${scoreKey}`]: scoreRecord,
+        updatedAt: serverTimestamp()
+      });
+    }
+  } catch (err) {
+    console.warn('Persist score notice:', err);
+  }
+
+  // Refresh Views
+  renderCouncilStudentList();
+  renderScoringSection();
+  renderScorersProgress();
+  renderAdminMonitor();
+
+  const sObj = findStudentInRound(sid);
+  const sName = sObj?.fullName || sObj?.studentName || sid;
+  if (isCompleted) {
+    showToast(`✓ Đã hoàn tất chấm điểm sinh viên ${sName}!`, 'success');
+  } else {
+    showToast(`Đã lưu tạm điểm cho sinh viên ${sName}.`, 'info');
+  }
+};
+
+window.reopenCurrentScore = async function() {
+  const sid = state.activeCouncilSelectedStudentId;
+  if (!sid) return;
+
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
+  const scorerId = state.user?.uid || state.user?.email;
+  const scoreKey = `${activityId}_${councilId}_${sid}_${scorerId}`;
+
+  const existing = state.councilScores?.[scoreKey];
+  if (!existing) return;
+
+  existing.status = 'draft';
+  existing.updatedAt = new Date().toISOString();
+
+  try {
+    const decRef = doc(db, 'graduationRounds', roundId, 'reviewDecisions', scoreKey);
+    await setDoc(decRef, existing, { merge: true }).catch(() => {});
+    if (state.isAdmin) {
+      const roundRef = doc(db, 'graduationRounds', roundId);
+      await updateDoc(roundRef, {
+        [`councilScores.${scoreKey}`]: existing,
+        updatedAt: serverTimestamp()
+      });
+    }
+  } catch (e) {}
+
+  renderCouncilStudentList();
+  renderScoringSection();
+  renderScorersProgress();
+  renderAdminMonitor();
+  showToast('Đã mở lại phiếu chấm. Bạn có thể chỉnh sửa và hoàn tất lại.', 'info');
+};
+
+// 12. PROGRESS OF SCORERS IN COUNCIL (PRIVACY PRESERVED)
+function renderScorersProgress() {
+  const container = document.getElementById('cws-scorers-progress-section');
+  if (!container) return;
+
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  const sid = state.activeCouncilSelectedStudentId;
+  if (!act?.scoringConfig?.enabled || !sid || !council) {
+    container.classList.add('hidden');
+    return;
+  }
+  container.classList.remove('hidden');
+
+  const slots = act.councilStructure?.slots || [];
+  const membersBySlot = council.membersBySlot || {};
+  const myUserId = state.user?.uid || state.user?.email;
+
+  const reqSlots = getRequiredScorers(council, act);
+  const guestSlots = getGuestScorers(council, act);
+
+  let reqCompleted = 0;
+  let reqTotal = 0;
+  let guestCompleted = 0;
+  let guestTotal = 0;
+
+  const itemsHtml = slots.map(s => {
+    const assigned = membersBySlot[s.key];
+    const isAssigned = Boolean(assigned && (assigned.memberId || assigned.memberName));
+    const scorerId = assigned?.memberId || assigned?.memberEmail || assigned?.memberName;
+    const scoreKey = scorerId ? `${activityId}_${councilId}_${sid}_${scorerId}` : null;
+    const score = scoreKey ? state.councilScores?.[scoreKey] : null;
+
+    const isMandatory = (s.type === 'mandatory');
+    if (isMandatory && isAssigned) {
+      reqTotal++;
+      if (score?.status === 'completed') reqCompleted++;
+    } else if (!isMandatory && isAssigned) {
+      guestTotal++;
+      if (score?.status === 'completed') guestCompleted++;
+    }
+
+    // PRIVACY CHECK: Only see score value if Admin or own score! Chair CANNOT see others!
+    const isOwnScore = (scorerId && (scorerId === myUserId || (assigned?.memberEmail && assigned.memberEmail.toLowerCase() === (state.user?.email || '').toLowerCase())));
+    const canSeeValue = (auth.isAdmin || isOwnScore);
+
+    let statusPill = '<span class="text-slate-400 font-mono text-xs">— Chưa chấm</span>';
+    if (!isAssigned) {
+      statusPill = '<span class="text-slate-300 italic text-[11px]">Chưa phân công</span>';
+    } else if (score?.status === 'completed') {
+      if (canSeeValue) {
+        statusPill = `<span class="badge bg-emerald-100 text-emerald-800 font-bold text-xs">✓ Đã chấm (${score.value})</span>`;
+      } else {
+        statusPill = '<span class="badge bg-emerald-100 text-emerald-800 font-bold text-xs">✓ Đã hoàn tất</span>';
+      }
+    } else if (score?.status === 'draft') {
+      if (canSeeValue) {
+        statusPill = `<span class="badge bg-amber-100 text-amber-800 font-bold text-xs">● Lưu tạm (${score.value || '--'})</span>`;
+      } else {
+        statusPill = '<span class="badge bg-amber-100 text-amber-800 font-bold text-xs">● Đang chấm</span>';
+      }
+    }
+
+    return `
+      <div class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200 text-xs">
+        <div>
+          <span class="font-bold text-slate-800">${s.name || s.label}</span>
+          <span class="text-slate-500 font-normal ml-1">(${assigned?.memberName || 'Chưa phân công'})</span>
+          ${isMandatory ? '<span class="text-rose-500 font-bold ml-1">*</span>' : ''}
+        </div>
+        <div>${statusPill}</div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="flex items-center justify-between">
+      <h4 class="font-black text-xs text-slate-800 uppercase tracking-wider">Tiến độ chấm điểm của Hội đồng cho SV này</h4>
+      <div class="text-[11px] font-bold text-slate-600 space-x-2">
+        <span>Bắt buộc: <strong class="${reqCompleted === reqTotal && reqTotal > 0 ? 'text-emerald-700' : 'text-amber-700'}">${reqCompleted}/${reqTotal}</strong></span>
+        ${guestTotal > 0 ? `<span>• Khách mời: <strong>${guestCompleted}/${guestTotal}</strong></span>` : ''}
+      </div>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+      ${itemsHtml}
+    </div>
+  `;
+}
+
+// 13. ADMIN REAL-TIME MONITOR (ONLY FOR ADMIN)
+function renderAdminMonitor() {
+  const container = document.getElementById('cws-admin-monitor-section');
+  if (!container) return;
+
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
+  if (!auth.isAdmin) {
+    container.classList.add('hidden');
+    return;
+  }
+  container.classList.remove('hidden');
+
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  const assignments = (act?.councilStudentAssignments || [])
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const slots = act?.councilStructure?.slots || [];
+  const membersBySlot = council.membersBySlot || {};
+  const mode = act?.scoringConfig?.mode || 'numeric';
+
+  const rowsHtml = assignments.map(asgn => {
+    const sid = asgn.studentId;
+    const sObj = findStudentInRound(sid);
+    const sName = sObj?.fullName || sObj?.studentName || sid;
+
+    let totalCompletedVal = 0;
+    let completedCount = 0;
+    const letterCounts = {};
+
+    const cellsHtml = slots.map(s => {
+      const assigned = membersBySlot[s.key];
+      const scorerId = assigned?.memberId || assigned?.memberEmail || assigned?.memberName;
+      const scoreKey = scorerId ? `${activityId}_${councilId}_${sid}_${scorerId}` : null;
+      const score = scoreKey ? state.councilScores?.[scoreKey] : null;
+
+      if (score?.status === 'completed') {
+        if (mode === 'numeric') {
+          totalCompletedVal += Number(score.value || 0);
+          completedCount++;
+          return `<td class="p-2 text-center font-mono font-bold text-emerald-700">${score.value}</td>`;
+        } else {
+          letterCounts[score.value] = (letterCounts[score.value] || 0) + 1;
+          return `<td class="p-2 text-center font-mono font-bold text-indigo-700">${score.value}</td>`;
+        }
+      } else if (score?.status === 'draft') {
+        return `<td class="p-2 text-center font-mono text-amber-600 text-[10px]">● ${score.value || 'Draft'}</td>`;
+      }
+      return '<td class="p-2 text-center text-slate-300 font-mono">--</td>';
+    }).join('');
+
+    let summaryCol = '--';
+    if (mode === 'numeric') {
+      if (completedCount > 0) {
+        const avg = (totalCompletedVal / completedCount).toFixed(2);
+        summaryCol = `<strong class="text-slate-900">${avg}</strong> <span class="text-[10px] text-slate-400">(${completedCount} chấm)</span>`;
+      }
+    } else {
+      const entries = Object.entries(letterCounts);
+      if (entries.length > 0) {
+        summaryCol = entries.map(([k, c]) => `${k}: ${c}`).join(', ');
+      }
+    }
+
+    return `
+      <tr class="hover:bg-indigo-50/40 transition-colors">
+        <td class="p-2 text-center font-mono font-bold text-slate-400">#${asgn.order || '--'}</td>
+        <td class="p-2 font-mono font-bold text-slate-900 whitespace-nowrap">${sid}</td>
+        <td class="p-2 font-bold text-slate-800 whitespace-nowrap">${sName}</td>
+        ${cellsHtml}
+        <td class="p-2 text-center font-mono font-semibold">${summaryCol}</td>
+      </tr>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="flex items-center justify-between">
+      <h4 class="font-black text-xs text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+        <span>🛡️</span> Bảng theo dõi Điểm & Trạng thái Hội đồng (Chỉ Quản trị viên)
+      </h4>
+      <span class="text-[10px] text-indigo-600 font-bold">Real-time Monitor</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs text-left border-collapse bg-white rounded-xl overflow-hidden shadow-xs border border-indigo-100">
+        <thead class="bg-indigo-50/70 text-indigo-900 border-b border-indigo-100 font-bold">
+          <tr>
+            <th class="p-2 text-center">#</th>
+            <th class="p-2">MSSV</th>
+            <th class="p-2">Họ và tên</th>
+            ${slots.map(s => `<th class="p-2 text-center whitespace-nowrap">${s.label || s.name}</th>`).join('')}
+            <th class="p-2 text-center whitespace-nowrap">${mode === 'numeric' ? 'Điểm TB' : 'Tổng hợp'}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// 14. URL DIRECT NAVIGATION LISTENER (?x=&a=&c=)
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const xCode = params.get('x') || params.get('round');
+      const aCode = params.get('a');
+      const cCode = params.get('c');
+
+      if (xCode && aCode && cCode && state.rounds && state.rounds.length > 0) {
+        const targetRound = state.rounds.find(r => !r.deleted && (r.shortCode === xCode || r.roundName === xCode || r.id === xCode || r.slug === xCode));
+        if (targetRound) {
+          const act = (targetRound.activities || []).find(a => a.id === aCode || a.slug === aCode);
+          if (act) {
+            const council = (act.councils || []).find(c => c.id === cCode || c.slug === cCode);
+            if (council) {
+              openCouncilWorkspace(targetRound.id, act.id, council.id);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('URL council direct navigation notice:', e);
+    }
+  }, 1500);
+});
+
