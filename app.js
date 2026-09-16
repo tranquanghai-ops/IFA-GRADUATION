@@ -41,7 +41,7 @@ export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   }).length;
 }
 
-/** IFA+ Graduation Beta Studio v1.6.0-beta.3 **/
+/** IFA+ Graduation Beta Studio v1.7.0-beta.1 **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -5767,6 +5767,14 @@ export function normalizeActivity(a, roundId, idx = 0) {
   const title = String(a.title || '').trim();
   const slug = String(a.slug || (title ? slugify(title) : '') || ('act-' + (idx + 1))).trim();
   const id = String(a.id || slug).trim();
+  
+  // Default council structure if missing
+  const defaultSlots = [
+    { key: 'chair', label: 'Chủ tịch', name: 'Chủ tịch Hội đồng', type: 'mandatory' },
+    { key: 'member', label: 'Ủy viên', name: 'Ủy viên Hội đồng', type: 'mandatory' },
+    { key: 'secretary', label: 'Thư ký', name: 'Thư ký Hội đồng', type: 'mandatory' }
+  ];
+
   return {
     id,
     roundId: String(a.roundId || roundId).trim(),
@@ -5781,6 +5789,11 @@ export function normalizeActivity(a, roundId, idx = 0) {
     visibility: a.visibility !== false,
     showAfterExpired: a.showAfterExpired !== false,
     submissionEnabled: Boolean(a.submissionEnabled),
+    councilEnabled: Boolean(a.councilEnabled),
+    showPresentationOrderToStudents: Boolean(a.showPresentationOrderToStudents),
+    councilStructure: (a.councilStructure && Array.isArray(a.councilStructure.slots)) ? a.councilStructure : { slots: defaultSlots },
+    councils: Array.isArray(a.councils) ? a.councils : [],
+    councilStudentAssignments: Array.isArray(a.councilStudentAssignments) ? a.councilStudentAssignments : [],
     slug,
     createdAt: a.createdAt || new Date().toISOString(),
     updatedAt: a.updatedAt || new Date().toISOString()
@@ -5919,8 +5932,9 @@ window.loadAdminRoundActivities = async function(roundId) {
           ${subBadge}
         </td>
         <td class="p-3 text-right whitespace-nowrap space-x-1">
+          ${act.councilEnabled ? `<button type="button" onclick="openActivityCouncilManagement('${targetRound.id}', '${act.id}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 transition-colors inline-flex items-center gap-1" title="Quản lý Hội đồng Mốc này"><span>⚖️ Hội đồng</span><span class="bg-indigo-200 text-indigo-900 px-1.5 py-0.2 rounded-full text-[10px]">${(act.councils || []).length}</span></button>` : ''}
           <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Sao chép link mốc ?x=...&a=...">🔗 Link</button>
-          <button type="button" onclick="copyActivityModal('${act.id}')" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 transition-colors" title="Sao chép tạo bản ghi mới">📋 Sao chép</button>
+          <button type="button" onclick="copyActivityModal('${act.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Sao chép tạo bản ghi mới">📋 Sao chép</button>
           <button type="button" onclick="toggleActivityVisibility('${act.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Ẩn/Hiện đối với sinh viên">${act.visibility !== false ? 'Ẩn' : 'Hiện'}</button>
           <button type="button" onclick="editActivityModal('${act.id}')" class="px-2 py-1 text-blue-600 hover:underline font-bold text-xs">Sửa</button>
           <button type="button" onclick="deleteActivity('${act.id}')" class="px-2 py-1 text-rose-600 hover:underline font-bold text-xs">Xóa</button>
@@ -5953,6 +5967,14 @@ window.openCreateActivityModal = function() {
   // Clear rich editor
   const editor = document.getElementById('activity-editor');
   if (editor) editor.innerHTML = '';
+
+  if (document.getElementById('activity-form-council-enabled')) {
+    document.getElementById('activity-form-council-enabled').checked = false;
+    toggleActivityCouncilFields(false);
+  }
+  if (document.getElementById('activity-form-show-order')) {
+    document.getElementById('activity-form-show-order').checked = false;
+  }
 
   document.getElementById('modal-activity-title').textContent = 'Thêm Mốc Kế hoạch Đợt TN';
   document.getElementById('modal-activity').classList.remove('hidden');
@@ -5996,6 +6018,15 @@ window.editActivityModal = function(actId) {
   document.getElementById('activity-form-visibility').checked = act.visibility !== false;
   document.getElementById('activity-form-show-expired').checked = act.showAfterExpired !== false;
   document.getElementById('activity-form-submission').checked = Boolean(act.submissionEnabled);
+
+  const councilEnabled = Boolean(act.councilEnabled);
+  if (document.getElementById('activity-form-council-enabled')) {
+    document.getElementById('activity-form-council-enabled').checked = councilEnabled;
+    toggleActivityCouncilFields(councilEnabled);
+  }
+  if (document.getElementById('activity-form-show-order')) {
+    document.getElementById('activity-form-show-order').checked = Boolean(act.showPresentationOrderToStudents);
+  }
 
   document.getElementById('modal-activity-title').textContent = 'Chỉnh sửa Mốc Kế hoạch';
   document.getElementById('modal-activity').classList.remove('hidden');
@@ -6327,6 +6358,12 @@ window.saveActivity = async function(e) {
     const slug = id ? (activities.find(a => a.id === id)?.slug || slugify(title)) : generateUniqueSlug(title, activities);
     const actId = id || ('act_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
 
+    const councilEnabled = document.getElementById('activity-form-council-enabled')?.checked === true;
+    const showPresentationOrderToStudents = document.getElementById('activity-form-show-order')?.checked === true;
+
+    // Preserve existing council data if editing
+    const existingAct = activities.find(a => a.id === actId);
+
     const activityData = {
       id: actId,
       roundId,
@@ -6340,6 +6377,17 @@ window.saveActivity = async function(e) {
       visibility,
       showAfterExpired,
       submissionEnabled,
+      councilEnabled,
+      showPresentationOrderToStudents,
+      councilStructure: existingAct?.councilStructure || {
+        slots: [
+          { key: 'chair', label: 'Chủ tịch', name: 'Chủ tịch Hội đồng', type: 'mandatory' },
+          { key: 'member', label: 'Ủy viên', name: 'Ủy viên Hội đồng', type: 'mandatory' },
+          { key: 'secretary', label: 'Thư ký', name: 'Thư ký Hội đồng', type: 'mandatory' }
+        ]
+      },
+      councils: existingAct?.councils || [],
+      councilStudentAssignments: existingAct?.councilStudentAssignments || [],
       slug,
       updatedAt: new Date().toISOString()
     };
@@ -6680,6 +6728,8 @@ window.loadStudentRoundActivities = async function(roundId) {
               </div>
             </div>
           ` : ''}
+
+          ${renderStudentCouncilTimelineInfo(act)}
         </div>
       </div>
     `;
@@ -7000,3 +7050,961 @@ window.removeSupportSupervisor = async function(studentId, supervisorId, supervi
     showToast('Lỗi gỡ GVHD hỗ trợ: ' + err.message, 'error');
   }
 };
+
+
+// ============================================================================
+// COUNCIL / HỘI ĐỒNG FOUNDATION MODULE (v1.7.0-beta.1)
+// ============================================================================
+
+window.toggleActivityCouncilFields = function(checked) {
+  const box = document.getElementById('activity-council-extra-fields');
+  if (box) {
+    if (checked) box.classList.remove('hidden');
+    else box.classList.add('hidden');
+  }
+};
+
+state.activeCouncilManagement = {
+  roundId: null,
+  activityId: null,
+  currentTab: 'councils',
+  filterQuery: '',
+  filterCouncilId: 'all'
+};
+
+window.openActivityCouncilManagement = function(roundId, actId) {
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) {
+    showToast('Không tìm thấy thông tin đợt tốt nghiệp!', 'error');
+    return;
+  }
+
+  const act = (targetRound.activities || []).find(a => a.id === actId);
+  if (!act) {
+    showToast('Không tìm thấy mốc kế hoạch!', 'error');
+    return;
+  }
+
+  state.activeCouncilManagement.roundId = roundId;
+  state.activeCouncilManagement.activityId = actId;
+  state.activeCouncilManagement.currentTab = 'councils';
+  state.activeCouncilManagement.filterQuery = '';
+  state.activeCouncilManagement.filterCouncilId = 'all';
+
+  // Ensure councilStructure defaults
+  if (!act.councilStructure || !Array.isArray(act.councilStructure.slots) || act.councilStructure.slots.length === 0) {
+    act.councilStructure = {
+      slots: [
+        { key: 'chair', label: 'Chủ tịch', name: 'Chủ tịch Hội đồng', type: 'mandatory' },
+        { key: 'member', label: 'Ủy viên', name: 'Ủy viên Hội đồng', type: 'mandatory' },
+        { key: 'secretary', label: 'Thư ký', name: 'Thư ký Hội đồng', type: 'mandatory' }
+      ]
+    };
+  }
+  act.councils = act.councils || [];
+  act.councilStudentAssignments = act.councilStudentAssignments || [];
+
+  // Update header text
+  document.getElementById('council-modal-act-title').textContent = `QUẢN LÝ HỘI ĐỒNG — ${act.title}`;
+  document.getElementById('council-modal-act-subtitle').textContent = `Đợt: ${targetRound.title} • Thời gian mốc: ${fmtActivityTime(act.startAt, act.endAt)}`;
+
+  switchCouncilTab('councils');
+  refreshCouncilModalViews();
+
+  document.getElementById('modal-activity-councils')?.classList.remove('hidden');
+};
+
+window.closeActivityCouncilManagement = function() {
+  document.getElementById('modal-activity-councils')?.classList.add('hidden');
+  const roundId = state.activeCouncilManagement.roundId;
+  if (roundId) {
+    loadAdminRoundActivities(roundId);
+    if (state.selectedRoundId === roundId) {
+      loadStudentRoundActivities(roundId);
+    }
+  }
+};
+
+window.switchCouncilTab = function(tabName) {
+  state.activeCouncilManagement.currentTab = tabName;
+  const tabs = ['councils', 'structure', 'students'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`ctab-btn-${t}`);
+    const panel = document.getElementById(`ctab-panel-${t}`);
+    if (t === tabName) {
+      if (btn) {
+        btn.classList.add('border-indigo-600', 'text-indigo-700');
+        btn.classList.remove('border-transparent', 'text-slate-500');
+      }
+      if (panel) panel.classList.remove('hidden');
+    } else {
+      if (btn) {
+        btn.classList.remove('border-indigo-600', 'text-indigo-700');
+        btn.classList.add('border-transparent', 'text-slate-500');
+      }
+      if (panel) panel.classList.add('hidden');
+    }
+  });
+
+  refreshCouncilModalViews();
+};
+
+window.refreshCouncilModalViews = function() {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const councils = act.councils || [];
+  const slots = act.councilStructure?.slots || [];
+  const assignments = act.councilStudentAssignments || [];
+
+  // Update badges in tabs
+  const councilsCountBadge = document.getElementById('cbadge-councils-count');
+  if (councilsCountBadge) councilsCountBadge.textContent = councils.length;
+
+  const slotsCountBadge = document.getElementById('cbadge-slots-count');
+  if (slotsCountBadge) slotsCountBadge.textContent = slots.length;
+
+  // Render Tab 1: Councils
+  renderCouncilCards(act);
+
+  // Render Tab 2: Structure Slots
+  renderCouncilSlotsTable(act);
+
+  // Render Tab 3: Students
+  renderCouncilStudentsTab(act);
+};
+
+// --- TAB 1: RENDER COUNCILS CARDS ---
+function renderCouncilCards(act) {
+  const container = document.getElementById('councils-cards-grid');
+  if (!container) return;
+
+  const councils = act.councils || [];
+  const assignments = act.councilStudentAssignments || [];
+  const slots = act.councilStructure?.slots || [];
+
+  if (councils.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-full p-8 text-center bg-white rounded-2xl border border-dashed border-slate-300">
+        <span class="text-3xl block mb-1">🏛️</span>
+        <span class="font-bold text-slate-700 text-xs block">Mốc này chưa có Hội đồng nào</span>
+        <p class="text-[11px] text-slate-400 mt-1">Bấm "+ Thêm Hội đồng" để tạo hội đồng đánh giá đầu tiên cho mốc.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = councils.map(c => {
+    const assignedStudents = assignments.filter(a => a.councilId === c.id);
+    const assignedCount = assignedStudents.length;
+
+    // Check currently presenting student
+    const presentingAssignment = assignedStudents.find(a => a.presentationStatus === 'presenting');
+    let presentingStudentHtml = '';
+    if (presentingAssignment) {
+      const studentObj = findStudentInRound(presentingAssignment.studentId);
+      presentingStudentHtml = `
+        <div class="mt-2 p-2 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-lg flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <span class="font-bold text-[10px] uppercase tracking-wider text-emerald-800">Đang trình bày:</span>
+            <span class="font-extrabold text-xs">${studentObj?.fullName || studentObj?.studentName || presentingAssignment.studentId}</span>
+          </div>
+          <span class="font-mono text-[10px] text-emerald-700 font-bold">#${presentingAssignment.order || '--'}</span>
+        </div>
+      `;
+    }
+
+    // Member slot fulfillment
+    const membersBySlot = c.membersBySlot || {};
+    let filledSlotsCount = 0;
+    slots.forEach(s => {
+      if (membersBySlot[s.key] && (membersBySlot[s.key].memberName || membersBySlot[s.key].name)) {
+        filledSlotsCount++;
+      }
+    });
+
+    let statusBadge = '<span class="badge bg-slate-100 text-slate-700 font-bold">Chuẩn bị</span>';
+    if (c.status === 'ongoing') statusBadge = '<span class="badge bg-emerald-100 text-emerald-800 font-bold">● Đang diễn ra</span>';
+    else if (c.status === 'completed') statusBadge = '<span class="badge bg-slate-200 text-slate-600 font-bold">✓ Đã kết thúc</span>';
+
+    return `
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 hover:border-slate-300 shadow-xs transition-all space-y-3">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="flex items-center gap-2">
+              <h4 class="font-black text-sm text-slate-900 tracking-tight">${c.name}</h4>
+              ${statusBadge}
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5 font-medium">📍 ${c.room || 'Chưa cập nhật phòng'}</p>
+          </div>
+          <div class="text-right">
+            <span class="font-black text-indigo-700 text-xs block">${assignedCount} SV</span>
+            <span class="text-[10px] text-slate-400">${filledSlotsCount}/${slots.length} thành viên</span>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600 font-mono bg-slate-50 p-2 rounded-xl border border-slate-100">
+          <span>📅 ${c.date || '--'}</span>
+          <span>🕒 ${c.startTime || '--'} → ${c.endTime || '--'}</span>
+        </div>
+
+        ${presentingStudentHtml}
+
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+          <button type="button" onclick="copyCouncilLink('${act.slug}', '${c.slug || c.id}')" class="text-slate-500 hover:text-indigo-600 font-semibold text-[11px] flex items-center gap-1" title="Sao chép link trực tiếp đến Hội đồng này">
+            <span>🔗 Link</span>
+          </button>
+          <div class="space-x-1.5">
+            <button type="button" onclick="copyCouncil('${c.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Sao chép Hội đồng">📋 Sao chép</button>
+            <button type="button" onclick="editCouncilModal('${c.id}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 transition-colors">Sửa / Thành viên</button>
+            <button type="button" onclick="deleteCouncil('${c.id}')" class="px-2 py-1 text-rose-600 hover:underline font-bold text-xs">Xóa</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// --- TAB 2: RENDER STRUCTURE SLOTS TABLE ---
+function renderCouncilSlotsTable(act) {
+  const tbody = document.getElementById('council-slots-tbody');
+  if (!tbody) return;
+
+  const slots = act.councilStructure?.slots || [];
+  tbody.innerHTML = slots.map((s, idx) => {
+    const isMandatory = (s.type === 'mandatory');
+    return `
+      <tr class="hover:bg-slate-50">
+        <td class="p-3 text-center font-bold text-slate-400 font-mono">${idx + 1}</td>
+        <td class="p-3 font-bold text-slate-800">${s.name || s.label}</td>
+        <td class="p-3 font-mono font-bold text-indigo-700">${s.label || s.key}</td>
+        <td class="p-3">
+          ${isMandatory ? '<span class="badge bg-slate-100 text-slate-700 font-bold">Bắt buộc</span>' : '<span class="badge bg-amber-100 text-amber-800 font-bold">Khách mời / DN</span>'}
+        </td>
+        <td class="p-3 text-right">
+          ${!isMandatory ? `<button type="button" onclick="deleteGuestSlot('${s.key}')" class="text-rose-600 hover:underline font-bold text-xs">Xóa</button>` : '<span class="text-slate-300 font-semibold">Cố định</span>'}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// --- TAB 3: RENDER STUDENTS & PRESENTATION ORDER ---
+function renderCouncilStudentsTab(act) {
+  const tbody = document.getElementById('council-students-tbody');
+  const councilFilterSelect = document.getElementById('council-student-filter-council');
+  if (!tbody) return;
+
+  const councils = act.councils || [];
+  const assignments = act.councilStudentAssignments || [];
+
+  // Update Council filter dropdown
+  if (councilFilterSelect) {
+    const currentVal = state.activeCouncilManagement.filterCouncilId || 'all';
+    councilFilterSelect.innerHTML = '<option value="all">Tất cả sinh viên</option><option value="unassigned">Chưa phân Hội đồng</option>' + councils.map(c => {
+      const cCount = assignments.filter(a => a.councilId === c.id).length;
+      return `<option value="${c.id}">${c.name} (${cCount} SV)</option>`;
+    }).join('');
+    councilFilterSelect.value = currentVal;
+  }
+
+  // Get all registered or eligible students in round
+  const roundStudents = getRoundAllStudents();
+  const studentsCountBadge = document.getElementById('cbadge-students-count');
+  const assignedCount = assignments.filter(a => !!a.councilId).length;
+  if (studentsCountBadge) studentsCountBadge.textContent = `${assignedCount}/${roundStudents.length}`;
+
+  const q = String(state.activeCouncilManagement.filterQuery || '').trim().toLowerCase();
+  const filterCid = state.activeCouncilManagement.filterCouncilId || 'all';
+
+  const filteredStudents = roundStudents.filter(s => {
+    const sid = s.mssv || s.studentId;
+    const name = s.fullName || s.studentName || '';
+    const topic = s.topicTitle || '';
+    if (q && !sid.toLowerCase().includes(q) && !name.toLowerCase().includes(q) && !topic.toLowerCase().includes(q)) {
+      return false;
+    }
+
+    const asgn = assignments.find(a => a.studentId === sid);
+    if (filterCid === 'unassigned') {
+      return !asgn || !asgn.councilId;
+    }
+    if (filterCid !== 'all') {
+      return asgn && asgn.councilId === filterCid;
+    }
+    return true;
+  });
+
+  const countTag = document.getElementById('council-student-filter-count');
+  if (countTag) countTag.textContent = `Hiển thị: ${filteredStudents.length} sinh viên`;
+
+  if (filteredStudents.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">Không có sinh viên phù hợp điều kiện lọc.</td></tr>';
+    return;
+  }
+
+  // Render rows
+  tbody.innerHTML = filteredStudents.map((s, idx) => {
+    const sid = s.mssv || s.studentId;
+    const name = s.fullName || s.studentName || '--';
+    const topic = s.topicTitle || '--';
+    const asgn = assignments.find(a => a.studentId === sid);
+    const assignedCouncilId = asgn?.councilId || '';
+    const order = asgn?.order || (idx + 1);
+    const status = asgn?.presentationStatus || 'waiting';
+
+    const councilOptions = '<option value="">-- Chưa phân công --</option>' + councils.map(c => {
+      return `<option value="${c.id}" ${assignedCouncilId === c.id ? 'selected' : ''}>${c.name}</option>`;
+    }).join('');
+
+    let statusPill = '<span class="badge bg-slate-100 text-slate-600 font-bold">Chờ</span>';
+    if (status === 'presenting') {
+      statusPill = '<span class="badge bg-emerald-500 text-white font-black animate-pulse">● Đang trình bày</span>';
+    } else if (status === 'presented') {
+      statusPill = '<span class="badge bg-indigo-100 text-indigo-800 font-bold">✓ Đã xong</span>';
+    }
+
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="p-3 text-center font-mono font-bold text-slate-400">${idx + 1}</td>
+        <td class="p-3 font-mono font-bold text-slate-900">${sid}</td>
+        <td class="p-3 font-semibold text-slate-800 whitespace-nowrap">${name}</td>
+        <td class="p-3 max-w-xs truncate text-slate-700" title="${topic}">${topic}</td>
+        <td class="p-3">
+          <select onchange="changeStudentCouncil('${sid}', this.value)" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold ${assignedCouncilId ? 'bg-indigo-50/60 text-indigo-900 border-indigo-200' : 'bg-white text-slate-500'}">
+            ${councilOptions}
+          </select>
+        </td>
+        <td class="p-3 text-center whitespace-nowrap">
+          ${assignedCouncilId ? `
+            <div class="flex items-center justify-center gap-1">
+              <span class="font-mono font-bold text-slate-700 w-5">#${order}</span>
+              <div class="flex flex-col">
+                <button type="button" onclick="moveStudentCouncilOrder('${sid}', 'up')" class="text-[10px] text-slate-400 hover:text-slate-800 leading-none">▲</button>
+                <button type="button" onclick="moveStudentCouncilOrder('${sid}', 'down')" class="text-[10px] text-slate-400 hover:text-slate-800 leading-none">▼</button>
+              </div>
+            </div>
+          ` : '<span class="text-slate-300 font-mono">--</span>'}
+        </td>
+        <td class="p-3 text-center whitespace-nowrap space-x-1">
+          ${assignedCouncilId ? `
+            ${statusPill}
+            <div class="inline-flex gap-1 ml-1.5">
+              <button type="button" onclick="setStudentPresentationStatus('${sid}', 'presenting')" class="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold" title="Bắt đầu trình bày">▶</button>
+              <button type="button" onclick="setStudentPresentationStatus('${sid}', 'presented')" class="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold" title="Hoàn tất trình bày">✓</button>
+              <button type="button" onclick="setStudentPresentationStatus('${sid}', 'waiting')" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[10px] font-bold" title="Đặt lại trạng thái chờ">↺</button>
+            </div>
+          ` : '<span class="text-slate-300">--</span>'}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.filterCouncilStudents = function() {
+  const searchInput = document.getElementById('council-student-search');
+  const councilSelect = document.getElementById('council-student-filter-council');
+  state.activeCouncilManagement.filterQuery = searchInput?.value || '';
+  state.activeCouncilManagement.filterCouncilId = councilSelect?.value || 'all';
+
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (act) renderCouncilStudentsTab(act);
+};
+
+// Helper: Get all students registered or eligible in round
+function getRoundAllStudents() {
+  const { roundId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) return [];
+
+  // Priority 1: registrations in adminReviewData
+  if (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0) {
+    return state.adminReviewData.registrations;
+  }
+  // Priority 2: eligibleStudents
+  if (Array.isArray(targetRound.eligibleStudents) && targetRound.eligibleStudents.length > 0) {
+    return targetRound.eligibleStudents;
+  }
+  return [];
+}
+
+function findStudentInRound(studentId) {
+  const all = getRoundAllStudents();
+  return all.find(s => (s.mssv === studentId || s.studentId === studentId));
+}
+
+// --- STUDENT COUNCIL ASSIGNMENT ACTIONS ---
+window.changeStudentCouncil = async function(studentId, newCouncilId) {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  act.councilStudentAssignments = act.councilStudentAssignments || [];
+  let existingIdx = act.councilStudentAssignments.findIndex(a => a.studentId === studentId);
+
+  if (!newCouncilId) {
+    // Unassign
+    if (existingIdx >= 0) {
+      act.councilStudentAssignments.splice(existingIdx, 1);
+    }
+  } else {
+    // Assign to new council: assign max order in that council
+    const councilAssignments = act.councilStudentAssignments.filter(a => a.councilId === newCouncilId);
+    const maxOrder = councilAssignments.reduce((m, a) => Math.max(m, a.order || 0), 0);
+
+    if (existingIdx >= 0) {
+      act.councilStudentAssignments[existingIdx].councilId = newCouncilId;
+      act.councilStudentAssignments[existingIdx].order = maxOrder + 1;
+    } else {
+      act.councilStudentAssignments.push({
+        studentId,
+        councilId: newCouncilId,
+        order: maxOrder + 1,
+        presentationStatus: 'waiting'
+      });
+    }
+  }
+
+  await persistActivityCouncilChanges(targetRound);
+  refreshCouncilModalViews();
+};
+
+window.moveStudentCouncilOrder = async function(studentId, direction) {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const assignments = act.councilStudentAssignments || [];
+  const current = assignments.find(a => a.studentId === studentId);
+  if (!current || !current.councilId) return;
+
+  const councilStudents = assignments
+    .filter(a => a.councilId === current.councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const idx = councilStudents.findIndex(a => a.studentId === studentId);
+  if (idx < 0) return;
+
+  if (direction === 'up' && idx > 0) {
+    const temp = councilStudents[idx].order;
+    councilStudents[idx].order = councilStudents[idx - 1].order;
+    councilStudents[idx - 1].order = temp;
+  } else if (direction === 'down' && idx < councilStudents.length - 1) {
+    const temp = councilStudents[idx].order;
+    councilStudents[idx].order = councilStudents[idx + 1].order;
+    councilStudents[idx + 1].order = temp;
+  } else {
+    return;
+  }
+
+  await persistActivityCouncilChanges(targetRound);
+  renderCouncilStudentsTab(act);
+};
+
+window.setStudentPresentationStatus = async function(studentId, newStatus) {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const current = (act.councilStudentAssignments || []).find(a => a.studentId === studentId);
+  if (!current) return;
+
+  // If setting to presenting, reset any other student presenting in the same council to waiting/presented
+  if (newStatus === 'presenting') {
+    (act.councilStudentAssignments || []).forEach(a => {
+      if (a.councilId === current.councilId && a.studentId !== studentId && a.presentationStatus === 'presenting') {
+        a.presentationStatus = 'waiting';
+      }
+    });
+  }
+
+  current.presentationStatus = newStatus;
+
+  await persistActivityCouncilChanges(targetRound);
+  refreshCouncilModalViews();
+};
+
+// --- CREATE / EDIT / COPY COUNCIL MODALS ---
+window.openCreateCouncilModal = function() {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  document.getElementById('form-edit-council').reset();
+  document.getElementById('council-form-id').value = '';
+  document.getElementById('modal-edit-council-title').textContent = 'Thêm Hội đồng mới';
+
+  // Suggest next council name
+  const nextNum = (act.councils || []).length + 1;
+  document.getElementById('council-form-name').value = `HĐ${nextNum}`;
+  document.getElementById('council-form-status').value = 'preparing';
+
+  // Inherit activity date/time if available
+  const actStart = isoToVietnameseDateTime(act.startAt);
+  const actEnd = isoToVietnameseDateTime(act.endAt);
+  document.getElementById('council-form-date').value = actStart.date || '';
+  document.getElementById('council-form-start-time').value = actStart.time || '08:00';
+  document.getElementById('council-form-end-time').value = actEnd.time || '11:30';
+
+  renderCouncilMembersFormSlots(act, {});
+
+  document.getElementById('modal-edit-council')?.classList.remove('hidden');
+};
+
+window.editCouncilModal = function(councilId) {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const council = (act.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  document.getElementById('council-form-id').value = council.id;
+  document.getElementById('modal-edit-council-title').textContent = `Chỉnh sửa: ${council.name}`;
+  document.getElementById('council-form-name').value = council.name || '';
+  document.getElementById('council-form-room').value = council.room || '';
+  document.getElementById('council-form-status').value = council.status || 'preparing';
+  document.getElementById('council-form-date').value = council.date || '';
+  document.getElementById('council-form-start-time').value = council.startTime || '';
+  document.getElementById('council-form-end-time').value = council.endTime || '';
+  document.getElementById('council-form-note').value = council.note || '';
+
+  renderCouncilMembersFormSlots(act, council.membersBySlot || {});
+
+  document.getElementById('modal-edit-council')?.classList.remove('hidden');
+};
+
+window.copyCouncil = function(councilId) {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const council = (act.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  // Clear ID so it will create a new council!
+  document.getElementById('council-form-id').value = '';
+  document.getElementById('modal-edit-council-title').textContent = `Sao chép Hội đồng (Bản mới)`;
+  document.getElementById('council-form-name').value = `${council.name} (Bản sao)`;
+  document.getElementById('council-form-room').value = council.room || '';
+  document.getElementById('council-form-status').value = 'preparing';
+  document.getElementById('council-form-date').value = council.date || '';
+  document.getElementById('council-form-start-time').value = council.startTime || '';
+  document.getElementById('council-form-end-time').value = council.endTime || '';
+  document.getElementById('council-form-note').value = council.note || '';
+
+  renderCouncilMembersFormSlots(act, council.membersBySlot || {});
+
+  document.getElementById('modal-edit-council')?.classList.remove('hidden');
+  showToast('Đã sao chép cấu hình Hội đồng. Vui lòng kiểm tra và lưu lại.', 'info');
+};
+
+window.closeEditCouncilModal = function() {
+  document.getElementById('modal-edit-council')?.classList.add('hidden');
+};
+
+function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
+  const container = document.getElementById('council-members-form-container');
+  if (!container) return;
+
+  const slots = act.councilStructure?.slots || [];
+  const supervisors = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
+    ? state.supervisorsMaster
+    : (state.roundSupervisors || []);
+
+  container.innerHTML = slots.map(s => {
+    const assigned = membersBySlot[s.key] || {};
+    const memberId = assigned.memberId || '';
+    const memberName = assigned.memberName || '';
+    const isGuest = (assigned.type === 'guest');
+
+    return `
+      <div class="p-2.5 bg-white border border-slate-200 rounded-xl space-y-1.5">
+        <div class="flex items-center justify-between">
+          <label class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+            <span>👤</span> ${s.name || s.label} <span class="text-indigo-600 font-mono text-[10px]">(${s.label || s.key})</span>
+          </label>
+          <label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer">
+            <input type="checkbox" id="chk-guest-${s.key}" ${isGuest ? 'checked' : ''} onchange="toggleSlotGuestInput('${s.key}', this.checked)" class="rounded text-tdtu-blue">
+            <span>Khách mời ngoài</span>
+          </label>
+        </div>
+
+        <!-- Supervisor dropdown -->
+        <div id="slot-sup-wrap-${s.key}" class="${isGuest ? 'hidden' : ''}">
+          <select id="slot-sup-${s.key}" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+            <option value="">-- Chưa phân công --</option>
+            ${supervisors.map(sup => `
+              <option value="${sup.id}" ${memberId === sup.id ? 'selected' : ''}>${sup.name} (${sup.department || 'Khoa MTCN'})${sup.employmentType === 'adjunct' ? ' • Thỉnh giảng' : ''}</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <!-- Guest manual inputs -->
+        <div id="slot-guest-wrap-${s.key}" class="${isGuest ? '' : 'hidden'} grid grid-cols-2 gap-2">
+          <input type="text" id="slot-guest-name-${s.key}" value="${isGuest ? memberName : ''}" placeholder="Họ và tên khách mời..." class="p-2 border border-slate-300 rounded-lg text-xs">
+          <input type="text" id="slot-guest-org-${s.key}" value="${assigned.organization || ''}" placeholder="Đơn vị / Doanh nghiệp..." class="p-2 border border-slate-300 rounded-lg text-xs">
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.toggleSlotGuestInput = function(slotKey, isGuest) {
+  const supWrap = document.getElementById(`slot-sup-wrap-${slotKey}`);
+  const guestWrap = document.getElementById(`slot-guest-wrap-${slotKey}`);
+  if (supWrap && guestWrap) {
+    if (isGuest) {
+      supWrap.classList.add('hidden');
+      guestWrap.classList.remove('hidden');
+    } else {
+      supWrap.classList.remove('hidden');
+      guestWrap.classList.add('hidden');
+    }
+  }
+};
+
+window.syncCouncilDatePicker = function(val) {
+  if (!val) return;
+  const parts = val.split('-');
+  if (parts.length === 3) {
+    const input = document.getElementById('council-form-date');
+    if (input) input.value = `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+};
+
+window.clearCouncilDateTime = function() {
+  const dateInput = document.getElementById('council-form-date');
+  const startInput = document.getElementById('council-form-start-time');
+  const endInput = document.getElementById('council-form-end-time');
+  if (dateInput) dateInput.value = '';
+  if (startInput) startInput.value = '';
+  if (endInput) endInput.value = '';
+};
+
+window.saveCouncil = async function(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const id = document.getElementById('council-form-id')?.value?.trim();
+  const name = document.getElementById('council-form-name')?.value?.trim();
+  const room = document.getElementById('council-form-room')?.value?.trim() || '';
+  const status = document.getElementById('council-form-status')?.value || 'preparing';
+  const date = document.getElementById('council-form-date')?.value?.trim() || '';
+  const startTime = document.getElementById('council-form-start-time')?.value?.trim() || '';
+  const endTime = document.getElementById('council-form-end-time')?.value?.trim() || '';
+  const note = document.getElementById('council-form-note')?.value?.trim() || '';
+
+  if (!name) {
+    showToast('Vui lòng nhập tên Hội đồng (*)', 'warning');
+    return;
+  }
+
+  // Validate date & time
+  if (date) {
+    const parsed = parseVietnameseDateTime(date, startTime || '08:00');
+    if (parsed === null) {
+      showToast('Ngày đánh giá không hợp lệ (DD/MM/YYYY)!', 'warning');
+      return;
+    }
+  }
+
+  // Extract membersBySlot
+  const slots = act.councilStructure?.slots || [];
+  const membersBySlot = {};
+  const supervisors = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
+    ? state.supervisorsMaster
+    : (state.roundSupervisors || []);
+
+  slots.forEach(s => {
+    const isGuest = document.getElementById(`chk-guest-${s.key}`)?.checked === true;
+    if (isGuest) {
+      const gName = document.getElementById(`slot-guest-name-${s.key}`)?.value?.trim();
+      const gOrg = document.getElementById(`slot-guest-org-${s.key}`)?.value?.trim();
+      if (gName) {
+        membersBySlot[s.key] = {
+          type: 'guest',
+          memberName: gName,
+          organization: gOrg || '',
+          slotKey: s.key
+        };
+      }
+    } else {
+      const supId = document.getElementById(`slot-sup-${s.key}`)?.value;
+      if (supId) {
+        const supObj = supervisors.find(x => x.id === supId);
+        membersBySlot[s.key] = {
+          type: 'supervisor',
+          memberId: supId,
+          memberName: supObj?.name || 'Giảng viên',
+          memberEmail: supObj?.email || '',
+          department: supObj?.department || '',
+          slotKey: s.key
+        };
+      }
+    }
+  });
+
+  const slug = id ? ((act.councils || []).find(c => c.id === id)?.slug || slugify(name)) : ('c-' + slugify(name) + '-' + Date.now().toString(36).substr(-4));
+  const councilId = id || ('council_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
+
+  const councilData = {
+    id: councilId,
+    slug,
+    name,
+    room,
+    status,
+    date,
+    startTime,
+    endTime,
+    note,
+    membersBySlot,
+    updatedAt: new Date().toISOString()
+  };
+
+  act.councils = act.councils || [];
+  const existingIdx = act.councils.findIndex(c => c.id === councilId);
+  if (existingIdx >= 0) {
+    act.councils[existingIdx] = councilData;
+  } else {
+    councilData.createdAt = councilData.updatedAt;
+    act.councils.push(councilData);
+  }
+
+  await persistActivityCouncilChanges(targetRound);
+  closeEditCouncilModal();
+  refreshCouncilModalViews();
+  showToast(`✓ Đã lưu thông tin Hội đồng "${name}" thành công!`, 'success');
+};
+
+window.deleteCouncil = async function(councilId) {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const council = (act.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  const confirmed = await showConfirm(
+    'Xóa Hội đồng',
+    `Bạn có chắc chắn muốn xóa Hội đồng "${council.name}" không? Các sinh viên đã phân vào Hội đồng này sẽ chuyển về trạng thái Chưa phân công.`,
+    { confirmText: 'Xóa Hội đồng', danger: true }
+  );
+  if (!confirmed) return;
+
+  act.councils = (act.councils || []).filter(c => c.id !== councilId);
+  // Free assigned students
+  (act.councilStudentAssignments || []).forEach(a => {
+    if (a.councilId === councilId) {
+      a.councilId = '';
+      a.presentationStatus = 'waiting';
+    }
+  });
+
+  await persistActivityCouncilChanges(targetRound);
+  refreshCouncilModalViews();
+  showToast(`Đã xóa Hội đồng "${council.name}".`, 'info');
+};
+
+// --- GUEST SLOTS MANAGEMENT ---
+window.openAddGuestSlotModal = function() {
+  document.getElementById('slot-form-name').value = '';
+  document.getElementById('slot-form-label').value = '';
+  document.getElementById('modal-add-guest-slot')?.classList.remove('hidden');
+};
+
+window.closeAddGuestSlotModal = function() {
+  document.getElementById('modal-add-guest-slot')?.classList.add('hidden');
+};
+
+window.saveGuestSlot = async function() {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const name = document.getElementById('slot-form-name')?.value?.trim();
+  const label = document.getElementById('slot-form-label')?.value?.trim();
+  if (!name || !label) {
+    showToast('Vui lòng nhập đầy đủ tên và mã viết tắt cho vị trí mới', 'warning');
+    return;
+  }
+
+  const key = 'guest_' + Date.now().toString(36);
+  act.councilStructure = act.councilStructure || { slots: [] };
+  act.councilStructure.slots.push({
+    key,
+    label,
+    name,
+    type: 'guest'
+  });
+
+  await persistActivityCouncilChanges(targetRound);
+  closeAddGuestSlotModal();
+  refreshCouncilModalViews();
+  showToast(`✓ Đã thêm vị trí "${name}" vào cấu trúc Hội đồng của Mốc!`, 'success');
+};
+
+window.deleteGuestSlot = async function(slotKey) {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const slots = act.councilStructure?.slots || [];
+  const targetSlot = slots.find(s => s.key === slotKey);
+  if (!targetSlot || targetSlot.type === 'mandatory') {
+    showToast('Không thể xóa vị trí bắt buộc!', 'warning');
+    return;
+  }
+
+  const confirmed = await showConfirm(
+    'Xóa Vị trí Thành viên',
+    `Bạn có chắc chắn muốn xóa vị trí "${targetSlot.name || targetSlot.label}" khỏi tất cả các Hội đồng trong Mốc này không?`,
+    { confirmText: 'Xóa vị trí', danger: true }
+  );
+  if (!confirmed) return;
+
+  act.councilStructure.slots = slots.filter(s => s.key !== slotKey);
+
+  // Clean up from all councils
+  (act.councils || []).forEach(c => {
+    if (c.membersBySlot && c.membersBySlot[slotKey]) {
+      delete c.membersBySlot[slotKey];
+    }
+  });
+
+  await persistActivityCouncilChanges(targetRound);
+  refreshCouncilModalViews();
+  showToast(`Đã xóa vị trí "${targetSlot.name}".`, 'info');
+};
+
+// --- LINK COPIERS ---
+window.copyCouncilLink = function(activitySlug, councilSlug) {
+  const { roundId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const rCode = targetRound?.slug || targetRound?.shortCode || roundId;
+  const link = `${window.location.origin}${window.location.pathname}?x=${encodeURIComponent(rCode)}&a=${encodeURIComponent(activitySlug)}&c=${encodeURIComponent(councilSlug)}`;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(() => {
+      showToast('✓ Đã sao chép liên kết trực tiếp Hội đồng: ' + link, 'success');
+    }).catch(() => {
+      prompt('Liên kết Hội đồng:', link);
+    });
+  } else {
+    prompt('Liên kết Hội đồng:', link);
+  }
+};
+
+// --- PERSISTENCE HELPER ---
+async function persistActivityCouncilChanges(targetRound) {
+  const roundId = targetRound.id;
+  try {
+    const roundRef = doc(db, 'graduationRounds', roundId);
+    await updateDoc(roundRef, {
+      activities: targetRound.activities,
+      updatedAt: serverTimestamp()
+    });
+  } catch (err) {
+    console.error('Lỗi lưu thay đổi Hội đồng:', err);
+    showToast('Lỗi lưu dữ liệu: ' + err.message, 'error');
+  }
+}
+
+// --- STUDENT TIMELINE RENDERING HELPER ---
+function renderStudentCouncilTimelineInfo(act) {
+  if (!act || !act.councilEnabled) return '';
+
+  const councils = act.councils || [];
+  const assignments = act.councilStudentAssignments || [];
+
+  // Determine current student ID (logged in or viewed in preview)
+  const studentMssv = state.studentMssv || state.user?.email?.split('@')[0];
+  const asgn = studentMssv ? assignments.find(a => a.studentId === studentMssv) : null;
+  const council = asgn && asgn.councilId ? councils.find(c => c.id === asgn.councilId) : null;
+
+  // Check if current user is a Supervisor in any of the councils in this activity
+  let memberBannerHtml = '';
+  const userEmail = state.user?.email?.toLowerCase();
+  if (userEmail) {
+    for (const c of councils) {
+      const members = Object.values(c.membersBySlot || {});
+      const myMembership = members.find(m => m.memberEmail && m.memberEmail.toLowerCase() === userEmail);
+      if (myMembership) {
+        const slotObj = (act.councilStructure?.slots || []).find(s => s.key === myMembership.slotKey);
+        memberBannerHtml = `
+          <div class="mt-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
+            <span class="font-bold text-blue-900 text-xs flex items-center gap-1.5">
+              <span>🏛️</span> Thầy/Cô được phân công: <strong>${c.name}</strong> (${slotObj?.name || slotObj?.label || 'Thành viên'})
+            </span>
+            <p class="text-[11px] text-blue-700">📍 Phòng: ${c.room || 'Đang cập nhật'} • 📅 Ngày: ${c.date || '--'} (${c.startTime || '--'} – ${c.endTime || '--'})</p>
+          </div>
+        `;
+        break;
+      }
+    }
+  }
+
+  if (!council) {
+    return `
+      <div class="mt-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs text-slate-600">
+        <span class="font-semibold">⚖️ Hội đồng đánh giá: <span class="text-slate-400 italic">Chưa phân công</span></span>
+        ${act.councils?.length > 0 ? `<span class="text-[10px] text-slate-400">${act.councils.length} Hội đồng</span>` : ''}
+      </div>
+      ${memberBannerHtml}
+    `;
+  }
+
+  let statusCls = 'bg-slate-100 text-slate-700';
+  let statusText = 'Chờ trình bày';
+  if (asgn.presentationStatus === 'presenting') {
+    statusCls = 'bg-emerald-500 text-white font-black animate-pulse';
+    statusText = '● Đang trình bày';
+  } else if (asgn.presentationStatus === 'presented') {
+    statusCls = 'bg-indigo-100 text-indigo-800 font-bold';
+    statusText = '✓ Đã trình bày';
+  }
+
+  const showOrder = act.showPresentationOrderToStudents && asgn.order;
+
+  return `
+    <div class="mt-2.5 p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2 text-xs">
+      <div class="flex items-center justify-between">
+        <span class="font-black text-indigo-950 flex items-center gap-1.5 text-xs sm:text-sm">
+          <span>⚖️</span> HỘI ĐỒNG: ${council.name}
+        </span>
+        <span class="badge ${statusCls} text-[10px]">${statusText}</span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-indigo-900 text-[11px]">
+        <div>📍 <strong>Phòng:</strong> ${council.room || 'Đang cập nhật'}</div>
+        <div>📅 <strong>Ngày:</strong> ${council.date || '--'} (${council.startTime || '--'} – ${council.endTime || '--'})</div>
+      </div>
+
+      ${showOrder ? `
+        <div class="pt-1.5 border-t border-indigo-100 flex items-center justify-between text-indigo-900">
+          <span class="font-semibold text-[11px]">Thứ tự trình bày của bạn:</span>
+          <span class="font-black text-xs px-2 py-0.5 bg-white rounded-lg border border-indigo-200">#${asgn.order}</span>
+        </div>
+      ` : ''}
+    </div>
+    ${memberBannerHtml}
+  `;
+}
