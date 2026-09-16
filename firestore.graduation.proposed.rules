@@ -416,67 +416,116 @@ service cloud.firestore {
       }
 
       // ============================================================================
-      // PROPOSED RULES FOR v2.3.1 (PHASE B MIGRATION - DO NOT DEPLOY YET)
+      // PROPOSED RULES FOR v2.3.2 (HARDENED SUBCOLLECTIONS - DO NOT DEPLOY YET)
       // ============================================================================
 
       // 1. Điểm chấm Hội đồng độc lập (councilScores)
       match /councilScores/{scoreId} {
-        // Đọc: Admin hoặc Giảng viên (staff)
-        allow read: if admin() || staff();
+        // Đọc: Chỉ Admin hoặc chính Giảng viên chấm điểm đó (Least Privilege - Không Staff Wildcard)
+        // Sinh viên tuyệt đối không được đọc điểm nội bộ hội đồng.
+        allow read: if admin()
+          || (staff() && resource.data.scorerEmail == email());
 
-        // Tạo: Admin hoặc Giảng viên chấm điểm chính chủ
+        // Tạo mới: Admin hoặc Giảng viên chấm điểm chính chủ
+        // Bắt buộc ràng buộc định danh: scorerEmail == auth.email, scoreId khớp format
         allow create: if admin()
-          || (staff() 
+          || (staff()
               && request.resource.data.scorerEmail == email()
+              && request.resource.data.scorerId is string
               && request.resource.data.studentId is string
-              && request.resource.data.activityId is string);
+              && request.resource.data.activityId is string
+              && request.resource.data.councilId is string
+              && request.resource.data.roundId == roundId
+              && request.resource.data.scoreId == (request.resource.data.activityId + '_' + request.resource.data.councilId + '_' + request.resource.data.studentId + '_' + request.resource.data.scorerId)
+              && scoreId == request.resource.data.scoreId
+              && (!('score' in request.resource.data) || (request.resource.data.score is number && request.resource.data.score >= 0 && request.resource.data.score <= 10)));
 
-        // Cập nhật: Admin, hoặc Giảng viên chấm chính chủ cập nhật phiếu điểm của mình,
-        // hoặc Chủ tịch Hội đồng hiệu chỉnh điểm (calibration)
-        allow update: if admin()
-          || (staff() 
-              && resource.data.scorerEmail == email() 
-              && request.resource.data.scorerEmail == email())
-          || (staff() 
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['calibration', 'updatedAt']));
+        // Cập nhật:
+        // 1) Giảng viên chấm cập nhật phiếu điểm chính chủ:
+        //    BẢO TOÀN TRƯỜNG ĐỊNH DANH (IMMUTABLE IDENTITY FIELDS): không được đổi scorerEmail, studentId, activityId, councilId, scorerId, roundId.
+        // 2) Admin hiệu chỉnh điểm (Calibration): identity fields vẫn BẤT BIẾN, chỉ chỉnh sửa điểm/nhận xét/calibration metadata.
+        // GHI CHÚ: Chair calibration từ client bị chặn ở Database Rules do dữ liệu phân công hội đồng nằm nested,
+        // Chair calibration phải qua Admin workflow hoặc chờ Authorization Index Docs.
+        allow update: if (staff()
+              && resource.data.scorerEmail == email()
+              && request.resource.data.scorerEmail == email()
+              && request.resource.data.scorerId == resource.data.scorerId
+              && request.resource.data.studentId == resource.data.studentId
+              && request.resource.data.activityId == resource.data.activityId
+              && request.resource.data.councilId == resource.data.councilId
+              && request.resource.data.roundId == resource.data.roundId
+              && (!('score' in request.resource.data) || (request.resource.data.score is number && request.resource.data.score >= 0 && request.resource.data.score <= 10)))
+          || (admin()
+              && request.resource.data.scorerEmail == resource.data.scorerEmail
+              && request.resource.data.scorerId == resource.data.scorerId
+              && request.resource.data.studentId == resource.data.studentId
+              && request.resource.data.activityId == resource.data.activityId
+              && request.resource.data.councilId == resource.data.councilId
+              && request.resource.data.roundId == resource.data.roundId);
 
-        allow delete: if admin();
+        // KHÔNG XÓA PHIẾU ĐIỂM: Mark voided/revoked + audit thay vì delete vật lý
+        allow delete: if false;
       }
 
       // 2. Từng lần nộp bài của Sinh viên (submissions)
       match /submissions/{submissionId} {
-        // Đọc: Admin, chính Sinh viên nộp, hoặc Giảng viên
+        // Đọc: Admin hoặc chính Sinh viên nộp bài (Không Staff Wildcard)
+        // GHI CHÚ: Giảng viên hướng dẫn / Phản biện / Hội đồng đọc file nộp cần Authorization Index Docs hoặc Trusted Backend.
         allow read: if admin()
-          || (student() && resource.data.studentId == email().replace('@student.tdtu.edu.vn', ''))
-          || staff();
+          || (student() && email().matches('^' + resource.data.studentId + '@student\\.tdtu\\.edu\\.vn$'));
 
         // Tạo mới: Admin hoặc chính Sinh viên nộp bài cho bản thân
         allow create: if admin()
           || (student()
-              && request.resource.data.studentId == email().replace('@student.tdtu.edu.vn', '')
+              && request.resource.data.studentId is string
+              && email().matches('^' + request.resource.data.studentId + '@student\\.tdtu\\.edu\\.vn$')
               && request.resource.data.submittedBy == email()
+              && request.resource.data.roundId == roundId
+              && request.resource.data.activityId is string
+              && request.resource.data.submissionId == submissionId
               && request.resource.data.status in ['submitted', 'uploading', 'draft']
-              && request.resource.data.files is list);
+              && request.resource.data.files is list
+              && request.resource.data.attemptNumber is int
+              && request.resource.data.attemptNumber >= 1);
 
-        // Cập nhật: Admin hoặc Sinh viên chính chủ rút bài nộp (chỉ đổi status sang withdrawn)
-        allow update: if admin()
-          || (student()
-              && resource.data.studentId == email().replace('@student.tdtu.edu.vn', '')
+        // Cập nhật:
+        // Sinh viên chỉ được RÚT BÀI (chuyển status từ submitted/uploading/draft sang withdrawn).
+        // Tuyệt đối không cho phép đổi files, studentId, roundId, activityId hoặc chuyển withdrawn -> submitted.
+        allow update: if (student()
+              && email().matches('^' + resource.data.studentId + '@student\\.tdtu\\.edu\\.vn$')
+              && resource.data.status in ['submitted', 'uploading', 'draft']
+              && request.resource.data.status == 'withdrawn'
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'withdrawnAt', 'updatedAt'])
-              && request.resource.data.status == 'withdrawn');
+              && request.resource.data.studentId == resource.data.studentId
+              && request.resource.data.roundId == resource.data.roundId
+              && request.resource.data.activityId == resource.data.activityId)
+          || (admin()
+              && request.resource.data.studentId == resource.data.studentId
+              && request.resource.data.roundId == resource.data.roundId
+              && request.resource.data.activityId == resource.data.activityId);
 
-        allow delete: if admin();
+        // BẢO TỒN LỊCH SỬ NỘP BÀI: Tuyệt đối không xóa bản ghi nộp
+        allow delete: if false;
       }
 
       // 3. Nhật ký kiểm toán Bất biến (auditLogs)
       match /auditLogs/{logId} {
-        // Đọc: Admin hoặc Giảng viên
-        allow read: if admin() || staff();
+        // Đọc: Chỉ Admin (Không Staff Read All, Không Student Read)
+        allow read: if admin();
 
-        // Tạo mới: Người dùng đã đăng nhập ghi nhận sự kiện của chính mình
-        allow create: if signedIn()
-          && request.resource.data.by == email()
-          && request.resource.data.action is string;
+        // Tạo mới: Chỉ cho phép các action hợp lệ theo whitelist vai trò (Không cho client tùy ý ghi)
+        // - Admin: mọi action hợp lệ
+        // - Sinh viên: chỉ action nộp bài / rút bài của chính mình
+        // - Giảng viên: chỉ action chấm điểm / lưu nháp của chính mình
+        allow create: if (admin() && request.resource.data.by == email())
+          || (student()
+              && request.resource.data.by == email()
+              && request.resource.data.action in ['Nộp bài', 'Rút bài', 'Nộp bài bổ sung']
+              && request.resource.data.roundId == roundId)
+          || (staff()
+              && request.resource.data.by == email()
+              && request.resource.data.action in ['Chấm điểm', 'Cập nhật điểm', 'Lưu nháp điểm']
+              && request.resource.data.roundId == roundId);
 
         // BẤT BIẾN: Tuyệt đối không cho phép sửa hoặc xóa nhật ký kiểm toán
         allow update: if false;
