@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation Beta</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.6.0-beta.1</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.6.0-beta.2</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -864,6 +864,9 @@
           </div>
 
           <div class="flex items-center gap-2">
+            <button type="button" onclick="openCopyFromRoundModal()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-all flex items-center gap-1.5 shadow-sm" title="Sao chép toàn bộ hoặc một số mốc từ đợt tốt nghiệp khác">
+              <span>📋 Sao chép từ Đợt khác</span>
+            </button>
             <button type="button" id="btn-create-activity" onclick="openCreateActivityModal()" class="px-4 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
               <span>+ Thêm mốc mới</span>
             </button>
@@ -1433,7 +1436,7 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v1.6.0-beta.1</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v1.6.0-beta.2</p>
     </div>
   </footer>
 
@@ -2089,28 +2092,33 @@
   <!-- TOAST CONTAINER -->
   <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
-  <!-- CREATE / EDIT ACTIVITY MODAL -->
-  <div id="modal-activity" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-      <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0">
-        <h3 id="modal-activity-title" class="font-bold text-base text-tdtu-blue">Thêm Mốc Kế hoạch Đợt TN</h3>
-        <button type="button" onclick="closeActivityModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+  <!-- CREATE / EDIT ACTIVITY MODAL (v1.6.0-beta.2) -->
+  <div id="modal-activity" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
+        <div>
+          <h3 id="modal-activity-title" class="font-bold text-base text-tdtu-blue">Thêm Mốc Kế hoạch Đợt TN</h3>
+          <p class="text-[11px] text-slate-400 mt-0.5">Thời gian hiển thị theo chuẩn Việt Nam (DD/MM/YYYY • 24h)</p>
+        </div>
+        <button type="button" onclick="closeActivityModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
       </div>
 
       <form id="form-activity" onsubmit="saveActivity(event)" class="flex flex-col flex-1 overflow-hidden">
-        <div class="p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
+        <div class="p-4 sm:p-5 space-y-4 text-xs overflow-y-auto flex-1">
           <input type="hidden" id="activity-form-id">
           <input type="hidden" id="activity-form-round-id">
 
+          <!-- Tiêu đề mốc -->
           <div>
             <label class="font-bold text-slate-700 block mb-1">Tên mốc kế hoạch <span class="text-rose-500">*</span></label>
-            <input type="text" id="activity-form-title" required placeholder="Ví dụ: Duyệt đồ án đợt 1, Nộp thuyết minh..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <input type="text" id="activity-form-title" required placeholder="Ví dụ: Nộp thuyết minh đợt 1, Duyệt hội đồng..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none">
           </div>
 
+          <!-- Loại hoạt động & Địa điểm -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="font-bold text-slate-700 block mb-1">Loại hoạt động <span class="text-rose-500">*</span></label>
-              <select id="activity-form-type" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+              <select id="activity-form-type" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
                 <option value="announcement">📢 Thông báo</option>
                 <option value="submission">📥 Nộp bài</option>
                 <option value="review">📋 Duyệt hội đồng</option>
@@ -2122,26 +2130,156 @@
             </div>
             <div>
               <label class="font-bold text-slate-700 block mb-1">Địa điểm / Phòng / Nền tảng</label>
-              <input type="text" id="activity-form-location" placeholder="Phòng A403 / Online qua Zoom..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <input type="text" id="activity-form-location" placeholder="Phòng A403 / Online Zoom..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
             </div>
           </div>
 
+          <!-- THỜI GIAN THEO CHUẨN VIỆT NAM (DD/MM/YYYY - 24H) -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label class="font-bold text-slate-700 block mb-1">Thời gian bắt đầu</label>
-              <input type="datetime-local" id="activity-form-start" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono">
+            <!-- THỜI GIAN BẮT ĐẦU -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="font-bold text-slate-700 text-xs flex items-center gap-1.5">
+                  <span>🕒</span> Bắt đầu
+                </label>
+                <button type="button" onclick="clearActivityDateTime('start')" class="text-[10px] text-slate-400 hover:text-rose-600 font-semibold transition-colors">Xóa</button>
+              </div>
+              <div class="grid grid-cols-5 gap-1.5">
+                <div class="col-span-3">
+                  <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Ngày (DD/MM/YYYY):</span>
+                  <div class="flex items-center">
+                    <input type="text" id="activity-form-start-date" placeholder="25/09/2026" maxlength="10"
+                      class="w-full p-2 border border-slate-300 rounded-l-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                      oninput="formatDateInput(this)" onblur="validateDateInput(this)">
+                    <label class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch">
+                      📅
+                      <input type="date" id="activity-form-start-date-picker" class="sr-only" onchange="syncPickerToDateInput('start', this.value)">
+                    </label>
+                  </div>
+                </div>
+                <div class="col-span-2">
+                  <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Giờ (24h):</span>
+                  <input type="text" id="activity-form-start-time" placeholder="08:00" maxlength="5"
+                    class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono font-bold"
+                    onblur="validateTimeInput(this)">
+                </div>
+              </div>
             </div>
-            <div>
-              <label class="font-bold text-slate-700 block mb-1">Thời gian kết thúc / Hạn cuối</label>
-              <input type="datetime-local" id="activity-form-end" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono">
+
+            <!-- THỜI GIAN KẾT THÚC / HẠN CUỐI -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="font-bold text-slate-700 text-xs flex items-center gap-1.5">
+                  <span>🏁</span> Kết thúc / Hạn cuối
+                </label>
+                <button type="button" onclick="clearActivityDateTime('end')" class="text-[10px] text-slate-400 hover:text-rose-600 font-semibold transition-colors">Xóa</button>
+              </div>
+              <div class="grid grid-cols-5 gap-1.5">
+                <div class="col-span-3">
+                  <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Ngày (DD/MM/YYYY):</span>
+                  <div class="flex items-center">
+                    <input type="text" id="activity-form-end-date" placeholder="26/09/2026" maxlength="10"
+                      class="w-full p-2 border border-slate-300 rounded-l-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                      oninput="formatDateInput(this)" onblur="validateDateInput(this)">
+                    <label class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch">
+                      📅
+                      <input type="date" id="activity-form-end-date-picker" class="sr-only" onchange="syncPickerToDateInput('end', this.value)">
+                    </label>
+                  </div>
+                </div>
+                <div class="col-span-2">
+                  <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Giờ (24h):</span>
+                  <input type="text" id="activity-form-end-time" placeholder="17:00" maxlength="5"
+                    class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono font-bold"
+                    onblur="validateTimeInput(this)">
+                </div>
+              </div>
             </div>
           </div>
 
+          <!-- RICH TEXT EDITOR CHO "NỘI DUNG / HƯỚNG DẪN CHI TIẾT" -->
           <div>
             <label class="font-bold text-slate-700 block mb-1">Nội dung / Hướng dẫn chi tiết</label>
-            <textarea id="activity-form-description" rows="3" placeholder="Yêu cầu đồ án, khối lượng sản phẩm, lưu ý quan trọng..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+            
+            <!-- Toolbar -->
+            <div class="rich-editor-toolbar">
+              <!-- Undo / Redo -->
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('undo')" title="Hoàn tác (Undo)">↶</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('redo')" title="Làm lại (Redo)">↷</button>
+              
+              <div class="rich-separator"></div>
+
+              <!-- Heading / Normal -->
+              <select class="rich-select" onchange="richFormatHeading(this.value); this.value='p';" title="Định dạng đoạn văn / Tiêu đề">
+                <option value="p">Đoạn văn</option>
+                <option value="h1">Tiêu đề 1 (H1)</option>
+                <option value="h2">Tiêu đề 2 (H2)</option>
+                <option value="h3">Tiêu đề 3 (H3)</option>
+              </select>
+
+              <!-- Font Size -->
+              <select class="rich-select" onchange="setRichFontSize(this.value); this.value='';" title="Cỡ chữ">
+                <option value="">Cỡ chữ</option>
+                <option value="10">10px</option>
+                <option value="12">12px</option>
+                <option value="14">14px</option>
+                <option value="16">16px</option>
+                <option value="18">18px</option>
+                <option value="20">20px</option>
+                <option value="24">24px</option>
+                <option value="28">28px</option>
+                <option value="32">32px</option>
+              </select>
+
+              <div class="rich-separator"></div>
+
+              <!-- Bold, Italic, Underline -->
+              <button type="button" class="rich-btn font-black" onmousedown="event.preventDefault(); document.execCommand('bold')" title="In đậm (Ctrl+B)">B</button>
+              <button type="button" class="rich-btn italic" onmousedown="event.preventDefault(); document.execCommand('italic')" title="In nghiêng (Ctrl+I)">I</button>
+              <button type="button" class="rich-btn underline" onmousedown="event.preventDefault(); document.execCommand('underline')" title="Gạch chân (Ctrl+U)">U</button>
+
+              <div class="rich-separator"></div>
+
+              <!-- Text color & Background highlight -->
+              <label class="rich-btn relative cursor-pointer" title="Màu chữ" onmousedown="event.preventDefault()">
+                <span class="font-bold text-blue-600">A</span>
+                <input type="color" class="sr-only" onchange="document.execCommand('foreColor', false, this.value)">
+              </label>
+
+              <label class="rich-btn relative cursor-pointer" title="Màu nền nổi bật (Highlight)" onmousedown="event.preventDefault()">
+                <span class="px-1 bg-yellow-200 text-slate-900 rounded font-bold text-[10px]">H</span>
+                <input type="color" value="#fef08a" class="sr-only" onchange="document.execCommand('hiliteColor', false, this.value)">
+              </label>
+
+              <div class="rich-separator"></div>
+
+              <!-- Alignment -->
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('justifyLeft')" title="Căn trái">⇤</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('justifyCenter')" title="Căn giữa">≡</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('justifyRight')" title="Căn phải">⇥</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('justifyFull')" title="Căn đều hai bên">≣</button>
+
+              <div class="rich-separator"></div>
+
+              <!-- Lists & Indent -->
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('insertUnorderedList')" title="Danh sách chấm">• List</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('insertOrderedList')" title="Danh sách số">1. List</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('outdent')" title="Giảm thụt lề">«</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('indent')" title="Tăng thụt lề">»</button>
+
+              <div class="rich-separator"></div>
+
+              <!-- Link & Clear formatting -->
+              <button type="button" class="rich-btn text-blue-600" onmousedown="event.preventDefault(); insertRichLink()" title="Chèn liên kết">🔗</button>
+              <button type="button" class="rich-btn text-slate-500" onmousedown="event.preventDefault(); document.execCommand('unlink')" title="Bỏ liên kết">🚫</button>
+              <button type="button" class="rich-btn text-rose-500" onmousedown="event.preventDefault(); document.execCommand('removeFormat')" title="Xóa định dạng">Tx</button>
+            </div>
+
+            <!-- Contenteditable Container -->
+            <div id="activity-editor" contenteditable="true" data-placeholder="Nhập yêu cầu đồ án, khối lượng sản phẩm, lưu ý quan trọng..." class="rich-editor-content"></div>
           </div>
 
+          <!-- Tùy chọn hiển thị & nộp bài -->
           <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 text-slate-700">
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="activity-form-visibility" checked class="rounded text-tdtu-blue">
@@ -2155,7 +2293,7 @@
               <input type="checkbox" id="activity-form-submission" class="rounded text-tdtu-blue">
               <span class="font-semibold text-xs">Có nộp bài (submissionEnabled)</span>
             </label>
-            <p class="text-[11px] text-slate-400 italic">💡 Nếu tick "Có nộp bài", giao diện sinh viên sẽ hiển thị badge "Nộp bài — Chưa mở ở phiên bản Beta này" (không tạo upload giả).</p>
+            <p class="text-[11px] text-slate-400 italic">💡 Nếu tick "Có nộp bài", giao diện sinh viên sẽ hiển thị badge "Nộp bài — Chưa mở ở phiên bản Beta này".</p>
           </div>
         </div>
 
@@ -2164,6 +2302,56 @@
           <button type="submit" class="px-6 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md transition-colors">Lưu Mốc</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- COPY ACTIVITIES FROM ANOTHER ROUND MODAL -->
+  <div id="modal-copy-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
+        <div>
+          <h3 class="font-bold text-base text-tdtu-blue">Sao chép Kế hoạch từ Đợt khác</h3>
+          <p id="copy-round-target-desc" class="text-xs text-slate-500 mt-0.5">Đợt tiếp nhận: ...</p>
+        </div>
+        <button type="button" onclick="closeCopyFromRoundModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs overflow-y-auto flex-1">
+        <!-- Bước 1: Chọn đợt nguồn -->
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Bước 1: Chọn Đợt tốt nghiệp nguồn <span class="text-rose-500">*</span></label>
+          <select id="copy-round-source-select" onchange="onSelectSourceRoundForCopy(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+            <option value="">-- Chọn đợt nguồn --</option>
+          </select>
+        </div>
+
+        <!-- Bước 2: Danh sách mốc -->
+        <div id="copy-round-milestones-container" class="space-y-2 hidden">
+          <div class="flex items-center justify-between">
+            <label class="font-bold text-slate-700">Bước 2: Chọn các mốc cần sao chép</label>
+            <div class="space-x-2">
+              <button type="button" onclick="toggleSelectAllCopyMilestones(true)" class="text-blue-600 hover:underline font-bold text-[11px]">Chọn tất cả</button>
+              <span class="text-slate-300">|</span>
+              <button type="button" onclick="toggleSelectAllCopyMilestones(false)" class="text-slate-500 hover:underline font-semibold text-[11px]">Bỏ chọn</button>
+            </div>
+          </div>
+
+          <div id="copy-round-milestones-list" class="max-h-60 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-slate-50/50 p-2 space-y-1">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <p class="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 p-2.5 rounded-xl leading-relaxed">
+            💡 <strong>Lưu ý:</strong> Các mốc được sao chép sẽ sinh ID và Slug mới (không ghi đè mốc đang có). Sau khi sao chép, bạn có thể chỉnh sửa ngày giờ cho phù hợp với đợt hiện tại.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+        <button type="button" onclick="closeCopyFromRoundModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Đóng</button>
+        <button type="button" id="btn-submit-copy-from-round" onclick="executeCopyFromRound()" disabled class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold shadow-md transition-colors">
+          Sao chép các mốc đã chọn
+        </button>
+      </div>
     </div>
   </div>
 

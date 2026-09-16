@@ -1,4 +1,4 @@
-/** IFA+ Graduation Beta Studio v1.6.0-beta.1 **/
+/** IFA+ Graduation Beta Studio v1.6.0-beta.2 **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -208,6 +208,7 @@ export const DEFAULT_PROJECT_TYPES = [
 
 
 // 24H Date formatting helpers
+// 24H Date formatting helpers (Strict Vietnamese DD/MM/YYYY & HH:mm)
 export const fmt24h = d => {
   if (!d) return '--';
   const date = new Date(d);
@@ -218,17 +219,23 @@ export const fmt24h = d => {
   const dd = pad(date.getDate());
   const MM = pad(date.getMonth() + 1);
   const yyyy = date.getFullYear();
-  return `${hh}:${mm} ${dd}/${MM}/${yyyy}`;
+  return `${dd}/${MM}/${yyyy} ${hh}:${mm}`;
 };
 
 export const fmtDateRange24h = (d1, d2) => {
   if (!d1 || !d2) return '--';
   const date1 = new Date(d1);
   const date2 = new Date(d2);
+  if (isNaN(date1.getTime()) || isNaN(date2.getTime())) return '--';
   const pad = n => String(n).padStart(2, '0');
-  const t1 = `${pad(date1.getHours())}:${pad(date1.getMinutes())} ${pad(date1.getDate())}/${pad(date1.getMonth()+1)}`;
-  const t2 = `${pad(date2.getHours())}:${pad(date2.getMinutes())} ${pad(date2.getDate())}/${pad(date2.getMonth()+1)}/${date2.getFullYear()}`;
-  return `${t1} → ${t2}`;
+  const d1Str = `${pad(date1.getDate())}/${pad(date1.getMonth() + 1)}/${date1.getFullYear()}`;
+  const t1Str = `${pad(date1.getHours())}:${pad(date1.getMinutes())}`;
+  const d2Str = `${pad(date2.getDate())}/${pad(date2.getMonth() + 1)}/${date2.getFullYear()}`;
+  const t2Str = `${pad(date2.getHours())}:${pad(date2.getMinutes())}`;
+  if (d1Str === d2Str) {
+    return `${d1Str} ${t1Str} → ${t2Str}`;
+  }
+  return `${d1Str} ${t1Str} → ${d2Str} ${t2Str}`;
 };
 
 window.copyRoundLink = function(roundId, shortCode) {
@@ -5347,10 +5354,277 @@ export function getActivityStatus(act) {
 
 export function fmtActivityTime(start, end) {
   if (!start && !end) return 'Chưa ấn định thời gian';
-  if (start && end) return fmtDateRange24h(start, end);
-  if (start) return 'Bắt đầu: ' + fmt24h(start);
-  if (end) return 'Hạn cuối: ' + fmt24h(end);
+  const pad = n => String(n).padStart(2, '0');
+  const fmtPart = iso => {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return {
+      date: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`,
+      time: `${pad(d.getHours())}:${pad(d.getMinutes())}`
+    };
+  };
+
+  const p1 = start ? fmtPart(start) : null;
+  const p2 = end ? fmtPart(end) : null;
+
+  if (p1 && p2) {
+    if (p1.date === p2.date) {
+      return `${p1.date} • ${p1.time} → ${p2.time}`;
+    }
+    return `${p1.date} ${p1.time} → ${p2.date} ${p2.time}`;
+  }
+  if (p1) return `Bắt đầu: ${p1.date} ${p1.time}`;
+  if (p2) return `Hạn cuối: ${p2.date} ${p2.time}`;
   return '--';
+}
+
+// Vietnamese Date/Time Parsing & Conversion Helpers
+export function isoToVietnameseDateTime(isoStr) {
+  if (!isoStr) return { date: '', time: '' };
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return { date: '', time: '' };
+  const pad = n => String(n).padStart(2, '0');
+  return {
+    date: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  };
+}
+
+export function parseVietnameseDateTime(dateStr, timeStr, defaultTime = '00:00') {
+  if (!dateStr || !dateStr.trim()) return '';
+  const dTrim = dateStr.trim();
+  const m = dTrim.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null; // Invalid format
+
+  const day = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10);
+  const year = parseInt(m[3], 10);
+
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 2000 || year > 2100) return null;
+  // Verify real days in month
+  const testDate = new Date(year, month - 1, day);
+  if (testDate.getDate() !== day || testDate.getMonth() !== month - 1) return null;
+
+  const tTrim = (timeStr && timeStr.trim()) ? timeStr.trim() : defaultTime;
+  const tm = tTrim.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (!tm) return null; // Invalid time
+
+  const hour = String(parseInt(tm[1], 10)).padStart(2, '0');
+  const min = String(parseInt(tm[2], 10)).padStart(2, '0');
+
+  const pad = n => String(n).padStart(2, '0');
+  return `${year}-${pad(month)}-${pad(day)}T${hour}:${min}:00`;
+}
+
+// Auto format DD/MM/YYYY while typing
+window.formatDateInput = function(input) {
+  let val = input.value.replace(/\D/g, '');
+  if (val.length > 8) val = val.substring(0, 8);
+  if (val.length >= 5) {
+    input.value = val.substring(0, 2) + '/' + val.substring(2, 4) + '/' + val.substring(4);
+  } else if (val.length >= 3) {
+    input.value = val.substring(0, 2) + '/' + val.substring(2);
+  } else {
+    input.value = val;
+  }
+};
+
+window.validateDateInput = function(input) {
+  const val = input.value.trim();
+  if (!val) return true;
+  const parsed = parseVietnameseDateTime(val, '00:00');
+  if (parsed === null) {
+    showToast('Ngày không hợp lệ! Vui lòng nhập định dạng DD/MM/YYYY (ví dụ: 25/09/2026)', 'warning');
+    input.classList.add('border-rose-500', 'bg-rose-50');
+    return false;
+  }
+  input.classList.remove('border-rose-500', 'bg-rose-50');
+  return true;
+};
+
+window.validateTimeInput = function(input) {
+  const val = input.value.trim();
+  if (!val) return true;
+  const tm = val.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (!tm) {
+    showToast('Giờ không hợp lệ! Vui lòng nhập định dạng 24h HH:mm (ví dụ: 08:30, 21:00)', 'warning');
+    input.classList.add('border-rose-500', 'bg-rose-50');
+    return false;
+  }
+  const pad = n => String(n).padStart(2, '0');
+  input.value = `${pad(tm[1])}:${pad(tm[2])}`;
+  input.classList.remove('border-rose-500', 'bg-rose-50');
+  return true;
+};
+
+window.syncPickerToDateInput = function(target, isoDate) {
+  if (!isoDate) return;
+  const parts = isoDate.split('-');
+  if (parts.length === 3) {
+    const vnDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+    const input = document.getElementById(`activity-form-${target}-date`);
+    if (input) input.value = vnDate;
+    const timeInput = document.getElementById(`activity-form-${target}-time`);
+    if (timeInput && !timeInput.value.trim()) {
+      timeInput.value = target === 'start' ? '08:00' : '17:00';
+    }
+  }
+};
+
+window.clearActivityDateTime = function(target) {
+  const dateInput = document.getElementById(`activity-form-${target}-date`);
+  const timeInput = document.getElementById(`activity-form-${target}-time`);
+  if (dateInput) {
+    dateInput.value = '';
+    dateInput.classList.remove('border-rose-500', 'bg-rose-50');
+  }
+  if (timeInput) {
+    timeInput.value = '';
+    timeInput.classList.remove('border-rose-500', 'bg-rose-50');
+  }
+};
+
+// Rich Text Editor Helpers
+window.richFormatHeading = function(tag) {
+  if (!tag) return;
+  document.execCommand('formatBlock', false, '<' + tag + '>');
+  document.getElementById('activity-editor')?.focus();
+};
+
+window.setRichFontSize = function(size) {
+  if (!size) return;
+  const sel = window.getSelection();
+  if (!sel.rangeCount || sel.isCollapsed) return;
+  document.execCommand('fontSize', false, '1');
+  const editor = document.getElementById('activity-editor');
+  if (editor) {
+    const elList = editor.querySelectorAll('font[size="1"], span[style*="font-size: x-small"]');
+    elList.forEach(el => {
+      el.removeAttribute('size');
+      el.style.fontSize = size + 'px';
+    });
+  }
+  document.getElementById('activity-editor')?.focus();
+};
+
+window.insertRichLink = function() {
+  const url = prompt('Nhập địa chỉ liên kết (URL):', 'https://');
+  if (!url || !url.trim()) return;
+  const cleanUrl = url.trim();
+  if (/^javascript:/i.test(cleanUrl)) {
+    showToast('Liên kết không an toàn!', 'warning');
+    return;
+  }
+  document.execCommand('createLink', false, cleanUrl);
+  const editor = document.getElementById('activity-editor');
+  if (editor) {
+    editor.querySelectorAll('a').forEach(a => {
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+    });
+  }
+  document.getElementById('activity-editor')?.focus();
+};
+
+// Safe HTML Sanitizer (Strict Whitelist)
+export function sanitizeRichHtml(rawHtml) {
+  if (!rawHtml || typeof rawHtml !== 'string') return '';
+
+  if (typeof DOMParser !== 'undefined') {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rawHtml, 'text/html');
+    const allowedTags = new Set([
+      'p', 'br', 'strong', 'b', 'em', 'i', 'u', 'span', 
+      'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'div', 'blockquote'
+    ]);
+    const allowedStyles = new Set([
+      'text-align', 'color', 'background-color', 'font-size'
+    ]);
+
+    function cleanNode(node) {
+      const children = Array.from(node.childNodes);
+      for (const child of children) {
+        if (child.nodeType === 1) { // Element
+          const tagName = child.tagName.toLowerCase();
+          if (!allowedTags.has(tagName)) {
+            if (['script', 'iframe', 'object', 'embed', 'style', 'link', 'svg'].includes(tagName)) {
+              child.remove();
+              continue;
+            }
+            const parent = child.parentNode;
+            while (child.firstChild) parent.insertBefore(child.firstChild, child);
+            parent.removeChild(child);
+            continue;
+          }
+
+          // Clean attributes
+          const attrs = Array.from(child.attributes);
+          for (const attr of attrs) {
+            const attrName = attr.name.toLowerCase();
+            if (attrName.startsWith('on') || attrName === 'id' || attrName === 'class') {
+              child.removeAttribute(attr.name);
+            } else if (tagName === 'a' && attrName === 'href') {
+              const href = attr.value.trim().toLowerCase();
+              if (href.startsWith('javascript:') || href.startsWith('data:') || href.startsWith('vbscript:')) {
+                child.removeAttribute(attr.name);
+              }
+            } else if (attrName === 'style') {
+              const styleRules = child.style;
+              const safeStyles = [];
+              for (let i = 0; i < styleRules.length; i++) {
+                const prop = styleRules[i].toLowerCase();
+                if (allowedStyles.has(prop)) {
+                  const val = styleRules.getPropertyValue(prop);
+                  if (!/url\(|expression\(|javascript:/i.test(val)) {
+                    safeStyles.push(`${prop}: ${val}`);
+                  }
+                }
+              }
+              if (safeStyles.length > 0) {
+                child.setAttribute('style', safeStyles.join('; '));
+              } else {
+                child.removeAttribute('style');
+              }
+            } else if (tagName === 'a' && (attrName === 'target' || attrName === 'rel')) {
+              // Allowed
+            } else {
+              child.removeAttribute(attr.name);
+            }
+          }
+
+          if (tagName === 'a') {
+            child.setAttribute('target', '_blank');
+            child.setAttribute('rel', 'noopener noreferrer');
+          }
+
+          cleanNode(child);
+        }
+      }
+    }
+
+    cleanNode(doc.body);
+    return doc.body.innerHTML;
+  }
+
+  // Fallback for node test environment
+  return rawHtml
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/javascript:/gi, '');
+}
+
+// Generate unique slug in round
+export function generateUniqueSlug(title, existingActivities = []) {
+  const baseSlug = (title ? slugify(title) : '') || ('act-' + Date.now());
+  const existingSlugs = new Set((existingActivities || []).map(a => a.slug || a.id));
+  if (!existingSlugs.has(baseSlug)) {
+    return baseSlug;
+  }
+  let counter = 2;
+  while (existingSlugs.has(`${baseSlug}-${counter}`)) {
+    counter++;
+  }
+  return `${baseSlug}-${counter}`;
 }
 
 export function normalizeActivity(a, roundId, idx = 0) {
@@ -5363,6 +5637,7 @@ export function normalizeActivity(a, roundId, idx = 0) {
     title,
     activityType: a.activityType || 'other',
     description: a.description || '',
+    descriptionHtml: a.descriptionHtml || a.description || '',
     startAt: a.startAt || '',
     endAt: a.endAt || '',
     location: a.location || '',
@@ -5407,7 +5682,7 @@ window.loadAdminRoundActivities = async function(roundId) {
       list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
   } catch (e) {
-    // Subcollection not permitted or empty, fallback cleanly to round.activities
+    // Fallback cleanly to round.activities
   }
 
   // Normalize and sort by order
@@ -5434,9 +5709,14 @@ window.loadAdminRoundActivities = async function(roundId) {
         <td colspan="8" class="p-10 text-center text-slate-400">
           <span class="text-2xl block mb-1">📅</span>
           Đợt "<strong>${targetRound.title}</strong>" chưa có mốc kế hoạch nào.<br>
-          <button type="button" onclick="openCreateActivityModal()" class="mt-3 px-4 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl font-bold text-xs border border-blue-200 transition-colors">
-            + Thêm mốc đầu tiên
-          </button>
+          <div class="mt-3 flex items-center justify-center gap-2">
+            <button type="button" onclick="openCopyFromRoundModal()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs border border-slate-300 transition-colors">
+              📋 Sao chép từ Đợt khác
+            </button>
+            <button type="button" onclick="openCreateActivityModal()" class="px-4 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl font-bold text-xs border border-blue-200 transition-colors">
+              + Thêm mốc đầu tiên
+            </button>
+          </div>
         </td>
       </tr>
     `;
@@ -5485,7 +5765,7 @@ window.loadAdminRoundActivities = async function(roundId) {
             </span>
           </div>
           <span class="font-bold text-slate-900 text-xs block">${act.title}</span>
-          ${act.description ? `<p class="text-[11px] text-slate-500 mt-0.5 line-clamp-1 truncate max-w-xs" title="${act.description}">${act.description}</p>` : ''}
+          ${act.description ? `<p class="text-[11px] text-slate-500 mt-0.5 line-clamp-1 truncate max-w-xs" title="${escapeHtml(act.description)}">${escapeHtml(act.description)}</p>` : ''}
         </td>
         <td class="p-3 font-mono text-[11px] text-slate-700 whitespace-nowrap">
           ${timeStr}
@@ -5504,6 +5784,7 @@ window.loadAdminRoundActivities = async function(roundId) {
         </td>
         <td class="p-3 text-right whitespace-nowrap space-x-1">
           <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Sao chép link mốc ?x=...&a=...">🔗 Link</button>
+          <button type="button" onclick="copyActivityModal('${act.id}')" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 transition-colors" title="Sao chép tạo bản ghi mới">📋 Sao chép</button>
           <button type="button" onclick="toggleActivityVisibility('${act.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Ẩn/Hiện đối với sinh viên">${act.visibility !== false ? 'Ẩn' : 'Hiện'}</button>
           <button type="button" onclick="editActivityModal('${act.id}')" class="px-2 py-1 text-blue-600 hover:underline font-bold text-xs">Sửa</button>
           <button type="button" onclick="deleteActivity('${act.id}')" class="px-2 py-1 text-rose-600 hover:underline font-bold text-xs">Xóa</button>
@@ -5513,7 +5794,7 @@ window.loadAdminRoundActivities = async function(roundId) {
   }).join('');
 };
 
-// 3. CREATE & EDIT ACTIVITY MODAL HANDLERS
+// 3. CREATE, EDIT & COPY ACTIVITY MODAL HANDLERS
 window.openCreateActivityModal = function() {
   const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
   if (!roundId) {
@@ -5528,6 +5809,14 @@ window.openCreateActivityModal = function() {
   document.getElementById('activity-form-show-expired').checked = true;
   document.getElementById('activity-form-submission').checked = false;
   document.getElementById('activity-form-type').value = 'review';
+
+  // Clear date/time
+  clearActivityDateTime('start');
+  clearActivityDateTime('end');
+
+  // Clear rich editor
+  const editor = document.getElementById('activity-editor');
+  if (editor) editor.innerHTML = '';
 
   document.getElementById('modal-activity-title').textContent = 'Thêm Mốc Kế hoạch Đợt TN';
   document.getElementById('modal-activity').classList.remove('hidden');
@@ -5548,9 +5837,26 @@ window.editActivityModal = function(actId) {
   document.getElementById('activity-form-title').value = act.title || '';
   document.getElementById('activity-form-type').value = act.activityType || 'other';
   document.getElementById('activity-form-location').value = act.location || '';
-  document.getElementById('activity-form-start').value = act.startAt || '';
-  document.getElementById('activity-form-end').value = act.endAt || '';
-  document.getElementById('activity-form-description').value = act.description || '';
+
+  // Dates
+  const startParts = isoToVietnameseDateTime(act.startAt);
+  const startDateInput = document.getElementById('activity-form-start-date');
+  const startTimeInput = document.getElementById('activity-form-start-time');
+  if (startDateInput) startDateInput.value = startParts.date;
+  if (startTimeInput) startTimeInput.value = startParts.time;
+
+  const endParts = isoToVietnameseDateTime(act.endAt);
+  const endDateInput = document.getElementById('activity-form-end-date');
+  const endTimeInput = document.getElementById('activity-form-end-time');
+  if (endDateInput) endDateInput.value = endParts.date;
+  if (endTimeInput) endTimeInput.value = endParts.time;
+
+  // Rich Text Editor
+  const editor = document.getElementById('activity-editor');
+  if (editor) {
+    editor.innerHTML = act.descriptionHtml || escapeHtml(act.description || '');
+  }
+
   document.getElementById('activity-form-visibility').checked = act.visibility !== false;
   document.getElementById('activity-form-show-expired').checked = act.showAfterExpired !== false;
   document.getElementById('activity-form-submission').checked = Boolean(act.submissionEnabled);
@@ -5559,11 +5865,255 @@ window.editActivityModal = function(actId) {
   document.getElementById('modal-activity').classList.remove('hidden');
 };
 
+window.copyActivityModal = function(actId) {
+  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const list = targetRound?.activities || state.roundActivities || [];
+  const act = list.find(a => a.id === actId);
+  if (!act) {
+    showToast('Không tìm thấy thông tin mốc kế hoạch!', 'error');
+    return;
+  }
+
+  // Clear ID so it will create a new activity on save
+  document.getElementById('form-activity').reset();
+  document.getElementById('activity-form-id').value = '';
+  document.getElementById('activity-form-round-id').value = roundId;
+  document.getElementById('activity-form-title').value = act.title ? `${act.title} (Bản sao)` : '';
+  document.getElementById('activity-form-type').value = act.activityType || 'other';
+  document.getElementById('activity-form-location').value = act.location || '';
+
+  // Dates
+  const startParts = isoToVietnameseDateTime(act.startAt);
+  const startDateInput = document.getElementById('activity-form-start-date');
+  const startTimeInput = document.getElementById('activity-form-start-time');
+  if (startDateInput) startDateInput.value = startParts.date;
+  if (startTimeInput) startTimeInput.value = startParts.time;
+
+  const endParts = isoToVietnameseDateTime(act.endAt);
+  const endDateInput = document.getElementById('activity-form-end-date');
+  const endTimeInput = document.getElementById('activity-form-end-time');
+  if (endDateInput) endDateInput.value = endParts.date;
+  if (endTimeInput) endTimeInput.value = endParts.time;
+
+  // Rich Text Editor
+  const editor = document.getElementById('activity-editor');
+  if (editor) {
+    editor.innerHTML = act.descriptionHtml || escapeHtml(act.description || '');
+  }
+
+  document.getElementById('activity-form-visibility').checked = act.visibility !== false;
+  document.getElementById('activity-form-show-expired').checked = act.showAfterExpired !== false;
+  document.getElementById('activity-form-submission').checked = Boolean(act.submissionEnabled);
+
+  document.getElementById('modal-activity-title').textContent = 'Sao chép Mốc Kế hoạch (Bản mới)';
+  document.getElementById('modal-activity').classList.remove('hidden');
+  showToast('Đã sao chép nội dung sang form mới. Bạn có thể chỉnh sửa trước khi lưu.', 'info');
+};
+
 window.closeActivityModal = function() {
   document.getElementById('modal-activity').classList.add('hidden');
 };
 
-// 4. SAVE ACTIVITY (PERSISTENCE)
+// 4. COPY ACTIVITIES FROM ANOTHER ROUND
+window.openCopyFromRoundModal = function() {
+  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) {
+    showToast('Vui lòng chọn đợt tốt nghiệp tiếp nhận kế hoạch!', 'warning');
+    return;
+  }
+
+  const desc = document.getElementById('copy-round-target-desc');
+  if (desc) desc.textContent = `Đợt tiếp nhận: ${targetRound.title}`;
+
+  const sel = document.getElementById('copy-round-source-select');
+  if (sel) {
+    const otherRounds = (state.rounds || []).filter(r => r.id !== roundId && !r.isDeleted);
+    sel.innerHTML = '<option value="">-- Chọn đợt nguồn --</option>' + otherRounds.map(r => {
+      const actCount = (r.activities || []).length;
+      return `<option value="${r.id}">${r.title} (${actCount} mốc)</option>`;
+    }).join('');
+  }
+
+  const container = document.getElementById('copy-round-milestones-container');
+  if (container) container.classList.add('hidden');
+  const submitBtn = document.getElementById('btn-submit-copy-from-round');
+  if (submitBtn) submitBtn.disabled = true;
+
+  document.getElementById('modal-copy-round')?.classList.remove('hidden');
+};
+
+window.closeCopyFromRoundModal = function() {
+  document.getElementById('modal-copy-round')?.classList.add('hidden');
+};
+
+window.onSelectSourceRoundForCopy = async function(sourceRoundId) {
+  const container = document.getElementById('copy-round-milestones-container');
+  const listEl = document.getElementById('copy-round-milestones-list');
+  const submitBtn = document.getElementById('btn-submit-copy-from-round');
+  if (!container || !listEl) return;
+
+  if (!sourceRoundId) {
+    container.classList.add('hidden');
+    if (submitBtn) submitBtn.disabled = true;
+    return;
+  }
+
+  const sourceRound = (state.rounds || []).find(r => r.id === sourceRoundId);
+  let acts = sourceRound?.activities || [];
+  if (acts.length === 0) {
+    try {
+      const snap = await getDocs(collection(db, 'graduationRounds', sourceRoundId, 'activities'));
+      if (snap && !snap.empty) {
+        acts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (sourceRound) sourceRound.activities = acts;
+      }
+    } catch (e) {}
+  }
+
+  if (acts.length === 0) {
+    listEl.innerHTML = '<div class="p-6 text-center text-slate-400">Đợt được chọn chưa có mốc kế hoạch nào để sao chép.</div>';
+    container.classList.remove('hidden');
+    if (submitBtn) submitBtn.disabled = true;
+    return;
+  }
+
+  const sorted = acts.map((a, i) => normalizeActivity(a, sourceRoundId, i)).sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  listEl.innerHTML = sorted.map(a => {
+    const typeMeta = ACTIVITY_TYPES[a.activityType] || ACTIVITY_TYPES.other;
+    const timeStr = fmtActivityTime(a.startAt, a.endAt);
+    return `
+      <label class="flex items-start gap-2.5 p-2 rounded-lg hover:bg-white transition-colors cursor-pointer border border-transparent hover:border-slate-200">
+        <input type="checkbox" value="${a.id}" data-act-id="${a.id}" checked onchange="updateCopyRoundSubmitState()" class="copy-milestone-checkbox rounded text-tdtu-blue mt-0.5">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 mb-0.5">
+            <span class="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-[9px] font-bold border ${typeMeta.color}">
+              ${typeMeta.icon} ${typeMeta.label}
+            </span>
+            <span class="font-bold text-slate-900 text-xs truncate">${a.title}</span>
+          </div>
+          <p class="text-[11px] text-slate-500 font-mono">${timeStr}</p>
+        </div>
+      </label>
+    `;
+  }).join('');
+
+  container.classList.remove('hidden');
+  updateCopyRoundSubmitState();
+};
+
+window.toggleSelectAllCopyMilestones = function(select) {
+  const checkboxes = document.querySelectorAll('.copy-milestone-checkbox');
+  checkboxes.forEach(cb => cb.checked = select);
+  updateCopyRoundSubmitState();
+};
+
+window.updateCopyRoundSubmitState = function() {
+  const submitBtn = document.getElementById('btn-submit-copy-from-round');
+  if (!submitBtn) return;
+  const checked = document.querySelectorAll('.copy-milestone-checkbox:checked');
+  if (checked.length > 0) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = `Sao chép các mốc đã chọn (${checked.length})`;
+  } else {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sao chép các mốc đã chọn';
+  }
+};
+
+window.executeCopyFromRound = async function() {
+  const targetRoundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  const sourceRoundId = document.getElementById('copy-round-source-select')?.value;
+  const targetRound = (state.rounds || []).find(r => r.id === targetRoundId);
+  const sourceRound = (state.rounds || []).find(r => r.id === sourceRoundId);
+
+  if (!targetRound || !sourceRound) {
+    showToast('Lỗi xác định đợt nguồn hoặc đợt tiếp nhận!', 'error');
+    return;
+  }
+
+  const checkedBoxes = Array.from(document.querySelectorAll('.copy-milestone-checkbox:checked'));
+  if (checkedBoxes.length === 0) {
+    showToast('Vui lòng chọn ít nhất 1 mốc để sao chép!', 'warning');
+    return;
+  }
+
+  const submitBtn = document.getElementById('btn-submit-copy-from-round');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Đang sao chép...';
+  }
+
+  try {
+    const sourceActs = sourceRound.activities || [];
+    const targetActs = Array.isArray(targetRound.activities) ? [...targetRound.activities] : [];
+
+    let copyCount = 0;
+    const nowIso = new Date().toISOString();
+
+    for (const cb of checkedBoxes) {
+      const actId = cb.value;
+      const src = sourceActs.find(a => a.id === actId);
+      if (!src) continue;
+
+      // Unique new ID and Slug
+      const newSlug = generateUniqueSlug(src.title, targetActs);
+      const newId = 'act_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+
+      const newAct = {
+        id: newId,
+        roundId: targetRoundId,
+        title: src.title || '',
+        activityType: src.activityType || 'other',
+        location: src.location || '',
+        startAt: src.startAt || '',
+        endAt: src.endAt || '',
+        description: src.description || '',
+        descriptionHtml: src.descriptionHtml || src.description || '',
+        visibility: src.visibility !== false,
+        showAfterExpired: src.showAfterExpired !== false,
+        submissionEnabled: Boolean(src.submissionEnabled),
+        slug: newSlug,
+        order: targetActs.length + 1,
+        createdAt: nowIso,
+        updatedAt: nowIso
+      };
+
+      targetActs.push(newAct);
+      copyCount++;
+    }
+
+    // Save to Firestore
+    const roundRef = doc(db, 'graduationRounds', targetRoundId);
+    await updateDoc(roundRef, {
+      activities: targetActs,
+      updatedAt: serverTimestamp()
+    });
+
+    targetRound.activities = targetActs;
+    state.roundActivities = targetActs;
+
+    closeCopyFromRoundModal();
+    loadAdminRoundActivities(targetRoundId);
+    if (state.selectedRoundId === targetRoundId) {
+      loadStudentRoundActivities(targetRoundId);
+    }
+
+    showToast(`✓ Đã sao chép thành công ${copyCount} mốc kế hoạch vào đợt "${targetRound.title}"!`, 'success');
+  } catch (err) {
+    console.error('Lỗi sao chép mốc từ đợt khác:', err);
+    showToast('Lỗi sao chép: ' + err.message, 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Sao chép các mốc đã chọn';
+    }
+  }
+};
+
+// 5. SAVE ACTIVITY (PERSISTENCE WITH VIETNAMESE DATES & RICH TEXT)
 window.saveActivity = async function(e) {
   if (e && typeof e.preventDefault === 'function') e.preventDefault();
 
@@ -5572,9 +6122,49 @@ window.saveActivity = async function(e) {
   const title = document.getElementById('activity-form-title')?.value?.trim();
   const activityType = document.getElementById('activity-form-type')?.value || 'other';
   const location = document.getElementById('activity-form-location')?.value?.trim() || '';
-  const startAt = document.getElementById('activity-form-start')?.value || '';
-  const endAt = document.getElementById('activity-form-end')?.value || '';
-  const description = document.getElementById('activity-form-description')?.value?.trim() || '';
+
+  // Parse start date & time (Vietnamese format DD/MM/YYYY + HH:mm)
+  const startDateStr = document.getElementById('activity-form-start-date')?.value?.trim();
+  const startTimeStr = document.getElementById('activity-form-start-time')?.value?.trim();
+  let startAt = '';
+  if (startDateStr) {
+    const parsedStart = parseVietnameseDateTime(startDateStr, startTimeStr, '00:00');
+    if (parsedStart === null) {
+      showToast('Thời gian bắt đầu không hợp lệ! Vui lòng kiểm tra ngày DD/MM/YYYY và giờ HH:mm', 'warning');
+      return;
+    }
+    startAt = parsedStart;
+  }
+
+  // Parse end date & time
+  const endDateStr = document.getElementById('activity-form-end-date')?.value?.trim();
+  const endTimeStr = document.getElementById('activity-form-end-time')?.value?.trim();
+  let endAt = '';
+  if (endDateStr) {
+    const parsedEnd = parseVietnameseDateTime(endDateStr, endTimeStr, '23:59');
+    if (parsedEnd === null) {
+      showToast('Thời gian kết thúc không hợp lệ! Vui lòng kiểm tra ngày DD/MM/YYYY và giờ HH:mm', 'warning');
+      return;
+    }
+    endAt = parsedEnd;
+  }
+
+  // Validation: endAt >= startAt if both provided
+  if (startAt && endAt) {
+    const startDate = new Date(startAt);
+    const endDate = new Date(endAt);
+    if (endDate < startDate) {
+      showToast('Thời gian kết thúc phải lớn hơn hoặc bằng thời gian bắt đầu!', 'warning');
+      return;
+    }
+  }
+
+  // Rich Text Description
+  const editor = document.getElementById('activity-editor');
+  const rawHtml = editor ? editor.innerHTML.trim() : '';
+  const descriptionHtml = sanitizeRichHtml(rawHtml);
+  const descriptionText = editor ? (editor.innerText || editor.textContent || '').trim() : '';
+
   const visibility = document.getElementById('activity-form-visibility')?.checked !== false;
   const showAfterExpired = document.getElementById('activity-form-show-expired')?.checked !== false;
   const submissionEnabled = document.getElementById('activity-form-submission')?.checked === true;
@@ -5598,8 +6188,8 @@ window.saveActivity = async function(e) {
 
   try {
     let activities = Array.isArray(targetRound.activities) ? [...targetRound.activities] : [];
-    const slug = id || (slugify(title) || ('act-' + Date.now()));
-    const actId = id || slug;
+    const slug = id ? (activities.find(a => a.id === id)?.slug || slugify(title)) : generateUniqueSlug(title, activities);
+    const actId = id || ('act_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
 
     const activityData = {
       id: actId,
@@ -5609,7 +6199,8 @@ window.saveActivity = async function(e) {
       location,
       startAt,
       endAt,
-      description,
+      description: descriptionText,
+      descriptionHtml,
       visibility,
       showAfterExpired,
       submissionEnabled,
@@ -5628,20 +6219,18 @@ window.saveActivity = async function(e) {
       activities.push(activityData);
     }
 
-    // Save to Firestore round document (works under deployed security rules)
+    // Save to Firestore round document
     const roundRef = doc(db, 'graduationRounds', roundId);
     await updateDoc(roundRef, {
       activities,
       updatedAt: serverTimestamp()
     });
 
-    // Also sync to subcollection if supported
+    // Best-effort sync to subcollection
     try {
       const actRef = doc(db, 'graduationRounds', roundId, 'activities', actId);
       await setDoc(actRef, activityData, { merge: true }).catch(() => {});
-    } catch (subErr) {
-      // Ignored
-    }
+    } catch (subErr) {}
 
     targetRound.activities = activities;
     state.roundActivities = activities;
@@ -5664,7 +6253,7 @@ window.saveActivity = async function(e) {
   }
 };
 
-// 5. DELETE ACTIVITY
+// 6. DELETE ACTIVITY
 window.deleteActivity = async function(actId) {
   const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
@@ -5707,7 +6296,7 @@ window.deleteActivity = async function(actId) {
   }
 };
 
-// 6. TOGGLE VISIBILITY
+// 7. TOGGLE VISIBILITY
 window.toggleActivityVisibility = async function(actId) {
   const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
@@ -5736,7 +6325,7 @@ window.toggleActivityVisibility = async function(actId) {
   }
 };
 
-// 7. MOVE ACTIVITY (REORDER UP/DOWN)
+// 8. MOVE ACTIVITY (REORDER UP/DOWN)
 window.moveActivity = async function(actId, direction) {
   const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
@@ -5758,7 +6347,6 @@ window.moveActivity = async function(actId, direction) {
     return;
   }
 
-  // Re-index orders
   activities.forEach((a, i) => a.order = i + 1);
 
   try {
@@ -5777,7 +6365,7 @@ window.moveActivity = async function(actId, direction) {
   }
 };
 
-// 8. COPY ACTIVITY LINK
+// 9. COPY ACTIVITY LINK
 window.copyActivityLink = function(roundId, activitySlug) {
   const r = (state.rounds || []).find(x => x.id === roundId);
   const rCode = r?.slug || r?.shortCode || roundId;
@@ -5793,7 +6381,7 @@ window.copyActivityLink = function(roundId, activitySlug) {
   }
 };
 
-// 9. STUDENT TIMELINE RENDERING
+// 10. STUDENT TIMELINE RENDERING
 state.showAllActivities = false;
 
 window.toggleStudentTimelineViewAll = function() {
@@ -5815,7 +6403,6 @@ window.loadStudentRoundActivities = async function(roundId) {
     return;
   }
 
-  // Load activities
   let list = Array.isArray(targetRound.activities) ? targetRound.activities : [];
   if (list.length === 0) {
     try {
@@ -5826,7 +6413,6 @@ window.loadStudentRoundActivities = async function(roundId) {
     } catch (e) {}
   }
 
-  // If not admin, strictly filter visible activities (visibility !== false)
   const visible = list
     .map((a, idx) => normalizeActivity(a, roundId, idx))
     .filter(a => state.isAdmin || a.visibility !== false)
@@ -5844,7 +6430,6 @@ window.loadStudentRoundActivities = async function(roundId) {
     return;
   }
 
-  // Determine main items vs collapsed expired items
   const mainItems = [];
   const collapsedPastItems = [];
 
@@ -5858,7 +6443,6 @@ window.loadStudentRoundActivities = async function(roundId) {
     }
   });
 
-  // Action button in header
   if (actionWrap) {
     if (collapsedPastItems.length > 0) {
       actionWrap.innerHTML = `
@@ -5904,6 +6488,22 @@ window.loadStudentRoundActivities = async function(roundId) {
       statusPill = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Kế hoạch</span>';
     }
 
+    // Rich description rendering
+    let descriptionRender = '';
+    if (act.descriptionHtml && act.descriptionHtml.trim()) {
+      descriptionRender = `
+        <div class="mt-2 text-xs text-slate-700 leading-relaxed bg-white/90 p-3 rounded-xl border border-slate-100 rich-rendered-content shadow-xs">
+          ${sanitizeRichHtml(act.descriptionHtml)}
+        </div>
+      `;
+    } else if (act.description && act.description.trim()) {
+      descriptionRender = `
+        <div class="mt-2 text-xs text-slate-600 whitespace-pre-line leading-relaxed bg-white/80 p-3 rounded-xl border border-slate-100">
+          ${escapeHtml(act.description)}
+        </div>
+      `;
+    }
+
     return `
       <div id="activity-card-${act.slug}" data-activity-id="${act.id}" class="flex items-start gap-3.5 p-4 rounded-2xl border ${cardBorder} transition-all duration-300 relative">
         ${markerHtml}
@@ -5933,11 +6533,7 @@ window.loadStudentRoundActivities = async function(roundId) {
             ` : ''}
           </div>
 
-          ${act.description ? `
-            <div class="mt-2 text-xs text-slate-600 whitespace-pre-line leading-relaxed bg-white/80 p-3 rounded-xl border border-slate-100">
-              ${act.description}
-            </div>
-          ` : ''}
+          ${descriptionRender}
 
           ${act.submissionEnabled ? `
             <div class="mt-2.5 flex items-center gap-2 p-2.5 bg-emerald-50/80 border border-emerald-200 text-emerald-900 rounded-xl text-xs">
@@ -5954,13 +6550,9 @@ window.loadStudentRoundActivities = async function(roundId) {
   }
 
   let htmlContent = '';
-
-  // Main items
   if (mainItems.length > 0) {
     htmlContent += mainItems.map(renderActivityCard).join('');
   }
-
-  // Collapsed past items
   if (collapsedPastItems.length > 0) {
     htmlContent += `
       <div class="pt-2">
@@ -5973,7 +6565,6 @@ window.loadStudentRoundActivities = async function(roundId) {
 
   container.innerHTML = htmlContent;
 
-  // Check URL &a= parameter highlighting
   if (state.targetActivitySlug) {
     const targetSlug = state.targetActivitySlug;
     setTimeout(() => {

@@ -105,3 +105,163 @@ body {
 .pulse-timer {
   animation: pulse-subtle 2s infinite ease-in-out;
 }
+
+
+/* ============================================================================
+   RICH TEXT EDITOR & RENDERED CONTENT (v1.6.0-beta.2)
+   ============================================================================ */
+.rich-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.rich-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.85rem;
+  height: 1.85rem;
+  padding: 0 0.4rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s;
+}
+
+.rich-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.rich-select {
+  height: 1.85rem;
+  padding: 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 0.375rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+}
+
+.rich-separator {
+  width: 1px;
+  height: 1.25rem;
+  background: #cbd5e1;
+  margin: 0 0.2rem;
+}
+
+.rich-editor-content {
+  border: 1px solid #cbd5e1;
+  border-top: none;
+  border-radius: 0 0 0.75rem 0.75rem;
+  padding: 0.75rem 1rem;
+  min-height: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: #1e293b;
+  background: #ffffff;
+  outline: none;
+}
+
+.rich-editor-content:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.rich-editor-content[data-placeholder]:empty:before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+/* Rich rendered content in timeline */
+.rich-rendered-content {
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: #334155;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.rich-rendered-content p {
+  margin-bottom: 0.5rem;
+}
+
+.rich-rendered-content p:last-child {
+  margin-bottom: 0;
+}
+
+.rich-rendered-content h1 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin-top: 0.65rem;
+  margin-bottom: 0.35rem;
+  color: #0f172a;
+}
+
+.rich-rendered-content h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-top: 0.55rem;
+  margin-bottom: 0.25rem;
+  color: #1e293b;
+}
+
+.rich-rendered-content h3 {
+  font-size: 0.925rem;
+  font-weight: 700;
+  margin-top: 0.45rem;
+  margin-bottom: 0.25rem;
+  color: #334155;
+}
+
+.rich-rendered-content ul {
+  list-style-type: disc;
+  margin-left: 1.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.rich-rendered-content ol {
+  list-style-type: decimal;
+  margin-left: 1.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.rich-rendered-content li {
+  margin-bottom: 0.25rem;
+}
+
+.rich-rendered-content a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rich-rendered-content a:hover {
+  color: #1d4ed8;
+}
+
+.rich-rendered-content blockquote {
+  border-left: 3px solid #94a3b8;
+  padding-left: 0.75rem;
+  font-style: italic;
+  color: #64748b;
+  margin: 0.5rem 0;
+}
