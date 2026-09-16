@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation Beta</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.6.0-beta.2</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.6.0-beta.3</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -784,6 +784,40 @@
           </div>
         </div>
 
+        <!-- Official Supervisors & Support Supervisors Management Section -->
+        <div id="admin-official-supervisors-section" class="card-surface overflow-hidden space-y-4 p-5 bg-white border border-slate-200">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="font-bold text-sm text-slate-900">👥 Danh sách Sinh viên có GVHD & Quản lý GVHD Hỗ trợ</h3>
+                <span id="adm-accepted-count-tag" class="badge bg-emerald-100 text-emerald-800 font-black">0 SV</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">Admin có thể bổ sung thêm GVHD hỗ trợ (không thuộc NV ban đầu) hoặc gỡ GVHD hỗ trợ sau khi đã chốt phân công.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="text" id="admin-assigned-search" oninput="filterAdminAssignedTable(this.value)" placeholder="Tìm MSSV, họ tên, GVHD..." class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-60">
+            </div>
+          </div>
+
+          <div class="overflow-x-auto bg-white rounded-xl border border-slate-100">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                <tr>
+                  <th class="p-3.5 w-24">MSSV</th>
+                  <th class="p-3.5">Họ và tên</th>
+                  <th class="p-3.5">Tên đề tài & Ngành</th>
+                  <th class="p-3.5">GVHD chính</th>
+                  <th class="p-3.5">GVHD hỗ trợ</th>
+                  <th class="p-3.5 text-right whitespace-nowrap">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="admin-assigned-supervisors-tbody" class="divide-y divide-slate-100">
+                <tr><td colspan="6" class="p-8 text-center text-slate-400">Chưa có sinh viên nào được phân công GVHD.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- Manual Assignment Section (For unassigned students) -->
         <div id="admin-manual-assignment-section" class="card-surface overflow-hidden space-y-4 p-5 bg-amber-50/50 border border-amber-200">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/80 pb-3">
@@ -919,6 +953,7 @@
                   <th class="p-3.5">Giới tính</th>
                   <th class="p-3.5">Email / SĐT</th>
                   <th class="p-3.5">Bộ môn</th>
+                  <th class="p-3.5 text-center whitespace-nowrap">Loại GV</th>
                   <th class="p-3.5">Chuyên môn</th>
                   <th class="p-3.5 text-center whitespace-nowrap">Tối đa</th>
                   <th class="p-3.5">Trạng thái</th>
@@ -1436,7 +1471,7 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v1.6.0-beta.2</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v1.6.0-beta.3</p>
     </div>
   </footer>
 
@@ -1805,14 +1840,23 @@
             </div>
           </div>
 
-          <div>
-            <label class="font-bold text-slate-700 block mb-1">Số SV hướng dẫn tối đa mặc định (1–50)</label>
-            <div class="flex items-center gap-2">
-              <input type="number" id="sup-form-default-quota" min="1" max="50" value="5" required class="w-24 p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-center focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
-              <span class="text-xs text-slate-500 font-semibold">SV / đợt</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Loại giảng viên <span class="text-rose-500">*</span></label>
+              <select id="sup-form-employment-type" onchange="handleEmploymentTypeChange(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <option value="internal" selected>Cơ hữu (Tối đa 10 SV)</option>
+                <option value="adjunct">Thỉnh giảng (Tối đa 5 SV)</option>
+              </select>
             </div>
-            <span class="text-[11px] text-slate-400 mt-1 block">Hệ thống sẽ tự động gán quota này khi thêm GVHD vào đợt mới. Admin vẫn có thể chỉnh lại trong từng đợt riêng biệt.</span>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Số SV hướng dẫn mặc định <span class="text-rose-500">*</span></label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="sup-form-default-quota" min="1" max="10" value="10" required class="w-24 p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-center focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <span class="text-xs text-slate-500 font-semibold">SV / đợt</span>
+              </div>
+            </div>
           </div>
+          <p class="text-[11px] text-slate-400">💡 Quy định hạn mức: Giảng viên Cơ hữu tối đa 10 SV, Giảng viên Thỉnh giảng tối đa 5 SV.</p>
           
           <!-- Image upload & Preview -->
           <div>
@@ -2092,7 +2136,7 @@
   <!-- TOAST CONTAINER -->
   <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
-  <!-- CREATE / EDIT ACTIVITY MODAL (v1.6.0-beta.2) -->
+  <!-- CREATE / EDIT ACTIVITY MODAL (v1.6.0-beta.3) -->
   <div id="modal-activity" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
@@ -2350,6 +2394,54 @@
         <button type="button" onclick="closeCopyFromRoundModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Đóng</button>
         <button type="button" id="btn-submit-copy-from-round" onclick="executeCopyFromRound()" disabled class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold shadow-md transition-colors">
           Sao chép các mốc đã chọn
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD SUPPORT SUPERVISOR -->
+  <div id="modal-add-support-supervisor" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
+        <div>
+          <h3 class="font-bold text-base text-tdtu-blue">Thêm GVHD Hỗ trợ</h3>
+          <p id="add-support-student-info" class="text-xs text-slate-500 mt-0.5">Sinh viên: ...</p>
+        </div>
+        <button type="button" onclick="closeAddSupportSupervisorModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs overflow-y-auto flex-1">
+        <input type="hidden" id="support-target-student-id">
+
+        <!-- Info card: Current Primary Supervisor -->
+        <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-blue-800">Giảng viên hướng dẫn hiện tại:</span>
+          <div id="support-current-supervisors-summary" class="font-bold text-slate-800 text-xs mt-1">...</div>
+        </div>
+
+        <!-- Select Support Supervisor -->
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Chọn Giảng viên hướng dẫn hỗ trợ <span class="text-rose-500">*</span></label>
+          <select id="select-support-supervisor" onchange="onSelectSupportSupervisorChange(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+            <option value="">-- Chọn GVHD hỗ trợ --</option>
+          </select>
+          <p id="support-supervisor-quota-hint" class="text-[11px] text-slate-500 mt-1 font-mono"></p>
+        </div>
+
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-amber-900 leading-relaxed text-[11px]">
+          <p>💡 <strong>Quy định nghiệp vụ:</strong></p>
+          <ul class="list-disc list-inside space-y-0.5">
+            <li>GVHD hỗ trợ không cần nằm trong các nguyện vọng ban đầu của SV.</li>
+            <li>Không thay đổi GVHD chính và không sửa lịch sử xét duyệt.</li>
+            <li>Sinh viên được thêm sẽ tính vào hạn mức Quota của GVHD hỗ trợ.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+        <button type="button" onclick="closeAddSupportSupervisorModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Hủy</button>
+        <button type="button" id="btn-confirm-add-support" onclick="executeAddSupportSupervisor()" disabled class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold shadow-md transition-colors">
+          Thêm GVHD Hỗ trợ
         </button>
       </div>
     </div>

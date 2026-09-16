@@ -1,4 +1,47 @@
-/** IFA+ Graduation Beta Studio v1.6.0-beta.2 **/
+
+// ============================================================================
+// OFFICIAL SUPERVISORS HELPERS (v1.6.0-beta.3)
+// ============================================================================
+export function getOfficialSupervisors(reg) {
+  if (!reg) return [];
+  if (Array.isArray(reg.officialSupervisors) && reg.officialSupervisors.length > 0) {
+    return reg.officialSupervisors;
+  }
+  // Backward compatibility: derive from acceptedSupervisorId / finalSupervisorId
+  const primaryId = reg.acceptedSupervisorId || reg.finalSupervisorId;
+  if (primaryId) {
+    return [{
+      supervisorId: primaryId,
+      supervisorName: reg.acceptedSupervisorName || '',
+      source: 'preference',
+      role: 'primary',
+      addedAt: reg.acceptedAt || reg.updatedAt || new Date().toISOString()
+    }];
+  }
+  return [];
+}
+
+export function isOfficialSupervisor(reg, supervisorId) {
+  if (!reg || !supervisorId) return false;
+  const list = getOfficialSupervisors(reg);
+  return list.some(s => s.supervisorId === supervisorId);
+}
+
+export function getPreliminaryExcludedSupervisorIds(reg) {
+  if (!reg) return [];
+  const list = getOfficialSupervisors(reg);
+  return list.map(s => s.supervisorId);
+}
+
+export function getSupervisorTotalAssignedCount(supId, registrations = []) {
+  if (!supId || !Array.isArray(registrations)) return 0;
+  return registrations.filter(r => {
+    if (r.reviewStatus !== 'accepted' && r.reviewStatus !== 'manually_assigned') return false;
+    return isOfficialSupervisor(r, supId);
+  }).length;
+}
+
+/** IFA+ Graduation Beta Studio v1.6.0-beta.3 **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -1053,32 +1096,56 @@ function renderStudentOfficialResult(reg) {
   const container = document.getElementById('official-result-body');
   if (!container) return;
 
-  if (reg.reviewStatus === 'accepted' || reg.reviewStatus === 'manually_assigned' || reg.acceptedSupervisorId) {
-    const sup = state.roundSupervisors.find(s => s.id === reg.acceptedSupervisorId || s.supervisorId === reg.acceptedSupervisorId)
-      || state.supervisorsMaster.find(s => s.id === reg.acceptedSupervisorId);
+  const officialList = getOfficialSupervisors(reg);
 
+  if ((reg.reviewStatus === 'accepted' || reg.reviewStatus === 'manually_assigned' || officialList.length > 0)) {
     const defaultAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23cbd5e1"/><path fill="%23cbd5e1" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
 
-    container.innerHTML = `
-      <div class="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/20 flex flex-col sm:flex-row items-center gap-5">
-        <img src="${sup?.photoUrl || defaultAvatar}" class="w-20 h-20 rounded-2xl object-cover border-2 border-amber-400 shadow-md">
-        <div class="text-center sm:text-left flex-1">
-          <span class="badge bg-emerald-500 text-white font-extrabold text-[11px] mb-1">
-            ${reg.acceptedRank === 'manual' ? 'Phân công theo quyết định Khoa' : 'Trúng tuyển Nguyện vọng ' + (reg.acceptedRank || 1)}
-          </span>
-          <h3 class="text-xl font-black text-white mt-1">${reg.acceptedSupervisorName || sup?.name || 'Giảng viên Hướng dẫn'}</h3>
-          <p class="text-xs text-blue-200 mt-0.5">${sup?.department || 'Khoa Mỹ thuật Công nghiệp'}</p>
-          <div class="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-3 text-xs">
-            ${(state.activeRound?.showEmailAfterPublish !== false && sup?.email) ? '<span class="bg-white/10 px-2.5 py-1 rounded-lg">✉️ ' + sup.email + '</span>' : ''}
-            ${(state.activeRound?.showPhoneAfterPublish !== false && sup?.phone) ? '<span class="bg-white/10 px-2.5 py-1 rounded-lg">📞 ' + sup.phone + '</span>' : ''}
+    const supervisorsCardsHtml = officialList.map(item => {
+      const sup = (state.roundSupervisors || []).find(s => s.id === item.supervisorId || s.supervisorId === item.supervisorId)
+        || (state.supervisorsMaster || []).find(s => s.id === item.supervisorId);
+
+      const isPrimary = (item.role === 'primary');
+      const roleBadge = isPrimary
+        ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500 text-white font-black text-[10px] shadow-sm uppercase tracking-wide">GVHD chính</span>'
+        : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500 text-white font-black text-[10px] shadow-sm uppercase tracking-wide">GVHD hỗ trợ</span>';
+
+      const showEmail = (state.activeRound?.showEmailAfterPublish !== false && sup?.email);
+      const showPhone = (state.activeRound?.showPhoneAfterPublish !== false && sup?.phone);
+
+      return `
+        <div class="bg-white/10 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/20 flex flex-col sm:flex-row items-center sm:items-start gap-4 flex-1 min-w-[280px]">
+          <img src="${sup?.photoUrl || defaultAvatar}" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 ${isPrimary ? 'border-amber-400' : 'border-blue-400'} shadow-md shrink-0">
+          <div class="text-center sm:text-left flex-1 min-w-0">
+            <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+              ${roleBadge}
+              ${isPrimary ? `<span class="text-[10px] text-amber-300 font-semibold">${reg.acceptedRank === 'manual' ? 'Phân công của Khoa' : 'Trúng tuyển NV' + (reg.acceptedRank || 1)}</span>` : ''}
+            </div>
+            <h3 class="text-lg sm:text-xl font-black text-white truncate">${item.supervisorName || sup?.name || 'Giảng viên Hướng dẫn'}</h3>
+            <p class="text-xs text-blue-200 mt-0.5">${sup?.department || 'Khoa Mỹ thuật Công nghiệp'}</p>
+            <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2.5 text-xs">
+              ${showEmail ? '<span class="bg-white/15 px-2.5 py-1 rounded-lg text-white font-mono text-[11px]">✉️ ' + sup.email + '</span>' : ''}
+              ${showPhone ? '<span class="bg-white/15 px-2.5 py-1 rounded-lg text-white font-mono text-[11px]">📞 ' + sup.phone + '</span>' : ''}
+            </div>
           </div>
         </div>
-      </div>
+      `;
+    }).join('');
 
-      <div class="bg-black/30 p-4 rounded-xl border border-white/10 text-xs space-y-1">
-        <span class="text-blue-300 font-bold block uppercase">Đề tài Đồ án Tốt nghiệp chính thức:</span>
-        <p class="text-white font-bold text-sm leading-relaxed">${reg.topicTitle}</p>
-        <p class="text-blue-200 text-[11px] mt-1">Loại hình: ${reg.projectType}</p>
+    container.innerHTML = `
+      <div class="space-y-4">
+        <div>
+          <span class="text-xs font-bold text-amber-300 uppercase tracking-wider block mb-2">GIẢNG VIÊN HƯỚNG DẪN ĐỒ ÁN (${officialList.length})</span>
+          <div class="flex flex-col md:flex-row gap-3">
+            ${supervisorsCardsHtml}
+          </div>
+        </div>
+
+        <div class="bg-black/30 p-4 rounded-xl border border-white/10 text-xs space-y-1">
+          <span class="text-blue-300 font-bold block uppercase">Đề tài Đồ án Tốt nghiệp chính thức:</span>
+          <p class="text-white font-bold text-sm leading-relaxed">${reg.topicTitle}</p>
+          <p class="text-blue-200 text-[11px] mt-1">Loại hình: ${reg.projectType}</p>
+        </div>
       </div>
     `;
   } else {
@@ -2650,7 +2717,14 @@ function renderRoundModalSupervisorsList(filter = '') {
     const supId = getSupervisorId(s);
     const isSelected = state.roundModalSupervisors.has(supId);
     const roundData = isSelected ? state.roundModalSupervisors.get(supId) : null;
-    const quota = roundData?.maxQuota || s.defaultQuota || 5;
+    const empType = s.employmentType || 'internal';
+    const maxCap = (empType === 'adjunct' ? 5 : 10);
+    const initialQuota = roundData?.maxQuota || s.defaultQuota || maxCap;
+    const quota = Math.min(maxCap, initialQuota);
+
+    const typeBadge = (empType === 'adjunct')
+      ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Thỉnh giảng (tối đa 5)</span>'
+      : '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Cơ hữu (tối đa 10)</span>';
 
     return `
       <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
@@ -2658,13 +2732,16 @@ function renderRoundModalSupervisorsList(filter = '') {
           <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleRoundModalSupervisor('${supId}', this.checked)" class="rounded text-tdtu-blue w-4 h-4">
           <img src="${s.photoUrl || 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><circle cx=\'12\' cy=\'8\' r=\'4\' fill=\'%23cbd5e1\'/><path fill=\'%23cbd5e1\' d=\'M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z\'/></svg>'}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0">
           <div class="min-w-0 flex-1">
-            <span class="font-bold text-slate-800 text-xs block truncate">${s.name}</span>
+            <div class="flex items-center gap-1.5">
+              <span class="font-bold text-slate-800 text-xs block truncate">${s.name}</span>
+              ${typeBadge}
+            </div>
             <span class="text-[11px] text-slate-500 block truncate">${s.department || 'Thiết kế nội thất'} • ${s.email}</span>
           </div>
         </label>
         <div class="flex items-center gap-1.5 ml-3 shrink-0">
-          <span class="text-[11px] text-slate-500 font-semibold">Chỉ tiêu (Quota):</span>
-          <input type="number" min="1" max="50" value="${quota}" ${!isSelected ? 'disabled' : ''} onchange="updateRoundModalSupervisorQuota('${supId}', this.value)" class="w-14 p-1 border border-slate-300 rounded-lg text-xs font-mono font-bold text-center bg-white disabled:opacity-40 disabled:bg-slate-100">
+          <span class="text-[11px] text-slate-500 font-semibold">Chỉ tiêu:</span>
+          <input type="number" min="1" max="${maxCap}" value="${quota}" ${!isSelected ? 'disabled' : ''} onchange="updateRoundModalSupervisorQuota('${supId}', this.value)" class="w-14 p-1 border border-slate-300 rounded-lg text-xs font-mono font-bold text-center bg-white disabled:opacity-40 disabled:bg-slate-100">
         </div>
       </div>
     `;
@@ -2687,7 +2764,11 @@ window.toggleRoundModalSupervisor = function(supId, isChecked) {
   if (isChecked) {
     // Preserve existing round quota if supervisor was previously configured in this round, otherwise default from master
     const existing = state.roundModalSupervisors.get(supId);
-    const initialQuota = existing?.maxQuota || s.defaultQuota || 5;
+    const empType = s.employmentType || 'internal';
+    const maxCap = (empType === 'adjunct' ? 5 : 10);
+    const rawQuota = existing?.maxQuota || s.defaultQuota || maxCap;
+    const initialQuota = Math.min(maxCap, Math.max(1, rawQuota));
+
     state.roundModalSupervisors.set(supId, {
       id: supId,
       supervisorId: supId,
@@ -2695,6 +2776,7 @@ window.toggleRoundModalSupervisor = function(supId, isChecked) {
       email: s.email,
       department: s.department || 'Thiết kế nội thất',
       photoUrl: s.photoUrl || '',
+      employmentType: empType,
       maxQuota: initialQuota,
       active: true
     });
@@ -2708,10 +2790,15 @@ window.toggleRoundModalSupervisor = function(supId, isChecked) {
 
 window.updateRoundModalSupervisorQuota = function(supId, val) {
   if (!supId || supId === 'undefined') return;
-  const q = parseInt(val, 10) || 5;
+  const allSups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
+    ? state.supervisorsMaster
+    : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
+  const s = allSups.find(x => getSupervisorId(x) === supId);
+  const maxCap = (s?.employmentType === 'adjunct') ? 5 : 10;
+  const q = parseInt(val, 10) || maxCap;
   if (state.roundModalSupervisors.has(supId)) {
     const item = state.roundModalSupervisors.get(supId);
-    item.maxQuota = Math.max(1, Math.min(50, q));
+    item.maxQuota = Math.max(1, Math.min(maxCap, q));
     state.roundModalSupervisors.set(supId, item);
   }
 };
@@ -3081,16 +3168,24 @@ function renderAdminSupervisorsMasterTable() {
 
   const defaultAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23cbd5e1"/><path fill="%23cbd5e1" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
 
-  tbody.innerHTML = state.supervisorsMaster.map(s => `
+  tbody.innerHTML = state.supervisorsMaster.map(s => {
+    const isAdjunct = (s.employmentType === 'adjunct');
+    const typeBadge = isAdjunct
+      ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Thỉnh giảng</span>'
+      : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Cơ hữu</span>';
+    const quotaVal = s.defaultQuota || (isAdjunct ? 5 : 10);
+
+    return `
     <tr class="hover:bg-slate-50">
       <td class="p-3.5"><img src="${s.photoUrl || defaultAvatar}" class="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm"></td>
       <td class="p-3.5 font-bold text-slate-900">${s.name}</td>
       <td class="p-3.5 text-slate-600">${s.gender || 'Nam'}</td>
       <td class="p-3.5 text-slate-600">${s.email || '--'} ${s.phone ? '• ' + s.phone : ''}</td>
       <td class="p-3.5 font-semibold text-slate-800">${s.department || 'Thiết kế nội thất'}</td>
+      <td class="p-3.5 text-center whitespace-nowrap">${typeBadge}</td>
       <td class="p-3.5 max-w-[200px] truncate text-slate-600" title="${s.expertise || ''}">${s.expertise || '--'}</td>
       <td class="p-3.5 text-center whitespace-nowrap">
-        <span class="inline-block px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg font-mono text-[11px] font-bold text-slate-700">${s.defaultQuota || 5} SV</span>
+        <span class="inline-block px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg font-mono text-[11px] font-bold text-slate-700">${quotaVal} SV</span>
       </td>
       <td class="p-3.5">
         <span class="badge ${s.active !== false ? 'badge-open' : 'badge-closed'}">${s.active !== false ? 'Active' : 'Ngừng'}</span>
@@ -3100,7 +3195,8 @@ function renderAdminSupervisorsMasterTable() {
         <button onclick="deleteSupervisorMaster('${s.id}')" class="text-rose-600 hover:underline font-bold">Xóa</button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 
@@ -3123,6 +3219,25 @@ window.previewSupervisorPhoto = function(input) {
   reader.readAsDataURL(file);
 };
 
+window.handleEmploymentTypeChange = function(type, isEdit = false) {
+  const quotaInput = document.getElementById('sup-form-default-quota');
+  if (!quotaInput) return;
+  const isAdjunct = (type === 'adjunct');
+  const maxCap = isAdjunct ? 5 : 10;
+  quotaInput.max = maxCap;
+
+  if (!isEdit) {
+    // When creating new supervisor, set standard default
+    quotaInput.value = isAdjunct ? 5 : 10;
+  } else {
+    // When editing, if current value exceeds new max, cap it
+    const current = parseInt(quotaInput.value, 10) || 5;
+    if (current > maxCap) {
+      quotaInput.value = maxCap;
+    }
+  }
+};
+
 window.openCreateSupervisorModal = function() {
   document.getElementById('form-supervisor').reset();
   document.getElementById('sup-form-id').value = '';
@@ -3143,8 +3258,14 @@ window.openCreateSupervisorModal = function() {
   if (document.getElementById('sup-form-gender')) {
     document.getElementById('sup-form-gender').value = 'Nam';
   }
+  
+  // Default to internal (Cơ hữu) with defaultQuota = 10
+  if (document.getElementById('sup-form-employment-type')) {
+    document.getElementById('sup-form-employment-type').value = 'internal';
+  }
   if (document.getElementById('sup-form-default-quota')) {
-    document.getElementById('sup-form-default-quota').value = '5';
+    document.getElementById('sup-form-default-quota').max = 10;
+    document.getElementById('sup-form-default-quota').value = '10';
   }
   
   document.getElementById('modal-supervisor-title').textContent = 'Thêm Giảng viên Hướng dẫn';
@@ -3186,8 +3307,19 @@ window.editSupervisorMasterModal = function(supId) {
   document.getElementById('sup-form-expertise').value = s.expertise || '';
   document.getElementById('sup-form-bio').value = s.bio || '';
   document.getElementById('sup-form-active').checked = s.active !== false;
+
+  // Employment type & quota logic (preserving existing quota if within max cap)
+  const empType = s.employmentType || 'internal';
+  if (document.getElementById('sup-form-employment-type')) {
+    document.getElementById('sup-form-employment-type').value = empType;
+  }
+  const maxCap = (empType === 'adjunct' ? 5 : 10);
+  const existingQuota = Number(s.defaultQuota);
+  const finalQuota = (!isNaN(existingQuota) && existingQuota >= 1) ? Math.min(maxCap, existingQuota) : (empType === 'adjunct' ? 5 : 10);
+
   if (document.getElementById('sup-form-default-quota')) {
-    document.getElementById('sup-form-default-quota').value = s.defaultQuota || 5;
+    document.getElementById('sup-form-default-quota').max = maxCap;
+    document.getElementById('sup-form-default-quota').value = finalQuota;
   }
 
   document.getElementById('modal-supervisor-title').textContent = 'Chỉnh sửa Giảng viên Hướng dẫn';
@@ -3244,8 +3376,10 @@ window.saveSupervisorMaster = async function(e) {
   const bio = document.getElementById('sup-form-bio')?.value.trim();
   const active = document.getElementById('sup-form-active')?.checked !== false;
 
+  const employmentType = document.getElementById('sup-form-employment-type')?.value || 'internal';
+  const maxCap = (employmentType === 'adjunct' ? 5 : 10);
   const defaultQuotaRaw = parseInt(document.getElementById('sup-form-default-quota')?.value, 10);
-  const defaultQuota = (Number.isInteger(defaultQuotaRaw) && defaultQuotaRaw >= 1 && defaultQuotaRaw <= 50) ? defaultQuotaRaw : 5;
+  const defaultQuota = (Number.isInteger(defaultQuotaRaw) && defaultQuotaRaw >= 1) ? Math.min(maxCap, defaultQuotaRaw) : maxCap;
 
   if (!name || !email || !email.includes('@')) {
     showToast('Vui lòng điền Họ tên và Email hợp lệ', 'error');
@@ -3261,6 +3395,7 @@ window.saveSupervisorMaster = async function(e) {
 
   const payload = {
     name, email, phone, photoUrl, gender, department, expertise, bio,
+    employmentType,
     defaultQuota,
     active,
     updatedAt: serverTimestamp()
@@ -3912,6 +4047,7 @@ window.loadAdminReviewData = async function(roundId) {
     renderAdminReviewDashboard();
     renderAdminReviewSupervisorsTable();
     renderAdminManualAssignmentTable();
+    renderAdminAssignedSupervisorsTable();
   } catch (e) {
     console.error('Error loading admin review data:', e);
   }
@@ -6579,5 +6715,288 @@ window.loadStudentRoundActivities = async function(roundId) {
       }
       state.targetActivitySlug = null;
     }, 300);
+  }
+};
+
+
+// ============================================================================
+// ADMIN OFFICIAL & SUPPORT SUPERVISORS MANAGEMENT TABLE (v1.6.0-beta.3)
+// ============================================================================
+window.filterAdminAssignedTable = function(filterVal) {
+  renderAdminAssignedSupervisorsTable(filterVal);
+};
+
+window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
+  const tbody = document.getElementById('admin-assigned-supervisors-tbody');
+  const countTag = document.getElementById('adm-accepted-count-tag');
+  if (!tbody) return;
+
+  const registrations = state.adminReviewData?.registrations || [];
+  const assigned = registrations.filter(r => r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned');
+
+  if (countTag) countTag.textContent = `${assigned.length} SV`;
+
+  const q = String(filterVal || '').trim().toLowerCase();
+  const filtered = assigned.filter(r => {
+    if (!q) return true;
+    const supNames = getOfficialSupervisors(r).map(s => s.supervisorName || '').join(' ').toLowerCase();
+    return (r.studentId && r.studentId.toLowerCase().includes(q)) ||
+      (r.studentName && r.studentName.toLowerCase().includes(q)) ||
+      (r.topicTitle && r.topicTitle.toLowerCase().includes(q)) ||
+      supNames.includes(q);
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="p-8 text-center text-slate-400">
+          ${assigned.length === 0 ? 'Chưa có sinh viên nào có kết quả GVHD chính thức.' : 'Không tìm thấy sinh viên phù hợp từ khóa tìm kiếm.'}
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(r => {
+    const officials = getOfficialSupervisors(r);
+    const primary = officials.find(s => s.role === 'primary') || officials[0];
+    const supports = officials.filter(s => s.role === 'support');
+
+    const primaryHtml = primary ? `
+      <div>
+        <span class="font-bold text-slate-900 text-xs block">${primary.supervisorName || 'GVHD chính'}</span>
+        <span class="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200">GVHD chính</span>
+      </div>
+    ` : '<span class="text-slate-400">--</span>';
+
+    const supportsHtml = (supports.length > 0) ? `
+      <div class="space-y-1.5">
+        ${supports.map(sup => `
+          <div class="flex items-center justify-between gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
+            <div>
+              <span class="font-bold text-slate-800 text-xs block">${sup.supervisorName}</span>
+              <span class="text-[9px] text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-200">GVHD hỗ trợ</span>
+            </div>
+            <button type="button" onclick="removeSupportSupervisor('${r.studentId}', '${sup.supervisorId}', '${escapeHtml(sup.supervisorName)}', '${escapeHtml(r.studentName || r.studentId)}')" class="px-2 py-0.5 text-rose-600 hover:bg-rose-50 rounded text-[10px] font-bold border border-rose-200 transition-colors" title="Gỡ GVHD hỗ trợ khỏi sinh viên này">
+              Gỡ
+            </button>
+          </div>
+        `).join('')}
+      </div>
+    ` : '<span class="text-slate-400 italic text-[11px]">Chưa có</span>';
+
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="p-3.5 font-mono font-bold text-slate-900">${r.studentId}</td>
+        <td class="p-3.5 font-semibold text-slate-800 whitespace-nowrap">${r.studentName || '--'}</td>
+        <td class="p-3.5 max-w-xs">
+          <span class="font-medium text-slate-900 block truncate" title="${r.topicTitle}">${r.topicTitle}</span>
+          <span class="text-[11px] text-slate-500">${r.projectType || '--'}</span>
+        </td>
+        <td class="p-3.5 whitespace-nowrap">${primaryHtml}</td>
+        <td class="p-3.5 min-w-[200px]">${supportsHtml}</td>
+        <td class="p-3.5 text-right whitespace-nowrap">
+          <button type="button" onclick="openAddSupportSupervisorModal('${r.studentId}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs border border-indigo-200 transition-colors flex items-center gap-1 inline-flex">
+            <span>+ Thêm GVHD hỗ trợ</span>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+window.openAddSupportSupervisorModal = function(studentId) {
+  const roundId = state.selectedRoundId;
+  const registrations = state.adminReviewData?.registrations || [];
+  const reg = registrations.find(r => r.studentId === studentId);
+  if (!reg) {
+    showToast('Không tìm thấy thông tin sinh viên!', 'error');
+    return;
+  }
+
+  document.getElementById('support-target-student-id').value = studentId;
+  const studentInfoEl = document.getElementById('add-support-student-info');
+  if (studentInfoEl) studentInfoEl.textContent = `Sinh viên: ${reg.studentName || studentId} (MSSV: ${studentId})`;
+
+  const officials = getOfficialSupervisors(reg);
+  const primary = officials.find(s => s.role === 'primary') || officials[0];
+  const supports = officials.filter(s => s.role === 'support');
+
+  const summaryEl = document.getElementById('support-current-supervisors-summary');
+  if (summaryEl) {
+    let htmlStr = `• GVHD chính: <strong>${primary?.supervisorName || 'Chưa xác định'}</strong>`;
+    if (supports.length > 0) {
+      htmlStr += `<br>• GVHD hỗ trợ: ${supports.map(s => s.supervisorName).join(', ')}`;
+    }
+    summaryEl.innerHTML = htmlStr;
+  }
+
+  // Populate Supervisors dropdown with duplicate protection & quota check
+  const select = document.getElementById('select-support-supervisor');
+  const supervisors = state.adminReviewData?.supervisors || [];
+  const assignedSupsSet = new Set(officials.map(s => s.supervisorId));
+
+  select.innerHTML = '<option value="">-- Chọn GVHD hỗ trợ --</option>' + supervisors.map(s => {
+    const isAlreadyAssigned = assignedSupsSet.has(s.id);
+    const empType = s.employmentType || 'internal';
+    const isAdjunct = (empType === 'adjunct');
+    const cap = isAdjunct ? Math.min(5, s.capacity || s.maxQuota || 5) : Math.min(10, s.capacity || s.maxQuota || 10);
+    const totalAssigned = getSupervisorTotalAssignedCount(s.id, registrations);
+    const remaining = cap - totalAssigned;
+    const isFull = (remaining <= 0);
+
+    let label = `${s.name} (${isAdjunct ? 'Thỉnh giảng' : 'Cơ hữu'} • ${totalAssigned}/${cap} SV)`;
+    if (isAlreadyAssigned) {
+      label += ' — Đã là GVHD của SV';
+    } else if (isFull) {
+      label += ' — Đã đủ Quota';
+    }
+
+    const disabledAttr = (isAlreadyAssigned || isFull) ? 'disabled' : '';
+    return `<option value="${s.id}" data-remaining="${remaining}" data-cap="${cap}" data-assigned="${totalAssigned}" ${disabledAttr}>${label}</option>`;
+  }).join('');
+
+  document.getElementById('support-supervisor-quota-hint').textContent = '';
+  document.getElementById('btn-confirm-add-support').disabled = true;
+
+  document.getElementById('modal-add-support-supervisor')?.classList.remove('hidden');
+};
+
+window.closeAddSupportSupervisorModal = function() {
+  document.getElementById('modal-add-support-supervisor')?.classList.add('hidden');
+};
+
+window.onSelectSupportSupervisorChange = function(supId) {
+  const submitBtn = document.getElementById('btn-confirm-add-support');
+  const hint = document.getElementById('support-supervisor-quota-hint');
+  if (!supId) {
+    if (submitBtn) submitBtn.disabled = true;
+    if (hint) hint.textContent = '';
+    return;
+  }
+
+  const select = document.getElementById('select-support-supervisor');
+  const opt = select.options[select.selectedIndex];
+  const remaining = parseInt(opt.getAttribute('data-remaining') || '0', 10);
+  const cap = parseInt(opt.getAttribute('data-cap') || '10', 10);
+  const assigned = parseInt(opt.getAttribute('data-assigned') || '0', 10);
+
+  if (remaining <= 0) {
+    if (submitBtn) submitBtn.disabled = true;
+    if (hint) hint.innerHTML = '<span class="text-rose-600 font-bold">⚠️ Giảng viên này đã đủ chỉ tiêu (hết quota) trong đợt!</span>';
+  } else {
+    if (submitBtn) submitBtn.disabled = false;
+    if (hint) hint.innerHTML = `<span class="text-emerald-700 font-bold">✓ Chỉ tiêu khả dụng: còn ${remaining} chỗ (Đang hướng dẫn ${assigned}/${cap} SV).</span>`;
+  }
+};
+
+window.executeAddSupportSupervisor = async function() {
+  const roundId = state.selectedRoundId;
+  const studentId = document.getElementById('support-target-student-id')?.value;
+  const supervisorId = document.getElementById('select-support-supervisor')?.value;
+
+  if (!roundId || !studentId || !supervisorId) return;
+
+  const registrations = state.adminReviewData?.registrations || [];
+  const reg = registrations.find(r => r.studentId === studentId);
+  const sup = (state.adminReviewData?.supervisors || []).find(s => s.id === supervisorId);
+
+  if (!reg || !sup) {
+    showToast('Không tìm thấy thông tin sinh viên hoặc giảng viên!', 'error');
+    return;
+  }
+
+  // Quota validation
+  const empType = sup.employmentType || 'internal';
+  const cap = (empType === 'adjunct' ? 5 : 10);
+  const currentAssigned = getSupervisorTotalAssignedCount(sup.id, registrations);
+  if (currentAssigned >= cap) {
+    showToast(`Giảng viên ${sup.name} đã đủ chỉ tiêu tối đa (${cap} SV) theo quy định!`, 'warning');
+    return;
+  }
+
+  // Duplicate protection
+  const officials = getOfficialSupervisors(reg);
+  if (officials.some(s => s.supervisorId === supervisorId)) {
+    showToast(`Thầy/Cô ${sup.name} đã là GVHD của sinh viên này!`, 'warning');
+    return;
+  }
+
+  const submitBtn = document.getElementById('btn-confirm-add-support');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Đang lưu...';
+  }
+
+  try {
+    const updatedOfficials = [...officials, {
+      supervisorId: sup.id,
+      supervisorName: sup.name,
+      source: 'admin_added',
+      role: 'support',
+      addedAt: new Date().toISOString()
+    }];
+
+    // Update in Firestore
+    const regRef = doc(db, 'graduationRounds', roundId, 'registrations', studentId);
+    await updateDoc(regRef, {
+      officialSupervisors: updatedOfficials,
+      updatedAt: serverTimestamp()
+    });
+
+    reg.officialSupervisors = updatedOfficials;
+
+    closeAddSupportSupervisorModal();
+    renderAdminAssignedSupervisorsTable();
+    renderAdminReviewDashboard();
+    renderAdminReviewSupervisorsTable();
+
+    showToast(`✓ Đã thêm Thầy/Cô ${sup.name} làm GVHD hỗ trợ cho sinh viên ${reg.studentName || studentId}!`, 'success');
+  } catch (err) {
+    console.error('Lỗi thêm GVHD hỗ trợ:', err);
+    showToast('Lỗi: ' + err.message, 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Thêm GVHD Hỗ trợ';
+    }
+  }
+};
+
+window.removeSupportSupervisor = async function(studentId, supervisorId, supervisorName, studentName) {
+  const roundId = state.selectedRoundId;
+  if (!roundId || !studentId || !supervisorId) return;
+
+  const confirmed = await showConfirm(
+    'Gỡ GVHD hỗ trợ',
+    `Bạn có chắc chắn muốn gỡ Thầy/Cô "${supervisorName}" khỏi vai trò GVHD hỗ trợ của sinh viên "${studentName}" không?`,
+    { confirmText: 'Gỡ GVHD hỗ trợ', danger: true }
+  );
+  if (!confirmed) return;
+
+  const registrations = state.adminReviewData?.registrations || [];
+  const reg = registrations.find(r => r.studentId === studentId);
+  if (!reg) return;
+
+  try {
+    const officials = getOfficialSupervisors(reg);
+    const updatedOfficials = officials.filter(s => !(s.role === 'support' && s.supervisorId === supervisorId));
+
+    const regRef = doc(db, 'graduationRounds', roundId, 'registrations', studentId);
+    await updateDoc(regRef, {
+      officialSupervisors: updatedOfficials,
+      updatedAt: serverTimestamp()
+    });
+
+    reg.officialSupervisors = updatedOfficials;
+
+    renderAdminAssignedSupervisorsTable();
+    renderAdminReviewDashboard();
+    renderAdminReviewSupervisorsTable();
+
+    showToast(`Đã gỡ GVHD hỗ trợ khỏi sinh viên ${studentName}.`, 'info');
+  } catch (err) {
+    console.error('Lỗi gỡ GVHD hỗ trợ:', err);
+    showToast('Lỗi gỡ GVHD hỗ trợ: ' + err.message, 'error');
   }
 };
