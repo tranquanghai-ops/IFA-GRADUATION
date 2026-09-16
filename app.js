@@ -1,4 +1,4 @@
-/** IFA+ Graduation Studio v1.5.1 **/
+/** IFA+ Graduation Studio v1.5.2 **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -2373,6 +2373,7 @@ window.editRoundModal = async function(roundId) {
         state.roundModalSupervisors.set(supId, {
           id: supId,
           supervisorId: supId,
+          maxQuota: data.maxQuota || 5,
           ...data
         });
       }
@@ -2626,7 +2627,7 @@ function renderRoundModalSupervisorsList(filter = '') {
     const supId = getSupervisorId(s);
     const isSelected = state.roundModalSupervisors.has(supId);
     const roundData = isSelected ? state.roundModalSupervisors.get(supId) : null;
-    const quota = roundData?.maxQuota || 5;
+    const quota = roundData?.maxQuota || s.defaultQuota || 5;
 
     return `
       <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
@@ -2661,6 +2662,9 @@ window.toggleRoundModalSupervisor = function(supId, isChecked) {
   if (!s) return;
 
   if (isChecked) {
+    // Preserve existing round quota if supervisor was previously configured in this round, otherwise default from master
+    const existing = state.roundModalSupervisors.get(supId);
+    const initialQuota = existing?.maxQuota || s.defaultQuota || 5;
     state.roundModalSupervisors.set(supId, {
       id: supId,
       supervisorId: supId,
@@ -2668,7 +2672,7 @@ window.toggleRoundModalSupervisor = function(supId, isChecked) {
       email: s.email,
       department: s.department || 'Thiết kế nội thất',
       photoUrl: s.photoUrl || '',
-      maxQuota: 5,
+      maxQuota: initialQuota,
       active: true
     });
   } else {
@@ -2706,7 +2710,7 @@ window.selectAllRoundModalSupervisors = function(select) {
           email: s.email,
           department: s.department || 'Thiết kế nội thất',
           photoUrl: s.photoUrl || '',
-          maxQuota: 5,
+          maxQuota: s.defaultQuota || 5,
           active: true
         });
       }
@@ -2926,7 +2930,8 @@ export const SAMPLE_SUPERVISORS = [
     active: true,
     showPhoto: true,
     showEmail: true,
-    showPhone: false
+    showPhone: false,
+    defaultQuota: 5
   },
   {
     id: "sup_ngovanduc",
@@ -2941,7 +2946,8 @@ export const SAMPLE_SUPERVISORS = [
     active: true,
     showPhoto: true,
     showEmail: true,
-    showPhone: false
+    showPhone: false,
+    defaultQuota: 5
   },
   {
     id: "sup_tomailinh",
@@ -2956,7 +2962,8 @@ export const SAMPLE_SUPERVISORS = [
     active: true,
     showPhoto: true,
     showEmail: true,
-    showPhone: false
+    showPhone: false,
+    defaultQuota: 5
   },
   {
     id: "sup_hongocle",
@@ -2971,7 +2978,8 @@ export const SAMPLE_SUPERVISORS = [
     active: true,
     showPhoto: true,
     showEmail: true,
-    showPhone: false
+    showPhone: false,
+    defaultQuota: 5
   },
   {
     id: "sup_nguyenminhhieu",
@@ -2986,7 +2994,8 @@ export const SAMPLE_SUPERVISORS = [
     active: true,
     showPhoto: true,
     showEmail: true,
-    showPhone: false
+    showPhone: false,
+    defaultQuota: 5
   },
   {
     id: "sup_truongthithuydiem",
@@ -3001,7 +3010,8 @@ export const SAMPLE_SUPERVISORS = [
     active: true,
     showPhoto: true,
     showEmail: true,
-    showPhone: false
+    showPhone: false,
+    defaultQuota: 5
   }
 ];
 
@@ -3056,6 +3066,9 @@ function renderAdminSupervisorsMasterTable() {
       <td class="p-3.5 text-slate-600">${s.email || '--'} ${s.phone ? '• ' + s.phone : ''}</td>
       <td class="p-3.5 font-semibold text-slate-800">${s.department || 'Thiết kế nội thất'}</td>
       <td class="p-3.5 max-w-[200px] truncate text-slate-600" title="${s.expertise || ''}">${s.expertise || '--'}</td>
+      <td class="p-3.5 text-center whitespace-nowrap">
+        <span class="inline-block px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg font-mono text-[11px] font-bold text-slate-700">${s.defaultQuota || 5} SV</span>
+      </td>
       <td class="p-3.5">
         <span class="badge ${s.active !== false ? 'badge-open' : 'badge-closed'}">${s.active !== false ? 'Active' : 'Ngừng'}</span>
       </td>
@@ -3107,6 +3120,9 @@ window.openCreateSupervisorModal = function() {
   if (document.getElementById('sup-form-gender')) {
     document.getElementById('sup-form-gender').value = 'Nam';
   }
+  if (document.getElementById('sup-form-default-quota')) {
+    document.getElementById('sup-form-default-quota').value = '5';
+  }
   
   document.getElementById('modal-supervisor-title').textContent = 'Thêm Giảng viên Hướng dẫn';
   document.getElementById('modal-supervisor').classList.remove('hidden');
@@ -3147,6 +3163,9 @@ window.editSupervisorMasterModal = function(supId) {
   document.getElementById('sup-form-expertise').value = s.expertise || '';
   document.getElementById('sup-form-bio').value = s.bio || '';
   document.getElementById('sup-form-active').checked = s.active !== false;
+  if (document.getElementById('sup-form-default-quota')) {
+    document.getElementById('sup-form-default-quota').value = s.defaultQuota || 5;
+  }
 
   document.getElementById('modal-supervisor-title').textContent = 'Chỉnh sửa Giảng viên Hướng dẫn';
   document.getElementById('modal-supervisor').classList.remove('hidden');
@@ -3202,6 +3221,9 @@ window.saveSupervisorMaster = async function(e) {
   const bio = document.getElementById('sup-form-bio')?.value.trim();
   const active = document.getElementById('sup-form-active')?.checked !== false;
 
+  const defaultQuotaRaw = parseInt(document.getElementById('sup-form-default-quota')?.value, 10);
+  const defaultQuota = (Number.isInteger(defaultQuotaRaw) && defaultQuotaRaw >= 1 && defaultQuotaRaw <= 50) ? defaultQuotaRaw : 5;
+
   if (!name || !email || !email.includes('@')) {
     showToast('Vui lòng điền Họ tên và Email hợp lệ', 'error');
     return;
@@ -3216,6 +3238,7 @@ window.saveSupervisorMaster = async function(e) {
 
   const payload = {
     name, email, phone, photoUrl, gender, department, expertise, bio,
+    defaultQuota,
     active,
     updatedAt: serverTimestamp()
   };

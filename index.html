@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.5.1</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.5.2</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -845,6 +845,7 @@
                   <th class="p-3.5">Email / SĐT</th>
                   <th class="p-3.5">Bộ môn</th>
                   <th class="p-3.5">Chuyên môn</th>
+                  <th class="p-3.5 text-center whitespace-nowrap">Tối đa</th>
                   <th class="p-3.5">Trạng thái</th>
                   <th class="p-3.5 text-right">Thao tác</th>
                 </tr>
@@ -1360,7 +1361,7 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Studio v1.5.1</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Studio v1.5.2</p>
     </div>
   </footer>
 
@@ -1727,6 +1728,15 @@
               <input type="text" id="sup-form-dept-custom" placeholder="Nhập tên bộ môn khác..." class="hidden mt-1.5 w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
               <input type="hidden" id="sup-form-dept" value="Thiết kế nội thất">
             </div>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Số SV hướng dẫn tối đa mặc định (1–50)</label>
+            <div class="flex items-center gap-2">
+              <input type="number" id="sup-form-default-quota" min="1" max="50" value="5" required class="w-24 p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-center focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+              <span class="text-xs text-slate-500 font-semibold">SV / đợt</span>
+            </div>
+            <span class="text-[11px] text-slate-400 mt-1 block">Hệ thống sẽ tự động gán quota này khi thêm GVHD vào đợt mới. Admin vẫn có thể chỉnh lại trong từng đợt riêng biệt.</span>
           </div>
           
           <!-- Image upload & Preview -->
