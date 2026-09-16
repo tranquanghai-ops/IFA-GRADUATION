@@ -41,7 +41,7 @@ export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   }).length;
 }
 
-/** IFA+ Graduation Beta Studio v1.9.0-beta.1 **/
+/** IFA+ Graduation Beta Studio v2.0.0-beta.1 **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -5794,7 +5794,15 @@ export function normalizeActivity(a, roundId, idx = 0) {
     { key: 'secretary', label: 'Thư ký', name: 'Thư ký Hội đồng', type: 'mandatory' }
   ];
 
-  // Default Letter Options & Scoring Config (v1.9.0-beta.1)
+  // Default Defense Rubric (v2.0.0-beta.1)
+  const defaultDefenseRubric = [
+    { id: 'crit_idea', key: 'idea', label: 'Ý tưởng', maxScore: 4, order: 1, description: 'Ý tưởng và tính sáng tạo' },
+    { id: 'crit_prac', key: 'practicality', label: 'Tính ứng dụng', maxScore: 3, order: 2, description: 'Tính ứng dụng và khả thi' },
+    { id: 'crit_tech', key: 'technique', label: 'Kỹ thuật thể hiện', maxScore: 2, order: 3, description: 'Kỹ thuật thể hiện và hoàn thiện' },
+    { id: 'crit_pres', key: 'presentation', label: 'Trình bày', maxScore: 1, order: 4, description: 'Báo cáo và trả lời câu hỏi' }
+  ];
+
+  // Default Letter Options & Scoring Config (v2.0.0-beta.1)
   const defaultLetterOptions = [
     { id: 'opt_a', key: 'A', label: 'A — Tốt', description: 'Tốt / Xuất sắc' },
     { id: 'opt_b', key: 'B', label: 'B — Khá', description: 'Khá' },
@@ -5802,9 +5810,16 @@ export function normalizeActivity(a, roundId, idx = 0) {
     { id: 'opt_d', key: 'D', label: 'D — Chưa đạt', description: 'Chưa đạt / Cần hoàn thiện lại' }
   ];
 
+  const scoringMode = (a.scoringConfig && ['numeric', 'letter', 'defense_rubric'].includes(a.scoringConfig.mode))
+    ? a.scoringConfig.mode
+    : 'numeric';
+
   const scoringConfig = a.scoringConfig ? {
     enabled: Boolean(a.scoringConfig.enabled),
-    mode: a.scoringConfig.mode === 'letter' ? 'letter' : 'numeric',
+    mode: scoringMode,
+    rubric: (Array.isArray(a.scoringConfig.rubric) && a.scoringConfig.rubric.length > 0)
+      ? a.scoringConfig.rubric
+      : defaultDefenseRubric,
     letterOptions: (Array.isArray(a.scoringConfig.letterOptions) && a.scoringConfig.letterOptions.length > 0)
       ? a.scoringConfig.letterOptions
       : defaultLetterOptions,
@@ -5816,6 +5831,7 @@ export function normalizeActivity(a, roundId, idx = 0) {
   } : {
     enabled: false,
     mode: 'numeric',
+    rubric: defaultDefenseRubric,
     letterOptions: defaultLetterOptions,
     numericConfig: { min: 0, max: 10, step: 0.1 }
   };
@@ -5837,7 +5853,13 @@ export function normalizeActivity(a, roundId, idx = 0) {
     councilEnabled: Boolean(a.councilEnabled),
     showPresentationOrderToStudents: Boolean(a.showPresentationOrderToStudents),
     councilStructure: (a.councilStructure && Array.isArray(a.councilStructure.slots)) ? a.councilStructure : { slots: defaultSlots },
-    councils: Array.isArray(a.councils) ? a.councils : [],
+    councils: Array.isArray(a.councils) ? a.councils.map(c => ({
+      ...c,
+      status: c.status || 'preparing',
+      auditLogs: Array.isArray(c.auditLogs) ? c.auditLogs : [],
+      guestInclusion: c.guestInclusion || {},
+      finalDefenseScores: c.finalDefenseScores || {}
+    })) : [],
     councilStudentAssignments: Array.isArray(a.councilStudentAssignments) ? a.councilStudentAssignments : [],
     scoringConfig,
     slug,
@@ -6031,8 +6053,15 @@ window.openCreateActivityModal = function() {
     { id: 'opt_c', key: 'C', label: 'C — Đạt', description: 'Đạt yêu cầu' },
     { id: 'opt_d', key: 'D', label: 'D — Chưa đạt', description: 'Chưa đạt / Cần hoàn thiện lại' }
   ];
+  state._currentActivityRubric = [
+    { id: 'crit_idea', key: 'idea', label: 'Ý tưởng', maxScore: 4, order: 1, description: 'Ý tưởng và tính sáng tạo' },
+    { id: 'crit_prac', key: 'practicality', label: 'Tính ứng dụng', maxScore: 3, order: 2, description: 'Tính ứng dụng và khả thi' },
+    { id: 'crit_tech', key: 'technique', label: 'Kỹ thuật thể hiện', maxScore: 2, order: 3, description: 'Kỹ thuật thể hiện và hoàn thiện' },
+    { id: 'crit_pres', key: 'presentation', label: 'Trình bày', maxScore: 1, order: 4, description: 'Báo cáo và trả lời câu hỏi' }
+  ];
   switchActivityScoringMode('numeric');
   renderActivityLetterOptions();
+  renderActivityRubricList();
 
   document.getElementById('modal-activity-title').textContent = 'Thêm Mốc Kế hoạch Đợt TN';
   document.getElementById('modal-activity').classList.remove('hidden');
@@ -6105,7 +6134,16 @@ window.editActivityModal = function(actId) {
         { id: 'opt_c', key: 'C', label: 'C — Đạt', description: 'Đạt yêu cầu' },
         { id: 'opt_d', key: 'D', label: 'D — Chưa đạt', description: 'Chưa đạt / Cần hoàn thiện lại' }
       ];
+  state._currentActivityRubric = Array.isArray(act.scoringConfig?.rubric) && act.scoringConfig.rubric.length > 0
+    ? JSON.parse(JSON.stringify(act.scoringConfig.rubric))
+    : [
+        { id: 'crit_idea', key: 'idea', label: 'Ý tưởng', maxScore: 4, order: 1, description: 'Ý tưởng và tính sáng tạo' },
+        { id: 'crit_prac', key: 'practicality', label: 'Tính ứng dụng', maxScore: 3, order: 2, description: 'Tính ứng dụng và khả thi' },
+        { id: 'crit_tech', key: 'technique', label: 'Kỹ thuật thể hiện', maxScore: 2, order: 3, description: 'Kỹ thuật thể hiện và hoàn thiện' },
+        { id: 'crit_pres', key: 'presentation', label: 'Trình bày', maxScore: 1, order: 4, description: 'Báo cáo và trả lời câu hỏi' }
+      ];
   renderActivityLetterOptions();
+  renderActivityRubricList();
 
   document.getElementById('modal-activity-title').textContent = 'Chỉnh sửa Mốc Kế hoạch';
   document.getElementById('modal-activity').classList.remove('hidden');
@@ -6445,9 +6483,33 @@ window.saveActivity = async function(e) {
     const sMax = parseFloat(document.getElementById('activity-scoring-max')?.value) || 10;
     const sStep = parseFloat(document.getElementById('activity-scoring-step')?.value) || 0.1;
 
+    if (scoringEnabled && scoringMode === 'defense_rubric') {
+      const rList = state._currentActivityRubric || [];
+      if (rList.length === 0) {
+        showToast('Chế độ Rubric bảo vệ yêu cầu ít nhất 1 tiêu chí chấm!', 'warning');
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Lưu Mốc'; }
+        return;
+      }
+      const keys = new Set();
+      for (const crit of rList) {
+        if (!crit.key || !crit.label || typeof crit.maxScore !== 'number' || crit.maxScore <= 0) {
+          showToast('Tiêu chí rubric không hợp lệ: vui lòng nhập mã, tên và điểm tối đa > 0!', 'warning');
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Lưu Mốc'; }
+          return;
+        }
+        if (keys.has(crit.key)) {
+          showToast(`Mã tiêu chí "${crit.key}" bị trùng lặp trong Rubric!`, 'warning');
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Lưu Mốc'; }
+          return;
+        }
+        keys.add(crit.key);
+      }
+    }
+
     const scoringConfig = {
       enabled: scoringEnabled,
       mode: scoringMode,
+      rubric: state._currentActivityRubric || [],
       letterOptions: state._currentActivityLetterOptions || [],
       numericConfig: { min: sMin, max: sMax, step: sStep }
     };
@@ -8125,18 +8187,146 @@ window.toggleActivityScoringConfig = function(enabled) {
 window.switchActivityScoringMode = function(mode) {
   const numWrap = document.getElementById('activity-scoring-numeric-wrap');
   const letterWrap = document.getElementById('activity-scoring-letter-wrap');
+  const rubricWrap = document.getElementById('activity-scoring-rubric-wrap');
   const rNum = document.querySelector('input[name="activity_scoring_mode"][value="numeric"]');
   const rLet = document.querySelector('input[name="activity_scoring_mode"][value="letter"]');
-  
+  const rRub = document.querySelector('input[name="activity_scoring_mode"][value="defense_rubric"]');
+
   if (mode === 'letter') {
     if (rLet) rLet.checked = true;
     if (numWrap) numWrap.classList.add('hidden');
     if (letterWrap) letterWrap.classList.remove('hidden');
+    if (rubricWrap) rubricWrap.classList.add('hidden');
+  } else if (mode === 'defense_rubric') {
+    if (rRub) rRub.checked = true;
+    if (numWrap) numWrap.classList.add('hidden');
+    if (letterWrap) letterWrap.classList.add('hidden');
+    if (rubricWrap) rubricWrap.classList.remove('hidden');
+    renderActivityRubricList();
   } else {
     if (rNum) rNum.checked = true;
     if (numWrap) numWrap.classList.remove('hidden');
     if (letterWrap) letterWrap.classList.add('hidden');
+    if (rubricWrap) rubricWrap.classList.add('hidden');
   }
+};
+
+window.renderActivityRubricList = function() {
+  const container = document.getElementById('activity-scoring-rubric-list');
+  const totalMaxEl = document.getElementById('activity-scoring-rubric-total-max');
+  if (!container) return;
+
+  const list = state._currentActivityRubric || [];
+  if (list.length === 0) {
+    container.innerHTML = '<div class="p-3 text-center text-slate-400">Chưa có tiêu chí nào. Bấm "+ Thêm tiêu chí".</div>';
+    if (totalMaxEl) totalMaxEl.textContent = '0.0';
+    return;
+  }
+
+  let totalMax = 0;
+  container.innerHTML = list.map((crit, idx) => {
+    totalMax += Number(crit.maxScore || 0);
+    return `
+      <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="font-mono font-bold text-slate-400">#${idx + 1}</span>
+          <span class="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 font-mono">${crit.key}</span>
+          <span class="font-bold text-slate-900">${crit.label}</span>
+          <span class="text-emerald-700 font-bold font-mono">(${crit.maxScore}đ)</span>
+          ${crit.description ? `<span class="text-[10px] text-slate-400 truncate max-w-xs">(${crit.description})</span>` : ''}
+        </div>
+        <div class="flex items-center gap-1.5 text-[11px]">
+          <button type="button" onclick="editRubricCriterion('${crit.id}')" class="text-blue-600 hover:underline font-bold">Sửa</button>
+          <button type="button" onclick="deleteRubricCriterion('${crit.id}')" class="text-rose-600 hover:underline font-bold">Xóa</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (totalMaxEl) totalMaxEl.textContent = totalMax.toFixed(1);
+};
+
+window.openAddRubricCriterionModal = function() {
+  document.getElementById('rubric-criterion-id').value = '';
+  document.getElementById('rubric-criterion-key').value = '';
+  document.getElementById('rubric-criterion-label').value = '';
+  document.getElementById('rubric-criterion-max').value = '2.5';
+  document.getElementById('rubric-criterion-desc').value = '';
+  document.getElementById('modal-rubric-criterion-title').textContent = 'Thêm tiêu chí Rubric mới';
+  document.getElementById('modal-rubric-criterion')?.classList.remove('hidden');
+};
+
+window.closeRubricCriterionModal = function() {
+  document.getElementById('modal-rubric-criterion')?.classList.add('hidden');
+};
+
+window.editRubricCriterion = function(id) {
+  const crit = (state._currentActivityRubric || []).find(c => c.id === id);
+  if (!crit) return;
+  document.getElementById('rubric-criterion-id').value = crit.id;
+  document.getElementById('rubric-criterion-key').value = crit.key;
+  document.getElementById('rubric-criterion-label').value = crit.label;
+  document.getElementById('rubric-criterion-max').value = crit.maxScore;
+  document.getElementById('rubric-criterion-desc').value = crit.description || '';
+  document.getElementById('modal-rubric-criterion-title').textContent = 'Chỉnh sửa tiêu chí Rubric';
+  document.getElementById('modal-rubric-criterion')?.classList.remove('hidden');
+};
+
+window.deleteRubricCriterion = function(id) {
+  state._currentActivityRubric = (state._currentActivityRubric || []).filter(c => c.id !== id);
+  renderActivityRubricList();
+};
+
+window.saveRubricCriterion = function() {
+  const id = document.getElementById('rubric-criterion-id')?.value?.trim();
+  const key = document.getElementById('rubric-criterion-key')?.value?.trim().toLowerCase();
+  const label = document.getElementById('rubric-criterion-label')?.value?.trim();
+  const maxScore = parseFloat(document.getElementById('rubric-criterion-max')?.value);
+  const desc = document.getElementById('rubric-criterion-desc')?.value?.trim() || '';
+
+  if (!key || !label) {
+    showToast('Vui lòng nhập đầy đủ Mã tiêu chí và Tên tiêu chí!', 'warning');
+    return;
+  }
+  if (isNaN(maxScore) || maxScore <= 0) {
+    showToast('Điểm tối đa của tiêu chí phải là số dương (> 0)!', 'warning');
+    return;
+  }
+
+  state._currentActivityRubric = state._currentActivityRubric || [];
+  
+  // Check duplicate key
+  const duplicate = state._currentActivityRubric.find(c => c.key === key && c.id !== id);
+  if (duplicate) {
+    showToast(`Mã tiêu chí "${key}" đã tồn tại! Vui lòng chọn mã khác.`, 'warning');
+    return;
+  }
+
+  if (id) {
+    const idx = state._currentActivityRubric.findIndex(c => c.id === id);
+    if (idx >= 0) {
+      state._currentActivityRubric[idx] = {
+        ...state._currentActivityRubric[idx],
+        key,
+        label,
+        maxScore,
+        description: desc
+      };
+    }
+  } else {
+    const newId = 'crit_' + Date.now().toString(36);
+    state._currentActivityRubric.push({
+      id: newId,
+      key,
+      label,
+      maxScore,
+      description: desc,
+      order: state._currentActivityRubric.length + 1
+    });
+  }
+
+  closeRubricCriterionModal();
+  renderActivityRubricList();
 };
 
 window.renderActivityLetterOptions = function() {
@@ -8230,7 +8420,10 @@ export function checkCouncilAuthorization(round, act, council, user) {
       slotKey: null,
       canScore: true,
       isSecretary: true,
-      isAdmin: true
+      isChair: true,
+      isAdmin: true,
+      canCalibrate: true,
+      canFinalize: true
     };
   }
 
@@ -8246,6 +8439,7 @@ export function checkCouncilAuthorization(round, act, council, user) {
     const assigned = membersBySlot[s.key];
     if (assigned && assigned.memberEmail && assigned.memberEmail.toLowerCase().trim() === userEmail) {
       const isSec = (s.key === 'secretary' || s.label === 'Thư ký');
+      const isChair = (s.key === 'chair' || s.label === 'Chủ tịch' || s.name === 'Chủ tịch Hội đồng');
       return {
         authorized: true,
         role: s.key,
@@ -8253,7 +8447,10 @@ export function checkCouncilAuthorization(round, act, council, user) {
         slotKey: s.key,
         canScore: true,
         isSecretary: isSec,
-        isAdmin: false
+        isChair: isChair,
+        isAdmin: false,
+        canCalibrate: isChair,
+        canFinalize: isChair
       };
     }
   }
@@ -8410,16 +8607,19 @@ function renderCouncilWorkspaceFull() {
   document.getElementById('cws-council-name').textContent = council.name;
   document.getElementById('cws-council-meta').textContent = `📍 Phòng: ${council.room || 'Đang cập nhật'} • 📅 ${council.date || '--'} (${council.startTime || '--'} – ${council.endTime || '--'})`;
 
-  // Status Badge
+  // Status Badge (v2.0.0-beta.1: preparing -> active -> ended -> finalized)
   const statusBadge = document.getElementById('cws-council-status-badge');
   if (statusBadge) {
     const cStat = council.status || 'preparing';
     if (cStat === 'active' || cStat === 'ongoing') {
       statusBadge.className = 'badge bg-emerald-500 text-white font-black animate-pulse text-[10px]';
       statusBadge.textContent = '● Đang diễn ra';
-    } else if (cStat === 'ended' || cStat === 'completed') {
-      statusBadge.className = 'badge bg-slate-200 text-slate-700 font-bold text-[10px]';
-      statusBadge.textContent = '✓ Đã kết thúc';
+    } else if (cStat === 'ended') {
+      statusBadge.className = 'badge bg-amber-500 text-white font-bold text-[10px]';
+      statusBadge.textContent = '⏸ Đã kết thúc (Chờ chốt)';
+    } else if (cStat === 'finalized' || cStat === 'completed') {
+      statusBadge.className = 'badge bg-slate-800 text-white font-bold text-[10px]';
+      statusBadge.textContent = '🔒 Đã chốt điểm';
     } else {
       statusBadge.className = 'badge bg-amber-100 text-amber-800 font-bold text-[10px]';
       statusBadge.textContent = 'Chuẩn bị';
@@ -8432,17 +8632,22 @@ function renderCouncilWorkspaceFull() {
     roleBadge.textContent = auth.roleName || 'Thành viên';
   }
 
-  // Session Controls (Secretary / Admin)
+  // Session Controls (Secretary / Chair / Admin)
   const sessionControls = document.getElementById('cws-session-controls');
   if (sessionControls) {
-    if (auth.isAdmin || auth.isSecretary) {
+    if (auth.isAdmin || auth.isSecretary || auth.isChair) {
       sessionControls.classList.remove('hidden');
       sessionControls.classList.add('flex');
       const startBtn = document.getElementById('btn-start-council-session');
       const endBtn = document.getElementById('btn-end-council-session');
+      const finBtn = document.getElementById('btn-finalize-council-session');
+      const reopenBtn = document.getElementById('btn-reopen-council-session');
       const cStat = council.status || 'preparing';
-      if (startBtn) startBtn.classList.toggle('hidden', cStat === 'active' || cStat === 'ongoing');
-      if (endBtn) endBtn.classList.toggle('hidden', cStat === 'ended' || cStat === 'completed');
+
+      if (startBtn) startBtn.classList.toggle('hidden', cStat !== 'preparing');
+      if (endBtn) endBtn.classList.toggle('hidden', cStat !== 'active' && cStat !== 'ongoing');
+      if (finBtn) finBtn.classList.toggle('hidden', cStat !== 'ended' || (!auth.isAdmin && !auth.isChair));
+      if (reopenBtn) reopenBtn.classList.toggle('hidden', cStat !== 'finalized' || !auth.isAdmin);
     } else {
       sessionControls.classList.add('hidden');
     }
@@ -8450,6 +8655,8 @@ function renderCouncilWorkspaceFull() {
 
   renderCouncilStudentList();
   renderCouncilSelectedStudentDetails();
+  renderPostCouncilSection();
+  renderAuditLogsSection();
 }
 
 function renderCouncilWorkspacePartialSync() {
@@ -8465,6 +8672,10 @@ function renderCouncilWorkspacePartialSync() {
   // Update scorers completion progress & admin monitor
   renderScorersProgress();
   renderAdminMonitor();
+
+  // Update post-council calibration and audit logs
+  renderPostCouncilSection();
+  renderAuditLogsSection();
 }
 
 function renderCouncilStudentList() {
@@ -8562,21 +8773,36 @@ window.filterCouncilWorkspaceStudents = function(q) {
 
 // 5. SELECT STUDENT & FLEXIBLE NAVIGATION (CRITICAL BUSINESS RULE)
 window.selectCouncilStudent = function(studentId) {
-  // PRESERVE UNSAVED INPUTS from current student
+  // PRESERVE UNSAVED INPUTS from current student (including rubric components)
   const oldSid = state.activeCouncilSelectedStudentId;
   if (oldSid && oldSid !== studentId) {
     const valInput = document.getElementById('cws-score-input-numeric');
+    const letInput = document.getElementById('cws-score-input-letter');
     const commentInput = document.getElementById('cws-score-comment');
-    if (valInput || commentInput) {
-      const currentVal = valInput ? valInput.value : state.councilLocalDrafts?.[oldSid]?.value;
-      const currentComm = commentInput ? commentInput.value : '';
-      if (currentVal || currentComm) {
-        state.councilLocalDrafts = state.councilLocalDrafts || {};
-        state.councilLocalDrafts[oldSid] = {
-          value: currentVal,
-          comment: currentComm
-        };
-      }
+    const rubricInputs = document.querySelectorAll('input[data-crit-key]');
+
+    let components = null;
+    if (rubricInputs.length > 0) {
+      components = {};
+      rubricInputs.forEach(inp => {
+        const k = inp.dataset.critKey;
+        const v = inp.value;
+        if (v !== '' && !isNaN(Number(v))) {
+          components[k] = Number(v);
+        }
+      });
+    }
+
+    const currentVal = valInput ? valInput.value : (letInput ? letInput.value : state.councilLocalDrafts?.[oldSid]?.value);
+    const currentComm = commentInput ? commentInput.value : (state.councilLocalDrafts?.[oldSid]?.comment || '');
+
+    if (currentVal !== undefined && currentVal !== '' || currentComm || (components && Object.keys(components).length > 0)) {
+      state.councilLocalDrafts = state.councilLocalDrafts || {};
+      state.councilLocalDrafts[oldSid] = {
+        value: currentVal,
+        comment: currentComm,
+        components: components || state.councilLocalDrafts?.[oldSid]?.components
+      };
     }
   }
 
@@ -8659,6 +8885,26 @@ function renderCouncilSelectedStudentDetails() {
         <div class="font-semibold text-slate-800">${supervisorsHtml}</div>
       </div>
     </div>
+
+    ${asgn?.presentationStatus === 'presented' ? (() => {
+      const prelim = getPreliminarySummary(sid, roundId);
+      if (prelim && prelim.average !== null) {
+        return `
+          <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs mt-2">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🎯</span>
+              <div>
+                <span class="font-bold text-amber-950">Điểm Sơ khảo TB:</span>
+                <span class="font-black font-mono text-sm text-amber-900 ml-1.5">${prelim.average.toFixed(2)}</span>
+                <span class="text-[10px] text-amber-700 ml-1 font-semibold">(${prelim.count} lượt chấm hợp lệ)</span>
+              </div>
+            </div>
+            <span class="text-[10px] text-slate-400 italic">Hiển thị sau khi hoàn tất trình bày</span>
+          </div>
+        `;
+      }
+      return '';
+    })() : ''}
   `;
 
   // Update presenting banner
@@ -8848,13 +9094,18 @@ window.startCouncilSession = async function() {
 };
 
 window.endCouncilSession = async function() {
-  const { roundId, activityId, councilId } = state.activeCouncilWorkspace;
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
   const council = (act?.councils || []).find(c => c.id === councilId);
   if (!council) return;
 
-  // Check required scorers completion
+  if (!auth.isAdmin && !auth.isChair) {
+    showToast('Chỉ Chủ tịch Hội đồng hoặc Quản trị viên mới có quyền kết thúc buổi làm việc của Hội đồng!', 'error');
+    return;
+  }
+
+  // Check required scorers completion (CT, UV, TK)
   const reqSlots = getRequiredScorers(council, act);
   const assignments = (act?.councilStudentAssignments || []).filter(a => a.councilId === councilId);
   
@@ -8869,19 +9120,22 @@ window.endCouncilSession = async function() {
         if (sc?.status !== 'completed') {
           uncompletedCount++;
         }
+      } else {
+        uncompletedCount++;
       }
     }
   }
 
-  let confirmMsg = `Xác nhận kết thúc buổi làm việc của Hội đồng "${council.name}"?`;
+  let confirmMsg = `Xác nhận kết thúc buổi làm việc của Hội đồng "${council.name}"? Sau khi kết thúc, Chủ tịch Hội đồng sẽ xem được toàn bộ điểm của các thành viên để tiến hành hiệu chỉnh điểm sau hội đồng.`;
   if (uncompletedCount > 0) {
-    confirmMsg = `Còn ${uncompletedCount} lượt chấm bắt buộc chưa hoàn tất. Bạn có chắc chắn muốn kết thúc Hội đồng không?`;
+    confirmMsg = `Còn ${uncompletedCount} lượt chấm bắt buộc (Chủ tịch, Ủy viên, Thư ký) chưa hoàn tất! Bạn có chắc chắn muốn kết thúc Hội đồng không?`;
   }
 
   const confirmed = await showConfirm('Kết thúc Hội đồng', confirmMsg, { confirmText: 'Kết thúc Hội đồng', danger: uncompletedCount > 0 });
   if (!confirmed) return;
 
   council.status = 'ended';
+  council.endedAt = new Date().toISOString();
   await persistActivityCouncilChanges(targetRound);
   renderCouncilWorkspaceFull();
   showToast(`Đã kết thúc phiên làm việc của Hội đồng "${council.name}".`, 'info');
@@ -8935,6 +9189,72 @@ function renderScoringSection() {
           }).join('')}
         </div>
         <input type="hidden" id="cws-score-input-letter" value="${currentVal}">
+      </div>
+    `;
+  } else if (mode === 'defense_rubric') {
+    const rubric = act.scoringConfig.rubric || [
+      { id: 'crit_idea', key: 'idea', label: 'Ý tưởng', maxScore: 4, order: 1 },
+      { id: 'crit_prac', key: 'practicality', label: 'Tính ứng dụng', maxScore: 3, order: 2 },
+      { id: 'crit_tech', key: 'technique', label: 'Kỹ thuật thể hiện', maxScore: 2, order: 3 },
+      { id: 'crit_pres', key: 'presentation', label: 'Trình bày', maxScore: 1, order: 4 }
+    ];
+    const components = (draft?.components !== undefined)
+      ? draft.components
+      : (savedScore?.components || {});
+
+    let compSum = 0;
+    const compRows = rubric.map(crit => {
+      const cVal = components[crit.key] !== undefined ? components[crit.key] : '';
+      if (cVal !== '' && !isNaN(Number(cVal))) {
+        compSum += Number(cVal);
+      }
+      return `
+        <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+          <div class="flex items-center justify-between">
+            <label class="font-bold text-slate-800 text-xs">${crit.label} <span class="text-indigo-600 font-mono text-[11px]">(tối đa ${crit.maxScore}đ)</span></label>
+            <div class="flex items-center gap-1.5">
+              <input type="number" id="cws-rubric-input-${crit.key}" data-crit-key="${crit.key}" data-max-score="${crit.maxScore}" value="${cVal}" min="0" max="${crit.maxScore}" step="0.1" ${isCompleted ? 'disabled' : ''} oninput="onRubricComponentChange('${crit.key}', this.value)" placeholder="0 – ${crit.maxScore}" class="w-24 p-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold text-right ${isCompleted ? 'bg-slate-100' : 'bg-white focus:ring-2 focus:ring-indigo-500'}">
+              <span class="text-[11px] text-slate-500 font-mono font-bold">/${crit.maxScore}</span>
+            </div>
+          </div>
+          ${crit.description ? `<p class="text-[10px] text-slate-500">${crit.description}</p>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    const totalValNum = currentVal !== '' && !isNaN(Number(currentVal)) ? Number(currentVal) : null;
+    const hasMismatch = (totalValNum !== null && Math.abs(compSum - totalValNum) >= 0.000001);
+
+    inputHtml = `
+      <div class="space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-1">
+          <label class="font-bold text-slate-800 text-xs">Chấm điểm theo Rubric Bảo vệ (Defense Rubric):</label>
+          <button type="button" ${isCompleted ? 'disabled' : ''} onclick="syncRubricSumToTotal()" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold border border-indigo-200 transition-colors">
+            ∑ Cộng tiêu chí vào Điểm tổng
+          </button>
+        </div>
+
+        <div class="space-y-2">
+          ${compRows}
+        </div>
+
+        <div class="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-center justify-between">
+          <div>
+            <span class="font-bold text-indigo-950 text-xs block">Điểm Tổng kết Bảo vệ (*):</span>
+            <span class="text-[10px] text-indigo-700">Tổng các tiêu chí: <strong id="cws-rubric-comp-sum">${compSum.toFixed(2)}</strong></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="number" id="cws-score-input-numeric" value="${currentVal}" min="0" max="10" step="0.1" oninput="onScoreInputChange(this.value)" ${isCompleted ? 'disabled' : ''} placeholder="0 – 10" class="w-28 p-2 border border-slate-300 rounded-xl font-mono text-sm font-black text-slate-900 text-right ${isCompleted ? 'bg-slate-100' : 'bg-white focus:ring-2 focus:ring-blue-500'}">
+            <span class="text-xs text-slate-500 font-semibold">/ 10 điểm</span>
+          </div>
+        </div>
+
+        ${hasMismatch ? `
+          <div id="cws-rubric-mismatch-warning" class="p-2.5 bg-amber-100/70 border border-amber-300 rounded-xl text-amber-900 text-xs font-semibold flex items-center gap-2">
+            <span>⚠️</span>
+            <span>Tổng tiêu chí (${compSum.toFixed(2)}) chưa khớp với Điểm tổng (${totalValNum})! Vui lòng bấm "Cộng tiêu chí vào Điểm tổng" hoặc điều chỉnh trước khi hoàn tất.</span>
+          </div>
+        ` : ''}
       </div>
     `;
   } else {
@@ -9045,8 +9365,59 @@ window.saveCurrentScore = async function(isCompleted) {
 
   const mode = act.scoringConfig?.mode || 'numeric';
   let val = '';
+  let components = {};
+
   if (mode === 'letter') {
     val = document.getElementById('cws-score-input-letter')?.value || state.councilLocalDrafts?.[sid]?.value || '';
+  } else if (mode === 'defense_rubric') {
+    val = document.getElementById('cws-score-input-numeric')?.value ?? state.councilLocalDrafts?.[sid]?.value ?? '';
+    const rubric = act.scoringConfig.rubric || [
+      { id: 'crit_idea', key: 'idea', label: 'Ý tưởng', maxScore: 4 },
+      { id: 'crit_prac', key: 'practicality', label: 'Tính ứng dụng', maxScore: 3 },
+      { id: 'crit_tech', key: 'technique', label: 'Kỹ thuật thể hiện', maxScore: 2 },
+      { id: 'crit_pres', key: 'presentation', label: 'Trình bày', maxScore: 1 }
+    ];
+
+    // Read current components
+    components = state.councilLocalDrafts?.[sid]?.components || state.councilScores?.[scoreKey]?.components || {};
+    rubric.forEach(crit => {
+      const inp = document.getElementById(`cws-rubric-input-${crit.key}`);
+      if (inp && inp.value !== '' && !isNaN(Number(inp.value))) {
+        components[crit.key] = Number(inp.value);
+      }
+    });
+
+    if (isCompleted) {
+      if (val === '' || val === null || val === undefined || isNaN(Number(val))) {
+        showToast('Vui lòng nhập điểm tổng trước khi hoàn tất chấm!', 'warning');
+        return;
+      }
+      const totalNum = Number(val);
+      if (totalNum < 0 || totalNum > 10) {
+        showToast('Điểm tổng kết bảo vệ phải từ 0 đến 10!', 'warning');
+        return;
+      }
+
+      let compSum = 0;
+      for (const crit of rubric) {
+        const cVal = components[crit.key];
+        if (cVal === undefined || cVal === null || cVal === '' || isNaN(Number(cVal))) {
+          showToast(`Vui lòng chấm tiêu chí "${crit.label}"!`, 'warning');
+          return;
+        }
+        const nVal = Number(cVal);
+        if (nVal < 0 || nVal > crit.maxScore) {
+          showToast(`Tiêu chí "${crit.label}" phải từ 0 đến ${crit.maxScore}!`, 'warning');
+          return;
+        }
+        compSum += nVal;
+      }
+
+      if (Math.abs(compSum - totalNum) >= 0.000001) {
+        showToast(`Tổng tiêu chí (${compSum.toFixed(2)}) chưa khớp với Điểm tổng (${totalNum})! Vui lòng bấm "Cộng tiêu chí vào Điểm tổng".`, 'warning');
+        return;
+      }
+    }
   } else {
     val = document.getElementById('cws-score-input-numeric')?.value || state.councilLocalDrafts?.[sid]?.value || '';
   }
@@ -9095,7 +9466,8 @@ window.saveCurrentScore = async function(isCompleted) {
     slotKey: auth.slotKey || 'admin',
     role: auth.role || 'member',
     mode,
-    value: mode === 'numeric' ? parseFloat(val) : String(val),
+    value: (mode === 'numeric' || mode === 'defense_rubric') ? parseFloat(val) : String(val),
+    components: mode === 'defense_rubric' ? components : undefined,
     comment: String(comment || '').trim(),
     status: isCompleted ? 'completed' : 'draft',
     createdAt: existing.createdAt || new Date().toISOString(),
@@ -9220,9 +9592,12 @@ function renderScorersProgress() {
       if (score?.status === 'completed') guestCompleted++;
     }
 
-    // PRIVACY CHECK: Only see score value if Admin or own score! Chair CANNOT see others!
+    // PRIVACY CHECK (v2.0.0-beta.1):
+    // Before 'ended': Only see score value if Admin or own score. Chair CANNOT see others.
+    // Once 'ended' or 'finalized': Chair sees all scores in their own council!
+    const isCouncilEnded = (council.status === 'ended' || council.status === 'finalized' || council.status === 'completed');
     const isOwnScore = (scorerId && (scorerId === myUserId || (assigned?.memberEmail && assigned.memberEmail.toLowerCase() === (state.user?.email || '').toLowerCase())));
-    const canSeeValue = (auth.isAdmin || isOwnScore);
+    const canSeeValue = (auth.isAdmin || isOwnScore || (isCouncilEnded && auth.isChair));
 
     let statusPill = '<span class="text-slate-400 font-mono text-xs">— Chưa chấm</span>';
     if (!isAssigned) {
@@ -10371,5 +10746,594 @@ window.saveAdminReviewerAssignments = async function() {
   } catch (err) {
     showToast('Lỗi lưu phân công: ' + err.message, 'error');
   }
+};
+
+
+
+// ============================================================================
+// v2.0.0-beta.1: RUBRIC EVENT HANDLERS & OFFICIAL DEFENSE SCORE & CALIBRATION
+// ============================================================================
+
+window.onRubricComponentChange = function(critKey, val) {
+  const sid = state.activeCouncilSelectedStudentId;
+  if (!sid) return;
+  state.councilLocalDrafts = state.councilLocalDrafts || {};
+  state.councilLocalDrafts[sid] = state.councilLocalDrafts[sid] || {};
+  state.councilLocalDrafts[sid].components = state.councilLocalDrafts[sid].components || {};
+  
+  if (val === '' || val === null || val === undefined) {
+    delete state.councilLocalDrafts[sid].components[critKey];
+  } else {
+    state.councilLocalDrafts[sid].components[critKey] = Number(val);
+  }
+
+  // Update live component sum display
+  const inputs = document.querySelectorAll('input[data-crit-key]');
+  let sum = 0;
+  inputs.forEach(inp => {
+    const v = parseFloat(inp.value);
+    if (!isNaN(v)) sum += v;
+  });
+
+  const sumEl = document.getElementById('cws-rubric-comp-sum');
+  if (sumEl) sumEl.textContent = sum.toFixed(2);
+
+  const totalInput = document.getElementById('cws-score-input-numeric');
+  const warnEl = document.getElementById('cws-rubric-mismatch-warning');
+  if (totalInput) {
+    const curTot = parseFloat(totalInput.value);
+    if (!isNaN(curTot)) {
+      const mismatch = Math.abs(sum - curTot) >= 0.000001;
+      if (warnEl) warnEl.classList.toggle('hidden', !mismatch);
+    }
+  }
+};
+
+window.syncRubricSumToTotal = function() {
+  const sid = state.activeCouncilSelectedStudentId;
+  if (!sid) return;
+  const inputs = document.querySelectorAll('input[data-crit-key]');
+  let sum = 0;
+  inputs.forEach(inp => {
+    const v = parseFloat(inp.value);
+    if (!isNaN(v)) sum += v;
+  });
+
+  const totalInput = document.getElementById('cws-score-input-numeric');
+  if (totalInput) {
+    totalInput.value = sum.toFixed(2);
+    onScoreInputChange(totalInput.value);
+  }
+
+  const warnEl = document.getElementById('cws-rubric-mismatch-warning');
+  if (warnEl) warnEl.classList.add('hidden');
+  showToast(`Đã cập nhật Điểm tổng: ${sum.toFixed(2)}`, 'info');
+};
+
+export function getOfficialDefenseScore(studentId, council, act, round) {
+  if (!council || !act) return { score: null, isComplete: false, count: 0, mandatoryComplete: false };
+  const slots = act.councilStructure?.slots || [];
+  const membersBySlot = council.membersBySlot || {};
+  const activityId = act.id;
+  const councilId = council.id;
+
+  let mandatoryTotal = 0;
+  let mandatoryCompleted = 0;
+  const mandatoryScores = [];
+  const includedGuestScores = [];
+  const excludedGuestScores = [];
+
+  for (const s of slots) {
+    const assigned = membersBySlot[s.key];
+    const scorerId = assigned?.memberId || assigned?.memberEmail || assigned?.memberName;
+    if (!scorerId) continue;
+    const scoreKey = `${activityId}_${councilId}_${studentId}_${scorerId}`;
+    const score = state.councilScores?.[scoreKey];
+    const isCompleted = (score?.status === 'completed');
+
+    if (s.type === 'mandatory') {
+      mandatoryTotal++;
+      if (isCompleted && typeof score.value === 'number') {
+        mandatoryCompleted++;
+        mandatoryScores.push({ slotKey: s.key, scorerId, scorerName: assigned.memberName || scorerId, value: score.value });
+      }
+    } else if (s.type === 'guest') {
+      if (isCompleted && typeof score.value === 'number') {
+        const isIncluded = council.guestInclusion?.[studentId]?.[s.key] !== false;
+        if (isIncluded) {
+          includedGuestScores.push({ slotKey: s.key, scorerId, scorerName: assigned.memberName || scorerId, value: score.value });
+        } else {
+          excludedGuestScores.push({ slotKey: s.key, scorerId, scorerName: assigned.memberName || scorerId, value: score.value });
+        }
+      }
+    }
+  }
+
+  const mandatoryComplete = (mandatoryTotal > 0 && mandatoryCompleted === mandatoryTotal);
+  const allIncluded = [...mandatoryScores.map(s => s.value), ...includedGuestScores.map(s => s.value)];
+  // Retain full IEEE 754 precision!
+  const rawAverage = allIncluded.length > 0 ? (allIncluded.reduce((a, b) => a + b, 0) / allIncluded.length) : null;
+
+  return {
+    studentId,
+    isComplete: mandatoryComplete,
+    mandatoryTotal,
+    mandatoryCompleted,
+    mandatoryComplete,
+    score: rawAverage,
+    formattedScore: rawAverage !== null ? rawAverage.toFixed(2) : '--',
+    mandatoryScores,
+    includedGuestScores,
+    excludedGuestScores,
+    allScoresCount: allIncluded.length
+  };
+}
+
+window.finalizeCouncilSession = async function() {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!council || !act) return;
+
+  if (!auth.isAdmin && !auth.isChair) {
+    showToast('Chỉ Chủ tịch Hội đồng hoặc Quản trị viên mới có quyền chốt điểm Hội đồng!', 'error');
+    return;
+  }
+
+  // Verification: all mandatory scorers must have completed scores for all students
+  const reqSlots = getRequiredScorers(council, act);
+  const assignments = (act.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+  
+  const missingStudents = [];
+  for (const asgn of assignments) {
+    const sId = asgn.studentId;
+    let missingForStudent = false;
+    for (const s of reqSlots) {
+      const assignedMem = council.membersBySlot?.[s.key];
+      const scorerId = assignedMem?.memberId || assignedMem?.memberEmail;
+      if (scorerId) {
+        const k = `${activityId}_${councilId}_${sId}_${scorerId}`;
+        const sc = state.councilScores?.[k];
+        if (sc?.status !== 'completed') {
+          missingForStudent = true;
+          break;
+        }
+      } else {
+        missingForStudent = true;
+        break;
+      }
+    }
+    if (missingForStudent) {
+      missingStudents.push(sId);
+    }
+  }
+
+  if (missingStudents.length > 0) {
+    showToast(`Không thể chốt điểm: Còn ${missingStudents.length} sinh viên chưa hoàn tất đủ các phiếu chấm bắt buộc!`, 'error');
+    return;
+  }
+
+  const confirmed = await showConfirm(
+    'Chốt điểm Hội đồng',
+    `Xác nhận khóa và chốt điểm chính thức cho toàn bộ ${assignments.length} sinh viên của Hội đồng "${council.name}"?`,
+    { confirmText: 'Khóa & Chốt điểm', danger: false }
+  );
+  if (!confirmed) return;
+
+  council.finalDefenseScores = council.finalDefenseScores || {};
+  for (const asgn of assignments) {
+    const sId = asgn.studentId;
+    const official = getOfficialDefenseScore(sId, council, act, targetRound);
+    council.finalDefenseScores[sId] = {
+      score: official.score,
+      completedScoresCount: official.allScoresCount,
+      finalizedAt: new Date().toISOString()
+    };
+  }
+
+  council.status = 'finalized';
+  council.finalizedAt = new Date().toISOString();
+  council.finalizedBy = state.user?.email || 'admin';
+
+  await persistActivityCouncilChanges(targetRound);
+  renderCouncilWorkspaceFull();
+  showToast(`✓ Đã chốt điểm Hội đồng "${council.name}" thành công! Điểm bảo vệ chính thức đã được ghi nhận.`, 'success');
+};
+
+window.openReopenCouncilModal = function() {
+  const { auth } = state.activeCouncilWorkspace || {};
+  if (!auth || !auth.isAdmin) {
+    showToast('Chỉ Quản trị viên mới có quyền mở lại Hội đồng đã chốt điểm!', 'error');
+    return;
+  }
+  document.getElementById('reopen-council-reason').value = '';
+  document.getElementById('modal-reopen-council')?.classList.remove('hidden');
+};
+
+window.closeReopenCouncilModal = function() {
+  document.getElementById('modal-reopen-council')?.classList.add('hidden');
+};
+
+window.confirmReopenCouncil = async function() {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  if (!auth || !auth.isAdmin) {
+    showToast('Chỉ Quản trị viên mới có quyền mở lại Hội đồng!', 'error');
+    return;
+  }
+
+  const reason = document.getElementById('reopen-council-reason')?.value?.trim();
+  if (!reason) {
+    showToast('Vui lòng nhập lý do mở lại Hội đồng!', 'warning');
+    return;
+  }
+
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  council.status = 'ended';
+  council.auditLogs = council.auditLogs || [];
+  council.auditLogs.unshift({
+    id: 'audit_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+    action: 'reopen_council',
+    councilId,
+    reason,
+    adjustedById: state.user?.uid || state.user?.email,
+    adjustedByName: state.user?.displayName || 'Quản trị viên',
+    adjustedByRole: 'admin',
+    createdAt: new Date().toISOString()
+  });
+
+  await persistActivityCouncilChanges(targetRound);
+  closeReopenCouncilModal();
+  renderCouncilWorkspaceFull();
+  showToast(`Đã mở lại Hội đồng "${council.name}". Trạng thái: Đã kết thúc (chưa chốt).`, 'info');
+};
+
+window.renderPostCouncilSection = function() {
+  const container = document.getElementById('cws-post-council-section');
+  if (!container) return;
+
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!council || !act) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  const isEndedOrFinalized = (council.status === 'ended' || council.status === 'finalized' || council.status === 'completed');
+  if (!isEndedOrFinalized || (!auth.isAdmin && !auth.isChair)) {
+    container.classList.add('hidden');
+    return;
+  }
+  container.classList.remove('hidden');
+
+  const assignments = (act.councilStudentAssignments || [])
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const slots = act.councilStructure?.slots || [];
+  const membersBySlot = council.membersBySlot || {};
+
+  const rowsHtml = assignments.map(asgn => {
+    const sid = asgn.studentId;
+    const sObj = findStudentInRound(sid);
+    const sName = sObj?.fullName || sObj?.studentName || sid;
+    const official = getOfficialDefenseScore(sid, council, act, targetRound);
+
+    const cellsHtml = slots.map(s => {
+      const assigned = membersBySlot[s.key];
+      const scorerId = assigned?.memberId || assigned?.memberEmail || assigned?.memberName;
+      const scoreKey = scorerId ? `${activityId}_${councilId}_${sid}_${scorerId}` : null;
+      const score = scoreKey ? state.councilScores?.[scoreKey] : null;
+
+      if (!assigned) {
+        return '<td class="p-2 text-center text-slate-300 font-mono text-[11px]">—</td>';
+      }
+
+      if (!score || score.status !== 'completed') {
+        return '<td class="p-2 text-center text-amber-600 font-mono text-[11px]">Chưa xong</td>';
+      }
+
+      const isGuest = (s.type === 'guest');
+      const isIncluded = isGuest ? (council.guestInclusion?.[sid]?.[s.key] !== false) : true;
+
+      return `
+        <td class="p-2 text-center">
+          <div class="flex flex-col items-center gap-0.5">
+            <span class="font-mono font-bold text-xs ${isGuest && !isIncluded ? 'line-through text-slate-400' : 'text-slate-900'}">${score.value}</span>
+            ${isGuest ? `
+              <button type="button" onclick="toggleGuestInclusion('${sid}', '${s.key}', ${!isIncluded})" class="px-1.5 py-0.2 rounded text-[9px] font-black border transition-colors ${isIncluded ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-500 border-slate-300'}">
+                ${isIncluded ? 'LẤY' : 'BỎ'}
+              </button>
+            ` : ''}
+            <button type="button" onclick="openScoreCalibrationModal('${sid}', '${scorerId}', '${s.key}')" class="text-[10px] text-indigo-600 hover:underline font-bold mt-0.5" title="Hiệu chỉnh điểm">
+              Hiệu chỉnh
+            </button>
+          </div>
+        </td>
+      `;
+    }).join('');
+
+    return `
+      <tr class="hover:bg-amber-50/40 transition-colors">
+        <td class="p-2 text-center font-mono font-bold text-slate-400">#${asgn.order || '--'}</td>
+        <td class="p-2 font-mono font-bold text-slate-900 whitespace-nowrap">${sid}</td>
+        <td class="p-2 font-bold text-slate-800 whitespace-nowrap">${sName}</td>
+        ${cellsHtml}
+        <td class="p-2 text-center font-mono font-black text-sm ${official.isComplete ? 'text-indigo-900 bg-indigo-50/50' : 'text-amber-700 bg-amber-50/50'}">
+          ${official.formattedScore}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="flex items-center justify-between flex-wrap gap-2">
+      <div>
+        <h4 class="font-black text-xs text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+          <span>⚖️</span> Bảng Hiệu chỉnh & Tính điểm Bảo vệ Chính thức (Chủ tịch / Quản trị viên)
+        </h4>
+        <p class="text-[11px] text-amber-800 mt-0.5">Chủ tịch có quyền hiệu chỉnh điểm và quyết định LẤY / BỎ điểm Khách mời trước khi chốt điểm.</p>
+      </div>
+      <span class="badge bg-amber-200 text-amber-900 font-bold text-[10px]">${council.status === 'finalized' ? 'Đã chốt điểm' : 'Sẵn sàng chốt'}</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs text-left border-collapse bg-white rounded-xl overflow-hidden shadow-xs border border-amber-200">
+        <thead class="bg-amber-100/70 text-amber-950 border-b border-amber-200 font-bold">
+          <tr>
+            <th class="p-2 text-center">#</th>
+            <th class="p-2">MSSV</th>
+            <th class="p-2">Họ và tên</th>
+            ${slots.map(s => `<th class="p-2 text-center whitespace-nowrap">${s.label || s.name} ${s.type === 'guest' ? '<span class="text-indigo-600 font-normal">(Khách)</span>' : ''}</th>`).join('')}
+            <th class="p-2 text-center whitespace-nowrap bg-indigo-100/80 text-indigo-950">ĐIỂM CHÍNH THỨC</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </div>
+  `;
+};
+
+window.openScoreCalibrationModal = function(studentId, scorerId, slotKey) {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  if (!auth.isAdmin && !auth.isChair) {
+    showToast('Chỉ Chủ tịch Hội đồng hoặc Quản trị viên mới có quyền hiệu chỉnh điểm!', 'error');
+    return;
+  }
+
+  if (council.status === 'finalized' && !auth.isAdmin) {
+    showToast('Hội đồng đã chốt điểm, chỉ Quản trị viên mới có thể điều chỉnh!', 'warning');
+    return;
+  }
+
+  const sObj = findStudentInRound(studentId);
+  const sName = sObj?.fullName || sObj?.studentName || studentId;
+  const scoreKey = `${activityId}_${councilId}_${studentId}_${scorerId}`;
+  const score = state.councilScores?.[scoreKey];
+  const assigned = council.membersBySlot?.[slotKey];
+
+  document.getElementById('calib-student-id').value = studentId;
+  document.getElementById('calib-scorer-id').value = scorerId;
+  document.getElementById('calib-slot-key').value = slotKey;
+  document.getElementById('calib-student-meta').textContent = `Sinh viên: ${sName} (${studentId})`;
+  document.getElementById('calib-scorer-info').textContent = `${assigned?.memberName || scorerId} (${assigned?.role || slotKey})`;
+  document.getElementById('calib-current-val').textContent = (score?.value !== undefined && score.value !== null) ? score.value : '--';
+  document.getElementById('calib-new-val').value = (score?.value !== undefined && score.value !== null) ? score.value : '';
+  document.getElementById('calib-reason').value = '';
+
+  document.getElementById('modal-score-calibration')?.classList.remove('hidden');
+};
+
+window.closeScoreCalibrationModal = function() {
+  document.getElementById('modal-score-calibration')?.classList.add('hidden');
+};
+
+window.saveScoreCalibration = async function() {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  if (!auth.isAdmin && !auth.isChair) {
+    showToast('Chỉ Chủ tịch Hội đồng hoặc Quản trị viên mới có quyền hiệu chỉnh điểm!', 'error');
+    return;
+  }
+
+  if (council.status === 'finalized' && !auth.isAdmin) {
+    showToast('Hội đồng đã chốt điểm, chỉ Quản trị viên mới có thể điều chỉnh!', 'warning');
+    return;
+  }
+
+  const studentId = document.getElementById('calib-student-id')?.value;
+  const scorerId = document.getElementById('calib-scorer-id')?.value;
+  const slotKey = document.getElementById('calib-slot-key')?.value;
+  const newValStr = document.getElementById('calib-new-val')?.value;
+  const reason = document.getElementById('calib-reason')?.value?.trim();
+
+  if (newValStr === '' || newValStr === null || isNaN(Number(newValStr))) {
+    showToast('Vui lòng nhập điểm mới hợp lệ (0 – 10)!', 'warning');
+    return;
+  }
+  const newVal = Number(newValStr);
+  if (newVal < 0 || newVal > 10) {
+    showToast('Điểm hiệu chỉnh phải từ 0 đến 10!', 'warning');
+    return;
+  }
+
+  if (!reason) {
+    showToast('Vui lòng nhập lý do hiệu chỉnh điểm bắt buộc!', 'warning');
+    return;
+  }
+
+  const scoreKey = `${activityId}_${councilId}_${studentId}_${scorerId}`;
+  const existing = state.councilScores?.[scoreKey] || {};
+  const oldVal = existing.value !== undefined ? existing.value : null;
+
+  const assigned = council.membersBySlot?.[slotKey];
+  const sObj = findStudentInRound(studentId);
+  const sName = sObj?.fullName || sObj?.studentName || studentId;
+
+  // Update score record
+  const updatedScore = {
+    ...existing,
+    activityId,
+    councilId,
+    studentId,
+    scorerId,
+    slotKey,
+    value: newVal,
+    status: 'completed',
+    adjusted: true,
+    adjustments: [
+      ...(existing.adjustments || []),
+      {
+        originalValue: oldVal,
+        newValue: newVal,
+        adjustedById: state.user?.uid || state.user?.email,
+        adjustedByName: state.user?.displayName || (auth.isAdmin ? 'Quản trị viên' : 'Chủ tịch HĐ'),
+        reason,
+        timestamp: new Date().toISOString()
+      }
+    ],
+    updatedAt: new Date().toISOString()
+  };
+
+  state.councilScores[scoreKey] = updatedScore;
+
+  // Append to council audit logs
+  council.auditLogs = council.auditLogs || [];
+  council.auditLogs.unshift({
+    id: 'audit_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+    roundId,
+    activityId,
+    councilId,
+    studentId,
+    studentName: sName,
+    scorerId,
+    scorerName: assigned?.memberName || scorerId,
+    slotKey,
+    field: 'defense_score',
+    originalValue: oldVal,
+    newValue: newVal,
+    reason,
+    adjustedById: state.user?.uid || state.user?.email,
+    adjustedByName: state.user?.displayName || (auth.isAdmin ? 'Quản trị viên' : 'Chủ tịch HĐ'),
+    adjustedByRole: auth.isAdmin ? 'admin' : 'chair',
+    createdAt: new Date().toISOString()
+  });
+
+  // Persist to Firestore
+  try {
+    const roundRef = doc(db, 'graduationRounds', roundId);
+    if (state.isAdmin) {
+      await updateDoc(roundRef, {
+        [`councilScores.${scoreKey}`]: updatedScore,
+        activities: targetRound.activities,
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      await persistActivityCouncilChanges(targetRound);
+    }
+  } catch (err) {
+    console.warn('Persist score calibration notice:', err);
+  }
+
+  closeScoreCalibrationModal();
+  renderCouncilWorkspaceFull();
+  showToast(`✓ Đã hiệu chỉnh điểm cho ${sName} thành công và ghi nhận vào Audit Log!`, 'success');
+};
+
+window.toggleGuestInclusion = async function(studentId, slotKey, isIncluded) {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  if (!auth.isAdmin && !auth.isChair) {
+    showToast('Chỉ Chủ tịch Hội đồng hoặc Quản trị viên mới có quyền chọn tính điểm Khách mời!', 'error');
+    return;
+  }
+
+  if (council.status === 'finalized' && !auth.isAdmin) {
+    showToast('Hội đồng đã chốt điểm, không thể thay đổi khách mời!', 'warning');
+    return;
+  }
+
+  council.guestInclusion = council.guestInclusion || {};
+  council.guestInclusion[studentId] = council.guestInclusion[studentId] || {};
+  council.guestInclusion[studentId][slotKey] = Boolean(isIncluded);
+
+  await persistActivityCouncilChanges(targetRound);
+  renderCouncilWorkspaceFull();
+  showToast(`Đã cập nhật tính điểm khách mời: ${isIncluded ? 'LẤY ĐIỂM' : 'KHÔNG LẤY'}.`, 'info');
+};
+
+window.renderAuditLogsSection = function() {
+  const container = document.getElementById('cws-audit-logs-section');
+  if (!container) return;
+
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!council || (!auth.isAdmin && !auth.isChair)) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  const logs = council.auditLogs || [];
+  if (logs.length === 0) {
+    container.classList.add('hidden');
+    return;
+  }
+  container.classList.remove('hidden');
+
+  container.innerHTML = `
+    <div class="flex items-center justify-between">
+      <h4 class="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+        <span>📋</span> Nhật ký Kiểm toán (Audit Log) của Hội đồng
+      </h4>
+      <span class="text-[10px] text-slate-500 font-mono font-bold">${logs.length} bản ghi</span>
+    </div>
+    <div class="space-y-1.5 max-h-48 overflow-y-auto mt-2">
+      ${logs.map(log => `
+        <div class="p-2 bg-white rounded-lg border border-slate-200 text-xs flex items-start justify-between gap-2">
+          <div>
+            <div class="font-bold text-slate-900">
+              ${log.action === 'reopen_council' ? '🔓 Mở lại Hội đồng' : `Hiệu chỉnh điểm: ${log.studentName || log.studentId} (${log.originalValue} ➔ ${log.newValue})`}
+            </div>
+            <p class="text-[11px] text-slate-600 mt-0.5">Lý do: <span class="italic font-semibold text-slate-800">"${escapeHtml(log.reason || '')}"</span></p>
+            <span class="text-[10px] text-slate-400">Bởi: ${log.adjustedByName || log.adjustedById} (${log.adjustedByRole})</span>
+          </div>
+          <span class="text-[10px] text-slate-400 font-mono whitespace-nowrap">${fmt24h(log.createdAt)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+};
+
+// Section 37: Guest Passcode Blocker Notice & Placeholders
+window.openGuestPasscodeModal = function() {
+  console.warn('BLOCKER: Secure Guest Passcode requires trusted backend');
+  document.getElementById('modal-guest-passcode-entry')?.classList.remove('hidden');
+};
+
+window.closeGuestPasscodeModal = function() {
+  document.getElementById('modal-guest-passcode-entry')?.classList.add('hidden');
 };
 

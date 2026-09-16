@@ -50,7 +50,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation Beta</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v1.9.0-beta.1</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v2.0.0-beta.1</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -1778,7 +1778,7 @@
   <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto px-4">
       <p class="font-semibold text-slate-700">Ngành Thiết kế Nội thất — Khoa Mỹ thuật Công nghiệp</p>
-      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v1.9.0-beta.1</p>
+      <p class="text-[11px] text-slate-400 mt-1">Trường Đại học Tôn Đức Thắng (TDTU) • Hệ thống IFA+ Graduation Beta v2.0.0-beta.1</p>
     </div>
   </footer>
 
@@ -2667,14 +2667,18 @@
                   <div id="activity-scoring-config-panel" class="hidden pl-2 space-y-3 bg-emerald-50/50 p-3 rounded-xl border border-emerald-200">
                     <div>
                       <label class="font-bold text-slate-700 block mb-1 text-xs">Kiểu chấm điểm:</label>
-                      <div class="flex items-center gap-4 text-xs font-semibold">
+                      <div class="flex items-center flex-wrap gap-4 text-xs font-semibold">
                         <label class="flex items-center gap-1.5 cursor-pointer">
                           <input type="radio" name="activity_scoring_mode" value="numeric" checked onchange="switchActivityScoringMode('numeric')">
                           <span>Điểm số (Numeric)</span>
                         </label>
                         <label class="flex items-center gap-1.5 cursor-pointer">
                           <input type="radio" name="activity_scoring_mode" value="letter" onchange="switchActivityScoringMode('letter')">
-                          <span>Điểm chữ (Letter Grade)</span>
+                          <span>Điểm chữ (Letter)</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="activity_scoring_mode" value="defense_rubric" onchange="switchActivityScoringMode('defense_rubric')">
+                          <span class="text-indigo-700 font-bold">🎯 Rubric bảo vệ (Defense Rubric 4+3+2+1)</span>
                         </label>
                       </div>
                     </div>
@@ -2703,6 +2707,24 @@
                       </div>
                       <div id="activity-scoring-letter-list" class="space-y-1.5 max-h-48 overflow-y-auto">
                         <!-- Rendered dynamically -->
+                      </div>
+                    </div>
+
+                    <!-- Defense Rubric Config (v2.0.0-beta.1) -->
+                    <div id="activity-scoring-rubric-wrap" class="hidden space-y-2">
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <label class="text-[11px] font-bold text-slate-700">Các tiêu chí chấm theo Rubric:</label>
+                          <span class="text-[10px] text-slate-500 block">Mặc định chuẩn: Ý tưởng (4) + Tính ứng dụng (3) + Kỹ thuật (2) + Trình bày (1) = 10đ</span>
+                        </div>
+                        <button type="button" onclick="openAddRubricCriterionModal()" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold shadow-xs">+ Thêm tiêu chí</button>
+                      </div>
+                      <div id="activity-scoring-rubric-list" class="space-y-1.5 max-h-56 overflow-y-auto">
+                        <!-- Rendered dynamically -->
+                      </div>
+                      <div class="p-2 bg-indigo-50/70 border border-indigo-200 rounded-lg flex items-center justify-between text-xs font-bold text-indigo-950">
+                        <span>Tổng điểm tối đa Rubric:</span>
+                        <span id="activity-scoring-rubric-total-max" class="font-mono text-sm text-indigo-700 font-black">10.0</span>
                       </div>
                     </div>
                   </div>
@@ -3140,12 +3162,18 @@
 
         <div class="flex items-center gap-2">
           <!-- Secretary / Admin Council State Controls -->
-          <div id="cws-session-controls" class="hidden items-center gap-1.5">
+          <div id="cws-session-controls" class="hidden items-center gap-1.5 flex-wrap">
             <button type="button" id="btn-start-council-session" onclick="startCouncilSession()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
               <span>▶ Bắt đầu Hội đồng</span>
             </button>
             <button type="button" id="btn-end-council-session" onclick="endCouncilSession()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
               <span>⏹ Kết thúc Hội đồng</span>
+            </button>
+            <button type="button" id="btn-finalize-council-session" onclick="finalizeCouncilSession()" class="hidden px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
+              <span>🔒 Chốt điểm Hội đồng</span>
+            </button>
+            <button type="button" id="btn-reopen-council-session" onclick="openReopenCouncilModal()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
+              <span>🔓 Mở lại Hội đồng</span>
             </button>
           </div>
           <button type="button" onclick="closeCouncilWorkspace()" class="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors">✕ Đóng</button>
@@ -3219,6 +3247,16 @@
 
           <!-- ADMIN REAL-TIME MONITOR (ONLY FOR ADMIN) -->
           <div id="cws-admin-monitor-section" class="hidden p-4 bg-indigo-50/40 border border-indigo-200 rounded-2xl space-y-3">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- POST-COUNCIL CALIBRATION & GUEST INCLUSION (CHAIR & ADMIN) (v2.0.0-beta.1) -->
+          <div id="cws-post-council-section" class="hidden p-4 sm:p-5 bg-amber-50/60 border-2 border-amber-300 rounded-2xl space-y-4">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- AUDIT LOG HISTORY PANEL (CHAIR & ADMIN) (v2.0.0-beta.1) -->
+          <div id="cws-audit-logs-section" class="hidden p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
             <!-- Rendered dynamically -->
           </div>
 
@@ -3345,6 +3383,155 @@
           <button type="button" id="btn-score-entry-draft" onclick="saveScoreEntry(false)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded-lg">💾 Lưu tạm</button>
           <button type="button" id="btn-score-entry-complete" onclick="saveScoreEntry(true)" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-xs">✓ Hoàn tất</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================================
+       MODAL: RUBRIC CRITERION EDITOR (v2.0.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-rubric-criterion" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <h4 id="modal-rubric-criterion-title" class="font-black text-sm text-slate-900">Thêm tiêu chí Rubric</h4>
+        <button type="button" onclick="closeRubricCriterionModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+      </div>
+      <div class="p-4 space-y-3">
+        <input type="hidden" id="rubric-criterion-id">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Mã tiêu chí (Key / duy nhất) <span class="text-rose-500">*</span></label>
+          <input type="text" id="rubric-criterion-key" placeholder="VD: idea, practicality, technique..." class="w-full p-2 border border-slate-300 rounded-xl font-mono text-xs">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Tên tiêu chí hiển thị <span class="text-rose-500">*</span></label>
+          <input type="text" id="rubric-criterion-label" placeholder="VD: Ý tưởng, Tính ứng dụng..." class="w-full p-2 border border-slate-300 rounded-xl text-xs font-bold">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Điểm tối đa (Max Score > 0) <span class="text-rose-500">*</span></label>
+          <input type="number" id="rubric-criterion-max" min="0.1" max="100" step="0.5" value="4" class="w-full p-2 border border-slate-300 rounded-xl font-mono text-xs font-bold">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Mô tả / Hướng dẫn chấm (tùy chọn):</label>
+          <textarea id="rubric-criterion-desc" rows="2" placeholder="Ghi chú chi tiết về tiêu chí..." class="w-full p-2 border border-slate-300 rounded-xl text-xs"></textarea>
+        </div>
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button type="button" onclick="closeRubricCriterionModal()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-600">Hủy</button>
+        <button type="button" onclick="saveRubricCriterion()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-xs">Lưu tiêu chí</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================
+       MODAL: POST-COUNCIL SCORE CALIBRATION (v2.0.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-score-calibration" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-amber-50 flex items-center justify-between">
+        <div>
+          <h4 class="font-black text-sm text-amber-950 flex items-center gap-1.5">
+            <span>⚖️</span> Hiệu chỉnh Điểm Sau Hội đồng
+          </h4>
+          <p id="calib-student-meta" class="text-[11px] text-amber-800 mt-0.5 font-semibold">Sinh viên: ...</p>
+        </div>
+        <button type="button" onclick="closeScoreCalibrationModal()" class="text-amber-800 hover:text-amber-950 font-bold p-1">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <input type="hidden" id="calib-student-id">
+        <input type="hidden" id="calib-scorer-id">
+        <input type="hidden" id="calib-slot-key">
+
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+          <div>
+            <span class="text-slate-500 font-bold block text-[11px]">Người chấm / Vai trò:</span>
+            <span id="calib-scorer-info" class="font-black text-slate-900 text-xs">Chủ tịch Hội đồng</span>
+          </div>
+          <div class="text-right">
+            <span class="text-slate-500 font-bold block text-[11px]">Điểm hiện tại:</span>
+            <span id="calib-current-val" class="font-black font-mono text-sm text-slate-800">8.5</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-800 block mb-1">Điểm mới sau hiệu chỉnh (0 – 10) <span class="text-rose-500">*</span></label>
+          <div class="flex items-center gap-3">
+            <input type="number" id="calib-new-val" min="0" max="10" step="0.1" placeholder="8.7" class="w-36 p-2 border border-slate-300 rounded-xl font-mono text-sm font-black text-slate-900 bg-white">
+            <span class="text-slate-500 font-semibold">/ 10 điểm</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-800 block mb-1">Lý do hiệu chỉnh bắt buộc (Audit Trail Reason) <span class="text-rose-500">*</span></label>
+          <textarea id="calib-reason" rows="3" placeholder="Ghi rõ lý do điều chỉnh điểm sau thảo luận hội đồng..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs"></textarea>
+          <p class="text-[10px] text-slate-400 mt-1 italic">Mọi thay đổi điểm số sẽ được ghi nhận vào Nhật ký kiểm toán (Audit Log) vĩnh viễn.</p>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button type="button" onclick="closeScoreCalibrationModal()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-600">Hủy</button>
+        <button type="button" onclick="saveScoreCalibration()" class="px-5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold shadow-xs">✓ Lưu hiệu chỉnh & Ghi log</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================
+       MODAL: REOPEN FINALIZED COUNCIL (ADMIN ONLY) (v2.0.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-reopen-council" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-rose-50 flex items-center justify-between">
+        <div>
+          <h4 class="font-black text-sm text-rose-950 flex items-center gap-1.5">
+            <span>🔓</span> Mở lại Hội đồng đã chốt điểm
+          </h4>
+          <p class="text-[11px] text-rose-700 mt-0.5 font-bold">Chỉ dành cho Quản trị viên</p>
+        </div>
+        <button type="button" onclick="closeReopenCouncilModal()" class="text-rose-700 hover:text-rose-950 font-bold p-1">✕</button>
+      </div>
+
+      <div class="p-5 space-y-3">
+        <p class="text-slate-700 text-xs">Hội đồng đang ở trạng thái <strong>Đã chốt điểm (Finalized)</strong>. Việc mở lại sẽ chuyển trạng thái về <strong>Đã kết thúc (Ended)</strong> để cho phép hiệu chỉnh tiếp.</p>
+        <div>
+          <label class="font-bold text-slate-800 block mb-1">Lý do mở lại Hội đồng <span class="text-rose-500">*</span></label>
+          <textarea id="reopen-council-reason" rows="3" placeholder="Ghi rõ lý do mở lại Hội đồng..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs"></textarea>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button type="button" onclick="closeReopenCouncilModal()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-600">Hủy</button>
+        <button type="button" onclick="confirmReopenCouncil()" class="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-xs">Xác nhận Mở lại</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================
+       MODAL: GUEST PASSCODE ENTRY (UI PLACEHOLDER PER SECTION 37) (v2.0.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-guest-passcode-entry" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <h4 class="font-black text-sm text-slate-900 flex items-center gap-1.5">
+          <span>🔑</span> Đăng nhập Khách mời bằng Passcode
+        </h4>
+        <button type="button" onclick="closeGuestPasscodeModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">
+          <p class="font-bold">⚠️ Thông báo an toàn hệ thống:</p>
+          <p class="text-[11px] mt-1 text-amber-800">Cơ chế xác thực mã Passcode 6 chữ số an toàn yêu cầu Cloud Functions / Backend tin cậy để chống lộ mã trên client. Tính năng hiện đang ở chế độ chờ triển khai backend an toàn.</p>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Mã Passcode 6 chữ số:</label>
+          <input type="text" id="guest-passcode-input" maxlength="6" placeholder="123456" disabled class="w-full p-2.5 border border-slate-200 rounded-xl font-mono text-center text-lg font-black tracking-widest bg-slate-100 text-slate-400">
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button type="button" onclick="closeGuestPasscodeModal()" class="px-4 py-1.5 bg-slate-200 text-slate-700 rounded-xl font-bold">Đóng</button>
       </div>
     </div>
   </div>
