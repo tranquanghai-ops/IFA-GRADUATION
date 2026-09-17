@@ -2136,13 +2136,13 @@ window.switchAdminTab = function(tabKey) {
   // 2. Active button styling in clean sidebar
   document.querySelectorAll('.admin-tab-btn').forEach(b => {
     b.classList.remove('bg-slate-900', 'text-white', 'shadow-xs', 'font-bold');
-    b.classList.add('text-slate-600', 'hover:bg-slate-100', 'hover:text-slate-900', 'font-medium');
+    b.classList.add('text-slate-600', 'hover:bg-slate-100', 'hover:text-slate-900', 'font-semibold', 'text-base');
   });
 
   const activeBtn = document.getElementById('atab-btn-' + tabKey);
   if (activeBtn) {
     activeBtn.classList.remove('text-slate-600', 'hover:bg-slate-100', 'hover:text-slate-900', 'font-medium');
-    activeBtn.classList.add('bg-slate-900', 'text-white', 'shadow-xs', 'font-bold');
+    activeBtn.classList.add('bg-slate-900', 'text-white', 'shadow-xs', 'font-bold', 'text-base');
   }
 
   // 3. Tab panels toggle
@@ -14938,9 +14938,9 @@ window.filterAdminRounds = function(filterKey) {
   state.adminRoundsFilter = filterKey;
   document.querySelectorAll('#admin-rounds-filter-pills .round-filter-btn').forEach(btn => {
     if (btn.dataset.filter === filterKey) {
-      btn.className = 'round-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white shadow-xs transition-all';
+      btn.className = 'round-filter-btn px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-900 text-white shadow-xs transition-all';
     } else {
-      btn.className = 'round-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all';
+      btn.className = 'round-filter-btn px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all';
     }
   });
   renderAdminRoundsCards();
@@ -15000,14 +15000,14 @@ window.renderAdminRoundsCards = function() {
 
   if (filtered.length === 0) {
     container.innerHTML = `
-      <div class="col-span-full card-surface p-12 text-center space-y-3 bg-white border border-dashed border-slate-300 rounded-2xl">
-        <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-xl font-bold">
+      <div class="card-surface p-12 text-center space-y-3 bg-white border border-dashed border-slate-300 rounded-2xl w-full">
+        <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-2xl font-bold">
           📁
         </div>
-        <p class="text-sm font-bold text-slate-700">Không có đợt tốt nghiệp nào ở mục này</p>
-        <p class="text-xs text-slate-400">Bạn có thể chuyển bộ lọc hoặc bấm "Tạo đợt tốt nghiệp" để thêm mới.</p>
-        <div>
-          <button onclick="openCreateRoundModal()" class="mt-2 px-4 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+        <p class="text-base font-bold text-slate-800">Không có đợt tốt nghiệp nào ở mục này</p>
+        <p class="text-sm text-slate-500">Bạn có thể chuyển bộ lọc hoặc bấm "Tạo đợt tốt nghiệp" để thêm mới.</p>
+        <div class="pt-2">
+          <button onclick="openCreateRoundModal()" class="px-5 py-2.5 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl text-sm font-semibold shadow-sm transition-all">
             + Tạo đợt tốt nghiệp
           </button>
         </div>
@@ -15024,17 +15024,17 @@ window.renderAdminRoundsCards = function() {
 
     let statusBadgeHtml = '';
     if (cat === 'running') {
-      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Đang diễn ra</span>';
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Đang diễn ra</span>';
     } else if (cat === 'upcoming') {
-      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Sắp mở</span>';
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">Sắp mở</span>';
     } else if (cat === 'ended') {
-      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Đã kết thúc</span>';
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">Đã kết thúc</span>';
     } else if (cat === 'hidden') {
-      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Đã ẩn</span>';
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">Đã ẩn</span>';
     }
 
     const activeBadgeHtml = isCurrentActive 
-      ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-900 border border-indigo-200">★ Đợt hiện hành</span>'
+      ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-indigo-100 text-indigo-900 border border-indigo-200">★ Đợt hiện hành</span>'
       : '';
 
     const eligibleCount = typeof r.eligibleCount === 'number' ? r.eligibleCount : (r.eligibleStudentsCount || 0);
@@ -15059,122 +15059,133 @@ window.renderAdminRoundsCards = function() {
     const isHidden = cat === 'hidden';
 
     return `
-      <div class="card-surface p-5 bg-white border border-slate-200 hover:border-slate-300 rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+      <article class="card-surface p-5 sm:p-6 bg-white border border-slate-200 hover:border-slate-300 rounded-2xl shadow-xs hover:shadow-md transition-all space-y-4 w-full">
         
-        <!-- CARD HEADER -->
-        <div class="space-y-2">
-          <div class="flex items-center justify-between gap-2 flex-wrap">
+        <!-- TOP ROW: 3 COLUMNS ON DESKTOP (LEFT: TITLE, MID: TIME & STATUS, RIGHT: METRICS) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+          
+          <!-- LEFT: Title, Year, Status Badges, Shortcode (5 cols) -->
+          <div class="lg:col-span-5 space-y-2">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+              <span class="text-xs uppercase font-bold tracking-wider px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
                 ${r.academicYear || 'Đồ án TN'}
               </span>
               ${statusBadgeHtml}
               ${activeBadgeHtml}
-            </div>
-
-            <div class="flex items-center gap-1.5">
-              <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Sao chép liên kết đợt ?x=${shortCode}" class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors text-xs flex items-center gap-1 font-mono">
+              <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Sao chép liên kết đợt ?x=${shortCode}" class="px-2.5 py-1 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors text-xs flex items-center gap-1 font-mono border border-slate-200 bg-white shadow-2xs">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
                 </svg>
-                <span class="text-[11px]">${shortCode}</span>
+                <span>${shortCode}</span>
               </button>
+            </div>
+
+            <h3 class="text-xl sm:text-[22px] font-bold text-slate-900 leading-snug hover:text-tdtu-blue transition-colors">
+              ${r.title}
+            </h3>
+          </div>
+
+          <!-- MIDDLE-LEFT: Time & Registration / Phase Info (3 cols) -->
+          <div class="lg:col-span-3 space-y-2 text-sm sm:text-[15px] border-t lg:border-t-0 lg:border-l border-slate-100 pt-3 lg:pt-0 lg:pl-5">
+            <div class="flex items-start gap-2.5 text-slate-600">
+              <span class="text-base shrink-0">📅</span>
+              <div>
+                <span class="text-xs text-slate-400 font-bold block uppercase tracking-wide">Thời gian mở - đóng</span>
+                <span class="font-mono text-sm sm:text-[15px] text-slate-800 font-semibold">${timeRangeStr}</span>
+              </div>
+            </div>
+            <div class="flex items-start gap-2.5 text-slate-600">
+              <span class="text-base shrink-0">📌</span>
+              <div>
+                <span class="text-xs text-slate-400 font-bold block uppercase tracking-wide">Trạng thái đợt</span>
+                <span class="text-sm sm:text-[15px] font-bold text-slate-800">${phaseInfo}</span>
+              </div>
             </div>
           </div>
 
-          <h3 class="text-base font-black text-slate-900 leading-snug hover:text-tdtu-blue transition-colors">
-            ${r.title}
-          </h3>
-
-          <div class="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
-            <span class="flex items-center gap-1">
-              <span>📅</span>
-              <span class="font-mono text-[11px] text-slate-700">${timeRangeStr}</span>
-            </span>
-            <span class="text-slate-300">•</span>
-            <span class="text-[11px] font-semibold text-slate-600">Trạng thái: <b>${phaseInfo}</b></span>
+          <!-- MIDDLE-RIGHT: 4 Metrics Summary (4 cols) -->
+          <div class="lg:col-span-4 border-t lg:border-t-0 lg:border-l border-slate-100 pt-3 lg:pt-0 lg:pl-5">
+            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-2.5 bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-center">
+              <div>
+                <span class="text-[13px] sm:text-[14px] text-slate-500 block font-semibold">SV Tốt nghiệp</span>
+                <span class="text-lg sm:text-xl font-bold text-slate-900">${eligibleCount}</span>
+              </div>
+              <div>
+                <span class="text-[13px] sm:text-[14px] text-slate-500 block font-semibold">GVHD</span>
+                <span class="text-lg sm:text-xl font-bold text-indigo-700">${supCount}</span>
+              </div>
+              <div>
+                <span class="text-[13px] sm:text-[14px] text-slate-500 block font-semibold">Đăng ký</span>
+                <span class="text-lg sm:text-xl font-bold text-emerald-700">${regCount}</span>
+              </div>
+              <div>
+                <span class="text-[13px] sm:text-[14px] text-slate-500 block font-semibold">Kế hoạch</span>
+                <span class="text-lg sm:text-xl font-bold text-blue-700">${actCount}</span>
+              </div>
+            </div>
           </div>
+
         </div>
 
-        <!-- METRICS SUMMARY GRID -->
-        <div class="grid grid-cols-4 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
-          <div>
-            <span class="text-[10px] text-slate-400 block font-bold uppercase">SV Tốt nghiệp</span>
-            <span class="text-base font-black text-slate-800">${eligibleCount}</span>
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-400 block font-bold uppercase">GVHD</span>
-            <span class="text-base font-black text-indigo-700">${supCount}</span>
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-400 block font-bold uppercase">Đăng ký</span>
-            <span class="text-base font-black text-emerald-700">${regCount}</span>
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-400 block font-bold uppercase">Kế hoạch</span>
-            <span class="text-base font-black text-blue-700">${actCount}</span>
-          </div>
-        </div>
-
-        <!-- 6 MAIN ACTION BUTTONS (PRIMARY WORKFLOW GRID) -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
-          <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-            <span class="text-blue-600 group-hover:scale-110 transition-transform">📅</span>
-            <span>Kế hoạch</span>
-          </button>
+        <!-- BOTTOM ACTIONS ROW: 6 MAIN ACTIONS (LEFT) + SECONDARY ACTIONS (RIGHT) -->
+        <div class="pt-4 border-t border-slate-100 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
           
-          <button type="button" onclick="navigateToRoundAction('${r.id}', 'eligible-students')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-            <span class="text-indigo-600 group-hover:scale-110 transition-transform">🎓</span>
-            <span>SV tốt nghiệp</span>
-          </button>
+          <!-- 6 Main Action Buttons -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 xl:flex xl:flex-wrap items-center gap-2">
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
+              <span class="text-blue-600 group-hover:scale-110 transition-transform text-base">📅</span>
+              <span>Kế hoạch</span>
+            </button>
+            
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'eligible-students')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
+              <span class="text-indigo-600 group-hover:scale-110 transition-transform text-base">🎓</span>
+              <span>SV tốt nghiệp</span>
+            </button>
 
-          <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-            <span class="text-emerald-600 group-hover:scale-110 transition-transform">📝</span>
-            <span>Đăng ký</span>
-          </button>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
+              <span class="text-emerald-600 group-hover:scale-110 transition-transform text-base">📝</span>
+              <span>Đăng ký</span>
+            </button>
 
-          <button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-            <span class="text-amber-600 group-hover:scale-110 transition-transform">🎯</span>
-            <span>Xét nguyện vọng</span>
-          </button>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
+              <span class="text-amber-600 group-hover:scale-110 transition-transform text-base">🎯</span>
+              <span>Xét nguyện vọng</span>
+            </button>
 
-          <button type="button" onclick="navigateToRoundAction('${r.id}', 'preview-student')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-            <span class="text-purple-600 group-hover:scale-110 transition-transform">👥</span>
-            <span>Phân công</span>
-          </button>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'preview-student')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
+              <span class="text-purple-600 group-hover:scale-110 transition-transform text-base">👥</span>
+              <span>Phân công</span>
+            </button>
 
-          <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-            <span class="text-rose-600 group-hover:scale-110 transition-transform">📊</span>
-            <span>Quản lý điểm</span>
-          </button>
-        </div>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
+              <span class="text-rose-600 group-hover:scale-110 transition-transform text-base">📊</span>
+              <span>Quản lý điểm</span>
+            </button>
+          </div>
 
-        <!-- SECONDARY ACTIONS FOOTER -->
-        <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 gap-2 flex-wrap">
-          <div class="flex items-center gap-1">
-            <button type="button" onclick="editRoundModal('${r.id}')" class="px-2.5 py-1 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+          <!-- Secondary Actions -->
+          <div class="flex items-center justify-end gap-1.5 text-sm sm:text-[14px] text-slate-600 flex-wrap pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100">
+            <button type="button" onclick="editRoundModal('${r.id}')" class="px-3 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
               ✏️ Sửa
             </button>
-            <button type="button" onclick="duplicateRoundModal('${r.id}')" class="px-2.5 py-1 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+            <button type="button" onclick="duplicateRoundModal('${r.id}')" class="px-3 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
               📋 Sao chép
             </button>
-            <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-2.5 py-1 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+            <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-3 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
               ${isClosed ? '↺ Mở lại' : '⏹ Kết thúc'}
             </button>
-            <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-2.5 py-1 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+            <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-3 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
               ${isHidden ? '👁️ Hiện' : '🙈 Ẩn'}
             </button>
-          </div>
-
-          <div class="flex items-center gap-2">
-            ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="text-blue-600 hover:underline font-bold text-[11px]">Đặt hiện hành</button>` : ''}
-            <button type="button" onclick="softDeleteRound('${r.id}')" class="px-2.5 py-1 rounded-lg hover:bg-rose-50 text-rose-600 font-semibold transition-colors">
+            ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-3 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 font-semibold transition-colors">⭐ Đặt hiện hành</button>` : ''}
+            <button type="button" onclick="softDeleteRound('${r.id}')" class="px-3 py-1.5 rounded-lg hover:bg-rose-50 text-rose-600 font-semibold transition-colors">
               🗑️ Xóa
             </button>
           </div>
+
         </div>
 
-      </div>
+      </article>
     `;
   }).join('');
 };
@@ -15224,7 +15235,7 @@ window.updateRoundBreadcrumb = function(tabKey) {
   const currentLabel = tabLabels[tabKey] || tabKey;
 
   bEl.innerHTML = `
-    <div class="flex items-center justify-between gap-3 bg-slate-100/90 hover:bg-slate-100 px-4 py-2.5 rounded-xl border border-slate-200/80 text-xs transition-colors">
+    <div class="flex items-center justify-between gap-3 bg-slate-100/90 hover:bg-slate-100 px-4 py-3 rounded-xl border border-slate-200/80 text-sm transition-colors">
       <div class="flex items-center gap-2 min-w-0">
         <button type="button" onclick="switchAdminTab('rounds')" class="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1.5 shrink-0 transition-colors">
           <span>←</span>
@@ -15236,8 +15247,8 @@ window.updateRoundBreadcrumb = function(tabKey) {
         <span class="text-slate-500 font-semibold shrink-0">${currentLabel}</span>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        ${roundYear ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200">${roundYear}</span>` : ''}
-        <button type="button" onclick="switchAdminTab('rounds')" class="text-[11px] text-slate-500 hover:text-slate-900 font-medium underline">Đổi đợt</button>
+        ${roundYear ? `<span class="text-xs font-bold px-2.5 py-0.5 rounded bg-white text-slate-700 border border-slate-200">${roundYear}</span>` : ''}
+        <button type="button" onclick="switchAdminTab('rounds')" class="text-xs text-slate-500 hover:text-slate-900 font-medium underline">Đổi đợt</button>
       </div>
     </div>
   `;
