@@ -13,11 +13,12 @@
 'use strict';
 
 const { onRequest } = require('firebase-functions/v2/https');
-const { requireStudentAuth } = require('./auth.js');
+const { requireStudentAuth, requireAdminAuth, getStorageBucket } = require('./auth.js');
 const { getDocument } = require('./firestore.js');
 const { validateFile, validateActivity, ValidationError } = require('./validation.js');
 const { isDriveConfigured, createUploadSession, getAccessToken, loadDriveConfig, runDriveDiagnostic, deleteDriveFile } = require('./drive.js');
 const { getSecret } = require('./secrets.js');
+const crypto = require('crypto');
 
 function extractFolderId(str) {
   if (!str || typeof str !== 'string') return null;
@@ -237,6 +238,131 @@ async function deleteFileHandler(req, res) {
   }
 }
 
+// ── POST /api/graduation/supervisor-portrait ─────────────────────────────────
+
+async function uploadSupervisorPortraitHandler(req, res) {
+  setCORSHeaders(req, res);
+  if (req.method === 'OPTIONS') return handleOptions(req, res);
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  await new Promise((resolve, reject) => {
+    requireAdminAuth(req, res, err => {
+      if (err) reject(err); else resolve();
+    });
+  }).catch(() => {});
+
+  if (res.headersSent) return;
+
+  try {
+    const { supervisorId, mimeType, imageBase64 } = req.body || {};
+
+    if (!supervisorId || typeof supervisorId !== 'string') {
+      return res.status(400).json({ error: 'Thiếu supervisorId hợp lệ' });
+    }
+
+    const cleanSupId = supervisorId.trim();
+    if (!/^[a-zA-Z0-9_.-]+$/.test(cleanSupId) || cleanSupId.includes('..')) {
+      return res.status(400).json({ error: 'supervisorId chứa ký tự không hợp lệ' });
+    }
+
+    const validMimes = ['image/webp', 'image/jpeg', 'image/jpg'];
+    if (!mimeType || !validMimes.includes(mimeType.toLowerCase())) {
+      return res.status(400).json({ error: 'Chỉ hỗ trợ định dạng image/webp hoặc image/jpeg' });
+    }
+    const normMime = (mimeType.toLowerCase() === 'image/jpg') ? 'image/jpeg' : mimeType.toLowerCase();
+    const ext = normMime === 'image/webp' ? 'webp' : 'jpg';
+
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
+      return res.status(400).json({ error: 'Thiếu dữ liệu ảnh' });
+    }
+
+    const rawBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
+    const buffer = Buffer.from(rawBase64, 'base64');
+
+    const MAX_PORTRAIT_SIZE = 3 * 1024 * 1024; // 3MB
+    if (buffer.length === 0) {
+      return res.status(400).json({ error: 'Dữ liệu ảnh rỗng' });
+    }
+    if (buffer.length > MAX_PORTRAIT_SIZE) {
+      return res.status(400).json({ error: 'Dung lượng ảnh vượt quá 3MB' });
+    }
+
+    const bucket = getStorageBucket();
+    const targetPath = `graduation/supervisors/${cleanSupId}/portrait.${ext}`;
+    const altExt = ext === 'webp' ? 'jpg' : 'webp';
+    const altPath = `graduation/supervisors/${cleanSupId}/portrait.${altExt}`;
+
+    // Clean up previous image with alternate extension if any
+    bucket.file(altPath).delete({ ignoreNotFound: true }).catch(() => {});
+
+    const downloadToken = crypto.randomUUID();
+    const file = bucket.file(targetPath);
+
+    await file.save(buffer, {
+      resumable: false,
+      metadata: {
+        contentType: normMime,
+        cacheControl: 'public, max-age=31536000',
+        metadata: {
+          firebaseStorageDownloadTokens: downloadToken,
+        },
+      },
+    });
+
+    const photoUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(targetPath)}?alt=media&token=${downloadToken}`;
+
+    return res.status(200).json({
+      ok: true,
+      photoUrl,
+      photoPath: targetPath,
+      size: buffer.length,
+      contentType: normMime,
+    });
+  } catch (err) {
+    console.error('[supervisor-portrait] Error:', err);
+    return res.status(500).json({ error: 'Lỗi lưu trữ ảnh GVHD: ' + err.message });
+  }
+}
+
+// ── POST /api/graduation/delete-supervisor-portrait ──────────────────────────
+
+async function deleteSupervisorPortraitHandler(req, res) {
+  setCORSHeaders(req, res);
+  if (req.method === 'OPTIONS') return handleOptions(req, res);
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  await new Promise((resolve, reject) => {
+    requireAdminAuth(req, res, err => {
+      if (err) reject(err); else resolve();
+    });
+  }).catch(() => {});
+
+  if (res.headersSent) return;
+
+  try {
+    const { supervisorId } = req.body || {};
+    if (!supervisorId || typeof supervisorId !== 'string') {
+      return res.status(400).json({ error: 'Thiếu supervisorId' });
+    }
+
+    const cleanSupId = supervisorId.trim();
+    if (!/^[a-zA-Z0-9_.-]+$/.test(cleanSupId) || cleanSupId.includes('..')) {
+      return res.status(400).json({ error: 'supervisorId chứa ký tự không hợp lệ' });
+    }
+
+    const bucket = getStorageBucket();
+    await Promise.all([
+      bucket.file(`graduation/supervisors/${cleanSupId}/portrait.webp`).delete({ ignoreNotFound: true }),
+      bucket.file(`graduation/supervisors/${cleanSupId}/portrait.jpg`).delete({ ignoreNotFound: true }),
+    ]);
+
+    return res.status(200).json({ ok: true, deleted: true });
+  } catch (err) {
+    console.error('[delete-supervisor-portrait] Error:', err);
+    return res.status(500).json({ error: 'Lỗi xóa ảnh GVHD: ' + err.message });
+  }
+}
+
 // ── Route dispatcher ─────────────────────────────────────────────────────────
 
 exports.graduationApi = onRequest(
@@ -261,6 +387,14 @@ exports.graduationApi = onRequest(
 
     if (urlPath === '/api/graduation/delete-file') {
       return await deleteFileHandler(req, res);
+    }
+
+    if (urlPath === '/api/graduation/supervisor-portrait') {
+      return await uploadSupervisorPortraitHandler(req, res);
+    }
+
+    if (urlPath === '/api/graduation/delete-supervisor-portrait') {
+      return await deleteSupervisorPortraitHandler(req, res);
     }
 
     setCORSHeaders(req, res);

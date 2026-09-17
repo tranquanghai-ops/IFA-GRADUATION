@@ -469,6 +469,7 @@ export const state = {
   
   // Active Data
   rounds: [],
+  roundsLoaded: false,
   selectedRoundId: null,
   activeRound: null,
   projectTypes: DEFAULT_PROJECT_TYPES.map((name, idx) => ({ id: 'default_' + (idx + 1), name, order: idx + 1, active: true })),
@@ -1148,20 +1149,31 @@ if (document.readyState === 'loading') {
 // --- ROUNDS MANAGEMENT ---
 async function loadRounds() {
   try {
-    const snap = await getDocs(query(collection(db, 'graduationRounds'), orderBy('createdAt', 'desc')));
+    const snap = await getDocs(collection(db, 'graduationRounds'));
     state.rounds = snap.docs.map(d => {
       const data = d.data();
+      const openAtVal = data.openAt || data.startDate || data.registrationOpenAt || null;
+      const closeAtVal = data.closeAt || data.endDate || data.registrationCloseAt || null;
+      const createdAtVal = data.createdAt || null;
       return {
         id: d.id,
         ...data,
-        openAtDate: data.openAt ? (data.openAt.toDate ? data.openAt.toDate() : new Date(data.openAt)) : null,
-        closeAtDate: data.closeAt ? (data.closeAt.toDate ? data.closeAt.toDate() : new Date(data.closeAt)) : null
+        openAtDate: openAtVal ? (openAtVal.toDate ? openAtVal.toDate() : new Date(openAtVal)) : null,
+        closeAtDate: closeAtVal ? (closeAtVal.toDate ? closeAtVal.toDate() : new Date(closeAtVal)) : null,
+        createdAtDate: createdAtVal ? (createdAtVal.toDate ? createdAtVal.toDate() : new Date(createdAtVal)) : null
       };
     });
 
+    state.rounds.sort((a, b) => {
+      const timeA = a.createdAtDate ? a.createdAtDate.getTime() : 0;
+      const timeB = b.createdAtDate ? b.createdAtDate.getTime() : 0;
+      return timeB - timeA;
+    });
+
+    state.roundsLoaded = true;
+
     renderRoundsDropdowns();
     renderAdminRoundsTable();
-    if (typeof renderAdminRoundsCards === 'function') renderAdminRoundsCards();
     if (typeof renderAdminRoundsCards === 'function') renderAdminRoundsCards();
 
     // Check ?x=SHORTCODE URL parameter
@@ -2494,10 +2506,13 @@ function renderSupervisorAcceptedTable() {
 
 export async function loadAdminStats() {
   try {
-    document.getElementById('stat-rounds-count').textContent = state.rounds.length;
+    const nonDeleted = (state.rounds || []).filter(r => !r.deleted && !r.isDeleted);
+    const statEl = document.getElementById('stat-rounds-count');
+    if (statEl) statEl.textContent = nonDeleted.length;
     
     const supMasterSnap = await getDocs(collection(db, 'supervisorMaster'));
-    document.getElementById('stat-supervisors-count').textContent = supMasterSnap.size;
+    const supStatEl = document.getElementById('stat-supervisors-count');
+    if (supStatEl) supStatEl.textContent = supMasterSnap.size;
 
     if (state.selectedRoundId) {
       const elSnap = await getDocs(collection(db, 'graduationRounds', state.selectedRoundId, 'eligibleStudents'));
@@ -2680,7 +2695,9 @@ window.softDeleteRound = async function(roundId) {
     r.isActive = false;
 
     renderAdminRoundsTable();
+    if (typeof renderAdminRoundsCards === 'function') renderAdminRoundsCards();
     populateRoundSelectors();
+    loadAdminStats().catch(() => {});
 
     await updateDoc(doc(db, 'graduationRounds', roundId), {
       deleted: true,
@@ -2708,7 +2725,9 @@ window.restoreRound = async function(roundId) {
 
     renderAdminTrashTable();
     renderAdminRoundsTable();
+    if (typeof renderAdminRoundsCards === 'function') renderAdminRoundsCards();
     populateRoundSelectors();
+    loadAdminStats().catch(() => {});
 
     await updateDoc(doc(db, 'graduationRounds', roundId), {
       deleted: false,
@@ -4324,12 +4343,28 @@ function renderAdminSupervisorsMasterTable() {
 
 
 // ============================================================================
-// GVHD PHOTO PROCESSING: RESIZE (MAX 1000PX), COMPRESS (WEBP/JPEG), STORAGE
+// GVHD PHOTO PROCESSING: RESIZE (MAX 1600PX), HIGH-QUALITY (WEBP 0.92/JPEG 0.90)
 // ============================================================================
 state.pendingSupervisorPhotoBlob = null;
 state.pendingRemoveSupervisorPhoto = false;
 
-// Client-side image processor: max dimension 1000px, WebP (quality 0.84) or JPEG fallback (0.85)
+function formatSupervisorFileSize(bytes) {
+  if (!bytes || bytes <= 0) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function blobToBase64DataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onloadend = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+// Client-side image processor: max long edge 1600px, WebP (quality 0.92) or JPEG fallback (0.90)
 export async function processSupervisorPhotoFile(file) {
   if (!file) throw new Error('Không tìm thấy tệp ảnh');
   if (file.size > 10 * 1024 * 1024) {
@@ -4350,7 +4385,7 @@ export async function processSupervisorPhotoFile(file) {
         try {
           const originalWidth = img.naturalWidth || img.width;
           const originalHeight = img.naturalHeight || img.height;
-          const maxDim = 1000;
+          const maxDim = 1600;
           let targetWidth = originalWidth;
           let targetHeight = originalHeight;
 
@@ -4374,42 +4409,57 @@ export async function processSupervisorPhotoFile(file) {
             return;
           }
 
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+
           // Draw full image keeping aspect ratio (no auto-crop)
           ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-          // Attempt WebP first (quality 0.84)
+          // Attempt WebP first (quality 0.92)
           canvas.toBlob((webpBlob) => {
             if (webpBlob && webpBlob.type === 'image/webp') {
-              resolve({
-                blob: webpBlob,
-                mimeType: 'image/webp',
-                extension: 'webp',
-                width: targetWidth,
-                height: targetHeight,
-                size: webpBlob.size,
-                originalSize: file.size,
-                previewUrl: URL.createObjectURL(webpBlob)
-              });
+              blobToBase64DataUrl(webpBlob).then(base64 => {
+                resolve({
+                  blob: webpBlob,
+                  base64,
+                  mimeType: 'image/webp',
+                  extension: 'webp',
+                  formatLabel: 'WebP 92%',
+                  width: targetWidth,
+                  height: targetHeight,
+                  originalWidth,
+                  originalHeight,
+                  size: webpBlob.size,
+                  originalSize: file.size,
+                  previewUrl: URL.createObjectURL(webpBlob)
+                });
+              }).catch(reject);
             } else {
-              // Fallback to JPEG (quality 0.85)
+              // Fallback to JPEG (quality 0.90)
               canvas.toBlob((jpegBlob) => {
                 if (jpegBlob) {
-                  resolve({
-                    blob: jpegBlob,
-                    mimeType: 'image/jpeg',
-                    extension: 'jpg',
-                    width: targetWidth,
-                    height: targetHeight,
-                    size: jpegBlob.size,
-                    originalSize: file.size,
-                    previewUrl: URL.createObjectURL(jpegBlob)
-                  });
+                  blobToBase64DataUrl(jpegBlob).then(base64 => {
+                    resolve({
+                      blob: jpegBlob,
+                      base64,
+                      mimeType: 'image/jpeg',
+                      extension: 'jpg',
+                      formatLabel: 'JPEG 90%',
+                      width: targetWidth,
+                      height: targetHeight,
+                      originalWidth,
+                      originalHeight,
+                      size: jpegBlob.size,
+                      originalSize: file.size,
+                      previewUrl: URL.createObjectURL(jpegBlob)
+                    });
+                  }).catch(reject);
                 } else {
                   reject(new Error('Không thể nén ảnh'));
                 }
-              }, 'image/jpeg', 0.85);
+              }, 'image/jpeg', 0.90);
             }
-          }, 'image/webp', 0.84);
+          }, 'image/webp', 0.92);
         } catch (err) {
           reject(err);
         }
@@ -4429,7 +4479,7 @@ export async function dataUrlToCompressedBlob(dataUrl) {
       try {
         const originalWidth = img.naturalWidth || img.width;
         const originalHeight = img.naturalHeight || img.height;
-        const maxDim = 1000;
+        const maxDim = 1600;
         let targetWidth = originalWidth;
         let targetHeight = originalHeight;
         if (originalWidth > maxDim || originalHeight > maxDim) {
@@ -4445,16 +4495,26 @@ export async function dataUrlToCompressedBlob(dataUrl) {
         canvas.width = targetWidth;
         canvas.height = targetHeight;
         const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
         canvas.toBlob((blob) => {
           if (blob && blob.type === 'image/webp') {
-            resolve({ blob, mimeType: 'image/webp', extension: 'webp' });
+            blobToBase64DataUrl(blob).then(base64 => {
+              resolve({ blob, base64, mimeType: 'image/webp', extension: 'webp', size: blob.size });
+            }).catch(() => resolve(null));
           } else {
             canvas.toBlob((jBlob) => {
-              resolve(jBlob ? { blob: jBlob, mimeType: 'image/jpeg', extension: 'jpg' } : null);
-            }, 'image/jpeg', 0.85);
+              if (jBlob) {
+                blobToBase64DataUrl(jBlob).then(base64 => {
+                  resolve({ blob, base64, mimeType: 'image/jpeg', extension: 'jpg', size: jBlob.size });
+                }).catch(() => resolve(null));
+              } else {
+                resolve(null);
+              }
+            }, 'image/jpeg', 0.90);
           }
-        }, 'image/webp', 0.84);
+        }, 'image/webp', 0.92);
       } catch (e) {
         resolve(null);
       }
@@ -4472,7 +4532,10 @@ window.previewSupervisorPhoto = async function(input) {
   const removeBtn = document.getElementById('sup-btn-remove-photo');
 
   try {
-    if (infoEl) infoEl.textContent = '⏳ Đang tối ưu và nén ảnh...';
+    if (infoEl) {
+      infoEl.textContent = '⏳ Đang tối ưu và nén ảnh chất lượng cao...';
+      infoEl.className = 'text-[11px] text-blue-600 font-semibold mt-1';
+    }
     const processed = await processSupervisorPhotoFile(file);
     state.pendingSupervisorPhotoBlob = processed;
     state.pendingRemoveSupervisorPhoto = false;
@@ -4480,13 +4543,13 @@ window.previewSupervisorPhoto = async function(input) {
     if (previewEl) previewEl.src = processed.previewUrl;
     if (removeBtn) removeBtn.classList.remove('hidden');
 
-    const origKb = Math.round(processed.originalSize / 1024);
-    const newKb = Math.round(processed.size / 1024);
+    const origFmt = formatSupervisorFileSize(processed.originalSize);
+    const newFmt = formatSupervisorFileSize(processed.size);
     if (infoEl) {
-      infoEl.textContent = `✓ Đã nén: ${origKb}KB ➔ ${newKb}KB (${processed.width}x${processed.height}, ${processed.extension.toUpperCase()})`;
+      infoEl.textContent = `Gốc: ${processed.originalWidth}x${processed.originalHeight} (${origFmt}) | Sau xử lý: ${processed.width}x${processed.height} (${newFmt}, ${processed.formatLabel})`;
       infoEl.className = 'text-[11px] text-emerald-600 font-semibold mt-1';
     }
-    showToast(`✓ Đã nén ảnh thành công (${newKb}KB). Ảnh sẽ được tải lên Storage khi bấm Lưu.`, 'success');
+    showToast(`✓ Đã tối ưu ảnh (${newFmt}). Ảnh sẽ được tải lên Storage khi bấm Lưu.`, 'success');
   } catch (err) {
     console.error('Lỗi xử lý ảnh GVHD:', err);
     if (infoEl) {
@@ -4560,7 +4623,7 @@ window.openCreateSupervisorModal = function() {
   if (removeBtn) removeBtn.classList.add('hidden');
   const infoEl = document.getElementById('sup-photo-info');
   if (infoEl) {
-    infoEl.textContent = 'Hỗ trợ JPG, PNG, WebP (tối đa 10MB, tự động tối ưu & nén < 300KB)';
+    infoEl.textContent = 'Hỗ trợ JPG, PNG, WebP (tối đa 10MB, tự động tối ưu chất lượng cao WebP/JPEG)';
     infoEl.className = 'text-[11px] text-slate-500 mt-1';
   }
   state.pendingSupervisorPhotoBlob = null;
@@ -4629,7 +4692,7 @@ window.editSupervisorMasterModal = function(supId) {
       infoEl.textContent = '✓ Ảnh đã được lưu trữ trên Firebase Storage.';
       infoEl.className = 'text-[11px] text-emerald-600 font-semibold mt-1';
     } else {
-      infoEl.textContent = 'Hỗ trợ JPG, PNG, WebP (tối đa 10MB, tự động tối ưu & nén < 300KB)';
+      infoEl.textContent = 'Hỗ trợ JPG, PNG, WebP (tối đa 10MB, tự động tối ưu chất lượng cao WebP/JPEG)';
       infoEl.className = 'text-[11px] text-slate-500 mt-1';
     }
   }
@@ -4750,35 +4813,60 @@ window.saveSupervisorMaster = async function(e) {
   }
 
   // ----------------------------------------------------------------------------
-  // PHOTO HANDLING: FIREBASE STORAGE UPLOAD & BASE64 BLOCK
+  // PHOTO HANDLING: IFAA FIREBASE STORAGE VIA GRADUATION API & BASE64 BLOCK
   // ----------------------------------------------------------------------------
   let finalPhotoUrl = document.getElementById('sup-form-photo')?.value.trim() || '';
   let finalPhotoPath = document.getElementById('sup-form-photo-path')?.value.trim() || '';
-  let oldPhotoPathToDelete = null;
-
-  // Normalized stable ID for storage path
   const cleanId = id || email.replace(/[^a-z0-9_.-]/g, '_');
+  const apiBase = window.IFA_CONFIG?.graduationApiEndpoint || window.IFA_CONFIG?.driveUploadEndpoint || 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi';
 
   if (state.pendingRemoveSupervisorPhoto) {
-    if (finalPhotoPath) oldPhotoPathToDelete = finalPhotoPath;
+    if (submitBtn) submitBtn.innerHTML = '<span>⏳ Đang xóa ảnh trên Storage...</span>';
+    try {
+      const idToken = state.user ? await state.user.getIdToken() : null;
+      if (idToken && (id || cleanId)) {
+        await fetch(apiBase + '/api/graduation/delete-supervisor-portrait', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + idToken,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ supervisorId: id || cleanId })
+        }).catch(err => console.warn('[Storage] Delete portrait warning:', err));
+      }
+    } catch (delErr) {
+      console.warn('[Storage] Delete portrait exception:', delErr);
+    }
     finalPhotoUrl = '';
     finalPhotoPath = '';
   } else if (state.pendingSupervisorPhotoBlob) {
-    if (submitBtn) submitBtn.innerHTML = '<span>⏳ Đang tải ảnh lên Storage...</span>';
-    const ext = state.pendingSupervisorPhotoBlob.extension || 'webp';
-    const storagePath = `graduation/supervisors/${cleanId}/portrait.${ext}`;
-
+    if (submitBtn) submitBtn.innerHTML = '<span>⏳ Đang tải ảnh lên Storage (IFA)...</span>';
     try {
-      if (!storage) {
-        throw new Error('Dịch vụ Firebase Storage chưa sẵn sàng hoặc bị tắt trên dự án.');
+      const idToken = state.user ? await state.user.getIdToken() : null;
+      if (!idToken) {
+        throw new Error('Chưa đăng nhập hoặc phiên làm việc đã hết hạn. Vui lòng tải lại trang.');
       }
-      const sRef = storageRef(storage, storagePath);
-      await uploadBytes(sRef, state.pendingSupervisorPhotoBlob.blob, {
-        contentType: state.pendingSupervisorPhotoBlob.mimeType,
-        cacheControl: 'public, max-age=31536000'
+
+      const uploadRes = await fetch(apiBase + '/api/graduation/supervisor-portrait', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + idToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          supervisorId: id || cleanId,
+          mimeType: state.pendingSupervisorPhotoBlob.mimeType,
+          imageBase64: state.pendingSupervisorPhotoBlob.base64
+        })
       });
-      finalPhotoUrl = await getDownloadURL(sRef);
-      finalPhotoPath = storagePath;
+
+      const uploadData = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok || !uploadData.ok) {
+        throw new Error(uploadData.error || `Lỗi tải ảnh lên Storage (HTTP ${uploadRes.status})`);
+      }
+
+      finalPhotoUrl = uploadData.photoUrl;
+      finalPhotoPath = uploadData.photoPath;
     } catch (uploadErr) {
       console.error('Lỗi upload Storage:', uploadErr);
       showToast('Lỗi tải ảnh lên Storage: ' + uploadErr.message + '. Dữ liệu GVHD cũ được giữ nguyên.', 'error', 6000);
@@ -4792,16 +4880,30 @@ window.saveSupervisorMaster = async function(e) {
     // Lazy migration of legacy base64
     if (submitBtn) submitBtn.innerHTML = '<span>⏳ Đang tối ưu & chuyển ảnh sang Storage...</span>';
     const migrated = await dataUrlToCompressedBlob(finalPhotoUrl);
-    if (migrated && storage) {
+    if (migrated) {
       try {
-        const storagePath = `graduation/supervisors/${cleanId}/portrait.${migrated.extension}`;
-        const sRef = storageRef(storage, storagePath);
-        await uploadBytes(sRef, migrated.blob, {
-          contentType: migrated.mimeType,
-          cacheControl: 'public, max-age=31536000'
+        const idToken = state.user ? await state.user.getIdToken() : null;
+        if (!idToken) throw new Error('Chưa đăng nhập');
+
+        const uploadRes = await fetch(apiBase + '/api/graduation/supervisor-portrait', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + idToken,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            supervisorId: id || cleanId,
+            mimeType: migrated.mimeType,
+            imageBase64: migrated.base64
+          })
         });
-        finalPhotoUrl = await getDownloadURL(sRef);
-        finalPhotoPath = storagePath;
+
+        const uploadData = await uploadRes.json().catch(() => ({}));
+        if (!uploadRes.ok || !uploadData.ok) {
+          throw new Error(uploadData.error || `HTTP ${uploadRes.status}`);
+        }
+        finalPhotoUrl = uploadData.photoUrl;
+        finalPhotoPath = uploadData.photoPath;
       } catch (migErr) {
         console.warn('Lỗi lazy migrate base64 photo:', migErr);
         showToast('Lỗi chuyển đổi ảnh sang Storage: ' + migErr.message + '. Dữ liệu GVHD cũ được giữ nguyên.', 'error');
@@ -4850,10 +4952,6 @@ window.saveSupervisorMaster = async function(e) {
       savedId = docRef.id;
     }
 
-    // Clean up old storage object if replaced or removed
-    if (oldPhotoPathToDelete && storage) {
-      deleteObject(storageRef(storage, oldPhotoPathToDelete)).catch(console.warn);
-    }
     state.pendingSupervisorPhotoBlob = null;
     state.pendingRemoveSupervisorPhoto = false;
 
@@ -17102,17 +17200,17 @@ window.searchAdminRounds = function(query) {
 };
 
 function getRoundStatusCategory(r) {
-  if (r.deleted) return 'deleted';
-  if (r.hidden || r.status === 'hidden') return 'hidden';
+  if (r.deleted || r.isDeleted) return 'deleted';
+  if (r.hidden || r.status === 'hidden' || r.isHidden) return 'hidden';
   
   const now = Date.now();
-  const openTime = r.openAtDate ? new Date(r.openAtDate).getTime() : null;
-  const closeTime = r.closeAtDate ? new Date(r.closeAtDate).getTime() : null;
+  const openTime = r.openAtDate ? new Date(r.openAtDate).getTime() : (r.openAt ? new Date(r.openAt.toDate ? r.openAt.toDate() : r.openAt).getTime() : null);
+  const closeTime = r.closeAtDate ? new Date(r.closeAtDate).getTime() : (r.closeAt ? new Date(r.closeAt.toDate ? r.closeAt.toDate() : r.closeAt).getTime() : null);
   
-  if (r.status === 'closed' || (closeTime && now > closeTime)) {
+  if (r.status === 'closed' || r.status === 'ended' || (closeTime && !isNaN(closeTime) && now > closeTime)) {
     return 'ended';
   }
-  if (r.status === 'upcoming' || (openTime && now < openTime)) {
+  if (r.status === 'upcoming' || (openTime && !isNaN(openTime) && now < openTime)) {
     return 'upcoming';
   }
   return 'running';
@@ -17122,17 +17220,27 @@ window.renderAdminRoundsCards = function() {
   const container = document.getElementById('admin-rounds-cards');
   if (!container) return;
 
+  if (!state.roundsLoaded && (!state.rounds || state.rounds.length === 0)) {
+    container.innerHTML = `
+      <div class="card-surface p-10 text-center space-y-3 bg-white border border-slate-200 rounded-2xl w-full">
+        <div class="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+        <p class="text-sm font-semibold text-slate-600">Đang tải danh sách đợt tốt nghiệp...</p>
+      </div>
+    `;
+    return;
+  }
+
   const totalBadge = document.getElementById('admin-rounds-total-badge');
-  const allNonDeleted = (state.rounds || []).filter(r => !r.deleted);
+  const allNonDeleted = (state.rounds || []).filter(r => !r.deleted && !r.isDeleted);
   if (totalBadge) totalBadge.textContent = `${allNonDeleted.length} đợt`;
 
   const filter = state.adminRoundsFilter || 'all';
-  const searchQuery = state.adminRoundsSearch || '';
+  const searchQuery = (state.adminRoundsSearch || '').trim().toLowerCase();
 
   let filtered = allNonDeleted.filter(r => {
     const cat = getRoundStatusCategory(r);
+    if (filter === 'all') return true;
     if (filter === 'hidden') return cat === 'hidden';
-    if (cat === 'hidden') return false;
     if (filter === 'upcoming') return cat === 'upcoming';
     if (filter === 'running') return cat === 'running';
     if (filter === 'ended') return cat === 'ended';
