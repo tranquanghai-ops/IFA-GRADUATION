@@ -291,16 +291,80 @@ import {
   doc, 
   getDoc, 
   getDocs, 
-  addDoc,
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
+  addDoc as rawAddDoc,
+  setDoc as rawSetDoc, 
+  updateDoc as rawUpdateDoc, 
+  deleteDoc as rawDeleteDoc, 
   query, 
   where, 
   orderBy, 
   serverTimestamp, 
-  writeBatch 
+  writeBatch as rawWriteBatch,
+  runTransaction as rawRunTransaction,
+  onSnapshot
 } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
+
+// Central Read-Only Write Guard for Impersonation / Act-As Safe Mode
+export function assertNotImpersonatingForWrite(actionName = 'Thao tác') {
+  if (state.impersonation) {
+    const targetName = state.impersonation.target?.name || 'người dùng';
+    const roleLabel = state.impersonation.target?.roleLabel || state.impersonation.target?.type || 'chế độ đóng vai';
+    const msg = `[CHẾ ĐỘ CHỈ ĐỌC] Thao tác ghi (${actionName}) bị chặn khi đang đóng vai ${targetName} (${roleLabel}). Không có dữ liệu nào bị thay đổi.`;
+    console.warn(`[Impersonation Guard] Blocked write operation: ${actionName}`, state.impersonation);
+    if (typeof showToast === 'function') {
+      showToast(msg, 'warning', 6000);
+    } else {
+      alert(msg);
+    }
+    const err = new Error(msg);
+    err.code = 'permission-denied-impersonation-readonly';
+    throw err;
+  }
+}
+window.assertNotImpersonatingForWrite = assertNotImpersonatingForWrite;
+
+export async function setDoc(...args) {
+  assertNotImpersonatingForWrite('setDoc');
+  return await rawSetDoc(...args);
+}
+
+export async function updateDoc(...args) {
+  assertNotImpersonatingForWrite('updateDoc');
+  return await rawUpdateDoc(...args);
+}
+
+export async function addDoc(...args) {
+  assertNotImpersonatingForWrite('addDoc');
+  return await rawAddDoc(...args);
+}
+
+export async function deleteDoc(...args) {
+  assertNotImpersonatingForWrite('deleteDoc');
+  return await rawDeleteDoc(...args);
+}
+
+export function writeBatch(firestore) {
+  assertNotImpersonatingForWrite('writeBatch');
+  const batch = rawWriteBatch(firestore);
+  const origCommit = batch.commit.bind(batch);
+  batch.commit = async function() {
+    assertNotImpersonatingForWrite('writeBatch.commit');
+    return await origCommit();
+  };
+  return batch;
+}
+
+export async function runTransaction(firestore, updateFunction) {
+  assertNotImpersonatingForWrite('runTransaction');
+  return await rawRunTransaction(firestore, updateFunction);
+}
+
+window.setDoc = setDoc;
+window.updateDoc = updateDoc;
+window.addDoc = addDoc;
+window.deleteDoc = deleteDoc;
+window.writeBatch = writeBatch;
+window.runTransaction = runTransaction;
 
 
 export const DEFAULT_PROJECT_TYPES = [
@@ -473,6 +537,13 @@ async function initFirebase() {
 
 
 // --- AUTH & ROLES ---
+export function isSystemOwner(user = null) {
+  const targetUser = user || state.realUser || state.user || auth?.currentUser;
+  const email = (targetUser?.email || '').toLowerCase().trim();
+  return email === 'tranquanghai@tdtu.edu.vn';
+}
+window.isSystemOwner = isSystemOwner;
+
 export async function setupAuthListener() {
   showLoading('Đang khởi tạo IFA+ Graduation Beta...');
 
@@ -501,9 +572,10 @@ export async function setupAuthListener() {
         }
 
         state.realIsAdmin = Boolean(state.isAdmin);
-        state.realIsOwner = (user.email?.toLowerCase().trim() === 'tranquanghai@tdtu.edu.vn');
+        state.realIsOwner = isSystemOwner(user);
 
-        // 1.1 Tải thiết lập hệ thống (System Settings)
+        // 1.1 Tải thiết lập hệ thống và kích hoạt Realtime Listener
+        setupSystemSettingsRealtimeListener();
         try {
           await loadSystemSettingsDoc();
         } catch (e) {}
@@ -565,6 +637,10 @@ export async function setupAuthListener() {
 
     } else {
       clearTimeout(safetyTimer);
+      if (unsubscribeSettings) {
+        try { unsubscribeSettings(); } catch (e) {}
+        unsubscribeSettings = null;
+      }
       state.realUser = null;
       state.realIsAdmin = false;
       state.realIsOwner = false;
@@ -600,7 +676,7 @@ export async function resolveActualRoles(user) {
 
   // 1. OWNER / ADMIN Check
   let isAdmin = false;
-  if (email === 'tranquanghai@tdtu.edu.vn') {
+  if (isSystemOwner(user)) {
     isAdmin = true;
   } else if (window.__tdtu_user && (window.__tdtu_user.isAdmin || window.__tdtu_user.role === 'admin')) {
     isAdmin = true;
@@ -5205,44 +5281,58 @@ export function getRealUser() {
 }
 
 export function getEffectiveActor() {
-  if (state.impersonation) {
+  if (state.impersonation && state.impersonation.target) {
     const target = state.impersonation.target || {};
+    const mssv = target.mssv || (target.type === 'student' ? target.id : '');
+    const email = (target.email || (mssv ? `${mssv.toLowerCase()}@student.tdtu.edu.vn` : '')).toLowerCase().trim();
+    const uid = target.id || target.uid || email || mssv;
     return {
-      user: state.user,
-      email: target.email || state.user?.email || '',
-      displayName: target.name || state.user?.displayName || '',
+      user: state.realUser || state.user, // Authentic Firebase Auth user preserved
+      uid: uid,
+      email: email,
+      displayName: target.name || mssv || email || 'Người dùng đóng vai',
+      photoURL: null,
       isAdmin: false, // Strict: zero admin privilege leak
-      isSupervisor: Boolean(state.isSupervisor),
-      isStudent: Boolean(state.isStudent),
-      studentMssv: state.studentMssv || '',
+      isSupervisor: target.type === 'supervisor' || target.type === 'reviewer' || target.type === 'council' || target.type === 'preliminary',
+      isStudent: target.type === 'student',
+      isReviewer: target.type === 'reviewer',
+      isCouncil: target.type === 'council',
+      isPreliminary: target.type === 'preliminary',
+      studentMssv: mssv,
       targetType: target.type,
+      roundId: target.roundId || '',
+      roundTitle: target.roundTitle || '',
+      roleLabel: target.roleLabel || target.type,
       impersonating: true,
-      readOnly: true
+      readOnly: true,
+      realUser: state.realUser || state.user
     };
   }
+  const mssv = state.studentMssv || (state.user?.email ? state.user.email.split('@')[0] : '');
   return {
     user: state.user,
-    email: state.user?.email || '',
+    uid: state.user?.uid || '',
+    email: (state.user?.email || '').toLowerCase().trim(),
     displayName: state.user?.displayName || '',
+    photoURL: state.user?.photoURL || null,
     isAdmin: Boolean(state.isAdmin),
     isSupervisor: Boolean(state.isSupervisor),
     isStudent: Boolean(state.isStudent),
-    studentMssv: state.studentMssv || '',
-    targetType: null,
+    isReviewer: false,
+    isCouncil: false,
+    isPreliminary: false,
+    studentMssv: mssv,
+    targetType: state.isAdmin ? 'admin' : (state.isSupervisor ? 'supervisor' : 'student'),
+    roleLabel: state.isAdmin ? 'Quản trị viên' : (state.isSupervisor ? 'Giảng viên' : 'Sinh viên'),
     impersonating: false,
-    readOnly: false
+    readOnly: false,
+    realUser: state.user
   };
 }
 
 export function checkImpersonationWriteGuard(actionDesc = 'Thao tác') {
   if (state.impersonation) {
-    const targetName = state.impersonation.target?.name || 'Người dùng';
-    const role = state.impersonation.target?.roleLabel || state.impersonation.target?.type || '';
-    if (typeof showToast === 'function') {
-      showToast(`⚠️ Thao tác bị chặn: Bạn đang đóng vai ${targetName} (${role}) — Chế độ Chỉ đọc (Read-only Safe Mode) đang kích hoạt để bảo vệ dữ liệu!`, 'warning', 6000);
-    } else {
-      alert(`⚠️ Thao tác bị chặn: Bạn đang ở Chế độ Đóng vai (${targetName}) - Chế độ Chỉ đọc được kích hoạt.`);
-    }
+    assertNotImpersonatingForWrite(actionDesc);
     return false;
   }
   return true;
@@ -5269,12 +5359,57 @@ export async function loadSystemSettingsDoc() {
 }
 window.loadSystemSettingsDoc = loadSystemSettingsDoc;
 
+let unsubscribeSettings = null;
+
+export function setupSystemSettingsRealtimeListener() {
+  if (unsubscribeSettings) {
+    try { unsubscribeSettings(); } catch (e) {}
+    unsubscribeSettings = null;
+  }
+
+  try {
+    const settingsDocRef = doc(db, 'settings', 'main');
+    unsubscribeSettings = onSnapshot(settingsDocRef, async (snap) => {
+      let isAllowed = false;
+      if (snap && snap.exists()) {
+        const data = snap.data();
+        isAllowed = Boolean(data?.allowImpersonation);
+      }
+
+      state.allowImpersonation = isAllowed;
+
+      // Update toggle / status label in Admin Settings if open
+      const toggle = document.getElementById('toggle-admin-impersonation');
+      const label = document.getElementById('impersonation-status-label');
+      if (toggle) toggle.checked = isAllowed;
+      if (label) {
+        label.textContent = isAllowed ? 'Đang bật' : 'Đang tắt';
+        label.className = isAllowed ? 'text-[11px] font-bold text-amber-600' : 'text-[11px] font-bold text-slate-500';
+      }
+
+      // Realtime session termination if turned off while an impersonation session is active
+      if (!isAllowed && state.impersonation) {
+        console.warn('[Impersonation] allowImpersonation turned OFF in real-time. Terminating active session immediately.');
+        await exitImpersonation();
+        if (typeof showToast === 'function') {
+          showToast('⚠️ Tính năng đóng vai đã bị Chủ sở hữu tắt. Phiên làm việc đã tự động kết thúc.', 'warning', 6000);
+        }
+      }
+    }, (err) => {
+      console.warn('[SystemSettings] Realtime settings listener notice:', err);
+    });
+  } catch (err) {
+    console.warn('[SystemSettings] Could not attach realtime settings listener:', err);
+  }
+}
+window.setupSystemSettingsRealtimeListener = setupSystemSettingsRealtimeListener;
+
 export async function loadAdminSystemSettings() {
   const toggle = document.getElementById('toggle-admin-impersonation');
   const label = document.getElementById('impersonation-status-label');
   const warning = document.getElementById('impersonation-permission-warning');
 
-  const isOwner = Boolean(state.realIsOwner || (state.realUser && state.realUser.email?.toLowerCase().trim() === 'tranquanghai@tdtu.edu.vn'));
+  const isOwner = isSystemOwner();
 
   try {
     const snap = await getDoc(doc(db, 'settings', 'main')).catch(() => null);
@@ -5302,7 +5437,7 @@ export async function loadAdminSystemSettings() {
 window.loadAdminSystemSettings = loadAdminSystemSettings;
 
 window.onToggleAdminImpersonation = async function(enabled) {
-  const isOwner = Boolean(state.realIsOwner || (state.realUser && state.realUser.email?.toLowerCase().trim() === 'tranquanghai@tdtu.edu.vn'));
+  const isOwner = isSystemOwner();
   if (!isOwner) {
     alert('Chỉ Chủ sở hữu hệ thống (tranquanghai@tdtu.edu.vn) có quyền cấu hình tính năng này.');
     const toggle = document.getElementById('toggle-admin-impersonation');
@@ -5369,14 +5504,8 @@ export function applyImpersonationActor(target) {
 
   const mssv = target.mssv || (target.type === 'student' ? target.id : '');
 
-  // 1. Synthetic user object
-  state.user = {
-    uid: target.id || target.email || mssv,
-    email: target.email || (mssv ? `${mssv.toLowerCase()}@student.tdtu.edu.vn` : ''),
-    displayName: target.name || mssv || 'Người dùng đóng vai',
-    photoURL: null,
-    isImpersonated: true
-  };
+  // 1. Real user preservation: do NOT replace real Firebase Auth user
+  state.user = state.realUser || state.user;
 
   // 2. Strict Privilege Demotion - Zero Admin Leak
   state.isAdmin = false;
@@ -5387,21 +5516,25 @@ export function applyImpersonationActor(target) {
     state.isStudent = true;
     state.isSupervisor = false;
     state.studentMssv = mssv;
+    state.userStudentId = mssv;
   } else if (target.type === 'supervisor') {
     state.actualRole = 'supervisor';
     state.isStudent = false;
     state.isSupervisor = true;
     state.studentMssv = '';
+    state.userStudentId = '';
   } else if (target.type === 'reviewer' || target.type === 'council' || target.type === 'preliminary') {
     state.actualRole = 'supervisor';
     state.isStudent = false;
     state.isSupervisor = true;
     state.studentMssv = '';
+    state.userStudentId = '';
   } else {
     state.actualRole = 'student';
     state.isStudent = false;
     state.isSupervisor = false;
     state.studentMssv = '';
+    state.userStudentId = '';
   }
 
   // 4. Update banner elements
@@ -9656,8 +9789,10 @@ window.saveLetterOption = function() {
 export function checkCouncilAuthorization(round, act, council, user) {
   if (!round || !act || !council) return { authorized: false, reason: 'Không tìm thấy dữ liệu Hội đồng' };
   
+  const actor = user || getEffectiveActor();
+
   // Admin always has full access
-  if (state.isAdmin) {
+  if (actor.isAdmin) {
     return {
       authorized: true,
       role: 'admin',
@@ -9672,11 +9807,11 @@ export function checkCouncilAuthorization(round, act, council, user) {
     };
   }
 
-  if (!user || !user.email) {
+  if (!actor || !actor.email) {
     return { authorized: false, reason: 'Vui lòng đăng nhập để truy cập Hội đồng.' };
   }
 
-  const userEmail = user.email.toLowerCase().trim();
+  const userEmail = actor.email.toLowerCase().trim();
   const membersBySlot = council.membersBySlot || {};
   const slots = act.councilStructure?.slots || [];
 
@@ -9729,7 +9864,7 @@ window.openCouncilWorkspace = async function(roundId, activityId, councilId, aut
   }
 
   // AUTHORIZATION CHECK
-  const authCheck = checkCouncilAuthorization(targetRound, act, council, state.user);
+  const authCheck = checkCouncilAuthorization(targetRound, act, council, getEffectiveActor());
   if (!authCheck.authorized) {
     showToast(authCheck.reason || 'Bạn không có quyền truy cập Hội đồng này.', 'error');
     return;
@@ -14426,6 +14561,13 @@ window.uploadProvider = {
 
 window.GoogleDriveTrustedUploader = {
   async upload({ file, student, activity, round, attempt, onProgress, abortSignal }) {
+    if (state.impersonation) {
+      assertNotImpersonatingForWrite('Tải lên Google Drive');
+      return {
+        success: false,
+        error: '[CHẾ ĐỘ CHỈ ĐỌC] Không thể tải tệp lên trong chế độ đóng vai.'
+      };
+    }
     const endpoint = window.IFA_CONFIG?.driveUploadEndpoint;
     if (!endpoint) {
       return {
@@ -15003,6 +15145,8 @@ window.submitStudentFiles = async function(actId) {
 };
 
 window.withdrawStudentSubmission = async function(actId, attemptNum, optRoundId) {
+  if (!checkImpersonationWriteGuard('Rút bài nộp')) return;
+
   const round = (state.rounds || []).find(r => r.id === (optRoundId || state.selectedRoundId)) || state.rounds?.[0];
   const act = (round?.activities || []).find(a => a.id === actId);
   if (!round || !act) {
@@ -16620,12 +16764,13 @@ window.initSupervisorPortal = async function() {
   const workspaceContainer = document.getElementById('supervisor-workspace-container');
 
   // ACCESS RULE: Only supervisor, support supervisor, or admin can access
-  const emailLower = (state.user?.email || '').toLowerCase().trim();
-  const isSupervisorCandidate = state.isSupervisor || state.isAdmin ||
+  const actor = getEffectiveActor();
+  const emailLower = (actor.email || '').toLowerCase().trim();
+  const isSupervisorCandidate = actor.isSupervisor || actor.isAdmin ||
     (state.roundSupervisors || []).some(s => (s.email || '').toLowerCase().trim() === emailLower) ||
     (state.supervisorsMaster || []).some(s => (s.email || '').toLowerCase().trim() === emailLower);
 
-  if (!state.user || !isSupervisorCandidate) {
+  if (!actor.email || !isSupervisorCandidate) {
     if (deniedCard) deniedCard.classList.remove('hidden');
     if (workspaceContainer) workspaceContainer.classList.add('hidden');
     return;
@@ -16648,11 +16793,12 @@ window.renderSupervisorRoundsDropdown = function() {
   const select = document.getElementById('supervisor-round-select');
   if (!select) return;
 
-  const emailLower = (state.user?.email || '').toLowerCase().trim();
+  const actor = getEffectiveActor();
+  const emailLower = (actor.email || '').toLowerCase().trim();
   const validRounds = (state.rounds || []).filter(r => !r.deleted);
 
   let filteredRounds = validRounds;
-  if (!state.isAdmin) {
+  if (!actor.isAdmin) {
     // Only show rounds this supervisor is part of or active round
     filteredRounds = validRounds.filter(r => {
       if (r.isActive) return true;
@@ -16689,7 +16835,8 @@ window.onSupervisorRoundSelected = async function(roundId) {
 window.loadSupervisorPortalData = async function(roundId) {
   if (!roundId) return;
 
-  const emailLower = (state.user?.email || '').toLowerCase().trim();
+  const actor = getEffectiveActor();
+  const emailLower = (actor.email || '').toLowerCase().trim();
   const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
   if (!round) return;
 
@@ -16705,7 +16852,7 @@ window.loadSupervisorPortalData = async function(roundId) {
   const activeBadgeEl = document.getElementById('sup-active-round-badge');
   const reviewIndicator = document.getElementById('sup-round-review-indicator');
 
-  const supDisplayName = currentSup?.name || state.user?.displayName || 'Thầy/Cô';
+  const supDisplayName = currentSup?.name || actor.displayName || 'Thầy/Cô';
   if (greetingEl) greetingEl.textContent = `Kính chào Thầy/Cô ${supDisplayName}`;
   if (roundInfoEl) roundInfoEl.textContent = `Đợt: ${round.title} • Năm học ${round.academicYear || ''}`;
   if (activeBadgeEl) activeBadgeEl.textContent = round.roundName || round.title || 'Đợt ĐATN';
@@ -16760,7 +16907,7 @@ window.loadSupervisorPortalData = async function(roundId) {
 
   // Admin fallback: If admin without personal assignment, can see all assigned students in round
   let displayStudents = assigned;
-  if (state.isAdmin && assigned.length === 0) {
+  if (actor.isAdmin && assigned.length === 0) {
     displayStudents = allRegistrations.filter(r => {
       const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
       return officials.length > 0 || r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned';
@@ -16770,7 +16917,7 @@ window.loadSupervisorPortalData = async function(roundId) {
   state.supervisorAssignedStudents = displayStudents;
 
   // 5. Compute Hero Stats
-  const quota = currentSup?.quota || currentSup?.capacity || (state.isAdmin ? displayStudents.length : 10);
+  const quota = currentSup?.quota || currentSup?.capacity || (actor.isAdmin ? displayStudents.length : 10);
   let primaryCount = 0;
   let supportCount = 0;
   let pendingCount = 0;
@@ -16781,7 +16928,7 @@ window.loadSupervisorPortalData = async function(roundId) {
       const isMe = (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) ||
         (s.email && s.email.toLowerCase().trim() === emailLower) ||
         (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower);
-      return (isMe || state.isAdmin) && s.role === 'primary';
+      return (isMe || actor.isAdmin) && s.role === 'primary';
     });
     if (isPrimary) primaryCount++;
     else supportCount++;
@@ -16835,7 +16982,8 @@ window.renderSupervisorAssignedStudents = function() {
   if (!container) return;
 
   const round = state.activeRound;
-  const emailLower = (state.user?.email || '').toLowerCase().trim();
+  const actor = getEffectiveActor();
+  const emailLower = (actor.email || '').toLowerCase().trim();
   const currentSup = (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower) ||
     (state.supervisorsMaster || []).find(s => (s.email || '').toLowerCase().trim() === emailLower);
   const mySupId = currentSup?.id || currentSup?.supervisorId;
@@ -16857,7 +17005,7 @@ window.renderSupervisorAssignedStudents = function() {
       const isMe = (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) ||
         (s.email && s.email.toLowerCase().trim() === emailLower) ||
         (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower);
-      return (isMe || state.isAdmin) && s.role === 'primary';
+      return (isMe || actor.isAdmin) && s.role === 'primary';
     });
     if (isPrimary) cntPrimary++;
     else cntSupport++;
@@ -17236,10 +17384,11 @@ state.selectedAssessmentRoundId = null;
 state.selectedAssessmentCouncilId = null;
 
 export function checkUserAssessmentCapabilities(round, userEmail = null, userId = null) {
-  const uEmail = (userEmail || state.user?.email || '').toLowerCase().trim();
-  const uId = userId || state.user?.uid || state.user?.email;
+  const actor = getEffectiveActor();
+  const uEmail = (userEmail || actor.email || '').toLowerCase().trim();
+  const uId = userId || actor.uid || actor.email;
 
-  if (state.isAdmin) {
+  if (actor.isAdmin) {
     return {
       isRoundAdmin: true,
       canDuyet1: true,
@@ -17459,8 +17608,9 @@ window.renderAssessmentHeroCard = function() {
   }
 
   // Metrics computation for user
-  const uEmail = (state.user?.email || '').toLowerCase().trim();
-  const uId = state.user?.uid || state.user?.email;
+  const actor = getEffectiveActor();
+  const uEmail = (actor.email || '').toLowerCase().trim();
+  const uId = actor.uid || actor.email;
   const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (targetRound.eligibleStudents || []);
@@ -17471,7 +17621,7 @@ window.renderAssessmentHeroCard = function() {
 
   // 1. Duyet 1, 2, 3
   const supervised = allRegs.filter(s => {
-    if (state.isAdmin) return true;
+    if (actor.isAdmin) return true;
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : [];
     return officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase() === uEmail));
   });
@@ -17489,7 +17639,7 @@ window.renderAssessmentHeroCard = function() {
   // 2. Thesis (Reviewer)
   const reviewerAssignments = targetRound.reviewerAssignments || {};
   const myReviewerStudents = allRegs.filter(s => {
-    if (state.isAdmin) return true;
+    if (actor.isAdmin) return true;
     const sid = s.mssv || s.studentId;
     return reviewerAssignments[sid] === uId || reviewerAssignments[sid] === uEmail;
   });
@@ -17651,14 +17801,15 @@ window.renderAssessmentDuyetList = function(phase) {
   const container = document.getElementById('assessment-list-duyet-' + phase);
   if (!targetRound || !container) return;
 
-  const uEmail = (state.user?.email || '').toLowerCase().trim();
-  const uId = state.user?.uid || state.user?.email;
+  const actor = getEffectiveActor();
+  const uEmail = (actor.email || '').toLowerCase().trim();
+  const uId = actor.uid || actor.email;
   const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (targetRound.eligibleStudents || []);
 
   const candidates = allRegs.filter(s => {
-    if (state.isAdmin) return true;
+    if (actor.isAdmin) return true;
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : [];
     return officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase() === uEmail));
   });
@@ -17756,8 +17907,9 @@ window.renderAssessmentThesisList = function() {
   const container = document.getElementById('assessment-list-thesis');
   if (!targetRound || !container) return;
 
-  const uEmail = (state.user?.email || '').toLowerCase().trim();
-  const uId = state.user?.uid || state.user?.email;
+  const actor = getEffectiveActor();
+  const uEmail = (actor.email || '').toLowerCase().trim();
+  const uId = actor.uid || actor.email;
   const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (targetRound.eligibleStudents || []);
@@ -17765,7 +17917,7 @@ window.renderAssessmentThesisList = function() {
   const reviewerAssignments = targetRound.reviewerAssignments || {};
 
   const candidates = allRegs.filter(s => {
-    if (state.isAdmin) return true;
+    if (actor.isAdmin) return true;
     const sid = s.mssv || s.studentId;
     const isReviewer = (reviewerAssignments[sid] === uId || reviewerAssignments[sid] === uEmail);
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : [];
@@ -17875,8 +18027,9 @@ window.renderAssessmentPreliminaryList = function() {
   const container = document.getElementById('assessment-list-preliminary');
   if (!targetRound || !container) return;
 
-  const uEmail = (state.user?.email || '').toLowerCase().trim();
-  const uId = state.user?.uid || state.user?.email;
+  const actor = getEffectiveActor();
+  const uEmail = (actor.email || '').toLowerCase().trim();
+  const uId = actor.uid || actor.email;
   const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (targetRound.eligibleStudents || []);
@@ -17973,7 +18126,8 @@ window.renderAssessmentDefenseList = function() {
   const container = document.getElementById('assessment-list-defense');
   if (!targetRound || !container) return;
 
-  const uEmail = (state.user?.email || '').toLowerCase().trim();
+  const actor = getEffectiveActor();
+  const uEmail = (actor.email || '').toLowerCase().trim();
 
   // Find all activities with councils
   const actsWithCouncils = (targetRound.activities || []).filter(a => a.councilEnabled && Array.isArray(a.councils) && a.councils.length > 0);
@@ -17983,7 +18137,7 @@ window.renderAssessmentDefenseList = function() {
     act.councils.forEach(c => {
       const members = Object.values(c.membersBySlot || {});
       const isMember = members.some(m => m.memberEmail && m.memberEmail.toLowerCase() === uEmail);
-      if (state.isAdmin || isMember) {
+      if (actor.isAdmin || isMember) {
         availableCouncils.push({ act, council: c });
       }
     });
