@@ -276,7 +276,10 @@ import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebase
 import { 
   getStorage, 
   ref as storageRef, 
-  getBytes as storageGetBytes 
+  getBytes as storageGetBytes,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject
 } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-storage.js';
 import { 
   getAuth, 
@@ -497,7 +500,7 @@ export const state = {
 
 window.state = state;
 
-let app, auth, db;
+let app, auth, db, storage;
 let countdownInterval = null;
 
 // --- LOADING OVERLAY HELPERS ---
@@ -532,6 +535,11 @@ async function initFirebase() {
   app = getApps().length > 0 ? getApp() : initializeApp(config);
   auth = getAuth(app);
   db = getFirestore(app);
+  try {
+    storage = getStorage(app);
+  } catch (e) {
+    console.warn('Firebase Storage initialization notice:', e);
+  }
 }
 
 
@@ -4174,23 +4182,201 @@ function renderAdminSupervisorsMasterTable() {
 }
 
 
-window.previewSupervisorPhoto = function(input) {
+// ============================================================================
+// GVHD PHOTO PROCESSING: RESIZE (MAX 1000PX), COMPRESS (WEBP/JPEG), STORAGE
+// ============================================================================
+state.pendingSupervisorPhotoBlob = null;
+state.pendingRemoveSupervisorPhoto = false;
+
+// Client-side image processor: max dimension 1000px, WebP (quality 0.84) or JPEG fallback (0.85)
+export async function processSupervisorPhotoFile(file) {
+  if (!file) throw new Error('Không tìm thấy tệp ảnh');
+  if (file.size > 10 * 1024 * 1024) {
+    throw new Error('Dung lượng ảnh vượt quá giới hạn cho phép (Tối đa 10MB)');
+  }
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+  if (!validTypes.includes((file.type || '').toLowerCase())) {
+    throw new Error('Định dạng ảnh không được hỗ trợ. Vui lòng chọn JPG, PNG hoặc WebP.');
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Lỗi đọc tệp ảnh'));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Không thể phân tích dữ liệu ảnh'));
+      img.onload = () => {
+        try {
+          const originalWidth = img.naturalWidth || img.width;
+          const originalHeight = img.naturalHeight || img.height;
+          const maxDim = 1000;
+          let targetWidth = originalWidth;
+          let targetHeight = originalHeight;
+
+          // Scale proportionally keeping original aspect ratio (never upscale)
+          if (originalWidth > maxDim || originalHeight > maxDim) {
+            if (originalWidth >= originalHeight) {
+              targetWidth = maxDim;
+              targetHeight = Math.round((originalHeight * maxDim) / originalWidth);
+            } else {
+              targetHeight = maxDim;
+              targetWidth = Math.round((originalWidth * maxDim) / originalHeight);
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Trình duyệt không hỗ trợ xử lý ảnh canvas'));
+            return;
+          }
+
+          // Draw full image keeping aspect ratio (no auto-crop)
+          ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+          // Attempt WebP first (quality 0.84)
+          canvas.toBlob((webpBlob) => {
+            if (webpBlob && webpBlob.type === 'image/webp') {
+              resolve({
+                blob: webpBlob,
+                mimeType: 'image/webp',
+                extension: 'webp',
+                width: targetWidth,
+                height: targetHeight,
+                size: webpBlob.size,
+                originalSize: file.size,
+                previewUrl: URL.createObjectURL(webpBlob)
+              });
+            } else {
+              // Fallback to JPEG (quality 0.85)
+              canvas.toBlob((jpegBlob) => {
+                if (jpegBlob) {
+                  resolve({
+                    blob: jpegBlob,
+                    mimeType: 'image/jpeg',
+                    extension: 'jpg',
+                    width: targetWidth,
+                    height: targetHeight,
+                    size: jpegBlob.size,
+                    originalSize: file.size,
+                    previewUrl: URL.createObjectURL(jpegBlob)
+                  });
+                } else {
+                  reject(new Error('Không thể nén ảnh'));
+                }
+              }, 'image/jpeg', 0.85);
+            }
+          }, 'image/webp', 0.84);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Convert legacy base64 data URL to compressed blob for lazy migration
+export async function dataUrlToCompressedBlob(dataUrl) {
+  if (!dataUrl || !dataUrl.startsWith('data:image')) return null;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const originalWidth = img.naturalWidth || img.width;
+        const originalHeight = img.naturalHeight || img.height;
+        const maxDim = 1000;
+        let targetWidth = originalWidth;
+        let targetHeight = originalHeight;
+        if (originalWidth > maxDim || originalHeight > maxDim) {
+          if (originalWidth >= originalHeight) {
+            targetWidth = maxDim;
+            targetHeight = Math.round((originalHeight * maxDim) / originalWidth);
+          } else {
+            targetHeight = maxDim;
+            targetWidth = Math.round((originalWidth * maxDim) / originalHeight);
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+        canvas.toBlob((blob) => {
+          if (blob && blob.type === 'image/webp') {
+            resolve({ blob, mimeType: 'image/webp', extension: 'webp' });
+          } else {
+            canvas.toBlob((jBlob) => {
+              resolve(jBlob ? { blob: jBlob, mimeType: 'image/jpeg', extension: 'jpg' } : null);
+            }, 'image/jpeg', 0.85);
+          }
+        }, 'image/webp', 0.84);
+      } catch (e) {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+window.previewSupervisorPhoto = async function(input) {
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
-  if (file.size > 2 * 1024 * 1024) {
-    showToast('Vui lòng chọn ảnh dung lượng dưới 2MB', 'warning');
+  const previewEl = document.getElementById('sup-photo-preview');
+  const infoEl = document.getElementById('sup-photo-info');
+  const removeBtn = document.getElementById('sup-btn-remove-photo');
+
+  try {
+    if (infoEl) infoEl.textContent = '⏳ Đang tối ưu và nén ảnh...';
+    const processed = await processSupervisorPhotoFile(file);
+    state.pendingSupervisorPhotoBlob = processed;
+    state.pendingRemoveSupervisorPhoto = false;
+
+    if (previewEl) previewEl.src = processed.previewUrl;
+    if (removeBtn) removeBtn.classList.remove('hidden');
+
+    const origKb = Math.round(processed.originalSize / 1024);
+    const newKb = Math.round(processed.size / 1024);
+    if (infoEl) {
+      infoEl.textContent = `✓ Đã nén: ${origKb}KB ➔ ${newKb}KB (${processed.width}x${processed.height}, ${processed.extension.toUpperCase()})`;
+      infoEl.className = 'text-[11px] text-emerald-600 font-semibold mt-1';
+    }
+    showToast(`✓ Đã nén ảnh thành công (${newKb}KB). Ảnh sẽ được tải lên Storage khi bấm Lưu.`, 'success');
+  } catch (err) {
+    console.error('Lỗi xử lý ảnh GVHD:', err);
+    if (infoEl) {
+      infoEl.textContent = '❌ ' + err.message;
+      infoEl.className = 'text-[11px] text-rose-600 font-semibold mt-1';
+    }
+    showToast(err.message, 'error');
     input.value = '';
-    return;
+    state.pendingSupervisorPhotoBlob = null;
   }
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const dataUrl = e.target.result;
-    const previewEl = document.getElementById('sup-photo-preview');
-    const photoInput = document.getElementById('sup-form-photo');
-    if (previewEl) previewEl.src = dataUrl;
-    if (photoInput) photoInput.value = dataUrl;
-  };
-  reader.readAsDataURL(file);
+};
+
+window.removeSupervisorPhoto = function() {
+  state.pendingSupervisorPhotoBlob = null;
+  state.pendingRemoveSupervisorPhoto = true;
+  const photoInput = document.getElementById('sup-form-photo');
+  const pathInput = document.getElementById('sup-form-photo-path');
+  const fileInput = document.getElementById('sup-form-file');
+  const previewEl = document.getElementById('sup-photo-preview');
+  const infoEl = document.getElementById('sup-photo-info');
+  const removeBtn = document.getElementById('sup-btn-remove-photo');
+
+  if (photoInput) photoInput.value = '';
+  if (pathInput) pathInput.value = '';
+  if (fileInput) fileInput.value = '';
+  if (previewEl) previewEl.src = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23cbd5e1'/><path fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>";
+  if (infoEl) {
+    infoEl.textContent = 'Đã chọn xóa ảnh (Bấm Lưu GVHD để hoàn tất)';
+    infoEl.className = 'text-[11px] text-amber-600 font-semibold mt-1';
+  }
+  if (removeBtn) removeBtn.classList.add('hidden');
 };
 
 window.handleEmploymentTypeChange = function(type, isEdit = false) {
@@ -4216,9 +4402,22 @@ window.openCreateSupervisorModal = function() {
   document.getElementById('form-supervisor').reset();
   document.getElementById('sup-form-id').value = '';
   document.getElementById('sup-form-photo').value = '';
+  if (document.getElementById('sup-form-photo-path')) {
+    document.getElementById('sup-form-photo-path').value = '';
+  }
   const prevEl = document.getElementById('sup-photo-preview');
   if (prevEl) prevEl.src = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23cbd5e1'/><path fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>";
   
+  const removeBtn = document.getElementById('sup-btn-remove-photo');
+  if (removeBtn) removeBtn.classList.add('hidden');
+  const infoEl = document.getElementById('sup-photo-info');
+  if (infoEl) {
+    infoEl.textContent = 'Hỗ trợ JPG, PNG, WebP (tối đa 10MB, tự động tối ưu & nén < 300KB)';
+    infoEl.className = 'text-[11px] text-slate-500 mt-1';
+  }
+  state.pendingSupervisorPhotoBlob = null;
+  state.pendingRemoveSupervisorPhoto = false;
+
   if (document.getElementById('sup-form-dept-select')) {
     document.getElementById('sup-form-dept-select').value = 'Thiết kế nội thất';
   }
@@ -4255,9 +4454,34 @@ window.editSupervisorMasterModal = function(supId) {
   document.getElementById('sup-form-email').value = s.email || '';
   document.getElementById('sup-form-phone').value = s.phone || '';
   document.getElementById('sup-form-photo').value = s.photoUrl || '';
+  if (document.getElementById('sup-form-photo-path')) {
+    document.getElementById('sup-form-photo-path').value = s.photoPath || '';
+  }
   const prevElEdit = document.getElementById('sup-photo-preview');
   if (prevElEdit) prevElEdit.src = s.photoUrl || "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23cbd5e1'/><path fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>";
   
+  const removeBtn = document.getElementById('sup-btn-remove-photo');
+  if (removeBtn) {
+    if (s.photoUrl) removeBtn.classList.remove('hidden');
+    else removeBtn.classList.add('hidden');
+  }
+
+  const infoEl = document.getElementById('sup-photo-info');
+  if (infoEl) {
+    if (s.photoUrl && s.photoUrl.startsWith('data:image')) {
+      infoEl.textContent = '⚠️ Ảnh đang lưu định dạng cũ (base64). Hệ thống sẽ tự động nén & chuyển lên Storage khi bấm Lưu.';
+      infoEl.className = 'text-[11px] text-amber-600 font-semibold mt-1';
+    } else if (s.photoUrl) {
+      infoEl.textContent = '✓ Ảnh đã được lưu trữ trên Firebase Storage.';
+      infoEl.className = 'text-[11px] text-emerald-600 font-semibold mt-1';
+    } else {
+      infoEl.textContent = 'Hỗ trợ JPG, PNG, WebP (tối đa 10MB, tự động tối ưu & nén < 300KB)';
+      infoEl.className = 'text-[11px] text-slate-500 mt-1';
+    }
+  }
+  state.pendingSupervisorPhotoBlob = null;
+  state.pendingRemoveSupervisorPhoto = false;
+
   if (document.getElementById('sup-form-gender')) {
     document.getElementById('sup-form-gender').value = s.gender || 'Nam';
   }
@@ -4316,6 +4540,9 @@ window.deleteSupervisorMaster = async function(supId) {
 
   try {
     await deleteDoc(doc(db, 'supervisorMaster', supId));
+    if (sup.photoPath && storage) {
+      deleteObject(storageRef(storage, sup.photoPath)).catch(console.warn);
+    }
     state.supervisorsMaster = state.supervisorsMaster.filter(s => s.id !== supId);
     renderAdminSupervisorsMasterTable();
     showToast(`Đã xóa giảng viên "${sup.name}" thành công.`, 'success');
@@ -4327,6 +4554,8 @@ window.deleteSupervisorMaster = async function(supId) {
 
 window.closeSupervisorModal = function() {
   document.getElementById('modal-supervisor').classList.add('hidden');
+  state.pendingSupervisorPhotoBlob = null;
+  state.pendingRemoveSupervisorPhoto = false;
 };
 
 window.saveSupervisorMaster = async function(e) {
@@ -4335,7 +4564,6 @@ window.saveSupervisorMaster = async function(e) {
   const name = document.getElementById('sup-form-name')?.value.trim();
   const email = document.getElementById('sup-form-email')?.value.trim().toLowerCase();
   const phone = document.getElementById('sup-form-phone')?.value.trim();
-  const photoUrl = document.getElementById('sup-form-photo')?.value.trim();
   const gender = document.getElementById('sup-form-gender')?.value || 'Nam';
 
   let department = 'Thiết kế nội thất';
@@ -4367,8 +4595,91 @@ window.saveSupervisorMaster = async function(e) {
     submitBtn.innerHTML = '<span>⏳ Đang lưu...</span>';
   }
 
+  // ----------------------------------------------------------------------------
+  // PHOTO HANDLING: FIREBASE STORAGE UPLOAD & BASE64 BLOCK
+  // ----------------------------------------------------------------------------
+  let finalPhotoUrl = document.getElementById('sup-form-photo')?.value.trim() || '';
+  let finalPhotoPath = document.getElementById('sup-form-photo-path')?.value.trim() || '';
+  let oldPhotoPathToDelete = null;
+
+  // Normalized stable ID for storage path
+  const cleanId = id || email.replace(/[^a-z0-9_.-]/g, '_');
+
+  if (state.pendingRemoveSupervisorPhoto) {
+    if (finalPhotoPath) oldPhotoPathToDelete = finalPhotoPath;
+    finalPhotoUrl = '';
+    finalPhotoPath = '';
+  } else if (state.pendingSupervisorPhotoBlob) {
+    if (submitBtn) submitBtn.innerHTML = '<span>⏳ Đang tải ảnh lên Storage...</span>';
+    const ext = state.pendingSupervisorPhotoBlob.extension || 'webp';
+    const storagePath = `graduation/supervisors/${cleanId}/portrait.${ext}`;
+
+    try {
+      if (!storage) {
+        throw new Error('Dịch vụ Firebase Storage chưa sẵn sàng hoặc bị tắt trên dự án.');
+      }
+      const sRef = storageRef(storage, storagePath);
+      await uploadBytes(sRef, state.pendingSupervisorPhotoBlob.blob, {
+        contentType: state.pendingSupervisorPhotoBlob.mimeType,
+        cacheControl: 'public, max-age=31536000'
+      });
+      finalPhotoUrl = await getDownloadURL(sRef);
+      finalPhotoPath = storagePath;
+    } catch (uploadErr) {
+      console.error('Lỗi upload Storage:', uploadErr);
+      showToast('Lỗi tải ảnh lên Storage: ' + uploadErr.message + '. Dữ liệu GVHD cũ được giữ nguyên.', 'error', 6000);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = origText;
+      }
+      return; // Stop flow on upload failure to preserve existing data
+    }
+  } else if (finalPhotoUrl.startsWith('data:image')) {
+    // Lazy migration of legacy base64
+    if (submitBtn) submitBtn.innerHTML = '<span>⏳ Đang tối ưu & chuyển ảnh sang Storage...</span>';
+    const migrated = await dataUrlToCompressedBlob(finalPhotoUrl);
+    if (migrated && storage) {
+      try {
+        const storagePath = `graduation/supervisors/${cleanId}/portrait.${migrated.extension}`;
+        const sRef = storageRef(storage, storagePath);
+        await uploadBytes(sRef, migrated.blob, {
+          contentType: migrated.mimeType,
+          cacheControl: 'public, max-age=31536000'
+        });
+        finalPhotoUrl = await getDownloadURL(sRef);
+        finalPhotoPath = storagePath;
+      } catch (migErr) {
+        console.warn('Lỗi lazy migrate base64 photo:', migErr);
+        showToast('Lỗi chuyển đổi ảnh sang Storage: ' + migErr.message + '. Dữ liệu GVHD cũ được giữ nguyên.', 'error');
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = origText;
+        }
+        return;
+      }
+    }
+  }
+
+  // BASE64 BLOCK: NEVER allow base64 string to be saved to Firestore
+  if (finalPhotoUrl && finalPhotoUrl.startsWith('data:')) {
+    showToast('Lỗi: Ảnh chưa được tải lên Firebase Storage. Không thể lưu chuỗi base64 vào cơ sở dữ liệu.', 'error');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origText;
+    }
+    return;
+  }
+
   const payload = {
-    name, email, phone, photoUrl, gender, department, expertise, bio,
+    name,
+    email,
+    phone,
+    photoUrl: finalPhotoUrl,
+    photoPath: finalPhotoPath,
+    gender,
+    department,
+    expertise,
+    bio,
     employmentType,
     defaultQuota,
     active,
@@ -4385,6 +4696,13 @@ window.saveSupervisorMaster = async function(e) {
       savedId = docRef.id;
     }
 
+    // Clean up old storage object if replaced or removed
+    if (oldPhotoPathToDelete && storage) {
+      deleteObject(storageRef(storage, oldPhotoPathToDelete)).catch(console.warn);
+    }
+    state.pendingSupervisorPhotoBlob = null;
+    state.pendingRemoveSupervisorPhoto = false;
+
     const supObj = { id: savedId, ...payload };
     const existingIdx = state.supervisorsMaster.findIndex(s => s.id === savedId);
     if (existingIdx >= 0) {
@@ -4395,7 +4713,7 @@ window.saveSupervisorMaster = async function(e) {
 
     renderAdminSupervisorsMasterTable();
     closeSupervisorModal();
-    showToast('Lưu Giảng viên Hướng dẫn thành công!', 'success');
+    showToast('✓ Lưu Giảng viên Hướng dẫn thành công!', 'success');
 
     // Background sync
     loadAdminSupervisorsMaster().catch(console.error);
@@ -5711,6 +6029,10 @@ export function getEffectiveActor() {
       roundId: target.roundId || '',
       roundTitle: target.roundTitle || '',
       roleLabel: target.roleLabel || target.type,
+      councilId: target.councilId || '',
+      councilName: target.councilName || '',
+      councilRole: target.councilRole || '',
+      activityName: target.activityName || '',
       impersonating: true,
       readOnly: true,
       realUser: state.realUser || state.user
@@ -6124,6 +6446,12 @@ window.openAdminImpersonateModal = function() {
   const modal = document.getElementById('modal-admin-impersonate');
   if (modal) modal.classList.remove('hidden');
 
+  state.selectedImpersonateCandidate = null;
+  const confirmBtn = document.getElementById('btn-confirm-impersonate');
+  const confirmText = document.getElementById('btn-confirm-impersonate-text');
+  if (confirmBtn) confirmBtn.disabled = true;
+  if (confirmText) confirmText.textContent = 'Đóng vai người đã chọn';
+
   gatherAndRenderImpersonateCandidates();
 };
 
@@ -6133,6 +6461,12 @@ window.closeAdminImpersonateModal = function() {
 };
 
 window.onImpersonateFiltersChange = function() {
+  state.selectedImpersonateCandidate = null;
+  const confirmBtn = document.getElementById('btn-confirm-impersonate');
+  const confirmText = document.getElementById('btn-confirm-impersonate-text');
+  if (confirmBtn) confirmBtn.disabled = true;
+  if (confirmText) confirmText.textContent = 'Đóng vai người đã chọn';
+
   gatherAndRenderImpersonateCandidates();
 };
 
@@ -6376,6 +6710,11 @@ async function gatherAndRenderImpersonateCandidates() {
     return matchName || matchEmail || matchMssv || matchCode || matchDept || matchTopic || matchRole;
   });
 
+  filtered.forEach((c, idx) => {
+    c.candKey = `cand_${idx}`;
+  });
+  state.impersonateCandidates = filtered;
+
   if (countEl) countEl.textContent = String(filtered.length);
 
   if (listEl) {
@@ -6384,22 +6723,32 @@ async function gatherAndRenderImpersonateCandidates() {
       return;
     }
 
-    listEl.innerHTML = filtered.map((c, idx) => {
+    listEl.innerHTML = filtered.map(c => {
       let roleBadgeColor = 'bg-blue-100 text-blue-800 border-blue-200';
       if (c.type === 'supervisor') roleBadgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-200';
       else if (c.type === 'reviewer') roleBadgeColor = 'bg-purple-100 text-purple-800 border-purple-200';
       else if (c.type === 'council') roleBadgeColor = 'bg-amber-100 text-amber-900 border-amber-300';
       else if (c.type === 'preliminary') roleBadgeColor = 'bg-indigo-100 text-indigo-800 border-indigo-200';
 
-      const candDataJson = escapeHtml(JSON.stringify(c));
+      const isSelected = state.selectedImpersonateCandidate && state.selectedImpersonateCandidate.candKey === c.candKey;
 
       return `
-        <div class="p-3 bg-white hover:bg-amber-50/40 rounded-xl border border-slate-200 hover:border-amber-300 transition-all flex items-center justify-between gap-3 shadow-2xs">
-          <div class="flex items-center gap-3 min-w-0">
+        <div onclick="selectImpersonateCandidate('${c.candKey}')"
+             ondblclick="confirmImpersonateCandidateDirectly('${c.candKey}')"
+             id="cand-card-${c.candKey}"
+             class="impersonate-candidate-card cursor-pointer p-3 bg-white hover:bg-amber-50/50 rounded-xl border ${isSelected ? 'border-amber-500 bg-amber-50/80 ring-2 ring-amber-400/40' : 'border-slate-200'} transition-all flex items-center justify-between gap-3 shadow-2xs">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="flex items-center justify-center shrink-0 pr-1">
+              <input type="radio" name="impersonate_candidate_radio" id="radio-${c.candKey}"
+                     value="${c.candKey}"
+                     ${isSelected ? 'checked' : ''}
+                     onchange="selectImpersonateCandidate('${c.candKey}')"
+                     class="w-4 h-4 text-amber-600 focus:ring-amber-500 border-slate-300 cursor-pointer">
+            </div>
             <div class="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-base shrink-0">
               ${c.type === 'student' ? '🎓' : (c.type === 'supervisor' ? '👨‍🏫' : (c.type === 'reviewer' ? '🔍' : (c.type === 'council' ? '⚖️' : '📋')))}
             </div>
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="font-bold text-slate-900 text-xs truncate">${escapeHtml(c.name)}</span>
                 ${c.mssv ? `<span class="font-mono text-[11px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold">${escapeHtml(c.mssv)}</span>` : ''}
@@ -6407,23 +6756,73 @@ async function gatherAndRenderImpersonateCandidates() {
                   ${escapeHtml(c.roleLabel)}
                 </span>
               </div>
-              <div class="text-[11px] text-slate-500 truncate mt-0.5 flex items-center gap-2">
+              <div class="text-[11px] text-slate-500 truncate mt-0.5 flex items-center gap-2 flex-wrap">
                 <span>✉️ ${escapeHtml(c.email || '--')}</span>
-                ${c.department ? `<span>• Khoa/BM: ${escapeHtml(c.department)}</span>` : ''}
+                ${c.department ? `<span>• BM: ${escapeHtml(c.department)}</span>` : ''}
                 ${c.roundTitle ? `<span class="text-amber-800 font-medium">• ${escapeHtml(c.roundTitle)}</span>` : ''}
                 ${c.topicTitle ? `<span class="text-blue-700 font-medium italic truncate">• Đề tài: ${escapeHtml(c.topicTitle)}</span>` : ''}
               </div>
             </div>
           </div>
-          <button type="button" onclick='startImpersonatingFromData(${candDataJson})' class="shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-sm transition-all flex items-center gap-1.5 cursor-pointer">
-            <span>🎭</span> <span>Đóng vai</span>
-          </button>
+          <div class="shrink-0">
+            <button type="button" onclick="event.stopPropagation(); selectImpersonateCandidate('${c.candKey}'); confirmImpersonateSelectedCandidate();" class="px-3 py-1.5 bg-slate-100 hover:bg-amber-500 hover:text-slate-950 text-slate-700 font-bold rounded-xl text-xs transition-colors flex items-center gap-1 cursor-pointer">
+              <span>🎭</span> <span>Chọn</span>
+            </button>
+          </div>
         </div>
       `;
     }).join('');
   }
 }
 window.gatherAndRenderImpersonateCandidates = gatherAndRenderImpersonateCandidates;
+
+window.selectImpersonateCandidate = function(candKey) {
+  const list = state.impersonateCandidates || [];
+  const cand = list.find(c => c.candKey === candKey);
+  if (!cand) return;
+
+  state.selectedImpersonateCandidate = cand;
+
+  // Uncheck / unhighlight other cards
+  document.querySelectorAll('.impersonate-candidate-card').forEach(el => {
+    el.classList.remove('border-amber-500', 'bg-amber-50/80', 'ring-2', 'ring-amber-400/40');
+    el.classList.add('border-slate-200', 'bg-white');
+  });
+
+  const card = document.getElementById(`cand-card-${candKey}`);
+  if (card) {
+    card.classList.remove('border-slate-200', 'bg-white');
+    card.classList.add('border-amber-500', 'bg-amber-50/80', 'ring-2', 'ring-amber-400/40');
+  }
+
+  const radio = document.getElementById(`radio-${candKey}`);
+  if (radio) {
+    radio.checked = true;
+  }
+
+  const confirmBtn = document.getElementById('btn-confirm-impersonate');
+  const confirmText = document.getElementById('btn-confirm-impersonate-text');
+  if (confirmBtn) {
+    confirmBtn.disabled = false;
+  }
+  if (confirmText) {
+    const ident = cand.mssv || cand.email || cand.id || '';
+    confirmText.textContent = `Đóng vai: ${cand.name} (${ident})`;
+  }
+};
+
+window.confirmImpersonateCandidateDirectly = function(candKey) {
+  window.selectImpersonateCandidate(candKey);
+  window.confirmImpersonateSelectedCandidate();
+};
+
+window.confirmImpersonateSelectedCandidate = function() {
+  if (!state.selectedImpersonateCandidate) {
+    showToast('Vui lòng chọn một người dùng cụ thể từ danh sách.', 'warning');
+    return;
+  }
+  window.startImpersonating(state.selectedImpersonateCandidate);
+};
 
 // --- SUPERVISOR BIO MODAL ---
 window.openBioModal = function(supId) {

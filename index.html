@@ -3421,20 +3421,26 @@
           </div>
           <p class="text-[11px] text-slate-400">💡 Quy định hạn mức: Giảng viên Cơ hữu tối đa 10 SV, Giảng viên Thỉnh giảng tối đa 5 SV.</p>
           
-          <!-- Image upload & Preview -->
+          <!-- Image upload & Preview (Storage + Auto-resize/compress) -->
           <div>
-            <label class="font-bold text-slate-700 block mb-1">Ảnh chân dung</label>
+            <label class="font-bold text-slate-700 block mb-1">Ảnh chân dung (Portrait)</label>
             <div class="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
-              <div class="w-14 h-14 rounded-full border-2 border-white shadow bg-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+              <div class="w-16 h-16 rounded-full border-2 border-white shadow bg-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
                 <img id="sup-photo-preview" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23cbd5e1'/><path fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" class="w-full h-full object-cover">
               </div>
-              <div class="flex-1">
-                <label class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-colors border border-slate-300 shadow-sm">
-                  <span>📁 Chọn ảnh</span>
-                  <input type="file" id="sup-form-file" accept="image/*" class="hidden" onchange="previewSupervisorPhoto(this)">
-                </label>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <label class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-colors border border-slate-300 shadow-sm">
+                    <span>📁 Chọn ảnh mới</span>
+                    <input type="file" id="sup-form-file" accept="image/jpeg,image/png,image/webp,image/jpg" class="hidden" onchange="previewSupervisorPhoto(this)">
+                  </label>
+                  <button type="button" id="sup-btn-remove-photo" onclick="removeSupervisorPhoto()" class="hidden px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition-colors cursor-pointer">
+                    <span>✕ Xóa ảnh</span>
+                  </button>
+                </div>
                 <input type="hidden" id="sup-form-photo">
-                <p class="text-[11px] text-slate-400 mt-1">Định dạng JPG, PNG (tối đa 2MB)</p>
+                <input type="hidden" id="sup-form-photo-path">
+                <p id="sup-photo-info" class="text-[11px] text-slate-500 mt-1">Hỗ trợ JPG, PNG, WebP (tối đa 10MB, tự động tối ưu & nén &lt; 300KB)</p>
               </div>
             </div>
           </div>
@@ -5279,11 +5285,16 @@
         <div class="text-center py-8 text-slate-400">Đang tải danh sách người dùng...</div>
       </div>
 
-      <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+      <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div class="text-[11px] text-slate-500">
-          💡 Khi đóng vai, hệ thống hoàn toàn tước quyền Admin thật. Thoát đóng vai bất cứ lúc nào qua banner trên cùng.
+          💡 Chọn đúng 1 người dùng để đóng vai. Hệ thống hoạt động ở chế độ <b>Chỉ đọc (Read-only Safe Mode)</b> và hoàn toàn tước quyền Admin.
         </div>
-        <button type="button" onclick="closeAdminImpersonateModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer">Đóng</button>
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" onclick="closeAdminImpersonateModal()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer">Hủy</button>
+          <button type="button" id="btn-confirm-impersonate" onclick="confirmImpersonateSelectedCandidate()" disabled class="px-5 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-slate-950 font-black rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
+            <span>🎭</span> <span id="btn-confirm-impersonate-text">Đóng vai người đã chọn</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
