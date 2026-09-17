@@ -11,8 +11,11 @@ function detectInitialPortal() {
     if (path.includes('/graduation/assessment') || path.includes('/graduation/mark')) {
       return 'assessment';
     }
+    if (path.includes('/graduation') || path === '/' || path.endsWith('/graduation/')) {
+      return 'student';
+    }
   } catch (e) {}
-  return null;
+  return 'student';
 }
 window.detectInitialPortal = detectInitialPortal;
 
@@ -475,7 +478,8 @@ export async function setupAuthListener() {
 
         // 2. Kích hoạt ngay view ban đầu để UI hiển thị tức thì
         const detectedPortal = detectInitialPortal();
-        const initView = (detectedPortal === 'admin' && state.isAdmin) ? 'admin' : (detectedPortal || state.currentView || state.actualRole || 'student');
+        // Cổng /graduation/ luôn là student view cho mọi đối tượng; chỉ vào admin khi URL rõ ràng là admin và user có quyền admin
+        const initView = (detectedPortal === 'admin' && state.isAdmin) ? 'admin' : 'student';
         await switchView(initView);
         if (initView === 'admin') {
           switchAdminTab('rounds');
@@ -657,26 +661,37 @@ export function updateAuthUI() {
     const studentDeskBtn = document.getElementById('nav-btn-student');
     const studentMobBtn = document.getElementById('m-nav-student');
 
-    if (state.isAdmin) {
-      if (adminDeskBtn) { adminDeskBtn.classList.remove('hidden'); adminDeskBtn.classList.add('flex'); }
-      if (adminMobBtn) adminMobBtn.classList.remove('hidden');
-      if (state.isSupervisor) {
-        if (supDeskBtn) { supDeskBtn.classList.remove('hidden'); supDeskBtn.classList.add('flex'); }
-        if (supMobBtn) supMobBtn.classList.remove('hidden');
+    // CỔNG SINH VIÊN (/graduation/): Ẩn toàn bộ thanh chuyển role to ở header
+    const roleNavGroup = document.getElementById('role-nav-group');
+    const mobileRoleNav = document.getElementById('mobile-role-nav');
+    const btnGotoAdmin = document.getElementById('btn-goto-admin');
+    const btnGotoStudent = document.getElementById('btn-goto-student');
+
+    if (state.currentView === 'student') {
+      if (roleNavGroup) roleNavGroup.classList.add('hidden');
+      if (mobileRoleNav) mobileRoleNav.classList.add('hidden');
+      if (btnGotoStudent) btnGotoStudent.classList.add('hidden');
+
+      // Nếu tài khoản là Admin ghé thăm Cổng Sinh viên: hiện nút nhỏ chuyển sang Quản trị
+      if (state.isAdmin) {
+        if (btnGotoAdmin) {
+          btnGotoAdmin.classList.remove('hidden');
+          btnGotoAdmin.classList.add('flex');
+        }
       } else {
-        if (supDeskBtn) { supDeskBtn.classList.add('hidden'); supDeskBtn.classList.remove('flex'); }
-        if (supMobBtn) supMobBtn.classList.add('hidden');
+        if (btnGotoAdmin) btnGotoAdmin.classList.add('hidden');
       }
-    } else if (state.isSupervisor) {
-      if (adminDeskBtn) { adminDeskBtn.classList.add('hidden'); adminDeskBtn.classList.remove('flex'); }
-      if (adminMobBtn) adminMobBtn.classList.add('hidden');
-      if (supDeskBtn) { supDeskBtn.classList.remove('hidden'); supDeskBtn.classList.add('flex'); }
-      if (supMobBtn) supMobBtn.classList.remove('hidden');
+    } else if (state.currentView === 'admin') {
+      if (roleNavGroup) roleNavGroup.classList.add('hidden');
+      if (mobileRoleNav) mobileRoleNav.classList.add('hidden');
+      if (btnGotoAdmin) btnGotoAdmin.classList.add('hidden');
+      if (btnGotoStudent) {
+        btnGotoStudent.classList.remove('hidden');
+        btnGotoStudent.classList.add('flex');
+      }
     } else {
-      if (adminDeskBtn) { adminDeskBtn.classList.add('hidden'); adminDeskBtn.classList.remove('flex'); }
-      if (adminMobBtn) adminMobBtn.classList.add('hidden');
-      if (supDeskBtn) { supDeskBtn.classList.add('hidden'); supDeskBtn.classList.remove('flex'); }
-      if (supMobBtn) supMobBtn.classList.add('hidden');
+      if (btnGotoAdmin) btnGotoAdmin.classList.add('hidden');
+      if (btnGotoStudent) btnGotoStudent.classList.add('hidden');
     }
 
   } else {
@@ -806,8 +821,9 @@ window.switchView = async function(targetView) {
       } else {
         // Open & in window!
         if (emptyCard) emptyCard.classList.add('hidden');
-        if (regFlow) regFlow.classList.remove('hidden');
         if (state.selectedRoundId) checkStudentEligibilityAndRegistration(state.selectedRoundId);
+        updateStudentJourneyStepper();
+        updateStudentPersonalSidebar();
       }
     }
   }
@@ -994,8 +1010,43 @@ function renderRoundHeader() {
   const round = state.activeRound;
   if (!round) return;
 
-  document.getElementById('round-title-display').textContent = round.title;
-  document.getElementById('round-academic-year').textContent = `Năm học ${round.academicYear || ''}`;
+  const titleDisplay = document.getElementById('round-title-display');
+  if (titleDisplay) titleDisplay.textContent = round.title;
+  const yearDisplay = document.getElementById('round-academic-year');
+  if (yearDisplay) yearDisplay.textContent = `Năm học ${round.academicYear || ''}`;
+
+  // Hero Card Quick Metrics
+  const milestonesCountEl = document.getElementById('hero-milestones-count');
+  if (milestonesCountEl) {
+    const actCount = (round.activities || []).length;
+    milestonesCountEl.textContent = `${actCount} mốc kế hoạch`;
+  }
+  const assignedSupEl = document.getElementById('hero-assigned-sup');
+  if (assignedSupEl) {
+    const officialList = state.myRegistration ? getOfficialSupervisors(state.myRegistration) : [];
+    if (officialList.length > 0) {
+      const p = officialList.find(s => s.role === 'primary') || officialList[0];
+      assignedSupEl.textContent = `GVHD: ${p.supervisorName}`;
+    } else {
+      assignedSupEl.textContent = 'GVHD: Chưa phân công';
+    }
+  }
+  const studentStateBadge = document.getElementById('hero-student-state-badge');
+  if (studentStateBadge) {
+    if (state.isEligible === true) {
+      studentStateBadge.className = 'badge bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-400/30';
+      studentStateBadge.textContent = 'Đủ điều kiện';
+    } else if (state.isEligible === 'pending') {
+      studentStateBadge.className = 'badge bg-amber-500/20 text-amber-300 font-bold border border-amber-400/30';
+      studentStateBadge.textContent = 'Chờ xác nhận ĐK';
+    } else if (state.isEligible === false) {
+      studentStateBadge.className = 'badge bg-rose-500/20 text-rose-300 font-bold border border-rose-400/30';
+      studentStateBadge.textContent = 'Chưa đủ ĐK';
+    } else {
+      studentStateBadge.className = 'badge bg-white/10 text-white font-mono text-[11px] border border-white/20';
+      studentStateBadge.textContent = 'Sinh viên';
+    }
+  }
   
   const statusBadge = document.getElementById('round-status-badge');
   const statusMap = {
@@ -1073,17 +1124,21 @@ async function checkStudentEligibilityAndRegistration(roundId) {
 
   const nonEligibleAlert = document.getElementById('non-eligible-alert');
   const alreadyRegCard = document.getElementById('already-registered-card');
+  const ctaCard = document.getElementById('registration-cta-card');
   const reviewInProgressCard = document.getElementById('review-in-progress-card');
   const officialResultCard = document.getElementById('official-result-card');
   const flowContainer = document.getElementById('registration-flow-container');
 
   if (!mssv) {
-    nonEligibleAlert.classList.add('hidden');
-    alreadyRegCard.classList.add('hidden');
-    reviewInProgressCard.classList.add('hidden');
-    officialResultCard.classList.add('hidden');
-    flowContainer.classList.remove('hidden');
+    if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
+    if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
+    if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
+    if (officialResultCard) officialResultCard.classList.add('hidden');
+    if (ctaCard) ctaCard.classList.remove('hidden');
+    if (flowContainer) flowContainer.classList.add('hidden');
     renderSupervisorsGrid();
+    updateStudentJourneyStepper();
+    updateStudentPersonalSidebar();
     return;
   }
 
@@ -1105,36 +1160,43 @@ async function checkStudentEligibilityAndRegistration(roundId) {
     } else {
       state.isEligible = false;
       state.eligibilityState = 'not_eligible';
-      nonEligibleAlert.classList.remove('hidden');
-      alreadyRegCard.classList.add('hidden');
-      reviewInProgressCard.classList.add('hidden');
-      officialResultCard.classList.add('hidden');
-      flowContainer.classList.add('hidden');
+      if (nonEligibleAlert) nonEligibleAlert.classList.remove('hidden');
+      if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
+      if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
+      if (officialResultCard) officialResultCard.classList.add('hidden');
+      if (ctaCard) ctaCard.classList.add('hidden');
+      if (flowContainer) flowContainer.classList.add('hidden');
+      updateStudentJourneyStepper();
+      updateStudentPersonalSidebar();
       return;
     }
 
     const regDoc = await getDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv));
     if (regDoc.exists()) {
       state.myRegistration = regDoc.data();
-      flowContainer.classList.add('hidden');
+      if (flowContainer) flowContainer.classList.add('hidden');
+      if (ctaCard) ctaCard.classList.add('hidden');
 
       const roundStatus = state.activeRound?.status;
       const reviewStatus = state.activeRound?.reviewStatus;
 
       // 1. If Published / Completed: Show Official Result Card
       if (roundStatus === 'published' || reviewStatus === 'completed') {
-        alreadyRegCard.classList.add('hidden');
-        reviewInProgressCard.classList.add('hidden');
+        if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
+        if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
         renderStudentOfficialResult(state.myRegistration);
-        officialResultCard.classList.remove('hidden');
+        if (officialResultCard) officialResultCard.classList.remove('hidden');
         renderStudentFinalScoreCard(mssv, state.activeRound);
+        updateStudentJourneyStepper();
+        updateStudentPersonalSidebar();
+        renderRoundHeader();
         return;
       }
 
       // 2. If Reviewing in Progress: Show Neutral Reviewing Card
       if (roundStatus === 'reviewing' || (reviewStatus && reviewStatus.startsWith('round_')) || reviewStatus === 'manual_assignment') {
-        alreadyRegCard.classList.add('hidden');
-        officialResultCard.classList.add('hidden');
+        if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
+        if (officialResultCard) officialResultCard.classList.add('hidden');
         
         let roundName = 'VÒNG XÉT NGUYỆN VỌNG';
         if (reviewStatus === 'round_1') roundName = 'XÉT NGUYỆN VỌNG 1';
@@ -1142,24 +1204,35 @@ async function checkStudentEligibilityAndRegistration(roundId) {
         else if (reviewStatus === 'round_3') roundName = 'XÉT NGUYỆN VỌNG 3';
         else if (reviewStatus === 'manual_assignment') roundName = 'ĐIỀU PHỐI BỔ SUNG';
         
-        document.getElementById('review-round-tag').textContent = roundName;
-        reviewInProgressCard.classList.remove('hidden');
+        const reviewTag = document.getElementById('review-round-tag');
+        if (reviewTag) reviewTag.textContent = roundName;
+        if (reviewInProgressCard) reviewInProgressCard.classList.remove('hidden');
+        updateStudentJourneyStepper();
+        updateStudentPersonalSidebar();
+        renderRoundHeader();
         return;
       }
 
       // 3. Normal Submitted State
-      officialResultCard.classList.add('hidden');
-      reviewInProgressCard.classList.add('hidden');
+      if (officialResultCard) officialResultCard.classList.add('hidden');
+      if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
       renderStudentExistingRegistration(state.myRegistration);
-      alreadyRegCard.classList.remove('hidden');
+      if (alreadyRegCard) alreadyRegCard.classList.remove('hidden');
       renderStudentFinalScoreCard(mssv, state.activeRound);
+      updateStudentJourneyStepper();
+      updateStudentPersonalSidebar();
+      renderRoundHeader();
 
     } else {
-      alreadyRegCard.classList.add('hidden');
-      reviewInProgressCard.classList.add('hidden');
-      officialResultCard.classList.add('hidden');
-      flowContainer.classList.remove('hidden');
+      if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
+      if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
+      if (officialResultCard) officialResultCard.classList.add('hidden');
+      if (ctaCard) ctaCard.classList.remove('hidden');
+      if (flowContainer) flowContainer.classList.add('hidden');
       goToStep(1);
+      updateStudentJourneyStepper();
+      updateStudentPersonalSidebar();
+      renderRoundHeader();
     }
   } catch (e) {
     console.error('Error checking student eligibility:', e);
@@ -1323,8 +1396,12 @@ window.enableEditRegistration = function() {
   document.getElementById('select-project-type').value = state.myRegistration.projectType || '';
   state.selectedPreferences = [...(state.myRegistration.preferences || [])];
 
-  document.getElementById('already-registered-card').classList.add('hidden');
-  document.getElementById('registration-flow-container').classList.remove('hidden');
+  const alreadyCard = document.getElementById('already-registered-card');
+  const ctaCard = document.getElementById('registration-cta-card');
+  const flowContainer = document.getElementById('registration-flow-container');
+  if (alreadyCard) alreadyCard.classList.add('hidden');
+  if (ctaCard) ctaCard.classList.add('hidden');
+  if (flowContainer) flowContainer.classList.remove('hidden');
   goToStep(1);
 };
 
@@ -7192,6 +7269,10 @@ window.loadStudentRoundActivities = async function(roundId) {
   }
 
   container.innerHTML = htmlContent;
+
+  if (typeof updateStudentPersonalSidebar === 'function') updateStudentPersonalSidebar();
+  if (typeof renderRoundHeader === 'function') renderRoundHeader();
+  if (typeof updateStudentJourneyStepper === 'function') updateStudentJourneyStepper();
 
   if (state.targetActivitySlug) {
     const targetSlug = state.targetActivitySlug;
@@ -15346,4 +15427,300 @@ window.toggleRoundHiddenStatus = async function(roundId) {
   } finally {
     hideLoading();
   }
+};
+
+
+// ============================================================================
+// PHASE 2: STUDENT PORTAL ENHANCEMENTS
+// ============================================================================
+
+window.startStudentRegistration = function() {
+  const ctaCard = document.getElementById('registration-cta-card');
+  const flowContainer = document.getElementById('registration-flow-container');
+  if (ctaCard) ctaCard.classList.add('hidden');
+  if (flowContainer) {
+    flowContainer.classList.remove('hidden');
+    flowContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
+window.cancelRegistrationEdit = function() {
+  const flowContainer = document.getElementById('registration-flow-container');
+  const ctaCard = document.getElementById('registration-cta-card');
+  const alreadyCard = document.getElementById('already-registered-card');
+  if (flowContainer) flowContainer.classList.add('hidden');
+  if (state.myRegistration) {
+    if (alreadyCard) alreadyCard.classList.remove('hidden');
+  } else {
+    if (ctaCard) ctaCard.classList.remove('hidden');
+  }
+};
+
+window.updateStudentJourneyStepper = function() {
+  const container = document.getElementById('journey-steps-list');
+  if (!container) return;
+
+  const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
+  const round = state.activeRound;
+  const reg = state.myRegistration;
+  const officialList = reg ? getOfficialSupervisors(reg) : [];
+  const hasOfficialSup = officialList.length > 0 || Boolean(reg?.assignedSupervisorId || reg?.officialSupervisor);
+
+  // 1. Đủ điều kiện
+  let s1Status = 'upcoming';
+  let s1Label = 'Chưa xét';
+  if (state.isEligible === true) {
+    s1Status = 'completed';
+    s1Label = 'Đủ điều kiện';
+  } else if (state.isEligible === 'pending') {
+    s1Status = 'active';
+    s1Label = 'Chờ xác nhận';
+  } else if (state.isEligible === false && mssv) {
+    s1Status = 'warning';
+    s1Label = 'Không đủ ĐK';
+  }
+
+  // 2. Đăng ký
+  let s2Status = 'upcoming';
+  let s2Label = 'Chưa đăng ký';
+  if (reg) {
+    s2Status = 'completed';
+    s2Label = 'Đã nộp đơn';
+  } else if (round?.status === 'open' && state.isEligible !== false) {
+    s2Status = 'active';
+    s2Label = 'Đang nhận ĐK';
+  }
+
+  // 3. Xét nguyện vọng
+  let s3Status = 'upcoming';
+  let s3Label = 'Chưa tới';
+  const isReviewing = round?.status === 'reviewing' || (round?.reviewStatus && round.reviewStatus.startsWith('round_')) || round?.reviewStatus === 'manual_assignment';
+  const isReviewDone = round?.status === 'published' || round?.status === 'finalized' || round?.reviewStatus === 'completed' || hasOfficialSup;
+  if (isReviewDone) {
+    s3Status = 'completed';
+    s3Label = 'Đã hoàn tất';
+  } else if (isReviewing && reg) {
+    s3Status = 'active';
+    s3Label = 'Đang xét duyệt';
+  }
+
+  // 4. Phân công GVHD
+  let s4Status = 'upcoming';
+  let s4Label = 'Chưa tới';
+  if (hasOfficialSup) {
+    s4Status = 'completed';
+    s4Label = 'Đã phân công';
+  } else if (isReviewing || round?.status === 'finalized') {
+    s4Status = 'active';
+    s4Label = 'Đang phân công';
+  }
+
+  // 5. Nộp bài
+  let s5Status = 'upcoming';
+  let s5Label = 'Chưa tới';
+  const activities = Array.isArray(round?.activities) ? round.activities : [];
+  const submissionActs = activities.filter(a => a.submissionEnabled);
+  if (hasOfficialSup && submissionActs.length > 0) {
+    s5Status = 'active';
+    s5Label = 'Đang thực hiện';
+  }
+
+  // 6. Bảo vệ
+  let s6Status = 'upcoming';
+  let s6Label = 'Chưa tới';
+  const defenseAct = activities.find(a => a.type === 'defense' || (a.title && a.title.toLowerCase().includes('bảo vệ')));
+  if (defenseAct && new Date() >= new Date(defenseAct.date || defenseAct.startDate || 0)) {
+    s6Status = 'active';
+    s6Label = 'Chuẩn bị / Đang BV';
+  }
+
+  // 7. Kết quả
+  let s7Status = 'upcoming';
+  let s7Label = 'Chưa tới';
+  if (round?.publishFinalScoreToStudents || round?.resultsPublished) {
+    s7Status = 'completed';
+    s7Label = 'Đã công bố';
+  } else if (s6Status === 'active') {
+    s7Status = 'active';
+    s7Label = 'Chờ công bố';
+  }
+
+  const steps = [
+    { num: 1, title: '1. Đủ điều kiện', status: s1Status, label: s1Label },
+    { num: 2, title: '2. Đăng ký', status: s2Status, label: s2Label },
+    { num: 3, title: '3. Xét nguyện vọng', status: s3Status, label: s3Label },
+    { num: 4, title: '4. Phân công GVHD', status: s4Status, label: s4Label },
+    { num: 5, title: '5. Nộp bài', status: s5Status, label: s5Label },
+    { num: 6, title: '6. Bảo vệ', status: s6Status, label: s6Label },
+    { num: 7, title: '7. Kết quả', status: s7Status, label: s7Label }
+  ];
+
+  const statusStyles = {
+    completed: {
+      circle: 'bg-emerald-600 text-white font-black shadow-sm',
+      badge: 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold',
+      border: 'border-emerald-200 bg-emerald-50/50',
+      icon: '✓'
+    },
+    active: {
+      circle: 'bg-blue-600 text-white font-black shadow-sm animate-pulse',
+      badge: 'bg-blue-50 text-blue-800 border-blue-300 font-bold',
+      border: 'border-blue-300 bg-blue-50/70 shadow-xs ring-1 ring-blue-300',
+      icon: '●'
+    },
+    warning: {
+      circle: 'bg-rose-600 text-white font-black shadow-sm',
+      badge: 'bg-rose-50 text-rose-800 border-rose-300 font-bold',
+      border: 'border-rose-200 bg-rose-50/50',
+      icon: '✕'
+    },
+    upcoming: {
+      circle: 'bg-slate-200 text-slate-600 font-bold',
+      badge: 'bg-slate-50 text-slate-500 border-slate-200',
+      border: 'border-slate-100 bg-slate-50/60',
+      icon: null
+    }
+  };
+
+  container.innerHTML = steps.map(s => {
+    const st = statusStyles[s.status] || statusStyles.upcoming;
+    return `
+      <div class="p-2.5 sm:p-3 rounded-xl border ${st.border} flex flex-col items-center text-center transition-all">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] mb-1.5 ${st.circle}">
+          ${st.icon || s.num}
+        </div>
+        <span class="font-bold text-[11px] text-slate-800 leading-tight mb-1 truncate w-full" title="${s.title}">${s.title}</span>
+        <span class="text-[9px] px-1.5 py-0.5 rounded-full border ${st.badge} whitespace-nowrap">${s.label}</span>
+      </div>
+    `;
+  }).join('');
+};
+
+window.updateStudentPersonalSidebar = function() {
+  const sidebar = document.getElementById('student-status-sidebar');
+  if (!sidebar) return;
+
+  const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
+  if (!mssv) {
+    sidebar.innerHTML = `
+      <div class="text-center py-6 text-slate-400 text-xs">
+        Vui lòng đăng nhập bằng tài khoản @student.tdtu.edu.vn để xem thông tin cá nhân.
+      </div>
+    `;
+    return;
+  }
+
+  const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(mssv) : null;
+  const fullName = studentObj?.fullName || studentObj?.name || state.user?.displayName || `Sinh viên ${mssv}`;
+  const studentClass = studentObj?.className || studentObj?.studentClass || 'Chưa cập nhật';
+  const major = studentObj?.major || 'Mỹ thuật Công nghiệp';
+
+  if (!state.facultyStudentsLoaded && typeof loadFacultyDatasetFromIFAA === 'function') {
+    loadFacultyDatasetFromIFAA().then(() => {
+      const sb = document.getElementById('student-status-sidebar');
+      if (sb) updateStudentPersonalSidebar();
+    }).catch(() => {});
+  }
+
+  // Eligibility
+  let eligibilityBadge = '<span class="text-[11px] font-bold text-slate-500">Chưa xác định</span>';
+  if (state.isEligible === true) {
+    eligibilityBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đủ điều kiện</span>';
+  } else if (state.isEligible === 'pending') {
+    eligibilityBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">⏳ Chờ xác nhận</span>';
+  } else if (state.isEligible === false) {
+    eligibilityBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">✕ Chưa đủ ĐK</span>';
+  }
+
+  // Registration
+  let regBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">Chưa đăng ký</span>';
+  if (state.myRegistration) {
+    regBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã đăng ký</span>';
+  } else if (state.activeRound?.status === 'open') {
+    regBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">● Đang mở ĐK</span>';
+  }
+
+  // Assignment & Supervisor
+  let supDisplay = 'Chưa phân công';
+  let assignBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">Chưa có</span>';
+  
+  const officialList = state.myRegistration ? getOfficialSupervisors(state.myRegistration) : [];
+  if (officialList.length > 0) {
+    const primary = officialList.find(s => s.role === 'primary') || officialList[0];
+    supDisplay = primary.supervisorName || 'GVHD chính thức';
+    assignBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã phân công</span>';
+  } else if (state.myRegistration && (state.activeRound?.status === 'reviewing' || (state.activeRound?.reviewStatus && state.activeRound.reviewStatus.startsWith('round_')))) {
+    assignBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300">Đang xét duyệt</span>';
+  }
+
+  // Upcoming Submission
+  let upcomingText = 'Không có mốc nộp bài sắp tới';
+  let upcomingBadge = '';
+  if (state.activeRound) {
+    const activities = Array.isArray(state.activeRound.activities) ? state.activeRound.activities : [];
+    const submissionActs = activities.filter(a => a.submissionEnabled && (a.closeAtDate || a.endDate || a.date));
+    const now = new Date();
+    const upcoming = submissionActs
+      .map(a => ({
+        title: a.title,
+        deadline: a.closeAtDate ? new Date(a.closeAtDate) : (a.endDate ? new Date(a.endDate) : new Date(a.date))
+      }))
+      .filter(a => !isNaN(a.deadline.getTime()) && a.deadline >= now)
+      .sort((a, b) => a.deadline - b.deadline)[0];
+
+    if (upcoming) {
+      upcomingText = `${upcoming.title}`;
+      upcomingBadge = `<span class="text-[10px] font-mono text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">Hạn: ${fmtIsoToVietnameseDateTime(upcoming.deadline.toISOString())}</span>`;
+    }
+  }
+
+  const avatarUrl = state.user?.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%2394a3b8"/><path fill="%2394a3b8" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
+
+  sidebar.innerHTML = `
+    <!-- Header -->
+    <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
+      <img src="${avatarUrl}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-sm shrink-0" alt="Avatar">
+      <div class="min-w-0 flex-1">
+        <h3 class="font-bold text-sm text-slate-900 truncate leading-snug">${fullName}</h3>
+        <p class="text-xs text-slate-500 font-mono">MSSV: <span class="font-bold text-tdtu-blue">${mssv}</span></p>
+      </div>
+    </div>
+
+    <!-- Student Details -->
+    <div class="space-y-2.5 text-xs">
+      <div class="flex items-center justify-between py-1 border-b border-slate-50">
+        <span class="text-slate-500">Lớp:</span>
+        <span class="font-bold text-slate-800 font-mono">${studentClass}</span>
+      </div>
+      <div class="flex items-center justify-between py-1 border-b border-slate-50">
+        <span class="text-slate-500">Ngành:</span>
+        <span class="font-bold text-slate-800">${major}</span>
+      </div>
+      <div class="flex items-center justify-between py-1 border-b border-slate-50">
+        <span class="text-slate-500">Điều kiện ĐATN:</span>
+        ${eligibilityBadge}
+      </div>
+      <div class="flex items-center justify-between py-1 border-b border-slate-50">
+        <span class="text-slate-500">Trạng thái đăng ký:</span>
+        ${regBadge}
+      </div>
+      <div class="flex items-center justify-between py-1 border-b border-slate-50">
+        <span class="text-slate-500">Phân công GVHD:</span>
+        ${assignBadge}
+      </div>
+      <div class="py-1 border-b border-slate-50">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-500">GVHD chính:</span>
+          <span class="font-bold text-slate-900">${supDisplay}</span>
+        </div>
+      </div>
+      <div class="pt-1">
+        <span class="text-slate-500 block mb-1">Mốc nộp bài gần nhất:</span>
+        <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
+          <span class="font-bold text-slate-800 text-[11px] block">${upcomingText}</span>
+          ${upcomingBadge ? `<div>${upcomingBadge}</div>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
 };

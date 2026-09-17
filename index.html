@@ -78,6 +78,13 @@
         <!-- User profile or Login trigger -->
         <div class="flex items-center gap-3">
           <div id="user-info-bar" class="hidden items-center gap-2.5">
+            <!-- Subtle Portal Switch Buttons -->
+            <a id="btn-goto-admin" href="/graduation/admin/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-300 bg-white/10 hover:bg-white/20 border border-amber-400/30 transition-all shadow-xs" title="Chuyển sang Cổng Quản trị">
+              <span>⚙️</span> <span class="hidden sm:inline">Quản trị</span>
+            </a>
+            <a id="btn-goto-student" href="/graduation/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-200 bg-white/10 hover:bg-white/20 border border-blue-400/30 transition-all shadow-xs" title="Xem Cổng Sinh viên">
+              <span>🎓</span> <span class="hidden sm:inline">Cổng SV</span>
+            </a>
             <img id="user-avatar" class="w-8 h-8 rounded-full border border-white/30 object-cover shadow-sm" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23fff'/><path fill='%23fff' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" alt="User">
             <div class="hidden lg:block text-right">
               <div id="user-display-name" class="text-xs font-semibold text-white leading-tight">Đang tải...</div>
@@ -131,6 +138,7 @@
     </section>
 
     <!-- VIEW 1: STUDENT VIEW -->
+        <!-- VIEW 1: STUDENT VIEW -->
     <section id="view-student" class="hidden space-y-6">
 
       <!-- EMPTY STATE WHEN NO OPEN ROUND -->
@@ -142,379 +150,475 @@
           Hiện chưa có đợt đăng ký<br>Đồ án tốt nghiệp
         </h3>
         <p class="text-xs text-slate-500 leading-relaxed">
-          Vui lòng quay lại sau khi Khoa có thông báo.
+          Vui lòng quay lại sau khi Khoa có thông báo chính thức.
         </p>
       </div>
 
-      <!-- ROUND HEADER BANNER & COUNTDOWN -->
-      <div class="card-surface p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl relative overflow-hidden">
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-          <div>
-            <div class="flex flex-wrap items-center gap-2 mb-2">
-              <span id="round-status-badge" class="badge badge-open">Đang mở đăng ký</span>
-              <span id="round-mode-badge" class="badge bg-white/10 text-white font-mono text-[11px]">3 Nguyện vọng</span>
-            </div>
-            <h1 id="round-title-display" class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white">
-              Đồ án Tốt nghiệp Thiết kế Nội thất
-            </h1>
-            <p id="round-academic-year" class="text-xs sm:text-sm text-blue-200 mt-1 font-medium">Năm học 2026-2027</p>
-            <p id="round-time-range" class="text-xs text-slate-300 mt-2 flex items-center gap-1.5">
-              <span>📅 Thời gian: 01/04/2026 08:00 — 15/04/2026 17:00</span>
-            </p>
-          </div>
+      <!-- STUDENT WORKSPACE CONTAINER -->
+      <div id="student-workspace-container" class="space-y-6">
 
-          <!-- Countdown Widget -->
-          <div class="bg-white/10 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/20 shadow-sm flex items-center gap-4 min-w-[240px]">
-            <div class="w-10 h-10 rounded-xl bg-amber-400 text-slate-900 flex items-center justify-center text-xl font-bold shadow-inner">
-              ⏱️
-            </div>
-            <div>
-              <span id="countdown-label" class="text-[11px] font-semibold text-blue-200 block uppercase tracking-wider">Thời gian còn lại</span>
-              <span id="countdown-value" class="text-base sm:text-lg font-black text-white font-mono tracking-tight pulse-timer">-- ngày --:--:--</span>
-            </div>
-          </div>
-        </div>
+        <!-- 1. CURRENT ROUND HERO CARD -->
+        <div id="student-hero-card" class="card-surface p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl relative overflow-hidden rounded-2xl border border-white/10">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+            <div class="space-y-2 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span id="round-status-badge" class="badge badge-open font-bold">Đang mở đăng ký</span>
+                <span id="round-mode-badge" class="badge bg-white/15 text-white font-mono text-[11px] border border-white/20">3 Nguyện vọng</span>
+                <span id="hero-student-state-badge" class="badge bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-400/30">Đủ điều kiện</span>
+              </div>
+              <h1 id="round-title-display" class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white leading-snug">
+                Đồ án Tốt nghiệp
+              </h1>
+              <p id="round-academic-year" class="text-xs sm:text-sm text-blue-200 font-medium">Năm học 2026-2027</p>
+              <p id="round-time-range" class="text-xs text-slate-300 flex items-center gap-1.5 pt-0.5">
+                <span>📅 Thời gian: --</span>
+              </p>
 
-        <!-- Multiple Rounds Switcher -->
-        <div id="multi-round-selector-wrap" class="hidden mt-4 pt-3 border-t border-white/10 flex items-center gap-2 text-xs">
-          <label for="select-active-round" class="font-semibold text-blue-200">Chọn đợt:</label>
-          <select id="select-active-round" onchange="onRoundSelected(this.value)" class="bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1 text-white font-medium focus:ring-2 focus:ring-amber-400 focus:outline-none">
-          </select>
-        </div>
-      </div>
-
-      <!-- NON-ELIGIBLE BANNER -->
-      <div id="non-eligible-alert" class="hidden card-surface bg-amber-50/90 border border-amber-200 p-5 text-amber-900 rounded-2xl shadow-sm">
-        <div class="flex items-start gap-3.5">
-          <span class="text-2xl mt-0.5">ℹ️</span>
-          <div class="flex-1">
-            <h3 class="font-bold text-sm sm:text-base text-amber-950">Bạn chưa có trong danh sách sinh viên đủ điều kiện đăng ký Đồ án tốt nghiệp đợt này.</h3>
-            <p class="text-xs sm:text-sm text-amber-800 mt-1 leading-relaxed">
-              Bạn vẫn có thể xem thông tin đợt, danh sách Giảng viên hướng dẫn, chuyên môn và liên hệ bên dưới. Chức năng nộp đơn đăng ký hiện đang bị khóa. Nếu cần hỗ trợ, vui lòng liên hệ Văn phòng Khoa.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- OFFICIAL RESULT CARD (When round published) -->
-      <!-- STUDENT FINAL SCORE & RANKING CARD (v2.1.0-beta.1) -->
-      <div id="student-final-score-card" class="hidden card-surface bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 text-white p-6 rounded-2xl shadow-xl border border-purple-400/30 space-y-4">
-        <div class="flex items-center justify-between border-b border-white/20 pb-4">
-          <div class="flex items-center gap-3">
-            <span class="text-3xl">🎓</span>
-            <div>
-              <span class="badge bg-amber-400 text-slate-900 font-extrabold text-xs mb-1">KẾT QUẢ ĐỒ ÁN TỐT NGHIỆP</span>
-              <h2 class="text-lg sm:text-xl font-black text-white">ĐIỂM TỔNG KẾT & XẾP HẠNG CHÍNH THỨC</h2>
-            </div>
-          </div>
-          <div id="student-final-score-title-badge" class="hidden">
-            <!-- Thủ khoa / Á khoa badge -->
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-          <div class="p-3 bg-white/10 rounded-xl border border-white/10">
-            <span class="text-[11px] text-purple-200 block">Điểm GVHD</span>
-            <span id="st-card-gvhd-score" class="text-base font-mono font-black text-white">--</span>
-          </div>
-          <div class="p-3 bg-white/10 rounded-xl border border-white/10">
-            <span class="text-[11px] text-purple-200 block">Điểm Thuyết minh (TM)</span>
-            <span id="st-card-tm-score" class="text-base font-mono font-black text-white">--</span>
-          </div>
-          <div class="p-3 bg-white/10 rounded-xl border border-white/10">
-            <span class="text-[11px] text-purple-200 block">Điểm Bảo vệ (HĐ)</span>
-            <span id="st-card-defense-score" class="text-base font-mono font-black text-white">--</span>
-          </div>
-          <div class="p-3 bg-amber-400/20 border border-amber-400/40 rounded-xl">
-            <span class="text-[11px] text-amber-300 block font-bold">ĐIỂM TỔNG KẾT</span>
-            <span id="st-card-final-score" class="text-xl font-mono font-black text-amber-300">--</span>
-          </div>
-        </div>
-
-        <div id="st-card-ranking-wrap" class="hidden pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-          <div>
-            <span class="text-slate-300">Thứ hạng toàn đợt:</span>
-            <span id="st-card-rank-display" class="font-black font-mono text-base text-white ml-2">--</span>
-          </div>
-          <div id="st-card-title-display" class="font-black text-amber-300 text-sm">
-            <!-- Danh hiệu -->
-          </div>
-        </div>
-      </div>
-
-      <div id="official-result-card" class="hidden card-surface bg-gradient-to-br from-indigo-900 via-blue-900 to-slate-900 text-white p-6 rounded-2xl shadow-xl border border-blue-400/30">
-        <div class="flex items-center gap-3 border-b border-white/20 pb-4 mb-4">
-          <span class="text-3xl">🎉</span>
-          <div>
-            <span class="badge bg-amber-400 text-slate-900 font-extrabold text-xs mb-1">KẾT QUẢ PHÂN CÔNG CHÍNH THỨC</span>
-            <h2 class="text-lg sm:text-xl font-black text-white">KẾT QUẢ XÉT DUYỆT GIẢNG VIÊN HƯỚNG DẪN</h2>
-          </div>
-        </div>
-
-        <div id="official-result-body" class="space-y-4">
-          <!-- Populated dynamically -->
-        </div>
-      </div>
-
-      <!-- REVIEW IN PROGRESS BANNER -->
-      <div id="review-in-progress-card" class="hidden card-surface bg-blue-50/90 border border-blue-200 p-5 text-blue-950 rounded-2xl shadow-sm">
-        <div class="flex items-start gap-3.5">
-          <span class="text-2xl mt-0.5">🔍</span>
-          <div class="flex-1">
-            <div class="flex items-center gap-2">
-              <span id="review-round-tag" class="badge bg-blue-200 text-blue-900 font-bold">ĐANG XÉT NGUYỆN VỌNG</span>
-            </div>
-            <h3 class="font-bold text-sm sm:text-base text-blue-950 mt-1">Hồ sơ của bạn đang trong quá trình xét duyệt</h3>
-            <p class="text-xs text-blue-800 mt-1 leading-relaxed">
-              Hội đồng Khoa và các Giảng viên hướng dẫn đang tiến hành xét duyệt nguyện vọng theo từng vòng. Kết quả phân công chính thức sẽ được công bố sau khi hoàn tất tất cả các vòng xét.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- ALREADY REGISTERED STATUS CARD -->
-      <div id="already-registered-card" class="hidden card-surface bg-emerald-50/70 border border-emerald-200 p-5 sm:p-6 rounded-2xl shadow-sm">
-        <div id="reg-card-eligibility-banner" class="hidden mb-4"></div>
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-emerald-200/80">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-xl font-bold shadow-md">
-              ✓
-            </div>
-            <div>
-              <span class="badge bg-emerald-200 text-emerald-800 font-bold mb-1">ĐÃ ĐĂNG KÝ THÀNH CÔNG</span>
-              <h2 class="text-lg font-extrabold text-slate-900" id="reg-card-topic">Thiết kế nội thất...</h2>
-              <p class="text-xs text-slate-500" id="reg-card-time">Thời gian nộp: --/--/---- --:--</p>
-            </div>
-          </div>
-          <button id="btn-edit-existing-reg" onclick="enableEditRegistration()" class="hidden px-4 py-2 bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto">
-            ✏️ Chỉnh sửa đăng ký
-          </button>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          <div>
-            <span class="font-semibold text-slate-500 block">Loại hình đồ án:</span>
-            <span id="reg-card-type" class="font-bold text-slate-800 text-sm">--</span>
-          </div>
-          <div>
-            <span class="font-semibold text-slate-500 block">Trạng thái hồ sơ:</span>
-            <span id="reg-card-status" class="font-bold text-emerald-700 text-sm">Đã ghi nhận (Chờ xét duyệt)</span>
-          </div>
-        </div>
-
-        <div class="mt-4 pt-3 border-t border-emerald-100">
-          <span class="font-bold text-slate-700 text-xs block mb-2">Nguyện vọng đã chọn:</span>
-          <div id="reg-card-preferences-list" class="space-y-2">
-            <!-- Populated dynamically -->
-          </div>
-        </div>
-      </div>
-
-      <!-- STUDENT TIMELINE: KẾ HOẠCH ĐỒ ÁN TỐT NGHIỆP -->
-      <div id="student-timeline-section" class="card-surface p-5 sm:p-6 space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="text-xl">📅</span>
-              <h2 class="text-base sm:text-lg font-black text-slate-900 tracking-tight">KẾ HOẠCH ĐỒ ÁN TỐT NGHIỆP</h2>
-              <span class="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold border border-blue-200">Timeline</span>
-            </div>
-            <p class="text-xs text-slate-500 mt-1">Lộ trình thực hiện, các mốc kiểm tra và bảo vệ đồ án tốt nghiệp trong đợt.</p>
-          </div>
-          <div id="student-timeline-header-actions" class="flex items-center gap-2">
-            <!-- Toggle full/collapsed timeline button -->
-          </div>
-        </div>
-
-        <div id="student-timeline-list" class="space-y-3">
-          <div class="p-6 text-center text-slate-400 text-xs">Đang tải kế hoạch đồ án tốt nghiệp...</div>
-        </div>
-      </div>
-
-      <!-- REGISTRATION FORM CONTAINER -->
-      <div id="registration-flow-container" class="space-y-6">
-
-        <!-- STEPPER HEADER -->
-        <div class="card-surface p-4 sm:p-5">
-          <div class="flex items-center justify-between max-w-xl mx-auto relative">
-            <div class="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-0.5 bg-slate-200 -z-0"></div>
-            
-            <div id="step-indicator-1" class="stepper-item active flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer" onclick="goToStep(1)">
-              <div class="stepper-circle">1</div>
-              <span class="text-[11px] font-bold text-slate-700">Đề tài & Loại hình</span>
-            </div>
-
-            <div id="step-indicator-2" class="stepper-item flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer" onclick="goToStep(2)">
-              <div class="stepper-circle">2</div>
-              <span class="text-[11px] font-bold text-slate-700">Chọn GVHD</span>
-            </div>
-
-            <div id="step-indicator-3" class="stepper-item flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer" onclick="goToStep(3)">
-              <div class="stepper-circle">3</div>
-              <span class="text-[11px] font-bold text-slate-700">Xác nhận</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- STEP 1: TOPIC & PROJECT TYPE -->
-        <div id="step-panel-1" class="card-surface p-6 space-y-6">
-          <div class="border-b pb-4">
-            <h2 class="text-lg font-bold text-tdtu-blue">1. Thông tin Đồ án Dự kiến</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Vui lòng điền tên đề tài dự kiến và phân loại đồ án trước khi chọn GVHD.</p>
-          </div>
-
-          <div class="space-y-4 max-w-2xl">
-            <div>
-              <label for="input-topic-title" class="block text-xs font-bold uppercase text-slate-600 mb-1.5">
-                Tên đề tài tốt nghiệp dự kiến <span class="text-rose-500">*</span>
-              </label>
-              <input type="text" id="input-topic-title" placeholder="Ví dụ: Thiết kế nội thất Trung tâm Văn hóa Nghệ thuật Đương đại..." class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none shadow-sm" maxlength="250">
-              <p id="topic-title-error" class="hidden text-rose-600 text-xs font-semibold mt-1"></p>
-              <div class="flex justify-between text-[11px] text-slate-400 mt-1">
-                <span>Tên đề tài có thể chỉnh sửa sau theo quy định của đợt.</span>
-                <span id="topic-char-count">0/250</span>
+              <!-- Quick Metrics Bar inside Hero -->
+              <div class="flex flex-wrap items-center gap-3 pt-2 text-xs text-blue-100">
+                <div class="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10">
+                  <span>📌</span>
+                  <span id="hero-milestones-count">-- mốc kế hoạch</span>
+                </div>
+                <div class="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10">
+                  <span>👨‍🏫</span>
+                  <span id="hero-assigned-sup">GVHD: Chưa phân công</span>
+                </div>
               </div>
             </div>
 
-            <div>
-              <label for="select-project-type" class="block text-xs font-bold uppercase text-slate-600 mb-1.5">
-                Loại hình đồ án <span class="text-rose-500">*</span>
-              </label>
-              <select id="select-project-type" class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none shadow-sm">
-                <option value="">-- Chọn loại hình đồ án --</option>
-                <option value="Nhà ở dân dụng">Nhà ở dân dụng</option>
-                <option value="Thương mại dịch vụ">Thương mại dịch vụ</option>
-                <option value="Cảnh quan">Cảnh quan</option>
-                <option value="Giáo dục / nghiên cứu">Giáo dục / nghiên cứu</option>
-                <option value="Văn phòng">Văn phòng</option>
-                <option value="Văn hóa / triển lãm / bảo tàng">Văn hóa / triển lãm / bảo tàng</option>
-                <option value="Resort / khách sạn">Resort / khách sạn</option>
-                <option value="F&B – Nhà hàng / Cafe / Bar / Pub">F&B – Nhà hàng / Cafe / Bar / Pub</option>
-                <option value="Dịch vụ sức khỏe">Dịch vụ sức khỏe</option>
-                <option value="Bến tàu / bến xe">Bến tàu / bến xe</option>
-                <option value="Khác">Khác</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="pt-4 flex justify-end">
-            <button type="button" onclick="validateAndGoToStep2()" class="px-6 py-2.5 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center gap-2">
-              <span>Tiếp tục: Chọn GVHD</span>
-              <span>→</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- STEP 2: SUPERVISOR SELECTION -->
-        <div id="step-panel-2" class="hidden space-y-6">
-
-          <!-- TOP SUMMARY TRAY -->
-          <div class="card-surface p-4 bg-slate-900 text-white rounded-2xl shadow-md sticky top-20 z-30">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <!-- Countdown Widget -->
+            <div class="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-sm flex items-center gap-4 min-w-[240px] shrink-0 self-start lg:self-auto">
+              <div class="w-11 h-11 rounded-xl bg-amber-400 text-slate-900 flex items-center justify-center text-xl font-bold shadow-inner">
+                ⏱️
+              </div>
               <div>
-                <span class="text-xs font-bold uppercase text-amber-400 tracking-wider">Danh sách Nguyện vọng</span>
-                <p class="text-[11px] text-slate-300" id="tray-mode-hint">Chọn đủ 3 nguyện vọng theo thứ tự ưu tiên giảm dần</p>
-              </div>
-
-              <!-- Badges Container -->
-              <div id="preferences-tray-items" class="flex flex-wrap items-center gap-2">
+                <span id="countdown-label" class="text-[11px] font-semibold text-blue-200 block uppercase tracking-wider">Thời gian còn lại</span>
+                <span id="countdown-value" class="text-base sm:text-lg font-black text-white font-mono tracking-tight pulse-timer">-- ngày --:--:--</span>
               </div>
             </div>
           </div>
 
-          <!-- WIZARD SUB-HEADER -->
-          <div id="wizard-sub-stepper" class="hidden card-surface p-4 bg-blue-50/80 border-blue-200">
-            <div class="flex items-center justify-between">
-              <div>
-                <span class="text-xs font-bold text-blue-800 uppercase" id="wizard-current-rank-label">ĐANG CHỌN: NGUYỆN VỌNG 1 / 3</span>
-                <p class="text-[11px] text-blue-600">Chọn 1 Giảng viên hướng dẫn bạn ưu tiên cao nhất.</p>
-              </div>
-              <div class="flex items-center gap-2">
-                <button id="btn-wizard-prev-rank" onclick="stepWizardRank(-1)" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all">← NV trước</button>
-                <button id="btn-wizard-next-rank" onclick="stepWizardRank(1)" class="px-3 py-1.5 bg-blue-600 rounded-lg text-xs font-bold text-white hover:bg-blue-700 transition-all">NV tiếp →</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- SEARCH & FILTER BAR -->
-          <div class="card-surface p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div class="relative w-full sm:w-80">
-              <input type="text" id="search-supervisor-input" oninput="filterSupervisorsList()" placeholder="Tìm theo tên GV, chuyên môn..." class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none">
-              <span class="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
-            </div>
-
-            <div class="flex items-center gap-2 text-xs">
-              <span class="text-slate-500 font-semibold">Hiển thị:</span>
-              <span id="supervisors-count-badge" class="font-bold text-slate-800">0 giảng viên</span>
-            </div>
-          </div>
-
-          <!-- SUPERVISORS GRID -->
-          <div id="supervisors-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          </div>
-
-          <div class="pt-4 flex justify-between">
-            <button type="button" onclick="goToStep(1)" class="px-5 py-2.5 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-sm rounded-xl transition-all">
-              ← Quay lại Bước 1
-            </button>
-            <button type="button" onclick="validateAndGoToStep3()" class="px-6 py-2.5 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center gap-2">
-              <span>Tiếp tục: Xem lại & Nộp</span>
-              <span>→</span>
-            </button>
+          <!-- Multiple Rounds Switcher -->
+          <div id="multi-round-selector-wrap" class="hidden mt-4 pt-3 border-t border-white/10 flex items-center gap-2 text-xs">
+            <label for="select-active-round" class="font-semibold text-blue-200">Chọn đợt:</label>
+            <select id="select-active-round" onchange="onRoundSelected(this.value)" class="bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1 text-white font-medium focus:ring-2 focus:ring-amber-400 focus:outline-none">
+            </select>
           </div>
         </div>
 
-        <!-- STEP 3: CONFIRMATION -->
-        <div id="step-panel-3" class="hidden card-surface p-6 space-y-6">
-          <div class="border-b pb-4">
-            <h2 class="text-lg font-bold text-tdtu-blue">3. Kiểm tra & Xác nhận Đăng ký</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Vui lòng rà soát kỹ các thông tin trước khi xác nhận gửi chính thức.</p>
-          </div>
-
-          <div class="space-y-4 max-w-3xl text-xs">
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
-              <div class="flex items-start justify-between">
-                <span class="font-bold text-slate-500 uppercase">Tên đề tài dự kiến:</span>
-                <button type="button" onclick="goToStep(1)" class="text-blue-600 hover:underline font-bold">Chỉnh sửa</button>
-              </div>
-              <p id="confirm-topic-title" class="font-bold text-sm text-slate-900 leading-snug">--</p>
-            </div>
-
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1">
-              <span class="font-bold text-slate-500 uppercase">Loại hình đồ án:</span>
-              <p id="confirm-project-type" class="font-bold text-slate-800">--</p>
-            </div>
-
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-slate-500 uppercase">Danh sách Nguyện vọng GVHD:</span>
-                <button type="button" onclick="goToStep(2)" class="text-blue-600 hover:underline font-bold">Chỉnh sửa</button>
-              </div>
-              <div id="confirm-preferences-list" class="space-y-2">
+        <!-- 2. STUDENT PROGRESS / JOURNEY (7-STEP STEPPER) -->
+        <div id="student-journey-card" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-lg">🗺️</span>
+              <div>
+                <h2 class="text-sm font-black text-slate-900 uppercase tracking-wide">Lộ trình Đồ án Tốt nghiệp</h2>
+                <p class="text-[11px] text-slate-500">Quy trình 7 bước từ xét điều kiện đến công bố kết quả chính thức</p>
               </div>
             </div>
+            <span id="journey-overall-badge" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">Đang tiến hành</span>
           </div>
 
-          <div class="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed">
-            ⚠️ <strong>LƯU Ý:</strong> Sau khi bấm <em>Xác nhận Đăng ký</em>, hệ thống sẽ lưu thông tin của bạn vào cơ sở dữ liệu đợt. Bạn có thể thay đổi nguyện vọng trong thời gian đợt đăng ký còn mở (nếu đợt cho phép).
+          <!-- 7 Steps Stepper Container -->
+          <div id="journey-steps-list" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 text-xs">
+            <!-- Populated dynamically by updateStudentJourneyStepper() -->
+          </div>
+        </div>
+
+        <!-- 3. TWO-COLUMN LAYOUT (DESKTOP: 8 COLS LEFT / 4 COLS RIGHT) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+          <!-- LEFT COLUMN: MAIN CONTENT MODULES (lg:col-span-8) -->
+          <div class="lg:col-span-8 space-y-6">
+
+            <!-- NON-ELIGIBLE BANNER -->
+            <div id="non-eligible-alert" class="hidden card-surface bg-amber-50/90 border border-amber-200 p-5 text-amber-900 rounded-2xl shadow-sm">
+              <div class="flex items-start gap-3.5">
+                <span class="text-2xl mt-0.5">ℹ️</span>
+                <div class="flex-1">
+                  <h3 class="font-bold text-sm sm:text-base text-amber-950">Bạn chưa có trong danh sách sinh viên đủ điều kiện đăng ký Đồ án tốt nghiệp đợt này.</h3>
+                  <p class="text-xs sm:text-sm text-amber-800 mt-1 leading-relaxed">
+                    Bạn vẫn có thể xem thông tin đợt, danh sách Giảng viên hướng dẫn, chuyên môn và kế hoạch bên dưới. Chức năng nộp đơn đăng ký hiện đang bị khóa. Nếu cần hỗ trợ, vui lòng liên hệ Văn phòng Khoa.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- MODULE 5: ĐIỂM & BẢO VỆ (STUDENT FINAL SCORE & RANKING CARD) -->
+            <div id="student-final-score-card" class="hidden card-surface bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900 text-white p-6 rounded-2xl shadow-xl border border-purple-400/30 space-y-4">
+              <div class="flex items-center justify-between border-b border-white/20 pb-4">
+                <div class="flex items-center gap-3">
+                  <span class="text-3xl">🎓</span>
+                  <div>
+                    <span class="badge bg-amber-400 text-slate-900 font-extrabold text-xs mb-1">KẾT QUẢ ĐỒ ÁN TỐT NGHIỆP</span>
+                    <h2 class="text-lg sm:text-xl font-black text-white">ĐIỂM TỔNG KẾT & XẾP HẠNG CHÍNH THỨC</h2>
+                  </div>
+                </div>
+                <div id="student-final-score-title-badge" class="hidden">
+                  <!-- Thủ khoa / Á khoa badge -->
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div class="p-3 bg-white/10 rounded-xl border border-white/10">
+                  <span class="text-[11px] text-purple-200 block">Điểm GVHD</span>
+                  <span id="st-card-gvhd-score" class="text-base font-mono font-black text-white">--</span>
+                </div>
+                <div class="p-3 bg-white/10 rounded-xl border border-white/10">
+                  <span class="text-[11px] text-purple-200 block">Điểm Thuyết minh (TM)</span>
+                  <span id="st-card-tm-score" class="text-base font-mono font-black text-white">--</span>
+                </div>
+                <div class="p-3 bg-white/10 rounded-xl border border-white/10">
+                  <span class="text-[11px] text-purple-200 block">Điểm Bảo vệ (HĐ)</span>
+                  <span id="st-card-defense-score" class="text-base font-mono font-black text-white">--</span>
+                </div>
+                <div class="p-3 bg-amber-400/20 border border-amber-400/40 rounded-xl">
+                  <span class="text-[11px] text-amber-300 block font-bold">ĐIỂM TỔNG KẾT</span>
+                  <span id="st-card-final-score" class="text-xl font-mono font-black text-amber-300">--</span>
+                </div>
+              </div>
+
+              <div id="st-card-ranking-wrap" class="hidden pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+                <div>
+                  <span class="text-slate-300">Thứ hạng toàn đợt:</span>
+                  <span id="st-card-rank-display" class="font-black font-mono text-base text-white ml-2">--</span>
+                </div>
+                <div id="st-card-title-display" class="font-black text-amber-300 text-sm">
+                  <!-- Danh hiệu -->
+                </div>
+              </div>
+            </div>
+
+            <!-- MODULE 4: KẾT QUẢ PHÂN CÔNG GVHD (OFFICIAL RESULT CARD) -->
+            <div id="official-result-card" class="hidden card-surface bg-gradient-to-br from-indigo-900 via-blue-900 to-slate-900 text-white p-6 rounded-2xl shadow-xl border border-blue-400/30">
+              <div class="flex items-center gap-3 border-b border-white/20 pb-4 mb-4">
+                <span class="text-3xl">🎉</span>
+                <div>
+                  <span class="badge bg-amber-400 text-slate-900 font-extrabold text-xs mb-1">KẾT QUẢ PHÂN CÔNG CHÍNH THỨC</span>
+                  <h2 class="text-lg sm:text-xl font-black text-white">KẾT QUẢ XÉT DUYỆT GIẢNG VIÊN HƯỚNG DẪN</h2>
+                </div>
+              </div>
+
+              <div id="official-result-body" class="space-y-4">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- REVIEW IN PROGRESS BANNER -->
+            <div id="review-in-progress-card" class="hidden card-surface bg-blue-50/90 border border-blue-200 p-5 text-blue-950 rounded-2xl shadow-sm">
+              <div class="flex items-start gap-3.5">
+                <span class="text-2xl mt-0.5">🔍</span>
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <span id="review-round-tag" class="badge bg-blue-200 text-blue-900 font-bold">ĐANG XÉT NGUYỆN VỌNG</span>
+                  </div>
+                  <h3 class="font-bold text-sm sm:text-base text-blue-950 mt-1">Hồ sơ của bạn đang trong quá trình xét duyệt</h3>
+                  <p class="text-xs text-blue-800 mt-1 leading-relaxed">
+                    Hội đồng Khoa và các Giảng viên hướng dẫn đang tiến hành xét duyệt nguyện vọng theo từng vòng. Kết quả phân công chính thức sẽ được công bố sau khi hoàn tất tất cả các vòng xét.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- MODULE 3: ĐĂNG KÝ ĐỀ TÀI & CHỌN GVHD -->
+
+            <!-- 3A: REGISTRATION CTA HERO CARD (WHEN UNREGISTERED & OPEN) -->
+            <div id="registration-cta-card" class="hidden card-surface p-6 bg-gradient-to-br from-blue-50 via-white to-blue-50/50 border-2 border-blue-200 rounded-2xl shadow-sm text-center space-y-4">
+              <div class="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto text-2xl font-black shadow-md">
+                ✍️
+              </div>
+              <div>
+                <span class="badge bg-blue-100 text-blue-800 font-bold text-xs mb-1">ĐỢT ĐANG MỞ ĐĂNG KÝ</span>
+                <h2 class="text-lg sm:text-xl font-black text-slate-900 mt-1">Đăng ký Đề tài & Chọn Giảng viên hướng dẫn</h2>
+                <p class="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                  Vui lòng hoàn thành điền tên đề tài dự kiến, chọn loại hình đồ án và đăng ký các nguyện vọng GVHD theo quy định của Khoa.
+                </p>
+              </div>
+              <div>
+                <button type="button" onclick="startStudentRegistration()" class="px-7 py-3 bg-tdtu-blue hover:bg-tdtu-dark text-white font-extrabold text-sm rounded-xl shadow-md transition-all inline-flex items-center gap-2 cursor-pointer">
+                  <span>🚀 BẮT ĐẦU ĐĂNG KÝ ĐỒ ÁN TỐT NGHIỆP</span>
+                  <span>→</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 3B: ALREADY REGISTERED STATUS CARD -->
+            <div id="already-registered-card" class="hidden card-surface bg-emerald-50/70 border border-emerald-200 p-5 sm:p-6 rounded-2xl shadow-sm">
+              <div id="reg-card-eligibility-banner" class="hidden mb-4"></div>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-emerald-200/80">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-xl font-bold shadow-md">
+                    ✓
+                  </div>
+                  <div>
+                    <span class="badge bg-emerald-200 text-emerald-800 font-bold mb-1">ĐÃ ĐĂNG KÝ THÀNH CÔNG</span>
+                    <h2 class="text-lg font-extrabold text-slate-900" id="reg-card-topic">Thiết kế nội thất...</h2>
+                    <p class="text-xs text-slate-500" id="reg-card-time">Thời gian nộp: --/--/---- --:--</p>
+                  </div>
+                </div>
+                <button id="btn-edit-existing-reg" onclick="enableEditRegistration()" class="hidden px-4 py-2 bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto cursor-pointer">
+                  ✏️ Chỉnh sửa đăng ký
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <span class="font-semibold text-slate-500 block">Loại hình đồ án:</span>
+                  <span id="reg-card-type" class="font-bold text-slate-800 text-sm">--</span>
+                </div>
+                <div>
+                  <span class="font-semibold text-slate-500 block">Trạng thái hồ sơ:</span>
+                  <span id="reg-card-status" class="font-bold text-emerald-700 text-sm">Đã ghi nhận (Chờ xét duyệt)</span>
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-emerald-100">
+                <span class="font-bold text-slate-700 text-xs block mb-2">Nguyện vọng đã chọn:</span>
+                <div id="reg-card-preferences-list" class="space-y-2">
+                  <!-- Populated dynamically -->
+                </div>
+              </div>
+            </div>
+
+            <!-- 3C: REGISTRATION FLOW CONTAINER (3-STEP STEPPER) -->
+            <div id="registration-flow-container" class="hidden space-y-6">
+
+              <!-- STEPPER HEADER -->
+              <div class="card-surface p-4 sm:p-5">
+                <div class="flex items-center justify-between max-w-xl mx-auto relative">
+                  <div class="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-0.5 bg-slate-200 -z-0"></div>
+                  
+                  <div id="step-indicator-1" class="stepper-item active flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer" onclick="goToStep(1)">
+                    <div class="stepper-circle">1</div>
+                    <span class="text-[11px] font-bold text-slate-700">Đề tài & Loại hình</span>
+                  </div>
+
+                  <div id="step-indicator-2" class="stepper-item flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer" onclick="goToStep(2)">
+                    <div class="stepper-circle">2</div>
+                    <span class="text-[11px] font-bold text-slate-700">Chọn GVHD</span>
+                  </div>
+
+                  <div id="step-indicator-3" class="stepper-item flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer" onclick="goToStep(3)">
+                    <div class="stepper-circle">3</div>
+                    <span class="text-[11px] font-bold text-slate-700">Xác nhận</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- STEP 1: TOPIC & PROJECT TYPE -->
+              <div id="step-panel-1" class="card-surface p-6 space-y-6">
+                <div class="border-b pb-4">
+                  <h2 class="text-lg font-bold text-tdtu-blue">1. Thông tin Đồ án Dự kiến</h2>
+                  <p class="text-xs text-slate-500 mt-0.5">Vui lòng điền tên đề tài dự kiến và phân loại đồ án trước khi chọn GVHD.</p>
+                </div>
+
+                <div class="space-y-4 max-w-2xl">
+                  <div>
+                    <label for="input-topic-title" class="block text-xs font-bold uppercase text-slate-600 mb-1.5">
+                      Tên đề tài tốt nghiệp dự kiến <span class="text-rose-500">*</span>
+                    </label>
+                    <input type="text" id="input-topic-title" placeholder="Ví dụ: Thiết kế nội thất Trung tâm Văn hóa Nghệ thuật Đương đại..." class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none shadow-sm" maxlength="250">
+                    <p id="topic-title-error" class="hidden text-rose-600 text-xs font-semibold mt-1"></p>
+                    <div class="flex justify-between text-[11px] text-slate-400 mt-1">
+                      <span>Tên đề tài có thể chỉnh sửa sau theo quy định của đợt.</span>
+                      <span id="topic-char-count">0/250</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label for="select-project-type" class="block text-xs font-bold uppercase text-slate-600 mb-1.5">
+                      Loại hình đồ án <span class="text-rose-500">*</span>
+                    </label>
+                    <select id="select-project-type" class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none shadow-sm">
+                      <option value="">-- Chọn loại hình đồ án --</option>
+                      <option value="Nhà ở dân dụng">Nhà ở dân dụng</option>
+                      <option value="Thương mại dịch vụ">Thương mại dịch vụ</option>
+                      <option value="Cảnh quan">Cảnh quan</option>
+                      <option value="Giáo dục / nghiên cứu">Giáo dục / nghiên cứu</option>
+                      <option value="Văn phòng">Văn phòng</option>
+                      <option value="Văn hóa / triển lãm / bảo tàng">Văn hóa / triển lãm / bảo tàng</option>
+                      <option value="Resort / khách sạn">Resort / khách sạn</option>
+                      <option value="F&B – Nhà hàng / Cafe / Bar / Pub">F&B – Nhà hàng / Cafe / Bar / Pub</option>
+                      <option value="Dịch vụ sức khỏe">Dịch vụ sức khỏe</option>
+                      <option value="Bến tàu / bến xe">Bến tàu / bến xe</option>
+                      <option value="Khác">Khác</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="pt-4 flex justify-between items-center">
+                  <button type="button" onclick="cancelRegistrationEdit()" class="px-4 py-2 border border-slate-300 text-slate-600 hover:bg-slate-100 font-bold text-xs rounded-xl transition-all cursor-pointer">
+                    Quay lại
+                  </button>
+                  <button type="button" onclick="validateAndGoToStep2()" class="px-6 py-2.5 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer">
+                    <span>Tiếp tục: Chọn GVHD</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- STEP 2: SUPERVISOR SELECTION -->
+              <div id="step-panel-2" class="hidden space-y-6">
+
+                <!-- TOP SUMMARY TRAY -->
+                <div class="card-surface p-4 bg-slate-900 text-white rounded-2xl shadow-md sticky top-20 z-30">
+                  <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div>
+                      <span class="text-xs font-bold uppercase text-amber-400 tracking-wider">Danh sách Nguyện vọng</span>
+                      <p class="text-[11px] text-slate-300" id="tray-mode-hint">Chọn đủ 3 nguyện vọng theo thứ tự ưu tiên giảm dần</p>
+                    </div>
+
+                    <!-- Badges Container -->
+                    <div id="preferences-tray-items" class="flex flex-wrap items-center gap-2">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- WIZARD SUB-HEADER -->
+                <div id="wizard-sub-stepper" class="hidden card-surface p-4 bg-blue-50/80 border-blue-200">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <span class="text-xs font-bold text-blue-800 uppercase" id="wizard-current-rank-label">ĐANG CHỌN: NGUYỆN VỌNG 1 / 3</span>
+                      <p class="text-[11px] text-blue-600">Chọn 1 Giảng viên hướng dẫn bạn ưu tiên cao nhất.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button id="btn-wizard-prev-rank" onclick="stepWizardRank(-1)" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all">← NV trước</button>
+                      <button id="btn-wizard-next-rank" onclick="stepWizardRank(1)" class="px-3 py-1.5 bg-blue-600 rounded-lg text-xs font-bold text-white hover:bg-blue-700 transition-all">NV tiếp →</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SEARCH & FILTER BAR -->
+                <div class="card-surface p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div class="relative w-full sm:w-80">
+                    <input type="text" id="search-supervisor-input" oninput="filterSupervisorsList()" placeholder="Tìm theo tên GV, chuyên môn..." class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none">
+                    <span class="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+                  </div>
+
+                  <div class="flex items-center gap-2 text-xs">
+                    <span class="text-slate-500 font-semibold">Hiển thị:</span>
+                    <span id="supervisors-count-badge" class="font-bold text-slate-800">0 giảng viên</span>
+                  </div>
+                </div>
+
+                <!-- SUPERVISORS GRID -->
+                <div id="supervisors-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                </div>
+
+                <div class="pt-4 flex justify-between">
+                  <button type="button" onclick="goToStep(1)" class="px-5 py-2.5 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-sm rounded-xl transition-all cursor-pointer">
+                    ← Quay lại Bước 1
+                  </button>
+                  <button type="button" onclick="validateAndGoToStep3()" class="px-6 py-2.5 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer">
+                    <span>Tiếp tục: Xem lại & Nộp</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- STEP 3: CONFIRMATION -->
+              <div id="step-panel-3" class="hidden card-surface p-6 space-y-6">
+                <div class="border-b pb-4">
+                  <h2 class="text-lg font-bold text-tdtu-blue">3. Kiểm tra & Xác nhận Đăng ký</h2>
+                  <p class="text-xs text-slate-500 mt-0.5">Vui lòng rà soát kỹ các thông tin trước khi xác nhận gửi chính thức.</p>
+                </div>
+
+                <div class="space-y-4 max-w-3xl text-xs">
+                  <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                    <div class="flex items-start justify-between">
+                      <span class="font-bold text-slate-500 uppercase">Tên đề tài dự kiến:</span>
+                      <button type="button" onclick="goToStep(1)" class="text-blue-600 hover:underline font-bold cursor-pointer">Chỉnh sửa</button>
+                    </div>
+                    <p id="confirm-topic-title" class="font-bold text-sm text-slate-900 leading-snug">--</p>
+                  </div>
+
+                  <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1">
+                    <span class="font-bold text-slate-500 uppercase">Loại hình đồ án:</span>
+                    <p id="confirm-project-type" class="font-bold text-slate-800">--</p>
+                  </div>
+
+                  <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="font-bold text-slate-500 uppercase">Danh sách Nguyện vọng GVHD:</span>
+                      <button type="button" onclick="goToStep(2)" class="text-blue-600 hover:underline font-bold cursor-pointer">Chỉnh sửa</button>
+                    </div>
+                    <div id="confirm-preferences-list" class="space-y-2">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed">
+                  ⚠️ <strong>LƯU Ý:</strong> Sau khi bấm <em>Xác nhận Đăng ký</em>, hệ thống sẽ lưu thông tin của bạn vào cơ sở dữ liệu đợt. Bạn có thể thay đổi nguyện vọng trong thời gian đợt đăng ký còn mở (nếu đợt cho phép).
+                </div>
+
+                <div class="pt-4 flex justify-between">
+                  <button type="button" onclick="goToStep(2)" class="px-5 py-2.5 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-sm rounded-xl transition-all cursor-pointer">
+                    ← Quay lại Bước 2
+                  </button>
+                  <button id="btn-submit-registration" type="button" onclick="submitRegistration()" class="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer">
+                    <span>🚀 XÁC NHẬN ĐĂNG KÝ CHÍNH THỨC</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- MODULE 2: KẾ HOẠCH & NỘP BÀI (STUDENT TIMELINE & SUBMISSION) -->
+            <div id="student-timeline-section" class="card-surface p-5 sm:p-6 space-y-4">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xl">📅</span>
+                    <h2 class="text-base sm:text-lg font-black text-slate-900 tracking-tight">KẾ HOẠCH & NỘP BÀI ĐỒ ÁN TỐT NGHIỆP</h2>
+                    <span class="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold border border-blue-200">Timeline & Nộp bài</span>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-1">Lộ trình thực hiện, các mốc kiểm tra và nộp bài trực tuyến theo từng giai đoạn.</p>
+                </div>
+                <div id="student-timeline-header-actions" class="flex items-center gap-2">
+                  <!-- Toggle full/collapsed timeline button -->
+                </div>
+              </div>
+
+              <div id="student-timeline-list" class="space-y-3">
+                <div class="p-6 text-center text-slate-400 text-xs">Đang tải kế hoạch đồ án tốt nghiệp...</div>
+              </div>
+            </div>
+
           </div>
 
-          <div class="pt-4 flex justify-between">
-            <button type="button" onclick="goToStep(2)" class="px-5 py-2.5 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-sm rounded-xl transition-all">
-              ← Quay lại Bước 2
-            </button>
-            <button id="btn-submit-registration" type="button" onclick="submitRegistration()" class="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-xl shadow-lg transition-all flex items-center gap-2">
-              <span>🚀 XÁC NHẬN ĐĂNG KÝ CHÍNH THỨC</span>
-            </button>
+          <!-- RIGHT COLUMN: PERSONAL STATUS SIDEBAR (lg:col-span-4) -->
+          <div class="lg:col-span-4 space-y-6 lg:sticky lg:top-20">
+
+            <!-- Student Profile & Status Summary Card -->
+            <div id="student-status-sidebar" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <!-- Populated dynamically by updateStudentPersonalSidebar() -->
+            </div>
+
+            <!-- Student Support Card -->
+            <div class="card-surface p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 space-y-2">
+              <div class="flex items-center gap-2 font-bold text-slate-800">
+                <span>ℹ️</span>
+                <span>Hỗ trợ Sinh viên ĐATN</span>
+              </div>
+              <p class="text-[11px] leading-relaxed text-slate-500">
+                Mọi thắc mắc về điều kiện xét duyệt, phân công GVHD hoặc sự cố nộp bài, sinh viên vui lòng liên hệ Văn phòng Khoa Mỹ thuật Công nghiệp.
+              </p>
+              <div class="pt-2 text-[11px] font-mono text-slate-600 border-t border-slate-200/80 flex flex-col gap-1">
+                <span>📍 Văn phòng Khoa: P.402 Nhà C</span>
+                <span>✉️ Email: mythuatcongnghiep@tdtu.edu.vn</span>
+              </div>
+            </div>
+
           </div>
+
         </div>
 
       </div>
 
     </section>
 
-    <!-- VIEW 2: SUPERVISOR VIEW (PHASE 2A REVIEW WORKFLOW) -->
-    <section id="view-supervisor" class="hidden space-y-6">
+<section id="view-supervisor" class="hidden space-y-6">
 
       <!-- Supervisor Profile & Header Banner -->
       <div class="card-surface p-6 bg-gradient-to-br from-white via-slate-50 to-indigo-50/40 border border-slate-200 shadow-sm">
