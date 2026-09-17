@@ -85,6 +85,9 @@
             <a id="btn-goto-student" href="/graduation/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-200 bg-white/10 hover:bg-white/20 border border-blue-400/30 transition-all shadow-xs" title="Xem Cổng Sinh viên">
               <span>🎓</span> <span class="hidden sm:inline">Cổng SV</span>
             </a>
+            <a id="btn-goto-assessment" href="/graduation/assessment/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-purple-200 bg-white/10 hover:bg-white/20 border border-purple-400/30 transition-all shadow-xs" title="Chuyển sang Cổng Đánh giá">
+              <span>📝</span> <span class="hidden sm:inline">Đánh giá</span>
+            </a>
             <img id="user-avatar" class="w-8 h-8 rounded-full border border-white/30 object-cover shadow-sm" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23fff'/><path fill='%23fff' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" alt="User">
             <div class="hidden lg:block text-right">
               <div id="user-display-name" class="text-xs font-semibold text-white leading-tight">Đang tải...</div>
@@ -620,267 +623,386 @@
 
 <section id="view-supervisor" class="hidden space-y-6">
 
-      <!-- Supervisor Profile & Header Banner -->
-      <div class="card-surface p-6 bg-gradient-to-br from-white via-slate-50 to-indigo-50/40 border border-slate-200 shadow-sm">
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div>
-            <div class="flex items-center gap-2 mb-1.5">
-              <span class="badge bg-indigo-100 text-indigo-800 font-bold">CỔNG XÉT DUYỆT GIẢNG VIÊN HƯỚNG DẪN</span>
-              <span id="sup-active-round-badge" class="badge bg-slate-200 text-slate-800 font-bold">Đang tải...</span>
-            </div>
-            <h1 id="supervisor-greeting-name" class="text-xl sm:text-2xl font-black text-tdtu-blue">Kính chào Thầy/Cô</h1>
-            <p class="text-xs text-slate-500 mt-1" id="supervisor-round-info">Đợt tốt nghiệp: Đang tải...</p>
-          </div>
-
-          <!-- Cumulative Quota Stats Realtime Grid -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3.5 rounded-2xl border border-indigo-100 shadow-sm text-center">
-            <div class="p-2 border-r border-slate-100">
-              <span class="text-[10px] font-bold text-slate-400 block uppercase">Tổng chỉ tiêu</span>
-              <span id="sup-stat-total-cap" class="text-xl font-black text-slate-900">0</span>
-            </div>
-            <div class="p-2 border-r border-slate-100">
-              <span class="text-[10px] font-bold text-slate-400 block uppercase">Đã nhận trước</span>
-              <span id="sup-stat-accepted-prev" class="text-xl font-black text-emerald-600">0</span>
-            </div>
-            <div class="p-2 border-r border-slate-100">
-              <span class="text-[10px] font-bold text-slate-400 block uppercase">Đang chọn vòng này</span>
-              <span id="sup-stat-selected-curr" class="text-xl font-black text-indigo-600">0</span>
-            </div>
-            <div class="p-2">
-              <span class="text-[10px] font-bold text-slate-400 block uppercase">Chỉ tiêu còn lại</span>
-              <span id="sup-stat-remaining-cap" class="text-xl font-black text-amber-600">0</span>
-            </div>
-          </div>
+      <!-- ACCESS DENIED STATE (WHEN USER HAS NO SUPERVISOR ROLE/ASSIGNMENT) -->
+      <div id="supervisor-access-denied" class="hidden card-surface p-12 text-center max-w-lg mx-auto my-8 border border-slate-200 shadow-sm rounded-2xl bg-white space-y-4">
+        <div class="w-16 h-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+          🚫
+        </div>
+        <h3 class="text-lg sm:text-xl font-black text-slate-900 leading-snug">
+          Không có quyền truy cập Cổng Giảng viên
+        </h3>
+        <p class="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
+          Cổng này dành riêng cho Giảng viên Hướng dẫn (GVHD). Tài khoản của bạn không có nhiệm vụ GVHD hoặc chưa được phân công sinh viên trong đợt tốt nghiệp này.
+        </p>
+        <div class="pt-2">
+          <a href="/graduation/" class="px-5 py-2.5 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-xl shadow-md transition-all inline-flex items-center gap-2">
+            <span>🎓 Về Cổng Sinh viên</span>
+          </a>
         </div>
       </div>
 
-      <!-- Supervisor Navigation Sub-tabs -->
-      <div class="card-surface p-3 bg-white flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-2">
-          <button id="sup-tab-btn-review" onclick="switchSupervisorTab('review')" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 shadow-sm transition-all">
-            🎯 Xét duyệt Vòng hiện tại
-          </button>
-          <button id="sup-tab-btn-accepted" onclick="switchSupervisorTab('accepted')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
-            🏆 Danh sách Đã nhận chính thức (<span id="sup-accepted-count-badge">0</span>)
-          </button>
-          <button id="sup-tab-btn-preliminary" onclick="switchSupervisorTab('preliminary')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
-            🎯 Chấm Sơ khảo Đợt TN
-          </button>
-          <button id="sup-tab-btn-reviewer" onclick="switchSupervisorTab('reviewer')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
-            📖 Phản biện Thuyết minh (<span id="sup-reviewer-count-badge">0</span>)
-          </button>
-          <button id="sup-tab-btn-preliminary" onclick="switchSupervisorTab('preliminary')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
-            🎯 Chấm Sơ khảo Đợt TN
-          </button>
-          <button id="sup-tab-btn-reviewer" onclick="switchSupervisorTab('reviewer')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
-            📖 Phản biện Thuyết minh (<span id="sup-reviewer-count-badge">0</span>)
-          </button>
+      <!-- SUPERVISOR WORKSPACE CONTAINER -->
+      <div id="supervisor-workspace-container" class="space-y-6">
+
+        <!-- 1. TOP ROUND SELECTOR BAR -->
+        <div class="card-surface p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2.5">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Đợt tốt nghiệp:</span>
+            <select id="supervisor-round-select" onchange="onSupervisorRoundSelected(this.value)" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-tdtu-blue focus:outline-none transition-all">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span id="sup-active-round-badge" class="badge bg-indigo-100 text-indigo-800 font-bold">Đang tải...</span>
+            <span id="sup-round-review-indicator" class="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200">
+              Trạng thái: Đang tải...
+            </span>
+          </div>
         </div>
 
-        <div id="sup-round-review-indicator" class="text-xs font-bold text-indigo-900 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-200">
-          Trạng thái: Đang tải...
-        </div>
-      </div>
+        <!-- 2. SUPERVISOR DASHBOARD HERO SUMMARY -->
+        <div id="supervisor-hero-card" class="card-surface p-6 bg-gradient-to-br from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl rounded-2xl border border-white/10 space-y-4">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div class="space-y-1.5 flex-1">
+              <div class="flex items-center gap-2">
+                <span class="badge bg-amber-400 text-slate-950 font-black text-xs">CỔNG GIẢNG VIÊN HƯỚNG DẪN</span>
+                <span id="sup-hero-role-badge" class="badge bg-white/20 text-white font-mono text-[11px] border border-white/20">GVHD</span>
+              </div>
+              <h1 id="supervisor-greeting-name" class="text-xl sm:text-2xl font-black text-white leading-snug">
+                Kính chào Thầy/Cô
+              </h1>
+              <p class="text-xs text-blue-200" id="supervisor-round-info">Đợt tốt nghiệp: Đang tải...</p>
+            </div>
 
-      <!-- SUPERVISOR SUB-PANEL 1: REVIEW CURRENT ROUND -->
-      <div id="sup-panel-review" class="space-y-4">
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/20 text-center shadow-inner">
+              <div class="p-2 border-r border-white/10">
+                <span class="text-[10px] font-bold text-blue-200 block uppercase">Chỉ tiêu (Quota)</span>
+                <span id="sup-stat-total-cap" class="text-xl font-black text-white">0</span>
+              </div>
+              <div class="p-2 border-r border-white/10">
+                <span class="text-[10px] font-bold text-blue-200 block uppercase">GVHD chính</span>
+                <span id="sup-stat-primary-count" class="text-xl font-black text-emerald-400">0</span>
+              </div>
+              <div class="p-2 border-r border-white/10">
+                <span class="text-[10px] font-bold text-blue-200 block uppercase">GVHD hỗ trợ</span>
+                <span id="sup-stat-support-count" class="text-xl font-black text-indigo-300">0</span>
+              </div>
+              <div class="p-2">
+                <span class="text-[10px] font-bold text-blue-200 block uppercase">Chờ xử lý</span>
+                <span id="sup-stat-pending-count" class="text-xl font-black text-amber-300">0</span>
+              </div>
+            </div>
+          </div>
 
-        <!-- Round Review Info & Actions Bar -->
-        <div class="card-surface p-4 bg-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
+          <!-- Nearest Milestone Alert Strip -->
+          <div id="sup-hero-milestone-strip" class="pt-3 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-blue-100">
             <div class="flex items-center gap-2">
-              <span id="sup-review-rank-badge" class="badge bg-amber-400 text-slate-900 font-black text-xs">NGUYỆN VỌNG 1</span>
-              <span id="sup-round-state-tag" class="text-xs text-slate-300">Đang xét</span>
+              <span class="text-base">📌</span>
+              <span id="sup-hero-next-milestone" class="font-bold">Mốc tiếp theo: Đang cập nhật...</span>
             </div>
-            <p class="text-xs text-slate-300 mt-1" id="sup-review-hint">
-              Danh sách sinh viên đặt Thầy/Cô ở Nguyện vọng này và chưa được nhận ở các vòng trước.
+            <div id="sup-hero-milestone-deadline" class="font-mono text-amber-300 bg-black/30 px-2.5 py-1 rounded-lg border border-white/10 self-start sm:self-auto">
+              Hạn nộp: --
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. NAVIGATION SUB-TABS -->
+        <div class="card-surface p-3 bg-white flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-slate-200 shadow-xs">
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="sup-tab-btn-assigned" onclick="switchSupervisorTab('assigned')" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-tdtu-blue shadow-sm transition-all cursor-pointer">
+              🎯 Danh sách SV Hướng dẫn (<span id="sup-assigned-count-badge">0</span>)
+            </button>
+            <button id="sup-tab-btn-review" onclick="switchSupervisorTab('review')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
+              🔍 Xét duyệt Nguyện vọng (<span id="sup-candidates-count-badge">0</span>)
+            </button>
+            <button id="sup-tab-btn-accepted" onclick="switchSupervisorTab('accepted')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
+              🏆 Danh sách Đã nhận (<span id="sup-accepted-count-badge">0</span>)
+            </button>
+            <button id="sup-tab-btn-preliminary" onclick="switchSupervisorTab('preliminary')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
+              🎯 Chấm Sơ khảo
+            </button>
+            <button id="sup-tab-btn-reviewer" onclick="switchSupervisorTab('reviewer')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
+              📖 Phản biện Thuyết minh (<span id="sup-reviewer-count-badge">0</span>)
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. SUB-PANEL A: MAIN AREA — ASSIGNED STUDENTS WORKSPACE -->
+        <div id="sup-panel-assigned" class="space-y-4">
+
+          <!-- Filter & Search Toolbar -->
+          <div class="card-surface p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <!-- Filter Pills -->
+            <div class="flex flex-wrap items-center gap-1.5 text-xs">
+              <button onclick="setSupervisorStudentFilter('all')" id="sup-flt-all" class="px-3 py-1.5 rounded-xl font-bold bg-tdtu-blue text-white shadow-xs cursor-pointer">Tất cả (<span id="sup-cnt-all">0</span>)</button>
+              <button onclick="setSupervisorStudentFilter('pending')" id="sup-flt-pending" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">Chưa xử lý (<span id="sup-cnt-pending">0</span>)</button>
+              <button onclick="setSupervisorStudentFilter('in_progress')" id="sup-flt-in_progress" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">Đang thực hiện (<span id="sup-cnt-in_progress">0</span>)</button>
+              <button onclick="setSupervisorStudentFilter('completed')" id="sup-flt-completed" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">Đã hoàn tất (<span id="sup-cnt-completed">0</span>)</button>
+              <button onclick="setSupervisorStudentFilter('primary')" id="sup-flt-primary" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">GVHD chính (<span id="sup-cnt-primary">0</span>)</button>
+              <button onclick="setSupervisorStudentFilter('support')" id="sup-flt-support" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">GVHD hỗ trợ (<span id="sup-cnt-support">0</span>)</button>
+            </div>
+
+            <!-- Search Input -->
+            <div class="relative w-full md:w-64">
+              <input type="text" id="supervisor-student-search" oninput="renderSupervisorAssignedStudents()" placeholder="Tìm MSSV, họ tên, đề tài..." class="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none">
+              <span class="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
+            </div>
+          </div>
+
+          <!-- Students Horizontal Cards Container -->
+          <div id="supervisor-students-list" class="space-y-3">
+            <!-- Populated dynamically: 1 student = 1 horizontal card -->
+          </div>
+
+          <!-- Empty State -->
+          <div id="supervisor-students-empty" class="hidden card-surface p-12 text-center max-w-md mx-auto my-6 border border-dashed border-slate-300 rounded-2xl bg-slate-50">
+            <div class="w-14 h-14 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl font-bold">
+              👨‍🎓
+            </div>
+            <h3 class="text-base font-black text-slate-800 mb-1">
+              Chưa có sinh viên phân công
+            </h3>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Hiện chưa có sinh viên nào được phân công cho Thầy/Cô trong đợt tốt nghiệp này.
             </p>
           </div>
 
-          <div class="flex items-center gap-2" id="sup-review-action-btns">
-            <!-- Dynamically populated: Finish Choice Button or Reopen Button -->
+        </div>
+
+        <!-- 5. SUB-PANEL B: REVIEW CURRENT ROUND CANDIDATES (CANDIDATE SELECTION) -->
+        <div id="sup-panel-review" class="hidden space-y-4">
+          <!-- Round Review Info & Actions Bar -->
+          <div class="card-surface p-4 bg-slate-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl">
+            <div>
+              <div class="flex items-center gap-2">
+                <span id="sup-review-rank-badge" class="badge bg-amber-400 text-slate-900 font-black text-xs">NGUYỆN VỌNG 1</span>
+                <span id="sup-round-state-tag" class="text-xs text-slate-300">Đang xét</span>
+              </div>
+              <p class="text-xs text-slate-300 mt-1" id="sup-review-hint">
+                Danh sách sinh viên đặt Thầy/Cô ở Nguyện vọng này và chưa được nhận ở các vòng trước.
+              </p>
+            </div>
+
+            <div class="flex items-center gap-2" id="sup-review-action-btns">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Candidate List Table -->
+          <div class="card-surface overflow-hidden rounded-2xl border border-slate-200">
+            <div class="p-3.5 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span class="text-xs font-bold text-slate-700">Ứng viên đăng ký vòng này:</span>
+              <input type="text" id="search-sup-candidates" oninput="filterSupervisorCandidates()" placeholder="Tìm theo MSSV, Họ tên..." class="px-3 py-1 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[800px] text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                  <tr>
+                    <th class="p-3.5">MSSV</th>
+                    <th class="p-3.5">Họ và tên</th>
+                    <th class="p-3.5">Đề tài dự kiến</th>
+                    <th class="p-3.5">Loại hình</th>
+                    <th class="p-3.5">Thời gian nộp</th>
+                    <th class="p-3.5 text-right">Quyết định của Thầy/Cô</th>
+                  </tr>
+                </thead>
+                <tbody id="sup-candidates-tbody" class="divide-y divide-slate-100">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <!-- Supervisor Candidate List Table / Cards -->
-        <div class="card-surface overflow-hidden">
-          <div class="p-3.5 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <span class="text-xs font-bold text-slate-700">Ứng viên đăng ký vòng này:</span>
-            <input type="text" id="search-sup-candidates" oninput="filterSupervisorCandidates()" placeholder="Tìm theo MSSV, Họ tên..." class="px-3 py-1 bg-white border rounded-lg text-xs max-w-xs">
+        <!-- 6. SUB-PANEL C: ACCEPTED STUDENTS ACROSS ROUNDS -->
+        <div id="sup-panel-accepted" class="hidden space-y-4">
+          <div class="card-surface overflow-hidden rounded-2xl border border-slate-200">
+            <div class="p-4 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between">
+              <h3 class="font-bold text-sm text-emerald-950">Danh sách Sinh viên đã được nhận chính thức qua các vòng</h3>
+              <span class="text-xs font-bold text-emerald-800" id="sup-total-accepted-text">Tổng: 0 SV</span>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs min-w-[700px]">
+                <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                  <tr>
+                    <th class="p-3.5">MSSV</th>
+                    <th class="p-3.5">Họ và tên</th>
+                    <th class="p-3.5">Đề tài tốt nghiệp</th>
+                    <th class="p-3.5">Loại hình</th>
+                    <th class="p-3.5">Hình thức trúng tuyển</th>
+                    <th class="p-3.5 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="sup-accepted-tbody" class="divide-y divide-slate-100">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. SUB-PANEL D: PRELIMINARY SCORING -->
+        <div id="sup-panel-preliminary" class="hidden space-y-4">
+          <div class="card-surface p-4 bg-gradient-to-r from-amber-500 to-amber-700 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl shadow-sm">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="badge bg-white text-amber-900 font-black text-xs">GIÁM KHẢO SƠ KHẢO</span>
+                <span class="text-xs text-amber-100">Đợt tốt nghiệp hiện tại</span>
+              </div>
+              <p class="text-xs text-amber-100 mt-1">
+                Thầy/Cô được phân công chấm Sơ khảo cho tất cả các sinh viên đủ điều kiện trong Đợt.
+              </p>
+            </div>
+            <div class="text-right">
+              <span class="text-[11px] text-amber-200 block">Tiến độ của Thầy/Cô:</span>
+              <span id="sup-prelim-my-progress" class="text-xl font-black">0 / 0 đã chấm</span>
+            </div>
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full min-w-[1100px] text-left text-xs">
-              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
-                <tr>
-                  <th class="p-3.5">Tên đợt</th>
-                  <th class="p-3.5">Năm học</th>
-                  <th class="p-3.5">Thời gian (24h)</th>
-                  <th class="p-3.5">GVHD</th>
-                  <th class="p-3.5">Đăng ký</th>
-                  <th class="p-3.5">Trạng thái</th>
-                  <th class="p-3.5">Đợt hiện hành</th>
-                  <th class="p-3.5">Link</th>
-                  <th class="p-3.5 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody id="sup-candidates-tbody" class="divide-y divide-slate-100">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
+          <div class="card-surface overflow-hidden rounded-2xl border border-slate-200">
+            <div class="p-3.5 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-700">Bộ lọc:</span>
+                <select id="sup-prelim-filter-status" onchange="renderSupervisorPreliminaryList()" class="p-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
+                  <option value="all">Tất cả sinh viên</option>
+                  <option value="unscored">Chưa chấm</option>
+                  <option value="scored">Đã chấm</option>
+                </select>
+              </div>
+              <input type="text" id="sup-prelim-search" oninput="renderSupervisorPreliminaryList()" placeholder="Tìm MSSV, Họ tên, Đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+            </div>
+
+            <div id="sup-prelim-cards-container" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 8. SUB-PANEL E: REVIEWER SCORING -->
+        <div id="sup-panel-reviewer" class="hidden space-y-4">
+          <div class="card-surface p-4 bg-gradient-to-r from-blue-600 to-indigo-800 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl shadow-sm">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="badge bg-white text-blue-900 font-black text-xs">GIẢNG VIÊN PHẢN BIỆN (GVPB)</span>
+                <span class="text-xs text-blue-100">Đánh giá Thuyết minh</span>
+              </div>
+              <p class="text-xs text-blue-100 mt-1">
+                Danh sách sinh viên được Khoa phân công cho Thầy/Cô đánh giá điểm Thuyết minh phản biện (TM PB).
+              </p>
+            </div>
+          </div>
+
+          <div class="card-surface overflow-hidden rounded-2xl border border-slate-200">
+            <div id="sup-reviewer-cards-container" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <!-- Rendered dynamically -->
+            </div>
           </div>
         </div>
 
       </div>
 
-      <!-- SUPERVISOR SUB-PANEL 2: ACCEPTED STUDENTS LIST -->
-      <div id="sup-panel-accepted" class="hidden space-y-4">
-        <div class="card-surface overflow-hidden">
-          <div class="p-4 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between">
-            <h3 class="font-bold text-sm text-emerald-950">Danh sách Sinh viên đã được nhận chính thức qua các vòng</h3>
-            <span class="text-xs font-bold text-emerald-800" id="sup-total-accepted-text">Tổng: 0 SV</span>
+      <!-- STUDENT DETAIL MODAL / DRAWER (PHASE 3) -->
+      <div id="supervisor-student-detail-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
+          <!-- Modal Header -->
+          <div class="p-5 bg-gradient-to-r from-slate-900 to-tdtu-blue text-white flex items-start justify-between gap-4">
+            <div class="flex items-center gap-3.5">
+              <div class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-xl font-bold border border-white/20">
+                🎓
+              </div>
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span id="dtl-role-badge" class="badge bg-emerald-500 text-white font-bold text-[10px]">GVHD chính</span>
+                  <span id="dtl-mssv" class="font-mono text-blue-200 text-xs font-bold">20000000</span>
+                </div>
+                <h3 id="dtl-full-name" class="text-lg font-black text-white leading-tight">Họ và tên Sinh viên</h3>
+                <p id="dtl-class-major" class="text-xs text-slate-300 mt-0.5">Lớp: -- • Ngành: --</p>
+              </div>
+            </div>
+            <button type="button" onclick="closeSupervisorStudentDetailModal()" class="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer" title="Đóng">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b">
-                <tr>
-                  <th class="p-3.5">MSSV</th>
-                  <th class="p-3.5">Họ và tên</th>
-                  <th class="p-3.5">Email</th>
-                  <th class="p-3.5">Đề tài tốt nghiệp</th>
-                  <th class="p-3.5">Loại hình</th>
-                  <th class="p-3.5">Hình thức trúng tuyển</th>
-                </tr>
-              </thead>
-              <tbody id="sup-accepted-tbody" class="divide-y divide-slate-100">
-                <!-- Dynamically populated -->
-              </tbody>
-            </table>
+          <!-- Modal Body -->
+          <div class="p-6 overflow-y-auto space-y-6 text-xs text-slate-700 flex-1">
+
+            <!-- Section A: Thông tin đề tài -->
+            <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-slate-500 uppercase tracking-wide text-[11px]">Đề tài Đồ án Tốt nghiệp</span>
+                <span id="dtl-project-type" class="badge bg-blue-100 text-blue-800 font-bold">Loại hình: --</span>
+              </div>
+              <p id="dtl-topic-title" class="text-sm font-black text-slate-900 leading-snug">Tên đề tài...</p>
+              <p id="dtl-registered-time" class="text-[11px] text-slate-400">Đăng ký ngày: --</p>
+            </div>
+
+            <!-- Section B: Phân công GVHD -->
+            <div class="space-y-2">
+              <span class="font-bold text-slate-800 uppercase tracking-wide text-[11px] block">Phân công Giảng viên Hướng dẫn</span>
+              <div id="dtl-supervisors-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Section C: Lộ trình & Mốc tiến độ -->
+            <div class="space-y-2">
+              <span class="font-bold text-slate-800 uppercase tracking-wide text-[11px] block">Tiến độ theo Kế hoạch Đợt</span>
+              <div id="dtl-milestones-list" class="space-y-2">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Section D: Bài nộp trực tuyến -->
+            <div class="space-y-2">
+              <span class="font-bold text-slate-800 uppercase tracking-wide text-[11px] block">Hồ sơ Bài nộp của Sinh viên</span>
+              <div id="dtl-submissions-list" class="space-y-2">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <!-- Section E: Đánh giá & Nhận xét của GVHD -->
+            <div class="p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-amber-950 uppercase tracking-wide text-[11px]">Đánh giá & Nhận xét của GVHD</span>
+                <span id="dtl-score-status" class="badge bg-amber-200 text-amber-900 font-bold">Chưa chấm</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <span class="text-[11px] text-slate-500 block">Điểm GVHD:</span>
+                  <span id="dtl-score-val" class="text-2xl font-black font-mono text-amber-700">--</span>
+                </div>
+                <div>
+                  <span class="text-[11px] text-slate-500 block">Thời gian lưu:</span>
+                  <span id="dtl-score-time" class="text-xs font-mono text-slate-600">--</span>
+                </div>
+              </div>
+              <div>
+                <span class="text-[11px] text-slate-500 block mb-1">Nhận xét của GVHD:</span>
+                <div id="dtl-comment-text" class="p-3 bg-white rounded-lg border border-amber-200/80 text-xs italic text-slate-700 min-h-[50px]">
+                  (Chưa có nhận xét)
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+            <button type="button" onclick="closeSupervisorStudentDetailModal()" class="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs rounded-xl transition-all cursor-pointer">
+              Đóng
+            </button>
+            <button id="btn-dtl-score" type="button" class="px-5 py-2.5 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer">
+              <span>✍️ Nhập Điểm / Cập nhật Nhận xét</span>
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- SUPERVISOR SUB-PANEL 3: CHẤM SƠ KHẢO ĐỢT TN (v1.9.0-beta.1) -->
-      <div id="sup-panel-preliminary" class="hidden space-y-4">
-        <div class="card-surface p-4 bg-gradient-to-r from-amber-500 to-amber-700 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl shadow-sm">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="badge bg-white text-amber-900 font-black text-xs">GIÁM KHẢO SƠ KHẢO</span>
-              <span class="text-xs text-amber-100">Đợt tốt nghiệp hiện tại</span>
-            </div>
-            <p class="text-xs text-amber-100 mt-1">
-              Thầy/Cô được phân công chấm Sơ khảo cho tất cả các sinh viên đủ điều kiện trong Đợt.
-            </p>
-          </div>
-          <div class="text-right">
-            <span class="text-[11px] text-amber-200 block">Tiến độ của Thầy/Cô:</span>
-            <span id="sup-prelim-my-progress" class="text-xl font-black">0 / 0 đã chấm</span>
-          </div>
-        </div>
-
-        <div class="card-surface overflow-hidden">
-          <div class="p-3.5 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-slate-700">Bộ lọc:</span>
-              <select id="sup-prelim-filter-status" onchange="renderSupervisorPreliminaryList()" class="p-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
-                <option value="all">Tất cả sinh viên</option>
-                <option value="unscored">Chưa chấm</option>
-                <option value="scored">Đã chấm</option>
-              </select>
-            </div>
-            <input type="text" id="sup-prelim-search" oninput="renderSupervisorPreliminaryList()" placeholder="Tìm MSSV, Họ tên, Đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
-          </div>
-
-          <div id="sup-prelim-cards-container" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-            <!-- Rendered dynamically -->
-          </div>
-        </div>
-      </div>
-
-      <!-- SUPERVISOR SUB-PANEL 4: PHẢN BIỆN THUYẾT MINH (v1.9.0-beta.1) -->
-      <div id="sup-panel-reviewer" class="hidden space-y-4">
-        <div class="card-surface p-4 bg-gradient-to-r from-blue-600 to-indigo-800 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl shadow-sm">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="badge bg-white text-blue-900 font-black text-xs">GIẢNG VIÊN PHẢN BIỆN (GVPB)</span>
-              <span class="text-xs text-blue-100">Đánh giá Thuyết minh</span>
-            </div>
-            <p class="text-xs text-blue-100 mt-1">
-              Danh sách sinh viên được Khoa phân công cho Thầy/Cô đánh giá điểm Thuyết minh phản biện (TM PB).
-            </p>
-          </div>
-        </div>
-
-        <div class="card-surface overflow-hidden">
-          <div id="sup-reviewer-cards-container" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-            <!-- Rendered dynamically -->
-          </div>
-        </div>
-      </div>
-
-      <!-- SUPERVISOR SUB-PANEL 3: CHẤM SƠ KHẢO ĐỢT TN (v1.9.0-beta.1) -->
-      <div id="sup-panel-preliminary" class="hidden space-y-4">
-        <div class="card-surface p-4 bg-gradient-to-r from-amber-500 to-amber-700 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl shadow-sm">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="badge bg-white text-amber-900 font-black text-xs">GIÁM KHẢO SƠ KHẢO</span>
-              <span class="text-xs text-amber-100">Đợt tốt nghiệp hiện tại</span>
-            </div>
-            <p class="text-xs text-amber-100 mt-1">
-              Thầy/Cô được phân công chấm Sơ khảo cho tất cả các sinh viên đủ điều kiện trong Đợt.
-            </p>
-          </div>
-          <div class="text-right">
-            <span class="text-[11px] text-amber-200 block">Tiến độ của Thầy/Cô:</span>
-            <span id="sup-prelim-my-progress" class="text-xl font-black">0 / 0 đã chấm</span>
-          </div>
-        </div>
-
-        <div class="card-surface overflow-hidden">
-          <div class="p-3.5 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-slate-700">Bộ lọc:</span>
-              <select id="sup-prelim-filter-status" onchange="renderSupervisorPreliminaryList()" class="p-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
-                <option value="all">Tất cả sinh viên</option>
-                <option value="unscored">Chưa chấm</option>
-                <option value="scored">Đã chấm</option>
-              </select>
-            </div>
-            <input type="text" id="sup-prelim-search" oninput="renderSupervisorPreliminaryList()" placeholder="Tìm MSSV, Họ tên, Đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
-          </div>
-
-          <div id="sup-prelim-cards-container" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-            <!-- Rendered dynamically -->
-          </div>
-        </div>
-      </div>
-
-      <!-- SUPERVISOR SUB-PANEL 4: PHẢN BIỆN THUYẾT MINH (v1.9.0-beta.1) -->
-      <div id="sup-panel-reviewer" class="hidden space-y-4">
-        <div class="card-surface p-4 bg-gradient-to-r from-blue-600 to-indigo-800 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl shadow-sm">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="badge bg-white text-blue-900 font-black text-xs">GIẢNG VIÊN PHẢN BIỆN (GVPB)</span>
-              <span class="text-xs text-blue-100">Đánh giá Thuyết minh</span>
-            </div>
-            <p class="text-xs text-blue-100 mt-1">
-              Danh sách sinh viên được Khoa phân công cho Thầy/Cô đánh giá điểm Thuyết minh phản biện (TM PB).
-            </p>
-          </div>
-        </div>
-
-        <div class="card-surface overflow-hidden">
-          <div id="sup-reviewer-cards-container" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-            <!-- Rendered dynamically -->
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- VIEW 3: ADMIN VIEW -->
-    <section id="view-admin" class="hidden space-y-6">
+    </section><section id="view-admin" class="hidden space-y-6">
 
       <!-- Admin Sidebar & Main Content Layout -->
       <div class="flex flex-col lg:flex-row gap-6 items-start">

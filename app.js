@@ -5,7 +5,13 @@ function detectInitialPortal() {
     if (path.includes('/graduation/admin') || path.endsWith('/admin') || path.endsWith('/admin/')) {
       return 'admin';
     }
-    if (path.includes('/graduation/supervisor') || path.includes('/graduation/gvhd')) {
+    if (path.includes('/graduation/supervisor') || path.endsWith('/supervisor') || path.endsWith('/supervisor/') ||
+        path.includes('/graduation/gvhd') || path.endsWith('/gvhd') || path.endsWith('/gvhd/')) {
+      if (path.includes('/graduation/gvhd') || path.endsWith('/gvhd') || path.endsWith('/gvhd/')) {
+        try {
+          window.history.replaceState(null, '', '/graduation/supervisor/');
+        } catch (e) {}
+      }
       return 'supervisor';
     }
     if (path.includes('/graduation/assessment') || path.includes('/graduation/mark')) {
@@ -478,8 +484,14 @@ export async function setupAuthListener() {
 
         // 2. Kích hoạt ngay view ban đầu để UI hiển thị tức thì
         const detectedPortal = detectInitialPortal();
-        // Cổng /graduation/ luôn là student view cho mọi đối tượng; chỉ vào admin khi URL rõ ràng là admin và user có quyền admin
-        const initView = (detectedPortal === 'admin' && state.isAdmin) ? 'admin' : 'student';
+        let initView = 'student';
+        if (detectedPortal === 'admin' && state.isAdmin) {
+          initView = 'admin';
+        } else if (detectedPortal === 'supervisor') {
+          initView = 'supervisor';
+        } else {
+          initView = 'student';
+        }
         await switchView(initView);
         if (initView === 'admin') {
           switchAdminTab('rounds');
@@ -661,37 +673,44 @@ export function updateAuthUI() {
     const studentDeskBtn = document.getElementById('nav-btn-student');
     const studentMobBtn = document.getElementById('m-nav-student');
 
-    // CỔNG SINH VIÊN (/graduation/): Ẩn toàn bộ thanh chuyển role to ở header
     const roleNavGroup = document.getElementById('role-nav-group');
     const mobileRoleNav = document.getElementById('mobile-role-nav');
     const btnGotoAdmin = document.getElementById('btn-goto-admin');
     const btnGotoStudent = document.getElementById('btn-goto-student');
+    const btnGotoAssessment = document.getElementById('btn-goto-assessment');
+
+    // Luôn ẩn thanh switch role lớn cũ trên các portal chuyên biệt
+    if (roleNavGroup) roleNavGroup.classList.add('hidden');
+    if (mobileRoleNav) mobileRoleNav.classList.add('hidden');
 
     if (state.currentView === 'student') {
-      if (roleNavGroup) roleNavGroup.classList.add('hidden');
-      if (mobileRoleNav) mobileRoleNav.classList.add('hidden');
       if (btnGotoStudent) btnGotoStudent.classList.add('hidden');
-
-      // Nếu tài khoản là Admin ghé thăm Cổng Sinh viên: hiện nút nhỏ chuyển sang Quản trị
+      if (btnGotoAssessment) btnGotoAssessment.classList.add('hidden');
       if (state.isAdmin) {
-        if (btnGotoAdmin) {
-          btnGotoAdmin.classList.remove('hidden');
-          btnGotoAdmin.classList.add('flex');
-        }
+        if (btnGotoAdmin) { btnGotoAdmin.classList.remove('hidden'); btnGotoAdmin.classList.add('flex'); }
       } else {
         if (btnGotoAdmin) btnGotoAdmin.classList.add('hidden');
       }
-    } else if (state.currentView === 'admin') {
-      if (roleNavGroup) roleNavGroup.classList.add('hidden');
-      if (mobileRoleNav) mobileRoleNav.classList.add('hidden');
-      if (btnGotoAdmin) btnGotoAdmin.classList.add('hidden');
-      if (btnGotoStudent) {
-        btnGotoStudent.classList.remove('hidden');
-        btnGotoStudent.classList.add('flex');
+    } else if (state.currentView === 'supervisor') {
+      if (btnGotoStudent) { btnGotoStudent.classList.remove('hidden'); btnGotoStudent.classList.add('flex'); }
+      if (state.isAdmin) {
+        if (btnGotoAdmin) { btnGotoAdmin.classList.remove('hidden'); btnGotoAdmin.classList.add('flex'); }
+      } else {
+        if (btnGotoAdmin) btnGotoAdmin.classList.add('hidden');
       }
+      if (state.isAdmin || state.isScorer) {
+        if (btnGotoAssessment) { btnGotoAssessment.classList.remove('hidden'); btnGotoAssessment.classList.add('flex'); }
+      } else {
+        if (btnGotoAssessment) btnGotoAssessment.classList.add('hidden');
+      }
+    } else if (state.currentView === 'admin') {
+      if (btnGotoAdmin) btnGotoAdmin.classList.add('hidden');
+      if (btnGotoStudent) { btnGotoStudent.classList.remove('hidden'); btnGotoStudent.classList.add('flex'); }
+      if (btnGotoAssessment) { btnGotoAssessment.classList.remove('hidden'); btnGotoAssessment.classList.add('flex'); }
     } else {
       if (btnGotoAdmin) btnGotoAdmin.classList.add('hidden');
       if (btnGotoStudent) btnGotoStudent.classList.add('hidden');
+      if (btnGotoAssessment) btnGotoAssessment.classList.add('hidden');
     }
 
   } else {
@@ -751,9 +770,9 @@ window.switchView = async function(targetView) {
 
   if (targetView === 'admin' && state.isAdmin) {
     loadAdminStats();
-  } else if (targetView === 'supervisor' && state.selectedRoundId) {
-    loadSupervisorReviewData(state.selectedRoundId);
-    } else if (targetView === 'student') {
+  } else if (targetView === 'supervisor') {
+    initSupervisorPortal();
+  } else if (targetView === 'student') {
     const emptyCard = document.getElementById('student-empty-round');
     const regFlow = document.getElementById('registration-flow-container');
     const targetRound = state.activeRound;
@@ -15723,4 +15742,616 @@ window.updateStudentPersonalSidebar = function() {
       </div>
     </div>
   `;
+};
+
+
+// ============================================================================
+// PHASE 3: SUPERVISOR PORTAL COMPLETE IMPLEMENTATION
+// ============================================================================
+
+state.supervisorStudentFilter = 'all';
+state.supervisorAssignedStudents = [];
+
+window.initSupervisorPortal = async function() {
+  const deniedCard = document.getElementById('supervisor-access-denied');
+  const workspaceContainer = document.getElementById('supervisor-workspace-container');
+
+  // ACCESS RULE: Only supervisor, support supervisor, or admin can access
+  const emailLower = (state.user?.email || '').toLowerCase().trim();
+  const isSupervisorCandidate = state.isSupervisor || state.isAdmin ||
+    (state.roundSupervisors || []).some(s => (s.email || '').toLowerCase().trim() === emailLower) ||
+    (state.supervisorsMaster || []).some(s => (s.email || '').toLowerCase().trim() === emailLower);
+
+  if (!state.user || !isSupervisorCandidate) {
+    if (deniedCard) deniedCard.classList.remove('hidden');
+    if (workspaceContainer) workspaceContainer.classList.add('hidden');
+    return;
+  }
+
+  if (deniedCard) deniedCard.classList.add('hidden');
+  if (workspaceContainer) workspaceContainer.classList.remove('hidden');
+
+  // Populate round selector filtered to rounds supervisor participates in (or all for admin)
+  renderSupervisorRoundsDropdown();
+
+  // If no round selected yet, pick active round or first available
+  const currentRoundId = state.selectedRoundId || state.activeRound?.id || (state.rounds && state.rounds[0]?.id);
+  if (currentRoundId) {
+    await loadSupervisorPortalData(currentRoundId);
+  }
+};
+
+window.renderSupervisorRoundsDropdown = function() {
+  const select = document.getElementById('supervisor-round-select');
+  if (!select) return;
+
+  const emailLower = (state.user?.email || '').toLowerCase().trim();
+  const validRounds = (state.rounds || []).filter(r => !r.deleted);
+
+  let filteredRounds = validRounds;
+  if (!state.isAdmin) {
+    // Only show rounds this supervisor is part of or active round
+    filteredRounds = validRounds.filter(r => {
+      if (r.isActive) return true;
+      const inSupervisors = Array.isArray(r.supervisors) && r.supervisors.some(s => (s.email || '').toLowerCase().trim() === emailLower);
+      const inAssigned = Array.isArray(r.registrations) && r.registrations.some(reg => {
+        const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(reg) : [];
+        return officials.some(s => (s.supervisorEmail || s.email || '').toLowerCase().trim() === emailLower);
+      });
+      return inSupervisors || inAssigned;
+    });
+    if (filteredRounds.length === 0 && validRounds.length > 0) {
+      filteredRounds = [validRounds.find(r => r.isActive) || validRounds[0]];
+    }
+  }
+
+  select.innerHTML = filteredRounds.map(r => `
+    <option value="${r.id}" ${r.id === state.selectedRoundId ? 'selected' : ''}>
+      ${r.title} (${r.academicYear || ''})${r.isActive ? ' ★ Hiện hành' : ''}
+    </option>
+  `).join('');
+
+  if (filteredRounds.length === 0) {
+    select.innerHTML = '<option value="">-- Chưa có đợt tốt nghiệp --</option>';
+  }
+};
+
+window.onSupervisorRoundSelected = async function(roundId) {
+  if (!roundId) return;
+  state.selectedRoundId = roundId;
+  state.activeRound = (state.rounds || []).find(r => r.id === roundId) || null;
+  await loadSupervisorPortalData(roundId);
+};
+
+window.loadSupervisorPortalData = async function(roundId) {
+  if (!roundId) return;
+
+  const emailLower = (state.user?.email || '').toLowerCase().trim();
+  const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  if (!round) return;
+
+  // 1. Locate current supervisor profile
+  let currentSup = (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower);
+  if (!currentSup) {
+    currentSup = (state.supervisorsMaster || []).find(s => (s.email || '').toLowerCase().trim() === emailLower);
+  }
+
+  // Header and Hero Information
+  const greetingEl = document.getElementById('supervisor-greeting-name');
+  const roundInfoEl = document.getElementById('supervisor-round-info');
+  const activeBadgeEl = document.getElementById('sup-active-round-badge');
+  const reviewIndicator = document.getElementById('sup-round-review-indicator');
+
+  const supDisplayName = currentSup?.name || state.user?.displayName || 'Thầy/Cô';
+  if (greetingEl) greetingEl.textContent = `Kính chào Thầy/Cô ${supDisplayName}`;
+  if (roundInfoEl) roundInfoEl.textContent = `Đợt: ${round.title} • Năm học ${round.academicYear || ''}`;
+  if (activeBadgeEl) activeBadgeEl.textContent = round.roundName || round.title || 'Đợt ĐATN';
+
+  const statusMap = {
+    draft: 'Bản nháp',
+    upcoming: 'Sắp mở đăng ký',
+    open: 'Đang mở đăng ký',
+    closed: 'Đã đóng đăng ký',
+    reviewing: 'Đang xét nguyện vọng',
+    finalized: 'Đã chốt phân công',
+    published: 'Đã công bố'
+  };
+  if (reviewIndicator) {
+    reviewIndicator.textContent = `Trạng thái: ${statusMap[round.status] || round.status || 'Đang thực hiện'}`;
+  }
+
+  // 2. Fetch all registrations for this round
+  let allRegistrations = [];
+  try {
+    const regSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'registrations'));
+    allRegistrations = regSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.warn('[SupervisorPortal] Could not query registrations directly:', err);
+    allRegistrations = round.registrations || [];
+  }
+
+  // 3. Fetch activities if not loaded
+  let activities = Array.isArray(round.activities) ? round.activities : [];
+  if (activities.length === 0) {
+    try {
+      const actSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'activities'));
+      activities = actSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      round.activities = activities;
+    } catch (e) {}
+  }
+
+  // 4. Identify Assigned Students for this supervisor
+  const mySupId = currentSup?.id || currentSup?.supervisorId;
+  const assigned = allRegistrations.filter(r => {
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
+    if (officials.length === 0) {
+      if (r.reviewStatus !== 'accepted' && r.reviewStatus !== 'manually_assigned') return false;
+    }
+    return officials.some(s => {
+      if (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) return true;
+      if (s.email && s.email.toLowerCase().trim() === emailLower) return true;
+      if (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower) return true;
+      return false;
+    });
+  });
+
+  // Admin fallback: If admin without personal assignment, can see all assigned students in round
+  let displayStudents = assigned;
+  if (state.isAdmin && assigned.length === 0) {
+    displayStudents = allRegistrations.filter(r => {
+      const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
+      return officials.length > 0 || r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned';
+    });
+  }
+
+  state.supervisorAssignedStudents = displayStudents;
+
+  // 5. Compute Hero Stats
+  const quota = currentSup?.quota || currentSup?.capacity || (state.isAdmin ? displayStudents.length : 10);
+  let primaryCount = 0;
+  let supportCount = 0;
+  let pendingCount = 0;
+
+  displayStudents.forEach(st => {
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
+    const isPrimary = officials.some(s => {
+      const isMe = (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) ||
+        (s.email && s.email.toLowerCase().trim() === emailLower) ||
+        (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower);
+      return (isMe || state.isAdmin) && s.role === 'primary';
+    });
+    if (isPrimary) primaryCount++;
+    else supportCount++;
+
+    // Check if score is pending
+    const sc = round.supervisorScores?.[st.studentId || st.id];
+    if (!sc || sc.status !== 'completed') {
+      pendingCount++;
+    }
+  });
+
+  document.getElementById('sup-stat-total-cap').textContent = quota;
+  document.getElementById('sup-stat-primary-count').textContent = primaryCount;
+  document.getElementById('sup-stat-support-count').textContent = supportCount;
+  document.getElementById('sup-stat-pending-count').textContent = pendingCount;
+
+  // Hero Next Milestone & Deadline
+  const nextMilestoneEl = document.getElementById('sup-hero-next-milestone');
+  const deadlineEl = document.getElementById('sup-hero-milestone-deadline');
+  const now = new Date();
+  const upcomingActs = activities
+    .map(a => ({
+      title: a.title,
+      date: a.closeAtDate ? new Date(a.closeAtDate) : (a.endDate ? new Date(a.endDate) : (a.date ? new Date(a.date) : null))
+    }))
+    .filter(a => a.date && !isNaN(a.date.getTime()) && a.date >= now)
+    .sort((a, b) => a.date - b.date);
+
+  if (upcomingActs.length > 0) {
+    if (nextMilestoneEl) nextMilestoneEl.textContent = `Mốc tiếp theo: ${upcomingActs[0].title}`;
+    if (deadlineEl) deadlineEl.textContent = `Hạn: ${fmtIsoToVietnameseDateTime(upcomingActs[0].date.toISOString())}`;
+  } else {
+    if (nextMilestoneEl) nextMilestoneEl.textContent = 'Mốc tiếp theo: Các mốc kế hoạch đã hoàn tất';
+    if (deadlineEl) deadlineEl.textContent = 'Đã hoàn tất timeline';
+  }
+
+  // Update tabs badges
+  const assignedBadge = document.getElementById('sup-assigned-count-badge');
+  if (assignedBadge) assignedBadge.textContent = displayStudents.length;
+
+  // Also load legacy review data for candidates tab if needed
+  await loadSupervisorReviewData(roundId);
+
+  // Render assigned students list
+  renderSupervisorAssignedStudents();
+};
+
+window.renderSupervisorAssignedStudents = function() {
+  const container = document.getElementById('supervisor-students-list');
+  const emptyCard = document.getElementById('supervisor-students-empty');
+  if (!container) return;
+
+  const round = state.activeRound;
+  const emailLower = (state.user?.email || '').toLowerCase().trim();
+  const currentSup = (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower) ||
+    (state.supervisorsMaster || []).find(s => (s.email || '').toLowerCase().trim() === emailLower);
+  const mySupId = currentSup?.id || currentSup?.supervisorId;
+
+  const all = state.supervisorAssignedStudents || [];
+  const searchTerm = (document.getElementById('supervisor-student-search')?.value || '').toLowerCase().trim();
+  const filterKey = state.supervisorStudentFilter || 'all';
+
+  // Update filter counters
+  let cntPending = 0;
+  let cntInProgress = 0;
+  let cntCompleted = 0;
+  let cntPrimary = 0;
+  let cntSupport = 0;
+
+  all.forEach(st => {
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
+    const isPrimary = officials.some(s => {
+      const isMe = (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) ||
+        (s.email && s.email.toLowerCase().trim() === emailLower) ||
+        (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower);
+      return (isMe || state.isAdmin) && s.role === 'primary';
+    });
+    if (isPrimary) cntPrimary++;
+    else cntSupport++;
+
+    const sc = round?.supervisorScores?.[st.studentId || st.id];
+    if (sc?.status === 'completed') cntCompleted++;
+    else if (sc?.status === 'draft') cntInProgress++;
+    else cntPending++;
+  });
+
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setEl('sup-cnt-all', all.length);
+  setEl('sup-cnt-pending', cntPending);
+  setEl('sup-cnt-in_progress', cntInProgress);
+  setEl('sup-cnt-completed', cntCompleted);
+  setEl('sup-cnt-primary', cntPrimary);
+  setEl('sup-cnt-support', cntSupport);
+
+  // Filter list
+  const filtered = all.filter(st => {
+    const studentId = st.studentId || st.id || '';
+    const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(studentId) : null;
+    const name = st.studentName || studentObj?.fullName || studentObj?.name || studentId;
+    const topic = st.topicTitle || '';
+
+    // Search query
+    if (searchTerm) {
+      const matchQuery = studentId.toLowerCase().includes(searchTerm) ||
+        name.toLowerCase().includes(searchTerm) ||
+        topic.toLowerCase().includes(searchTerm);
+      if (!matchQuery) return false;
+    }
+
+    // Filter pill
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
+    const isPrimary = officials.some(s => {
+      const isMe = (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) ||
+        (s.email && s.email.toLowerCase().trim() === emailLower) ||
+        (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower);
+      return (isMe || state.isAdmin) && s.role === 'primary';
+    });
+
+    const sc = round?.supervisorScores?.[studentId];
+    if (filterKey === 'primary') return isPrimary;
+    if (filterKey === 'support') return !isPrimary;
+    if (filterKey === 'completed') return sc?.status === 'completed';
+    if (filterKey === 'in_progress') return sc?.status === 'draft';
+    if (filterKey === 'pending') return !sc || sc.status !== 'completed';
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = '';
+    if (emptyCard) emptyCard.classList.remove('hidden');
+    return;
+  }
+
+  if (emptyCard) emptyCard.classList.add('hidden');
+
+  // Render 1 Student = 1 Horizontal Card (IFAA Style)
+  container.innerHTML = filtered.map(st => {
+    const studentId = st.studentId || st.id || '';
+    const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(studentId) : null;
+    const name = st.studentName || studentObj?.fullName || studentObj?.name || `Sinh viên ${studentId}`;
+    const className = studentObj?.className || studentObj?.studentClass || st.className || '--';
+    const major = studentObj?.major || st.major || 'Mỹ thuật Công nghiệp';
+    const topicTitle = st.topicTitle || 'Chưa cập nhật tên đề tài';
+    const projectType = st.projectType || 'Đồ án tốt nghiệp';
+
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
+    const isPrimary = officials.some(s => {
+      const isMe = (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) ||
+        (s.email && s.email.toLowerCase().trim() === emailLower) ||
+        (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower);
+      return (isMe || state.isAdmin) && s.role === 'primary';
+    });
+
+    const roleBadge = isPrimary
+      ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">GVHD chính</span>'
+      : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800 border border-indigo-300">GVHD hỗ trợ</span>';
+
+    // Score status
+    const sc = round?.supervisorScores?.[studentId];
+    let scoreBadge = '';
+    if (sc?.status === 'completed') {
+      scoreBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-mono font-black bg-emerald-100 text-emerald-800 border border-emerald-300">Điểm GVHD: ${Number(sc.score).toFixed(1)}</span>`;
+    } else if (sc?.status === 'draft') {
+      scoreBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-300">● Lưu tạm: ${sc.score ?? '--'}</span>`;
+    } else {
+      scoreBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500">Chưa chấm</span>';
+    }
+
+    // Next milestone & submission check
+    const activities = Array.isArray(round?.activities) ? round.activities : [];
+    const subActs = activities.filter(a => a.submissionEnabled);
+    let submissionStatusStr = 'Chưa có mốc nộp bài';
+    if (subActs.length > 0) {
+      const latestAct = subActs[0];
+      const rules = (typeof getEffectiveSubmissionRules === 'function') ? getEffectiveSubmissionRules(studentId, latestAct, round) : null;
+      if (rules?.currentSubmission) {
+        submissionStatusStr = `<span class="text-emerald-700 font-bold">✓ Đã nộp: ${latestAct.title}</span>`;
+      } else {
+        submissionStatusStr = `<span class="text-slate-500">Chưa nộp ${latestAct.title}</span>`;
+      }
+    }
+
+    const defaultAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23cbd5e1"/><path fill="%23cbd5e1" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
+
+    return `
+      <div class="card-surface p-4 sm:p-5 bg-white rounded-2xl border border-slate-200 hover:border-tdtu-blue/40 shadow-xs hover:shadow-md transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <!-- Left: Student Info & Role -->
+        <div class="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
+          <img src="${defaultAvatar}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0" alt="Avatar">
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+              ${roleBadge}
+              <span class="font-mono text-xs font-bold text-tdtu-blue bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">${studentId}</span>
+              <span class="text-slate-400 text-xs hidden sm:inline">•</span>
+              <span class="text-xs text-slate-500 font-medium truncate">Lớp: ${className}</span>
+            </div>
+            <h3 class="text-sm sm:text-base font-black text-slate-900 leading-snug truncate">${name}</h3>
+            <p class="text-xs text-slate-600 mt-1 line-clamp-1">
+              <strong class="text-slate-700">Đề tài:</strong> ${topicTitle}
+            </p>
+            <div class="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] text-slate-500">
+              <span>Loại hình: <b class="text-slate-700">${projectType}</b></span>
+              <span>•</span>
+              <span>${submissionStatusStr}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Status Badges & Action Buttons -->
+        <div class="flex flex-wrap items-center justify-between lg:justify-end gap-2.5 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 shrink-0">
+          <div class="mr-2">
+            ${scoreBadge}
+          </div>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}')" class="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer" title="Xem thông tin chi tiết">
+              📋 Xem hồ sơ
+            </button>
+            <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}', 'progress')" class="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer" title="Xem tiến độ và mốc kế hoạch">
+              📅 Tiến độ
+            </button>
+            <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}', 'comment')" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-xl text-xs font-bold transition-all cursor-pointer" title="Nhận xét của GVHD">
+              💬 Nhận xét
+            </button>
+            <button type="button" onclick="openScoreEntryModal('supervisor', '${studentId}')" class="px-3.5 py-1.5 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl text-xs font-black shadow-xs transition-all cursor-pointer" title="Nhập hoặc chỉnh sửa điểm GVHD">
+              ✍️ Chấm điểm
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+window.setSupervisorStudentFilter = function(filterKey) {
+  state.supervisorStudentFilter = filterKey;
+
+  const btnIds = ['all', 'pending', 'in_progress', 'completed', 'primary', 'support'];
+  btnIds.forEach(k => {
+    const btn = document.getElementById('sup-flt-' + k);
+    if (!btn) return;
+    if (k === filterKey) {
+      btn.className = 'px-3 py-1.5 rounded-xl font-bold bg-tdtu-blue text-white shadow-xs cursor-pointer';
+    } else {
+      btn.className = 'px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer';
+    }
+  });
+
+  renderSupervisorAssignedStudents();
+};
+
+window.switchSupervisorTab = function(tabName) {
+  const tabs = {
+    assigned: ['sup-tab-btn-assigned', 'sup-panel-assigned'],
+    review: ['sup-tab-btn-review', 'sup-panel-review'],
+    accepted: ['sup-tab-btn-accepted', 'sup-panel-accepted'],
+    preliminary: ['sup-tab-btn-preliminary', 'sup-panel-preliminary'],
+    reviewer: ['sup-tab-btn-reviewer', 'sup-panel-reviewer']
+  };
+
+  Object.entries(tabs).forEach(([k, [btnId, panelId]]) => {
+    const btn = document.getElementById(btnId);
+    const panel = document.getElementById(panelId);
+    const isTarget = (k === tabName);
+
+    if (btn) {
+      if (isTarget) {
+        btn.className = 'px-4 py-2 rounded-xl text-xs font-bold text-white bg-tdtu-blue shadow-sm transition-all cursor-pointer';
+      } else {
+        btn.className = 'px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer';
+      }
+    }
+    if (panel) {
+      if (isTarget) panel.classList.remove('hidden');
+      else panel.classList.add('hidden');
+    }
+  });
+};
+
+window.openSupervisorStudentDetailModal = function(studentId, focusSection = null) {
+  const modal = document.getElementById('supervisor-student-detail-modal');
+  if (!modal) return;
+
+  const round = state.activeRound;
+  const st = (state.supervisorAssignedStudents || []).find(s => (s.studentId || s.id) === studentId) ||
+    findStudentInRound(studentId);
+  const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(studentId) : null;
+
+  const fullName = st?.studentName || studentObj?.fullName || studentObj?.name || studentId;
+  const className = studentObj?.className || studentObj?.studentClass || st?.className || '--';
+  const major = studentObj?.major || st?.major || 'Mỹ thuật Công nghiệp';
+
+  document.getElementById('dtl-mssv').textContent = studentId;
+  document.getElementById('dtl-full-name').textContent = fullName;
+  document.getElementById('dtl-class-major').textContent = `Lớp: ${className} • Ngành: ${major}`;
+  document.getElementById('dtl-topic-title').textContent = st?.topicTitle || 'Chưa cập nhật tên đề tài';
+  document.getElementById('dtl-project-type').textContent = `Loại hình: ${st?.projectType || '--'}`;
+
+  const dateStr = st?.submittedAt ? (st.submittedAt.toDate ? st.submittedAt.toDate() : new Date(st.submittedAt)).toLocaleString('vi-VN') : '--';
+  document.getElementById('dtl-registered-time').textContent = `Đăng ký ngày: ${dateStr}`;
+
+  // Supervisors List
+  const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
+  const supsListEl = document.getElementById('dtl-supervisors-list');
+  if (supsListEl) {
+    if (officials.length > 0) {
+      supsListEl.innerHTML = officials.map(s => `
+        <div class="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center gap-2.5">
+          <span class="text-xl">👨‍🏫</span>
+          <div>
+            <span class="font-bold text-slate-800 text-xs block">${s.supervisorName || 'Giảng viên Hướng dẫn'}</span>
+            <span class="text-[10px] ${s.role === 'primary' ? 'text-emerald-700 font-bold' : 'text-indigo-700'} uppercase">${s.role === 'primary' ? 'GVHD chính' : 'GVHD hỗ trợ'}</span>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      supsListEl.innerHTML = '<div class="p-3 text-slate-400 italic">Chưa có thông tin phân công chính thức.</div>';
+    }
+  }
+
+  // Milestones Timeline
+  const milestonesEl = document.getElementById('dtl-milestones-list');
+  const activities = Array.isArray(round?.activities) ? round.activities : [];
+  if (milestonesEl) {
+    if (activities.length > 0) {
+      milestonesEl.innerHTML = activities.map((act, idx) => {
+        const rules = (typeof getEffectiveSubmissionRules === 'function') ? getEffectiveSubmissionRules(studentId, act, round) : null;
+        let stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Chưa nộp</span>';
+        if (rules?.currentSubmission) {
+          stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">✓ Đã nộp bài</span>';
+        }
+        return `
+          <div class="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-[10px]">${idx + 1}</span>
+              <span class="font-bold text-slate-800">${act.title}</span>
+            </div>
+            ${stBadge}
+          </div>
+        `;
+      }).join('');
+    } else {
+      milestonesEl.innerHTML = '<div class="p-3 text-slate-400 italic">Chưa có kế hoạch mốc hoạt động.</div>';
+    }
+  }
+
+  // Submissions list
+  const subsListEl = document.getElementById('dtl-submissions-list');
+  if (subsListEl) {
+    const subActs = activities.filter(a => a.submissionEnabled);
+    let attemptsCount = 0;
+    let html = subActs.map(act => {
+      const rules = (typeof getEffectiveSubmissionRules === 'function') ? getEffectiveSubmissionRules(studentId, act, round) : null;
+      if (!rules || !rules.attemptsHistory || rules.attemptsHistory.length === 0) return '';
+      attemptsCount += rules.attemptsHistory.length;
+
+      return rules.attemptsHistory.map((att, idx) => {
+        const fName = att.files?.[0]?.validatedName || att.files?.[0]?.originalName || 'Tệp đính kèm';
+        const fSize = att.files?.[0]?.size ? (att.files[0].size / (1024 * 1024)).toFixed(1) + ' MB' : '';
+        const safeViewUrl = att.files?.[0]?.providerUrl || (att.files?.[0]?.providerFileId ? 'https://drive.google.com/file/d/' + att.files[0].providerFileId + '/view' : '#');
+
+        return `
+          <div class="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-3 text-xs">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-900">${act.title} (Lần ${att.attempt || idx + 1})</span>
+                <span class="text-[10px] text-slate-400 font-mono">${att.submittedAt ? fmtIsoToVietnameseDateTime(att.submittedAt) : '--'}</span>
+              </div>
+              <span class="text-[11px] text-slate-600 font-mono block mt-0.5 truncate max-w-sm">${fName} (${fSize})</span>
+            </div>
+            ${safeViewUrl !== '#' ? `
+              <a href="${safeViewUrl}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] rounded-lg transition-colors inline-flex items-center gap-1">
+                <span>👁️</span> Xem file
+              </a>
+            ` : '<span class="text-slate-400 text-[10px]">Tệp cục bộ</span>'}
+          </div>
+        `;
+      }).join('');
+    }).filter(Boolean).join('');
+
+    if (attemptsCount === 0) {
+      subsListEl.innerHTML = '<div class="p-3 bg-slate-50 rounded-xl text-slate-400 text-center italic">Sinh viên chưa nộp bài qua hệ thống.</div>';
+    } else {
+      subsListEl.innerHTML = html;
+    }
+  }
+
+  // Score & Comment Section
+  const sc = round?.supervisorScores?.[studentId];
+  const scoreValEl = document.getElementById('dtl-score-val');
+  const scoreTimeEl = document.getElementById('dtl-score-time');
+  const scoreStatusEl = document.getElementById('dtl-score-status');
+  const commentTextEl = document.getElementById('dtl-comment-text');
+
+  if (sc?.status === 'completed') {
+    if (scoreValEl) scoreValEl.textContent = Number(sc.score).toFixed(1);
+    if (scoreTimeEl) scoreTimeEl.textContent = sc.updatedAt ? fmt24h(sc.updatedAt) : '--';
+    if (scoreStatusEl) {
+      scoreStatusEl.className = 'badge bg-emerald-100 text-emerald-800 font-bold';
+      scoreStatusEl.textContent = 'Đã hoàn tất chấm điểm';
+    }
+  } else if (sc?.status === 'draft') {
+    if (scoreValEl) scoreValEl.textContent = sc.score ?? '--';
+    if (scoreTimeEl) scoreTimeEl.textContent = sc.updatedAt ? fmt24h(sc.updatedAt) : '--';
+    if (scoreStatusEl) {
+      scoreStatusEl.className = 'badge bg-amber-100 text-amber-800 font-bold';
+      scoreStatusEl.textContent = 'Bản lưu tạm';
+    }
+  } else {
+    if (scoreValEl) scoreValEl.textContent = '--';
+    if (scoreTimeEl) scoreTimeEl.textContent = 'Chưa chấm';
+    if (scoreStatusEl) {
+      scoreStatusEl.className = 'badge bg-slate-100 text-slate-500 font-bold';
+      scoreStatusEl.textContent = 'Chưa chấm';
+    }
+  }
+
+  if (commentTextEl) {
+    commentTextEl.textContent = sc?.comment ? `"${sc.comment}"` : '(Chưa có nhận xét nào từ GVHD)';
+  }
+
+  // Button link to open score modal
+  const btnScore = document.getElementById('btn-dtl-score');
+  if (btnScore) {
+    btnScore.onclick = () => {
+      closeSupervisorStudentDetailModal();
+      openScoreEntryModal('supervisor', studentId);
+    };
+  }
+
+  modal.classList.remove('hidden');
+};
+
+window.closeSupervisorStudentDetailModal = function() {
+  const modal = document.getElementById('supervisor-student-detail-modal');
+  if (modal) modal.classList.add('hidden');
 };
