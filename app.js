@@ -1493,16 +1493,19 @@ function renderStudentOfficialResult(reg) {
 
       const showEmail = (state.activeRound?.showEmailAfterPublish !== false && sup?.email);
       const showPhone = (state.activeRound?.showPhoneAfterPublish !== false && sup?.phone);
+      const supName = item.supervisorName || sup?.name || 'Giảng viên Hướng dẫn';
+      const escapedSupName = escapeHtml(supName);
+      const avatarSrc = (sup?.photoUrl && sup.photoUrl.trim()) ? sup.photoUrl : getSupervisorAvatarSvgDataUri(supName);
 
       return `
         <div class="bg-white/10 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/20 flex flex-col sm:flex-row items-center sm:items-start gap-4 flex-1 min-w-[280px]">
-          <img src="${sup?.photoUrl || defaultAvatar}" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 ${isPrimary ? 'border-amber-400' : 'border-blue-400'} shadow-md shrink-0">
+          <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedSupName}');" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 ${isPrimary ? 'border-amber-400' : 'border-blue-400'} shadow-md shrink-0" alt="${escapedSupName}">
           <div class="text-center sm:text-left flex-1 min-w-0">
             <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
               ${roleBadge}
               ${isPrimary ? `<span class="text-[10px] text-amber-300 font-semibold">${reg.acceptedRank === 'manual' ? 'Phân công của Khoa' : 'Trúng tuyển NV' + (reg.acceptedRank || 1)}</span>` : ''}
             </div>
-            <h3 class="text-lg sm:text-xl font-black text-white truncate">${item.supervisorName || sup?.name || 'Giảng viên Hướng dẫn'}</h3>
+            <h3 class="text-lg sm:text-xl font-black text-white truncate">${supName}</h3>
             <p class="text-xs text-blue-200 mt-0.5">${sup?.department || 'Khoa Mỹ thuật Công nghiệp'}</p>
             <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2.5 text-xs">
               ${showEmail ? '<span class="bg-white/15 px-2.5 py-1 rounded-lg text-white font-mono text-[11px]">✉️ ' + sup.email + '</span>' : ''}
@@ -1716,13 +1719,16 @@ function renderSupervisorsGrid() {
       }
     }
 
+    const escapedName = escapeHtml(s.name || '');
+    const avatarSrc = (s.showPhoto !== false && s.photoUrl && s.photoUrl.trim()) ? s.photoUrl : getSupervisorAvatarSvgDataUri(s.name);
+
     return `
       <div class="card-surface p-5 flex flex-col justify-between card-hover relative ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20' : ''}">
         ${isSelected ? `<span class="absolute right-3 top-3 px-2 py-0.5 rounded-full bg-amber-500 text-slate-900 font-extrabold text-[10px] shadow-sm">NV${assignedRank}</span>` : ''}
 
         <div class="space-y-3">
           <div class="flex items-center gap-3">
-            <img src="${(s.showPhoto !== false && s.photoUrl) ? s.photoUrl : defaultAvatar}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-sm" alt="${s.name}">
+            <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-sm" alt="${escapedName}">
             <div>
               <h3 class="font-bold text-slate-900 text-sm leading-tight">${s.name}</h3>
               <p class="text-[11px] text-slate-500">${s.department || 'Bộ môn TKNT'}</p>
@@ -3635,11 +3641,14 @@ function renderRoundModalSupervisorsList(filter = '') {
       ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Thỉnh giảng (tối đa 5)</span>'
       : '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Cơ hữu (tối đa 10)</span>';
 
+    const escapedName = escapeHtml(s.name || '');
+    const avatarSrc = (s.photoUrl && s.photoUrl.trim()) ? s.photoUrl : getSupervisorAvatarSvgDataUri(s.name);
+
     return `
       <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
         <label class="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
           <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleRoundModalSupervisor('${supId}', this.checked)" class="rounded text-tdtu-blue w-4 h-4">
-          <img src="${s.photoUrl || 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><circle cx=\'12\' cy=\'8\' r=\'4\' fill=\'%23cbd5e1\'/><path fill=\'%23cbd5e1\' d=\'M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z\'/></svg>'}" class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0">
+          <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0" alt="${escapedName}">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5">
               <span class="font-bold text-slate-800 text-xs block truncate">${s.name}</span>
@@ -4144,11 +4153,53 @@ async function loadAdminSupervisorsMaster() {
   }
 }
 
+export function getSupervisorInitials(name) {
+  if (!name || typeof name !== 'string') return 'GV';
+  const clean = name.replace(/^(TS\.|ThS\.|PGS\.TS\.|GS\.TS\.|ThS|TS|PGS|GS|Thầy|Cô|GV|GVHD|Ths|Ts)\s+/i, '').trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'GV';
+  const lastWord = parts[parts.length - 1];
+  return lastWord.charAt(0).toUpperCase();
+}
+
+const AVATAR_PALETTES = [
+  { bg1: '#3b82f6', bg2: '#1d4ed8' },
+  { bg1: '#10b981', bg2: '#047857' },
+  { bg1: '#8b5cf6', bg2: '#6d28d9' },
+  { bg1: '#f59e0b', bg2: '#b45309' },
+  { bg1: '#ec4899', bg2: '#be185d' },
+  { bg1: '#06b6d4', bg2: '#0e7490' },
+  { bg1: '#6366f1', bg2: '#4338ca' },
+  { bg1: '#14b8a6', bg2: '#0f766e' }
+];
+
+export function getSupervisorAvatarSvgDataUri(name) {
+  const initial = getSupervisorInitials(name);
+  let hash = 0;
+  const str = String(name || '');
+  for (let i = 0; i < str.length; i++) hash = (hash << 5) - hash + str.charCodeAt(i);
+  const colorIndex = Math.abs(hash) % AVATAR_PALETTES.length;
+  const color = AVATAR_PALETTES[colorIndex];
+  
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+    <defs>
+      <linearGradient id="g_${colorIndex}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${color.bg1}"/>
+        <stop offset="100%" stop-color="${color.bg2}"/>
+      </linearGradient>
+    </defs>
+    <rect width="100" height="100" rx="22" fill="url(#g_${colorIndex})"/>
+    <text x="50" y="55" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${initial}</text>
+  </svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
+window.getSupervisorInitials = getSupervisorInitials;
+window.getSupervisorAvatarSvgDataUri = getSupervisorAvatarSvgDataUri;
+
 function renderAdminSupervisorsMasterTable() {
   const tbody = document.getElementById('admin-supervisors-master-tbody');
   if (!tbody) return;
-
-  const defaultAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23cbd5e1"/><path fill="%23cbd5e1" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
 
   tbody.innerHTML = state.supervisorsMaster.map(s => {
     const isAdjunct = (s.employmentType === 'adjunct');
@@ -4156,10 +4207,14 @@ function renderAdminSupervisorsMasterTable() {
       ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Thỉnh giảng</span>'
       : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Cơ hữu</span>';
     const quotaVal = s.defaultQuota || (isAdjunct ? 5 : 10);
+    const escapedName = escapeHtml(s.name || '');
+    const avatarSrc = (s.photoUrl && s.photoUrl.trim()) ? s.photoUrl : getSupervisorAvatarSvgDataUri(s.name);
 
     return `
     <tr class="hover:bg-slate-50">
-      <td class="p-3.5"><img src="${s.photoUrl || defaultAvatar}" class="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm"></td>
+      <td class="p-3.5">
+        <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-9 h-9 rounded-full object-cover border border-slate-200 shadow-sm" alt="${escapedName}">
+      </td>
       <td class="p-3.5 font-bold text-slate-900">${s.name}</td>
       <td class="p-3.5 text-slate-600">${s.gender || 'Nam'}</td>
       <td class="p-3.5 text-slate-600">${s.email || '--'} ${s.phone ? '• ' + s.phone : ''}</td>
@@ -4371,7 +4426,11 @@ window.removeSupervisorPhoto = function() {
   if (photoInput) photoInput.value = '';
   if (pathInput) pathInput.value = '';
   if (fileInput) fileInput.value = '';
-  if (previewEl) previewEl.src = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23cbd5e1'/><path fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>";
+  if (previewEl) {
+    const name = document.getElementById('sup-form-name')?.value || 'GV';
+    previewEl.onerror = null;
+    previewEl.src = getSupervisorAvatarSvgDataUri(name);
+  }
   if (infoEl) {
     infoEl.textContent = 'Đã chọn xóa ảnh (Bấm Lưu GVHD để hoàn tất)';
     infoEl.className = 'text-[11px] text-amber-600 font-semibold mt-1';
@@ -4406,7 +4465,10 @@ window.openCreateSupervisorModal = function() {
     document.getElementById('sup-form-photo-path').value = '';
   }
   const prevEl = document.getElementById('sup-photo-preview');
-  if (prevEl) prevEl.src = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23cbd5e1'/><path fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>";
+  if (prevEl) {
+    prevEl.onerror = null;
+    prevEl.src = getSupervisorAvatarSvgDataUri('GV');
+  }
   
   const removeBtn = document.getElementById('sup-btn-remove-photo');
   if (removeBtn) removeBtn.classList.add('hidden');
@@ -4458,7 +4520,13 @@ window.editSupervisorMasterModal = function(supId) {
     document.getElementById('sup-form-photo-path').value = s.photoPath || '';
   }
   const prevElEdit = document.getElementById('sup-photo-preview');
-  if (prevElEdit) prevElEdit.src = s.photoUrl || "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23cbd5e1'/><path fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>";
+  if (prevElEdit) {
+    prevElEdit.onerror = function() {
+      this.onerror = null;
+      this.src = getSupervisorAvatarSvgDataUri(s.name || 'GV');
+    };
+    prevElEdit.src = (s.photoUrl && s.photoUrl.trim()) ? s.photoUrl : getSupervisorAvatarSvgDataUri(s.name || 'GV');
+  }
   
   const removeBtn = document.getElementById('sup-btn-remove-photo');
   if (removeBtn) {
@@ -6829,9 +6897,16 @@ window.openBioModal = function(supId) {
   const sup = state.roundSupervisors.find(s => s.id === supId) || state.supervisorsMaster.find(s => s.id === supId);
   if (!sup) return;
 
-  const defaultAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23cbd5e1"/><path fill="%23cbd5e1" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
-
-  document.getElementById('bio-modal-photo').src = (sup.showPhoto !== false && sup.photoUrl) ? sup.photoUrl : defaultAvatar;
+  const bioPhoto = document.getElementById('bio-modal-photo');
+  const avatarSrc = (sup.showPhoto !== false && sup.photoUrl && sup.photoUrl.trim()) ? sup.photoUrl : getSupervisorAvatarSvgDataUri(sup.name);
+  if (bioPhoto) {
+    bioPhoto.onerror = function() {
+      this.onerror = null;
+      this.src = getSupervisorAvatarSvgDataUri(sup.name);
+    };
+    bioPhoto.src = avatarSrc;
+    bioPhoto.alt = escapeHtml(sup.name || 'Giảng viên');
+  }
   document.getElementById('bio-modal-name').textContent = sup.name || '--';
   document.getElementById('bio-modal-dept').textContent = sup.department || '--';
   document.getElementById('bio-modal-expertise').textContent = sup.expertise || 'Đang cập nhật';
