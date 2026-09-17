@@ -104,6 +104,17 @@ export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   }).length;
 }
 
+// A missing field is intentionally treated as the legacy preference workflow.
+export function getSupervisorAssignmentMode(round = state?.activeRound) {
+  return round?.supervisorAssignmentMode === 'direct_assignment'
+    ? 'direct_assignment'
+    : 'student_preference';
+}
+
+function isDirectSupervisorAssignment(round = state?.activeRound) {
+  return getSupervisorAssignmentMode(round) === 'direct_assignment';
+}
+
 /** IFA+ Graduation Beta Studio v2.6.0-beta.1 (Admin Impersonation / Act-As Test Mode) **/
 
 // Override native alert to use non-blocking toast
@@ -1550,6 +1561,7 @@ function renderStudentExistingRegistration(reg) {
 
   const bannerEl = document.getElementById('reg-card-eligibility-banner');
   const statusEl = document.getElementById('reg-card-status');
+  const directAssignment = isDirectSupervisorAssignment();
   if (bannerEl) {
     if (reg.eligibilityStatus === 'pending') {
       bannerEl.className = 'mb-4 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-start gap-2.5';
@@ -1583,6 +1595,20 @@ function renderStudentExistingRegistration(reg) {
         statusEl.textContent = 'Không đủ điều kiện';
         statusEl.className = 'font-bold text-rose-700 text-sm';
       }
+    } else if (directAssignment) {
+      bannerEl.className = 'mb-4 p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-start gap-2.5';
+      bannerEl.innerHTML = `
+        <span class="text-base">ℹ️</span>
+        <div>
+          <span class="font-bold block">GVHD: Chưa phân công</span>
+          <p class="text-[11px] text-blue-800 mt-0.5 leading-relaxed">Vui lòng chờ Khoa phân công giảng viên hướng dẫn.</p>
+        </div>
+      `;
+      bannerEl.classList.remove('hidden');
+      if (statusEl) {
+        statusEl.textContent = 'Chờ Khoa phân công GVHD';
+        statusEl.className = 'font-bold text-blue-700 text-sm';
+      }
     } else {
       bannerEl.className = 'mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs flex items-start gap-2.5';
       bannerEl.innerHTML = `
@@ -1606,6 +1632,11 @@ function renderStudentExistingRegistration(reg) {
   document.getElementById('reg-card-time').textContent = `Thời gian nộp: ${dateStr}`;
 
   const listEl = document.getElementById('reg-card-preferences-list');
+  if (listEl && directAssignment) {
+    listEl.closest('.bg-slate-50')?.classList.add('hidden');
+    return;
+  }
+  listEl?.closest('.bg-slate-50')?.classList.remove('hidden');
   listEl.innerHTML = (reg.preferences || []).map(p => `
     <div class="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-emerald-100 shadow-sm text-xs">
       <span class="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-[10px]">
@@ -1868,7 +1899,36 @@ function renderPreferencesTray() {
 }
 
 // --- STEPPER NAVIGATION ---
+function applySupervisorAssignmentModeToRegistrationUI() {
+  const directAssignment = isDirectSupervisorAssignment();
+  const selectionStep = document.getElementById('step-indicator-2');
+  const confirmStep = document.getElementById('step-indicator-3');
+  const nextButton = document.getElementById('btn-registration-step-1-next');
+  const confirmBackButton = document.getElementById('btn-registration-confirm-back');
+  const topicDescription = document.getElementById('registration-topic-step-description');
+
+  if (selectionStep) selectionStep.classList.toggle('hidden', directAssignment);
+  if (confirmStep) {
+    const circle = confirmStep.querySelector('.stepper-circle');
+    const label = confirmStep.querySelector('span');
+    if (circle) circle.textContent = directAssignment ? '2' : '3';
+    if (label) label.textContent = 'Xác nhận';
+  }
+  if (nextButton) nextButton.innerHTML = directAssignment
+    ? '<span>Tiếp tục: Xem lại & Nộp</span><span>→</span>'
+    : '<span>Tiếp tục: Chọn GVHD</span><span>→</span>';
+  if (topicDescription) topicDescription.textContent = directAssignment
+    ? 'Vui lòng điền tên đề tài dự kiến và phân loại đồ án trước khi xác nhận đăng ký.'
+    : 'Vui lòng điền tên đề tài dự kiến và phân loại đồ án trước khi chọn GVHD.';
+  if (confirmBackButton) {
+    confirmBackButton.setAttribute('onclick', directAssignment ? 'goToStep(1)' : 'goToStep(2)');
+    confirmBackButton.textContent = directAssignment ? '← Quay lại Thông tin đề tài' : '← Quay lại Bước 2';
+  }
+}
+
 window.goToStep = function(step) {
+  applySupervisorAssignmentModeToRegistrationUI();
+  if (isDirectSupervisorAssignment() && step === 2) step = 3;
   state.currentStep = step;
 
   [1, 2, 3].forEach(s => {
@@ -1947,10 +2007,14 @@ window.validateAndGoToStep2 = function() {
     return;
   }
 
-  goToStep(2);
+  goToStep(isDirectSupervisorAssignment() ? 3 : 2);
 };
 
 window.validateAndGoToStep3 = function() {
+  if (isDirectSupervisorAssignment()) {
+    goToStep(3);
+    return;
+  }
   const maxPref = state.activeRound?.preferenceCount || 3;
   if (state.selectedPreferences.length < maxPref) {
     showToast(`Vui lòng chọn đủ ${maxPref} nguyện vọng trước khi tiếp tục.`, 'info');
@@ -1963,7 +2027,11 @@ function renderConfirmationPanel() {
   document.getElementById('confirm-topic-title').textContent = (document.getElementById('input-topic-title')?.value || '').trim();
   document.getElementById('confirm-project-type').textContent = document.getElementById('select-project-type')?.value || '';
 
+  const directAssignment = isDirectSupervisorAssignment();
+  const preferencesSection = document.getElementById('confirmation-preferences-section');
+  if (preferencesSection) preferencesSection.classList.toggle('hidden', directAssignment);
   const listEl = document.getElementById('confirm-preferences-list');
+  if (!listEl) return;
   listEl.innerHTML = state.selectedPreferences.map(p => `
     <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200">
       <span class="w-6 h-6 rounded-full bg-tdtu-blue text-white font-extrabold flex items-center justify-center text-xs">
@@ -1997,6 +2065,7 @@ window.submitRegistration = async function() {
   try {
     const isPending = (state.isEligible === 'pending' || state.eligibilityState === 'pending');
     const eligibilityStatus = isPending ? 'pending' : 'eligible';
+    const directAssignment = isDirectSupervisorAssignment();
 
     const payload = {
       studentId: mssv,
@@ -2004,7 +2073,7 @@ window.submitRegistration = async function() {
       email: state.user?.email || `${mssv}@student.tdtu.edu.vn`,
       topicTitle,
       projectType,
-      preferences: state.selectedPreferences.map(p => ({
+      preferences: directAssignment ? [] : state.selectedPreferences.map(p => ({
         rank: p.rank,
         supervisorId: p.supervisorId,
         supervisorName: p.supervisorName,
@@ -2013,13 +2082,13 @@ window.submitRegistration = async function() {
       submittedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       status: 'submitted',
-      reviewStatus: 'waiting',
+      reviewStatus: directAssignment ? 'direct_assignment_pending' : 'waiting',
       eligibilityStatus: eligibilityStatus
     };
 
     await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload);
     
-    showToast('🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
+    showToast(directAssignment ? '🎉 ĐĂNG KÝ THÀNH CÔNG! Vui lòng chờ Khoa phân công GVHD.' : '🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
     await checkStudentEligibilityAndRegistration(roundId);
   } catch (err) {
     console.error('Lỗi khi nộp đăng ký:', err);
@@ -2129,6 +2198,16 @@ function renderSupervisorReviewUI(currentSup, currentRound, reviewStatus, isLock
   const stateTag = document.getElementById('sup-round-state-tag');
   const actionBtns = document.getElementById('sup-review-action-btns');
   const indicator = document.getElementById('sup-round-review-indicator');
+
+  if (isDirectSupervisorAssignment()) {
+    rankBadge.textContent = 'PHÂN CÔNG TRỰC TIẾP';
+    stateTag.textContent = 'Khoa phân công trực tiếp';
+    indicator.textContent = 'Khoa/Admin phân công GVHD trực tiếp; danh sách sinh viên đã được phân công hiển thị bên dưới.';
+    actionBtns.innerHTML = '<span class="text-xs text-slate-400 italic">Không có bước xét nguyện vọng trong đợt này.</span>';
+    const tbody = document.getElementById('sup-candidates-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400">Đợt này sử dụng phân công trực tiếp. Vui lòng xem danh sách sinh viên đã được phân công.</td></tr>';
+    return;
+  }
 
   rankBadge.textContent = `NGUYỆN VỌNG ${currentRound}`;
 
@@ -2878,6 +2957,8 @@ window.openCreateRoundModal = function() {
   document.getElementById('form-round').reset();
   document.getElementById('round-form-id').value = '';
   document.getElementById('modal-round-title').textContent = 'Tạo Đợt Đồ án Tốt nghiệp Mới';
+  const defaultAssignmentMode = document.querySelector('input[name="supervisor-assignment-mode"][value="student_preference"]');
+  if (defaultAssignmentMode) defaultAssignmentMode.checked = true;
 
   const preEl = document.getElementById('round-allow-pre-eligibility');
   if (preEl) {
@@ -2931,6 +3012,9 @@ window.editRoundModal = async function(roundId) {
   document.getElementById('round-form-status').value = r.status || 'draft';
   document.getElementById('round-form-pref-count').value = r.preferenceCount || '3';
   document.getElementById('round-form-selection-mode').value = r.selectionMode || 'cards';
+  const assignmentMode = getSupervisorAssignmentMode(r);
+  const assignmentModeInput = document.querySelector(`input[name="supervisor-assignment-mode"][value="${assignmentMode}"]`);
+  if (assignmentModeInput) assignmentModeInput.checked = true;
   document.getElementById('round-form-allow-edit').checked = r.allowStudentEdit !== false;
   document.getElementById('round-form-allow-topic-edit').checked = r.allowTopicEdit !== false;
   document.getElementById('round-form-allow-pref-edit').checked = r.allowPreferenceEdit !== false;
@@ -3809,6 +3893,7 @@ window.saveRound = async function(e) {
 
   const preferenceCount = parseInt(document.getElementById('round-form-pref-count')?.value, 10) || 3;
   const selectionMode = document.getElementById('round-form-selection-mode')?.value || 'cards';
+  const supervisorAssignmentMode = document.querySelector('input[name="supervisor-assignment-mode"]:checked')?.value || 'student_preference';
   const status = document.getElementById('round-form-status')?.value || 'draft';
   const allowStudentEdit = document.getElementById('round-form-allow-edit')?.checked !== false;
   const allowTopicEdit = document.getElementById('round-form-allow-topic-edit')?.checked !== false;
@@ -3859,6 +3944,7 @@ window.saveRound = async function(e) {
     closeAt: closeDate,
     preferenceCount,
     selectionMode,
+    supervisorAssignmentMode,
     status,
     allowStudentEdit,
     allowTopicEdit,
@@ -5543,6 +5629,8 @@ function renderAdminReviewDashboard() {
   const round = state.activeRound;
   if (!round) return;
 
+  const directAssignment = isDirectSupervisorAssignment(round);
+
   const currentRound = round.currentReviewRound || 0;
   const reviewStatus = round.reviewStatus || 'not_started';
   const preferenceCount = round.preferenceCount || 3;
@@ -5566,6 +5654,32 @@ function renderAdminReviewDashboard() {
   document.getElementById('adm-stat-total-quota').textContent = totalQuota;
   document.getElementById('adm-stat-fill-rate').textContent = `${fillRate}%`;
   document.getElementById('adm-unassigned-count-tag').textContent = `${unassignedCount} SV`;
+
+  const reviewSupervisorsSection = document.getElementById('admin-review-supervisors-section');
+  const preferencesHeader = document.getElementById('admin-manual-preferences-header');
+  const workflowKicker = document.getElementById('admin-review-workflow-kicker');
+  const manualSectionTitle = document.querySelector('#admin-manual-assignment-section h3 span:first-child');
+  const manualSectionDescription = document.querySelector('#admin-manual-assignment-section p');
+  if (reviewSupervisorsSection) reviewSupervisorsSection.classList.toggle('hidden', directAssignment);
+  if (preferencesHeader) preferencesHeader.classList.toggle('hidden', directAssignment);
+  if (workflowKicker) workflowKicker.textContent = directAssignment ? 'BẢNG ĐIỀU KHIỂN PHÂN CÔNG GVHD' : 'BẢNG ĐIỀU KHIỂN QUY TRÌNH XÉT DUYỆT';
+  if (manualSectionTitle) manualSectionTitle.textContent = directAssignment ? '🛠️ Phân công GVHD trực tiếp' : '🛠️ Phân công Thủ công (Sinh viên chưa có GVHD)';
+  if (manualSectionDescription) manualSectionDescription.textContent = directAssignment
+    ? 'Phân công trực tiếp cho sinh viên đã đăng ký. Chỉ tiêu GVHD vẫn được áp dụng.'
+    : 'Dành cho sinh viên chưa trúng tuyển sau các vòng nguyện vọng, hoặc điều phối bổ sung.';
+
+  if (directAssignment) {
+    statusPill.className = 'badge bg-indigo-200 text-indigo-900 font-black';
+    statusPill.textContent = 'Phân công trực tiếp';
+    titleEl.textContent = 'Giai đoạn: Khoa phân công GVHD trực tiếp';
+    descEl.textContent = `Có ${unassignedCount} sinh viên chưa có GVHD. Phân công trực tiếp theo chỉ tiêu, sau đó công bố kết quả theo quy trình hiện có.`;
+    actionsWrap.innerHTML = `
+      <button onclick="publishAdminResults()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
+        <span>📢 HOÀN TẤT & CÔNG BỐ KẾT QUẢ CHÍNH THỨC</span>
+      </button>
+    `;
+    return;
+  }
 
   if (reviewStatus === 'not_started' || reviewStatus === 'draft' || currentRound === 0) {
     statusPill.className = 'badge bg-slate-200 text-slate-800 font-black';
@@ -5685,10 +5799,11 @@ function renderAdminManualAssignmentTable() {
   if (!tbody) return;
 
   const registrations = state.adminReviewData.registrations;
+  const directAssignment = isDirectSupervisorAssignment();
   const unassigned = registrations.filter(r => r.reviewStatus !== 'accepted' && r.reviewStatus !== 'manually_assigned');
 
   if (unassigned.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-emerald-700 font-bold bg-emerald-50/50">🎉 Tất cả sinh viên đã được phân công Giảng viên hướng dẫn!</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${directAssignment ? 6 : 7}" class="p-6 text-center text-emerald-700 font-bold bg-emerald-50/50">🎉 Tất cả sinh viên đã được phân công Giảng viên hướng dẫn!</td></tr>`;
     return;
   }
 
@@ -5701,7 +5816,7 @@ function renderAdminManualAssignmentTable() {
         <td class="p-3.5 font-semibold text-slate-800">${r.studentName || '--'}</td>
         <td class="p-3.5 max-w-xs font-medium text-slate-900" title="${r.topicTitle}">${r.topicTitle}</td>
         <td class="p-3.5 text-slate-600">${r.projectType || '--'}</td>
-        <td class="p-3.5 text-[11px] text-slate-500 max-w-xs truncate" title="${prefsText}">${prefsText}</td>
+        ${directAssignment ? '' : `<td class="p-3.5 text-[11px] text-slate-500 max-w-xs truncate" title="${prefsText}">${prefsText}</td>`}
         <td class="p-3.5 font-bold text-amber-700 text-xs">Chưa phân công</td>
         <td class="p-3.5 text-right">
           <button onclick="openAdminManualAssignModal('${r.studentId}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-sm">
@@ -5924,6 +6039,10 @@ window.openAdminManualAssignModal = function(studentId) {
   state.manualAssignStudentId = studentId;
   const reg = state.adminReviewData.registrations.find(r => r.studentId === studentId);
   if (!reg) return;
+
+  const directAssignment = isDirectSupervisorAssignment();
+  const modalTitle = document.querySelector('#modal-admin-manual-assign h3');
+  if (modalTitle) modalTitle.textContent = directAssignment ? 'Phân công GVHD trực tiếp' : 'Phân công GVHD Thủ công';
 
   document.getElementById('manual-assign-student-info').textContent = `${reg.studentId} — ${reg.studentName || ''}`;
   document.getElementById('manual-assign-topic-info').textContent = `Đề tài: ${reg.topicTitle} (${reg.projectType})`;
@@ -17075,7 +17194,9 @@ window.renderAdminRoundsCards = function() {
     const actCount = typeof r.activitiesCount === 'number' ? r.activitiesCount : (r.activities ? r.activities.length : 0);
 
     let phaseInfo = '';
-    if (r.reviewStatus === 'completed') {
+    if (directAssignment && r.reviewStatus !== 'completed') {
+      phaseInfo = 'Khoa phân công trực tiếp';
+    } else if (r.reviewStatus === 'completed') {
       phaseInfo = 'Đã chốt phân công GVHD';
     } else if (r.currentRank) {
       phaseInfo = `Đang xét NV${r.currentRank}`;
@@ -17175,14 +17296,14 @@ window.renderAdminRoundsCards = function() {
               <span>Đăng ký</span>
             </button>
 
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            ${directAssignment ? '' : `<button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
               <span class="text-amber-600 group-hover:scale-110 transition-transform">🎯</span>
               <span>Xét nguyện vọng</span>
-            </button>
+            </button>`}
 
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'preview-student')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            <button type="button" onclick="navigateToRoundAction('${r.id}', '${directAssignment ? 'review' : 'preview-student'}')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
               <span class="text-purple-600 group-hover:scale-110 transition-transform">👥</span>
-              <span>Phân công</span>
+              <span>${directAssignment ? 'Phân công GVHD' : 'Phân công'}</span>
             </button>
 
             <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
@@ -17260,7 +17381,9 @@ window.updateRoundBreadcrumb = function(tabKey) {
     'preview-student': 'Kết quả phân công',
     'scoring-dashboard': 'Quản lý điểm'
   };
-  const currentLabel = tabLabels[tabKey] || tabKey;
+  const currentLabel = tabKey === 'review' && isDirectSupervisorAssignment(currentRound)
+    ? 'Phân công GVHD'
+    : (tabLabels[tabKey] || tabKey);
 
   bEl.innerHTML = `
     <div class="flex items-center justify-between gap-3 bg-slate-100/90 hover:bg-slate-100 px-4 py-3 rounded-xl border border-slate-200/80 text-sm transition-colors">
@@ -17301,6 +17424,9 @@ window.duplicateRoundModal = async function(roundId) {
   document.getElementById('round-form-status').value = 'draft';
   document.getElementById('round-form-pref-count').value = r.preferenceCount || '3';
   document.getElementById('round-form-selection-mode').value = r.selectionMode || 'cards';
+  const assignmentMode = getSupervisorAssignmentMode(r);
+  const assignmentModeInput = document.querySelector(`input[name="supervisor-assignment-mode"][value="${assignmentMode}"]`);
+  if (assignmentModeInput) assignmentModeInput.checked = true;
   if (document.getElementById('round-form-allow-edit')) {
     document.getElementById('round-form-allow-edit').checked = r.allowStudentEdit !== false;
   }
@@ -17392,6 +17518,8 @@ window.startStudentRegistration = function() {
     flowContainer.classList.remove('hidden');
     flowContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+  state.selectedPreferences = [];
+  goToStep(1);
 };
 
 window.cancelRegistrationEdit = function() {
@@ -17415,6 +17543,7 @@ window.updateStudentJourneyStepper = function() {
   const reg = state.myRegistration;
   const officialList = reg ? getOfficialSupervisors(reg) : [];
   const hasOfficialSup = officialList.length > 0 || Boolean(reg?.assignedSupervisorId || reg?.officialSupervisor);
+  const directAssignment = isDirectSupervisorAssignment(round);
 
   // 1. Đủ điều kiện
   let s1Status = 'upcoming';
@@ -17460,9 +17589,9 @@ window.updateStudentJourneyStepper = function() {
   if (hasOfficialSup) {
     s4Status = 'completed';
     s4Label = 'Đã phân công';
-  } else if (isReviewing || round?.status === 'finalized') {
+  } else if ((directAssignment && reg) || isReviewing || round?.status === 'finalized') {
     s4Status = 'active';
-    s4Label = 'Đang phân công';
+    s4Label = directAssignment ? 'Chờ Khoa phân công' : 'Đang phân công';
   }
 
   // 5. Nộp bài
@@ -17495,7 +17624,7 @@ window.updateStudentJourneyStepper = function() {
     s7Label = 'Chờ công bố';
   }
 
-  const steps = [
+  const preferenceSteps = [
     { num: 1, title: '1. Đủ điều kiện', status: s1Status, label: s1Label },
     { num: 2, title: '2. Đăng ký', status: s2Status, label: s2Label },
     { num: 3, title: '3. Xét nguyện vọng', status: s3Status, label: s3Label },
@@ -17504,6 +17633,16 @@ window.updateStudentJourneyStepper = function() {
     { num: 6, title: '6. Bảo vệ', status: s6Status, label: s6Label },
     { num: 7, title: '7. Kết quả', status: s7Status, label: s7Label }
   ];
+  const steps = directAssignment
+    ? [
+        { num: 1, title: '1. Đủ điều kiện', status: s1Status, label: s1Label },
+        { num: 2, title: '2. Đăng ký', status: s2Status, label: s2Label },
+        { num: 3, title: '3. Phân công GVHD', status: s4Status, label: s4Label },
+        { num: 4, title: '4. Nộp bài', status: s5Status, label: s5Label },
+        { num: 5, title: '5. Bảo vệ', status: s6Status, label: s6Label },
+        { num: 6, title: '6. Kết quả', status: s7Status, label: s7Label }
+      ]
+    : preferenceSteps;
 
   const statusStyles = {
     completed: {
