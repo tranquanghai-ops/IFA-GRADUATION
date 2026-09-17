@@ -104,7 +104,7 @@ export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   }).length;
 }
 
-/** IFA+ Graduation Beta Studio v2.5.0-beta.1 (IFAA CORS Fix + Drive Backend) **/
+/** IFA+ Graduation Beta Studio v2.6.0-beta.1 (Admin Impersonation / Act-As Test Mode) **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -378,6 +378,17 @@ export const state = {
   studentMssv: '',
   isEligible: false,
   
+  // Impersonation / Act-As Test Mode State (v2.6.0-beta.1)
+  realUser: null,
+  realIsAdmin: false,
+  realIsOwner: false,
+  impersonation: null, // { realUser, target, mode: 'read_only', startedAt }
+  allowImpersonation: false,
+  impersonateCandidates: [],
+  impersonateFilterRound: 'all',
+  impersonateFilterRole: 'all',
+  impersonateSearchQuery: '',
+  
   // Active Data
   rounds: [],
   selectedRoundId: null,
@@ -471,6 +482,7 @@ export async function setupAuthListener() {
   }, 6000);
 
   onAuthStateChanged(auth, async user => {
+    state.realUser = user;
     state.user = user;
 
     if (user) {
@@ -487,12 +499,29 @@ export async function setupAuthListener() {
         } catch (e) {
           console.warn('[IFA-Graduation] Role resolution notice:', e);
         }
+
+        state.realIsAdmin = Boolean(state.isAdmin);
+        state.realIsOwner = (user.email?.toLowerCase().trim() === 'tranquanghai@tdtu.edu.vn');
+
+        // 1.1 Tải thiết lập hệ thống (System Settings)
+        try {
+          await loadSystemSettingsDoc();
+        } catch (e) {}
+
+        // 1.2 Khôi phục phiên đóng vai (nếu có và hợp lệ)
+        if (state.allowImpersonation && state.realIsAdmin) {
+          loadImpersonationSession();
+        } else {
+          try { sessionStorage.removeItem('ifa_graduation_impersonation'); } catch (e) {}
+          state.impersonation = null;
+        }
+
         updateAuthUI();
 
         // 2. Kích hoạt ngay view ban đầu để UI hiển thị tức thì
         const detectedPortal = getCurrentPortal();
         let initView = 'student';
-        if (detectedPortal === 'admin' && state.isAdmin) {
+        if (detectedPortal === 'admin') {
           initView = 'admin';
         } else if (detectedPortal === 'supervisor') {
           initView = 'supervisor';
@@ -502,7 +531,7 @@ export async function setupAuthListener() {
           initView = 'student';
         }
         await switchView(initView);
-        if (initView === 'admin') {
+        if (initView === 'admin' && !state.impersonation && state.isAdmin) {
           switchAdminTab('rounds');
         }
 
@@ -528,7 +557,7 @@ export async function setupAuthListener() {
       }
 
       // 4. Background bootstrap cho project types nếu là Admin (chạy ngầm, không chặn startup)
-      if (state.isAdmin) {
+      if (state.isAdmin && !state.impersonation) {
         setTimeout(() => {
           bootstrapProjectTypesIfNeeded().catch(() => {});
         }, 1200);
@@ -536,6 +565,13 @@ export async function setupAuthListener() {
 
     } else {
       clearTimeout(safetyTimer);
+      state.realUser = null;
+      state.realIsAdmin = false;
+      state.realIsOwner = false;
+      state.impersonation = null;
+      try { sessionStorage.removeItem('ifa_graduation_impersonation'); } catch (e) {}
+      const gBanner = document.getElementById('global-impersonation-banner');
+      if (gBanner) gBanner.classList.add('hidden');
       await resolveActualRoles(null);
       updateAuthUI();
       document.getElementById('login-required-section').classList.remove('hidden');
@@ -641,7 +677,12 @@ export function updateAuthUI() {
     userInfoBar.classList.add('flex');
     btnHeaderLogin.classList.add('hidden');
 
-    document.getElementById('user-display-name').textContent = state.user.displayName || state.user.email;
+    const isImp = Boolean(state.impersonation);
+    const target = isImp ? (state.impersonation.target || {}) : {};
+
+    document.getElementById('user-display-name').textContent = isImp
+      ? `${target.name || state.user.displayName || state.user.email} (Đang đóng vai)`
+      : (state.user.displayName || state.user.email);
     document.getElementById('user-avatar').src = state.user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23fff"/><path fill="%23fff" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
     
     // Display ACTUAL ROLE badge
@@ -651,7 +692,10 @@ export function updateAuthUI() {
     let roleName = 'Sinh viên';
     let badgeClass = 'text-[10px] bg-blue-500/30 text-blue-200 px-1.5 py-0.5 rounded font-medium border border-blue-400/30';
 
-    if (state.actualRole === 'admin') {
+    if (isImp) {
+      roleName = `Đóng vai: ${target.roleLabel || target.type || 'Người dùng'}`;
+      badgeClass = 'text-[10px] bg-amber-500/30 text-amber-200 px-1.5 py-0.5 rounded font-black border border-amber-400/40';
+    } else if (state.actualRole === 'admin') {
       roleName = 'Quản trị viên';
       badgeClass = 'text-[10px] bg-rose-500/30 text-rose-200 px-1.5 py-0.5 rounded font-bold border border-rose-400/30';
     } else if (state.actualRole === 'supervisor') {
@@ -664,9 +708,46 @@ export function updateAuthUI() {
       roleBadge.className = badgeClass;
     }
 
+    // Global Impersonation Banner sync
+    const globalBanner = document.getElementById('global-impersonation-banner');
+    if (globalBanner) {
+      if (isImp) {
+        globalBanner.classList.remove('hidden');
+        const bName = document.getElementById('impersonate-banner-name');
+        const bId = document.getElementById('impersonate-banner-identifier');
+        const bRole = document.getElementById('impersonate-banner-role');
+        const bRound = document.getElementById('impersonate-banner-round');
+        if (bName) bName.textContent = target.name || target.email || 'Người dùng';
+        if (bId) bId.textContent = target.mssv ? `(${target.mssv})` : (target.email ? `(${target.email})` : '');
+        if (bRole) bRole.textContent = target.roleLabel || target.type || 'Sinh viên';
+        if (bRound) {
+          if (target.roundTitle) {
+            bRound.textContent = `Đợt: ${target.roundTitle}`;
+            bRound.classList.remove('hidden');
+          } else {
+            bRound.classList.add('hidden');
+          }
+        }
+      } else {
+        globalBanner.classList.add('hidden');
+      }
+    }
+
+    // Header Impersonate button visibility
+    const btnOpenImp = document.getElementById('btn-open-impersonate');
+    if (btnOpenImp) {
+      if (state.realIsAdmin && state.allowImpersonation && !isImp) {
+        btnOpenImp.classList.remove('hidden');
+        btnOpenImp.classList.add('flex');
+      } else {
+        btnOpenImp.classList.add('hidden');
+        btnOpenImp.classList.remove('flex');
+      }
+    }
+
     // Subtext if viewing different view
     if (viewingBadge) {
-      if (state.actualRole && state.currentView && state.actualRole !== state.currentView) {
+      if (state.actualRole && state.currentView && state.actualRole !== state.currentView && !isImp) {
         const viewLabels = { student: 'Sinh viên', supervisor: 'GVHD', admin: 'Quản trị' };
         viewingBadge.textContent = '(Đang xem: ' + (viewLabels[state.currentView] || state.currentView) + ')';
         viewingBadge.classList.remove('hidden');
@@ -797,8 +878,27 @@ window.switchView = async function(targetView) {
     }
   });
 
-  if (targetView === 'admin' && state.isAdmin) {
-    loadAdminStats();
+  if (targetView === 'admin') {
+    const lockCard = document.getElementById('admin-impersonation-lock-card');
+    const mainLayout = document.getElementById('admin-main-layout');
+
+    if (state.impersonation) {
+      if (lockCard) lockCard.classList.remove('hidden');
+      if (mainLayout) mainLayout.classList.add('hidden');
+      const target = state.impersonation.target || {};
+      const lockName = document.getElementById('admin-lock-target-name');
+      const lockRole = document.getElementById('admin-lock-target-role');
+      if (lockName) lockName.textContent = `${target.name || target.email} ${target.mssv ? '(' + target.mssv + ')' : ''}`;
+      if (lockRole) lockRole.textContent = target.roleLabel || target.type || 'Người dùng';
+      return;
+    } else {
+      if (lockCard) lockCard.classList.add('hidden');
+      if (mainLayout) mainLayout.classList.remove('hidden');
+    }
+
+    if (state.isAdmin) {
+      loadAdminStats();
+    }
   } else if (targetView === 'supervisor') {
     initSupervisorPortal();
   } else if (targetView === 'assessment') {
@@ -1788,6 +1888,8 @@ function renderConfirmationPanel() {
 }
 
 window.submitRegistration = async function() {
+  if (!checkImpersonationWriteGuard('Nộp đăng ký nguyện vọng đồ án')) return;
+
   const roundId = state.selectedRoundId;
   const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
   const topicTitle = (document.getElementById('input-topic-title')?.value || '').trim();
@@ -2022,6 +2124,8 @@ window.filterSupervisorCandidates = function() {
 };
 
 window.toggleSupervisorDecision = async function(studentId) {
+  if (!checkImpersonationWriteGuard('Thay đổi quyết định chọn sinh viên')) return;
+
   const roundId = state.selectedRoundId;
   const currentRound = state.activeRound?.currentReviewRound || 1;
   const emailLower = (state.user?.email || '').toLowerCase();
@@ -2093,6 +2197,8 @@ window.closeSupervisorConfirmModal = function() {
 };
 
 window.confirmSupervisorRoundCompletion = async function() {
+  if (!checkImpersonationWriteGuard('Xác nhận hoàn thành vòng chọn sinh viên')) return;
+
   const roundId = state.selectedRoundId;
   const currentRound = state.activeRound?.currentReviewRound || 1;
   const emailLower = (state.user?.email || '').toLowerCase();
@@ -2273,7 +2379,7 @@ window.switchAdminTab = function(tabKey) {
   }
 
   // 3. Tab panels toggle
-  ['overview', 'review', 'rounds', 'faculty-students', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash', 'timeline', 'scoring-dashboard'].forEach(t => {
+  ['overview', 'review', 'rounds', 'faculty-students', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash', 'timeline', 'scoring-dashboard', 'system-settings'].forEach(t => {
     const p = document.getElementById('atab-panel-' + t);
     if (p) {
       if (t === tabKey) p.classList.remove('hidden');
@@ -2306,6 +2412,7 @@ window.switchAdminTab = function(tabKey) {
   else if (tabKey === 'preview-student') preparePreviewStudentDropdown();
   else if (tabKey === 'trash') renderAdminTrashTable();
   else if (tabKey === 'scoring-dashboard') loadAdminScoringDashboard();
+  else if (tabKey === 'system-settings') loadAdminSystemSettings();
   else if (tabKey === 'timeline') {
     if (roundId) {
       const sel = document.getElementById('admin-timeline-round-select');
@@ -5084,6 +5191,698 @@ window.exitPreviewMode = function() {
     checkStudentEligibilityAndRegistration(state.selectedRoundId);
   }
 };
+
+// ============================================================================
+// FEATURE: ADMIN IMPERSONATION / ACT-AS TEST MODE (v2.6.0-beta.1)
+// ============================================================================
+
+export function isImpersonating() {
+  return Boolean(state.impersonation);
+}
+
+export function getRealUser() {
+  return state.realUser || auth.currentUser;
+}
+
+export function getEffectiveActor() {
+  if (state.impersonation) {
+    const target = state.impersonation.target || {};
+    return {
+      user: state.user,
+      email: target.email || state.user?.email || '',
+      displayName: target.name || state.user?.displayName || '',
+      isAdmin: false, // Strict: zero admin privilege leak
+      isSupervisor: Boolean(state.isSupervisor),
+      isStudent: Boolean(state.isStudent),
+      studentMssv: state.studentMssv || '',
+      targetType: target.type,
+      impersonating: true,
+      readOnly: true
+    };
+  }
+  return {
+    user: state.user,
+    email: state.user?.email || '',
+    displayName: state.user?.displayName || '',
+    isAdmin: Boolean(state.isAdmin),
+    isSupervisor: Boolean(state.isSupervisor),
+    isStudent: Boolean(state.isStudent),
+    studentMssv: state.studentMssv || '',
+    targetType: null,
+    impersonating: false,
+    readOnly: false
+  };
+}
+
+export function checkImpersonationWriteGuard(actionDesc = 'Thao tác') {
+  if (state.impersonation) {
+    const targetName = state.impersonation.target?.name || 'Người dùng';
+    const role = state.impersonation.target?.roleLabel || state.impersonation.target?.type || '';
+    if (typeof showToast === 'function') {
+      showToast(`⚠️ Thao tác bị chặn: Bạn đang đóng vai ${targetName} (${role}) — Chế độ Chỉ đọc (Read-only Safe Mode) đang kích hoạt để bảo vệ dữ liệu!`, 'warning', 6000);
+    } else {
+      alert(`⚠️ Thao tác bị chặn: Bạn đang ở Chế độ Đóng vai (${targetName}) - Chế độ Chỉ đọc được kích hoạt.`);
+    }
+    return false;
+  }
+  return true;
+}
+
+window.isImpersonating = isImpersonating;
+window.getRealUser = getRealUser;
+window.getEffectiveActor = getEffectiveActor;
+window.checkImpersonationWriteGuard = checkImpersonationWriteGuard;
+
+export async function loadSystemSettingsDoc() {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'main')).catch(() => null);
+    if (snap && snap.exists()) {
+      const data = snap.data();
+      state.allowImpersonation = Boolean(data.allowImpersonation);
+    } else {
+      state.allowImpersonation = false;
+    }
+  } catch (e) {
+    console.warn('[IFA-Graduation] loadSystemSettingsDoc notice:', e);
+    state.allowImpersonation = false;
+  }
+}
+window.loadSystemSettingsDoc = loadSystemSettingsDoc;
+
+export async function loadAdminSystemSettings() {
+  const toggle = document.getElementById('toggle-admin-impersonation');
+  const label = document.getElementById('impersonation-status-label');
+  const warning = document.getElementById('impersonation-permission-warning');
+
+  const isOwner = Boolean(state.realIsOwner || (state.realUser && state.realUser.email?.toLowerCase().trim() === 'tranquanghai@tdtu.edu.vn'));
+
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'main')).catch(() => null);
+    const data = snap?.exists() ? snap.data() : {};
+    state.allowImpersonation = Boolean(data.allowImpersonation);
+
+    if (toggle) {
+      toggle.checked = state.allowImpersonation;
+      toggle.disabled = !isOwner;
+    }
+
+    if (label) {
+      label.textContent = state.allowImpersonation ? 'Đang bật' : 'Đang tắt';
+      label.className = state.allowImpersonation ? 'text-[11px] font-bold text-amber-600' : 'text-[11px] font-bold text-slate-500';
+    }
+
+    if (warning) {
+      if (!isOwner) warning.classList.remove('hidden');
+      else warning.classList.add('hidden');
+    }
+  } catch (e) {
+    console.warn('[SystemSettings] Error loading settings:', e);
+  }
+}
+window.loadAdminSystemSettings = loadAdminSystemSettings;
+
+window.onToggleAdminImpersonation = async function(enabled) {
+  const isOwner = Boolean(state.realIsOwner || (state.realUser && state.realUser.email?.toLowerCase().trim() === 'tranquanghai@tdtu.edu.vn'));
+  if (!isOwner) {
+    alert('Chỉ Chủ sở hữu hệ thống (tranquanghai@tdtu.edu.vn) có quyền cấu hình tính năng này.');
+    const toggle = document.getElementById('toggle-admin-impersonation');
+    if (toggle) toggle.checked = state.allowImpersonation;
+    return;
+  }
+
+  try {
+    showLoading('Đang cập nhật thiết lập hệ thống...');
+    await setDoc(doc(db, 'settings', 'main'), {
+      allowImpersonation: Boolean(enabled),
+      updatedAt: serverTimestamp(),
+      updatedBy: state.realUser?.email || ''
+    }, { merge: true });
+
+    state.allowImpersonation = Boolean(enabled);
+
+    const label = document.getElementById('impersonation-status-label');
+    if (label) {
+      label.textContent = state.allowImpersonation ? 'Đang bật' : 'Đang tắt';
+      label.className = state.allowImpersonation ? 'text-[11px] font-bold text-amber-600' : 'text-[11px] font-bold text-slate-500';
+    }
+
+    // If disabled, auto terminate any active impersonation sessions
+    if (!state.allowImpersonation && state.impersonation) {
+      await exitImpersonation();
+    }
+
+    updateAuthUI();
+    hideLoading();
+    if (typeof showToast === 'function') {
+      showToast(state.allowImpersonation ? '✓ Đã bật tính năng Đóng vai người dùng.' : '✓ Đã tắt tính năng Đóng vai người dùng.', 'success', 3000);
+    }
+  } catch (e) {
+    hideLoading();
+    console.error('[SystemSettings] Toggle error:', e);
+    alert('Lỗi cập nhật thiết lập: ' + e.message);
+    const toggle = document.getElementById('toggle-admin-impersonation');
+    if (toggle) toggle.checked = state.allowImpersonation;
+  }
+};
+
+export function loadImpersonationSession() {
+  try {
+    const raw = sessionStorage.getItem('ifa_graduation_impersonation');
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (session && session.target) {
+      state.impersonation = session;
+      applyImpersonationActor(session.target);
+      return session;
+    }
+  } catch (e) {
+    console.warn('[Impersonation] Failed to load session:', e);
+    try { sessionStorage.removeItem('ifa_graduation_impersonation'); } catch (err) {}
+    state.impersonation = null;
+  }
+  return null;
+}
+window.loadImpersonationSession = loadImpersonationSession;
+
+export function applyImpersonationActor(target) {
+  if (!target) return;
+
+  const mssv = target.mssv || (target.type === 'student' ? target.id : '');
+
+  // 1. Synthetic user object
+  state.user = {
+    uid: target.id || target.email || mssv,
+    email: target.email || (mssv ? `${mssv.toLowerCase()}@student.tdtu.edu.vn` : ''),
+    displayName: target.name || mssv || 'Người dùng đóng vai',
+    photoURL: null,
+    isImpersonated: true
+  };
+
+  // 2. Strict Privilege Demotion - Zero Admin Leak
+  state.isAdmin = false;
+
+  // 3. Set specific roles
+  if (target.type === 'student') {
+    state.actualRole = 'student';
+    state.isStudent = true;
+    state.isSupervisor = false;
+    state.studentMssv = mssv;
+  } else if (target.type === 'supervisor') {
+    state.actualRole = 'supervisor';
+    state.isStudent = false;
+    state.isSupervisor = true;
+    state.studentMssv = '';
+  } else if (target.type === 'reviewer' || target.type === 'council' || target.type === 'preliminary') {
+    state.actualRole = 'supervisor';
+    state.isStudent = false;
+    state.isSupervisor = true;
+    state.studentMssv = '';
+  } else {
+    state.actualRole = 'student';
+    state.isStudent = false;
+    state.isSupervisor = false;
+    state.studentMssv = '';
+  }
+
+  // 4. Update banner elements
+  const banner = document.getElementById('global-impersonation-banner');
+  if (banner) {
+    banner.classList.remove('hidden');
+    const nameEl = document.getElementById('impersonate-banner-name');
+    const idEl = document.getElementById('impersonate-banner-identifier');
+    const roleEl = document.getElementById('impersonate-banner-role');
+    const roundEl = document.getElementById('impersonate-banner-round');
+
+    if (nameEl) nameEl.textContent = target.name || mssv || target.email;
+    if (idEl) idEl.textContent = mssv ? `(${mssv})` : (target.email ? `(${target.email})` : '');
+    if (roleEl) roleEl.textContent = target.roleLabel || target.type;
+    if (roundEl) {
+      if (target.roundTitle) {
+        roundEl.textContent = `Đợt: ${target.roundTitle}`;
+        roundEl.classList.remove('hidden');
+      } else {
+        roundEl.classList.add('hidden');
+      }
+    }
+  }
+
+  // 5. Update admin lock card elements
+  const lockTargetName = document.getElementById('admin-lock-target-name');
+  const lockTargetRole = document.getElementById('admin-lock-target-role');
+  if (lockTargetName) lockTargetName.textContent = `${target.name} (${target.email || mssv})`;
+  if (lockTargetRole) lockTargetRole.textContent = target.roleLabel || target.type;
+}
+window.applyImpersonationActor = applyImpersonationActor;
+
+window.startImpersonating = async function(target) {
+  if (!state.allowImpersonation) {
+    alert('Tính năng đóng vai hiện đang bị tắt trong Cài đặt hệ thống.');
+    return;
+  }
+  if (!state.realIsAdmin) {
+    alert('Chỉ Quản trị viên mới có quyền sử dụng tính năng này.');
+    return;
+  }
+
+  const sessionData = {
+    realUser: {
+      uid: state.realUser?.uid || '',
+      email: state.realUser?.email || '',
+      displayName: state.realUser?.displayName || ''
+    },
+    target: target,
+    mode: 'read_only',
+    startedAt: Date.now()
+  };
+
+  try {
+    sessionStorage.setItem('ifa_graduation_impersonation', JSON.stringify(sessionData));
+  } catch (e) {
+    console.warn('[Impersonation] Failed to write sessionStorage:', e);
+  }
+
+  state.impersonation = sessionData;
+  applyImpersonationActor(target);
+  closeAdminImpersonateModal();
+  updateAuthUI();
+
+  if (typeof showToast === 'function') {
+    showToast(`Đã bắt đầu đóng vai: ${target.name} (${target.roleLabel || target.type}) - Chế độ Chỉ đọc.`, 'info', 4000);
+  }
+
+  // Navigate to corresponding portal
+  if (target.type === 'student') {
+    if (window.location.pathname.includes('/admin') || window.location.pathname.includes('/supervisor') || window.location.pathname.includes('/assessment')) {
+      window.location.href = '/graduation/';
+    } else {
+      await switchView('student');
+      if (typeof checkStudentEligibilityAndRegistration === 'function') {
+        checkStudentEligibilityAndRegistration(target.roundId || state.selectedRoundId);
+      }
+    }
+  } else if (target.type === 'supervisor') {
+    if (!window.location.pathname.includes('/supervisor')) {
+      window.location.href = '/graduation/supervisor/';
+    } else {
+      await switchView('supervisor');
+      if (typeof initSupervisorPortal === 'function') {
+        initSupervisorPortal();
+      }
+    }
+  } else if (target.type === 'reviewer' || target.type === 'council' || target.type === 'preliminary') {
+    if (!window.location.pathname.includes('/assessment')) {
+      window.location.href = '/graduation/assessment/';
+    } else {
+      await switchView('assessment');
+      if (typeof initAssessmentPortal === 'function') {
+        initAssessmentPortal();
+      }
+    }
+  }
+};
+
+window.startImpersonatingFromData = function(cand) {
+  window.startImpersonating(cand);
+};
+
+window.exitImpersonation = async function() {
+  try {
+    sessionStorage.removeItem('ifa_graduation_impersonation');
+  } catch (e) {}
+
+  state.impersonation = null;
+
+  const banner = document.getElementById('global-impersonation-banner');
+  if (banner) banner.classList.add('hidden');
+
+  if (state.realUser) {
+    state.user = state.realUser;
+    await resolveActualRoles(state.realUser);
+  }
+
+  updateAuthUI();
+
+  const currentPortal = getCurrentPortal();
+  if (currentPortal === 'admin' || state.currentView === 'admin') {
+    await switchView('admin');
+    if (typeof switchAdminTab === 'function') {
+      switchAdminTab(state.currentAdminTab || 'rounds');
+    }
+  } else {
+    window.location.href = '/graduation/admin/';
+  }
+
+  if (typeof showToast === 'function') {
+    showToast('Đã thoát chế độ đóng vai. Đã khôi phục đầy đủ quyền Quản trị viên.', 'success', 4000);
+  }
+};
+
+window.goToCurrentRolePortal = function() {
+  if (!state.impersonation) {
+    switchView('admin');
+    return;
+  }
+  const type = state.impersonation.target?.type;
+  if (type === 'student') {
+    window.location.href = '/graduation/';
+  } else if (type === 'supervisor') {
+    window.location.href = '/graduation/supervisor/';
+  } else if (type === 'reviewer' || type === 'council' || type === 'preliminary') {
+    window.location.href = '/graduation/assessment/';
+  } else {
+    window.location.href = '/graduation/';
+  }
+};
+
+window.openAdminImpersonateModal = function() {
+  if (!state.allowImpersonation || !state.realIsAdmin) {
+    alert('Tính năng đóng vai chưa được bật trong Cài đặt hệ thống hoặc bạn không có quyền.');
+    return;
+  }
+
+  const roundSelect = document.getElementById('impersonate-filter-round');
+  if (roundSelect) {
+    const rounds = (state.rounds || []).filter(r => !r.deleted);
+    let opts = '<option value="all">-- Tất cả các đợt --</option>';
+    rounds.forEach(r => {
+      const isAct = r.isActive ? ' (Hiện hành)' : '';
+      opts += `<option value="${r.id}">${escapeHtml(r.roundName || r.title || r.id)}${isAct}</option>`;
+    });
+    roundSelect.innerHTML = opts;
+    if (state.selectedRoundId && rounds.some(r => r.id === state.selectedRoundId)) {
+      roundSelect.value = state.selectedRoundId;
+    }
+  }
+
+  const roleSelect = document.getElementById('impersonate-filter-role');
+  if (roleSelect) roleSelect.value = 'all';
+
+  const searchInput = document.getElementById('impersonate-search-input');
+  if (searchInput) searchInput.value = '';
+
+  const modal = document.getElementById('modal-admin-impersonate');
+  if (modal) modal.classList.remove('hidden');
+
+  gatherAndRenderImpersonateCandidates();
+};
+
+window.closeAdminImpersonateModal = function() {
+  const modal = document.getElementById('modal-admin-impersonate');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.onImpersonateFiltersChange = function() {
+  gatherAndRenderImpersonateCandidates();
+};
+
+let impersonateSearchTimer = null;
+window.onImpersonateSearchInput = function() {
+  clearTimeout(impersonateSearchTimer);
+  impersonateSearchTimer = setTimeout(() => {
+    gatherAndRenderImpersonateCandidates();
+  }, 250);
+};
+
+async function gatherAndRenderImpersonateCandidates() {
+  const roundFilter = document.getElementById('impersonate-filter-round')?.value || 'all';
+  const roleFilter = document.getElementById('impersonate-filter-role')?.value || 'all';
+  const searchQuery = (document.getElementById('impersonate-search-input')?.value || '').trim().toLowerCase();
+  const listEl = document.getElementById('impersonate-candidates-list');
+  const countEl = document.getElementById('impersonate-candidate-count');
+
+  if (listEl) {
+    listEl.innerHTML = '<div class="text-center py-6 text-slate-400">Đang tải danh sách người dùng thực tế...</div>';
+  }
+
+  const candidates = [];
+  const candidateKeys = new Set();
+
+  function addCandidate(cand) {
+    const key = `${cand.type}_${cand.email || cand.id || cand.mssv}_${cand.roundId || ''}`;
+    if (!candidateKeys.has(key)) {
+      candidateKeys.add(key);
+      candidates.push(cand);
+    }
+  }
+
+  // 1. SUPERVISORS (from state.supervisorsMaster and rounds)
+  if (roleFilter === 'all' || roleFilter === 'supervisor') {
+    const sups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
+      ? state.supervisorsMaster
+      : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
+    
+    sups.forEach(s => {
+      if (s.active !== false && s.email) {
+        addCandidate({
+          type: 'supervisor',
+          id: s.id || s.email,
+          name: s.name || s.displayName || s.email,
+          email: s.email,
+          code: s.code || s.lecturerCode || '',
+          department: s.department || '',
+          roundId: (roundFilter !== 'all' ? roundFilter : ''),
+          roundTitle: '',
+          roleLabel: 'Giảng viên hướng dẫn (GVHD)'
+        });
+      }
+    });
+  }
+
+  // 2. STUDENTS (from registrations and eligible students in rounds)
+  if (roleFilter === 'all' || roleFilter === 'student') {
+    const targetRounds = (roundFilter !== 'all')
+      ? (state.rounds || []).filter(r => r.id === roundFilter)
+      : (state.rounds || []).filter(r => !r.deleted);
+
+    for (const r of targetRounds) {
+      // In-memory registrations
+      const regs = r.registrations || (state.adminReviewData?.registrations && state.selectedRoundId === r.id ? state.adminReviewData.registrations : []);
+      regs.forEach(st => {
+        const sid = st.mssv || st.studentId;
+        if (sid) {
+          addCandidate({
+            type: 'student',
+            id: sid,
+            mssv: sid,
+            name: st.studentName || st.name || sid,
+            email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
+            roundId: r.id,
+            roundTitle: r.roundName || r.title || r.id,
+            topicTitle: st.topicTitle || '',
+            roleLabel: 'Sinh viên'
+          });
+        }
+      });
+
+      // Eligible students if any
+      const eligible = r.eligibleStudents || [];
+      eligible.forEach(st => {
+        const sid = st.mssv || st.studentId;
+        if (sid) {
+          addCandidate({
+            type: 'student',
+            id: sid,
+            mssv: sid,
+            name: st.studentName || st.name || sid,
+            email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
+            roundId: r.id,
+            roundTitle: r.roundName || r.title || r.id,
+            topicTitle: '',
+            roleLabel: 'Sinh viên'
+          });
+        }
+      });
+
+      // If registrations for selected round not in memory, query Firestore subcollection
+      if (roundFilter !== 'all' && regs.length === 0 && eligible.length === 0) {
+        try {
+          const snap = await getDocs(collection(db, 'graduationRounds', r.id, 'registrations'));
+          snap.docs.forEach(d => {
+            const st = d.data();
+            const sid = d.id || st.mssv || st.studentId;
+            if (sid) {
+              addCandidate({
+                type: 'student',
+                id: sid,
+                mssv: sid,
+                name: st.studentName || st.name || sid,
+                email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
+                roundId: r.id,
+                roundTitle: r.roundName || r.title || r.id,
+                topicTitle: st.topicTitle || '',
+                roleLabel: 'Sinh viên'
+              });
+            }
+          });
+        } catch (e) {}
+      }
+    }
+
+    // Also check facultyStudents if candidates are empty
+    if (candidates.filter(c => c.type === 'student').length === 0 && Array.isArray(state.facultyStudents) && state.facultyStudents.length > 0) {
+      state.facultyStudents.slice(0, 30).forEach(fs => {
+        const sid = fs.mssv || fs.studentId;
+        if (sid) {
+          addCandidate({
+            type: 'student',
+            id: sid,
+            mssv: sid,
+            name: fs.name || fs.fullName || sid,
+            email: fs.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
+            roundId: '',
+            roundTitle: '',
+            topicTitle: '',
+            roleLabel: 'Sinh viên'
+          });
+        }
+      });
+    }
+  }
+
+  // 3. REVIEWERS (from round.reviewerAssignments)
+  if (roleFilter === 'all' || roleFilter === 'reviewer') {
+    const targetRounds = (roundFilter !== 'all')
+      ? (state.rounds || []).filter(r => r.id === roundFilter)
+      : (state.rounds || []);
+
+    for (const r of targetRounds) {
+      const reviewerAssignments = r.reviewerAssignments || {};
+      const distinctReviewerIds = [...new Set(Object.values(reviewerAssignments))];
+      distinctReviewerIds.forEach(revId => {
+        if (!revId) return;
+        const supInfo = (state.supervisorsMaster || []).find(s => s.id === revId || s.email === revId);
+        addCandidate({
+          type: 'reviewer',
+          id: revId,
+          name: supInfo?.name || revId,
+          email: supInfo?.email || (revId.includes('@') ? revId : ''),
+          roundId: r.id,
+          roundTitle: r.roundName || r.title || r.id,
+          roleLabel: 'Giảng viên phản biện (Reviewer)'
+        });
+      });
+    }
+  }
+
+  // 4. COUNCIL MEMBERS (from round.activities councils)
+  if (roleFilter === 'all' || roleFilter === 'council') {
+    const targetRounds = (roundFilter !== 'all')
+      ? (state.rounds || []).filter(r => r.id === roundFilter)
+      : (state.rounds || []);
+
+    for (const r of targetRounds) {
+      const actsWithCouncils = (r.activities || []).filter(a => a.councilEnabled && Array.isArray(a.councils));
+      for (const act of actsWithCouncils) {
+        for (const c of (act.councils || [])) {
+          const members = Object.values(c.membersBySlot || {});
+          for (const m of members) {
+            if (m.memberEmail) {
+              const roleTitle = m.slotName || m.memberRole || 'Thành viên Hội đồng';
+              addCandidate({
+                type: 'council',
+                id: m.memberId || m.memberEmail,
+                name: m.memberName || m.memberEmail,
+                email: m.memberEmail,
+                roundId: r.id,
+                roundTitle: r.roundName || r.title || r.id,
+                councilId: c.id,
+                councilName: c.councilName || c.name || 'Hội đồng',
+                councilRole: roleTitle,
+                activityName: act.title || act.name,
+                roleLabel: `${roleTitle} - ${c.councilName || c.name || 'Hội đồng'}`
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 5. PRELIMINARY (Cán bộ Sơ khảo)
+  if (roleFilter === 'all' || roleFilter === 'preliminary') {
+    const targetRounds = (roundFilter !== 'all')
+      ? (state.rounds || []).filter(r => r.id === roundFilter)
+      : (state.rounds || []);
+
+    for (const r of targetRounds) {
+      const rSups = r.supervisors || [];
+      rSups.forEach(s => {
+        if (s.email) {
+          addCandidate({
+            type: 'preliminary',
+            id: s.id || s.email,
+            name: s.name || s.email,
+            email: s.email,
+            roundId: r.id,
+            roundTitle: r.roundName || r.title || r.id,
+            roleLabel: 'Cán bộ chấm Sơ khảo'
+          });
+        }
+      });
+    }
+  }
+
+  // Filter candidates by search query
+  const filtered = candidates.filter(c => {
+    if (!searchQuery) return true;
+    const matchName = (c.name || '').toLowerCase().includes(searchQuery);
+    const matchEmail = (c.email || '').toLowerCase().includes(searchQuery);
+    const matchMssv = (c.mssv || '').toLowerCase().includes(searchQuery);
+    const matchCode = (c.code || '').toLowerCase().includes(searchQuery);
+    const matchDept = (c.department || '').toLowerCase().includes(searchQuery);
+    const matchTopic = (c.topicTitle || '').toLowerCase().includes(searchQuery);
+    const matchRole = (c.roleLabel || '').toLowerCase().includes(searchQuery);
+    return matchName || matchEmail || matchMssv || matchCode || matchDept || matchTopic || matchRole;
+  });
+
+  if (countEl) countEl.textContent = String(filtered.length);
+
+  if (listEl) {
+    if (filtered.length === 0) {
+      listEl.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs">Không tìm thấy người dùng thực tế phù hợp với bộ lọc.</div>';
+      return;
+    }
+
+    listEl.innerHTML = filtered.map((c, idx) => {
+      let roleBadgeColor = 'bg-blue-100 text-blue-800 border-blue-200';
+      if (c.type === 'supervisor') roleBadgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      else if (c.type === 'reviewer') roleBadgeColor = 'bg-purple-100 text-purple-800 border-purple-200';
+      else if (c.type === 'council') roleBadgeColor = 'bg-amber-100 text-amber-900 border-amber-300';
+      else if (c.type === 'preliminary') roleBadgeColor = 'bg-indigo-100 text-indigo-800 border-indigo-200';
+
+      const candDataJson = escapeHtml(JSON.stringify(c));
+
+      return `
+        <div class="p-3 bg-white hover:bg-amber-50/40 rounded-xl border border-slate-200 hover:border-amber-300 transition-all flex items-center justify-between gap-3 shadow-2xs">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-base shrink-0">
+              ${c.type === 'student' ? '🎓' : (c.type === 'supervisor' ? '👨‍🏫' : (c.type === 'reviewer' ? '🔍' : (c.type === 'council' ? '⚖️' : '📋')))}
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-bold text-slate-900 text-xs truncate">${escapeHtml(c.name)}</span>
+                ${c.mssv ? `<span class="font-mono text-[11px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold">${escapeHtml(c.mssv)}</span>` : ''}
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold border ${roleBadgeColor}">
+                  ${escapeHtml(c.roleLabel)}
+                </span>
+              </div>
+              <div class="text-[11px] text-slate-500 truncate mt-0.5 flex items-center gap-2">
+                <span>✉️ ${escapeHtml(c.email || '--')}</span>
+                ${c.department ? `<span>• Khoa/BM: ${escapeHtml(c.department)}</span>` : ''}
+                ${c.roundTitle ? `<span class="text-amber-800 font-medium">• ${escapeHtml(c.roundTitle)}</span>` : ''}
+                ${c.topicTitle ? `<span class="text-blue-700 font-medium italic truncate">• Đề tài: ${escapeHtml(c.topicTitle)}</span>` : ''}
+              </div>
+            </div>
+          </div>
+          <button type="button" onclick='startImpersonatingFromData(${candDataJson})' class="shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-sm transition-all flex items-center gap-1.5 cursor-pointer">
+            <span>🎭</span> <span>Đóng vai</span>
+          </button>
+        </div>
+      `;
+    }).join('');
+  }
+}
+window.gatherAndRenderImpersonateCandidates = gatherAndRenderImpersonateCandidates;
 
 // --- SUPERVISOR BIO MODAL ---
 window.openBioModal = function(supId) {
@@ -9800,6 +10599,8 @@ window.onScoreCommentChange = function(comm) {
 
 // 11. SAVE & REOPEN SCORE (CONCURRENCY & PRIVACY)
 window.saveCurrentScore = async function(isCompleted) {
+  if (!checkImpersonationWriteGuard('Lưu điểm thành viên hội đồng')) return;
+
   const sid = state.activeCouncilSelectedStudentId;
   if (!sid) return;
 
@@ -10603,6 +11404,8 @@ window.closeScoreEntryModal = function() {
 };
 
 window.saveScoreEntry = async function(isCompleted) {
+  if (!checkImpersonationWriteGuard('Lưu mục điểm đánh giá')) return;
+
   const type = document.getElementById('score-entry-type').value;
   const studentId = document.getElementById('score-entry-student-id').value;
   const valStr = document.getElementById('score-entry-value').value;
@@ -14051,6 +14854,8 @@ window.cancelStudentUpload = function(actId) {
 };
 
 window.submitStudentFiles = async function(actId) {
+  if (!checkImpersonationWriteGuard('Nộp tệp tin bài làm mốc kế hoạch')) return;
+
   const round = (state.rounds || []).find(r => r.id === state.selectedRoundId);
   const act = (round?.activities || []).find(a => a.id === actId);
   const fileInput = document.getElementById('sub-input-file-' + actId);
@@ -14761,6 +15566,7 @@ window.buildDeterministicCouncilScoreId = function(activityId, councilId, studen
 };
 
 window.saveCouncilScoreRecord = async function(roundId, scoreData) {
+  if (!checkImpersonationWriteGuard('Lưu điểm đánh giá hội đồng')) return { success: false, error: 'Chế độ đóng vai (Chỉ đọc) không cho phép ghi điểm.' };
   if (!roundId || !scoreData) return { success: false, error: 'Thiếu thông tin roundId hoặc scoreData' };
 
   const actId = scoreData.activityId;
@@ -14999,6 +15805,7 @@ window.getRoundAuditLogs = async function(roundId, fallbackRound) {
 
 // 4. FIRST-COMPLETED-WINS TRANSACTIONS (GVHD & TM HD)
 window.submitSupervisorScoreTransaction = async function({ roundId, studentId, supervisorId, supervisorEmail, supervisorName, score, feedback, isCompleted }) {
+  if (!checkImpersonationWriteGuard('Ghi nhận điểm GVHD')) throw new Error('Chế độ đóng vai (Chỉ đọc) không cho phép ghi điểm');
   const roundRef = doc(db, 'graduationRounds', roundId);
   const now = new Date().toISOString();
 
@@ -15041,6 +15848,7 @@ window.submitSupervisorScoreTransaction = async function({ roundId, studentId, s
 };
 
 window.submitThesisScoreHDTransaction = async function({ roundId, studentId, supervisorId, supervisorEmail, supervisorName, score, feedback, isCompleted }) {
+  if (!checkImpersonationWriteGuard('Ghi nhận điểm Đồ án HD')) throw new Error('Chế độ đóng vai (Chỉ đọc) không cho phép ghi điểm');
   const roundRef = doc(db, 'graduationRounds', roundId);
   const now = new Date().toISOString();
 
