@@ -1,4 +1,51 @@
 
+function detectInitialPortal() {
+  try {
+    const path = (window.location.pathname || '').toLowerCase();
+    if (path.includes('/graduation/admin') || path.endsWith('/admin') || path.endsWith('/admin/')) {
+      return 'admin';
+    }
+    if (path.includes('/graduation/supervisor') || path.includes('/graduation/gvhd')) {
+      return 'supervisor';
+    }
+    if (path.includes('/graduation/assessment') || path.includes('/graduation/mark')) {
+      return 'assessment';
+    }
+  } catch (e) {}
+  return null;
+}
+window.detectInitialPortal = detectInitialPortal;
+
+
+window.escapeHtml = function(unsafe) {
+  if (unsafe == null) return '';
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+window.fmtIsoToVietnameseDateTime = function(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const yy = d.getFullYear();
+    return `${hh}:${mm} ${dd}/${mo}/${yy}`;
+  } catch (e) {
+    return '';
+  }
+};
+// Expose module-level constants to fix ReferenceErrors inside the module
+const escapeHtml = window.escapeHtml;
+const fmtIsoToVietnameseDateTime = window.fmtIsoToVietnameseDateTime;
+
+
 // ============================================================================
 // OFFICIAL SUPERVISORS HELPERS (v1.6.0-beta.3)
 // ============================================================================
@@ -69,6 +116,8 @@ window.handleSupervisorDeptChange = function(val) {
 // ============================================================================
 // UI HELPERS: TOAST NOTIFICATIONS & CUSTOM CONFIRM MODAL (NO ALERT/CONFIRM)
 // ============================================================================
+
+
 window.showToast = function(message, type = 'info', duration = 3500) {
   const container = document.getElementById('toast-container');
   if (!container) {
@@ -425,8 +474,12 @@ export async function setupAuthListener() {
         updateAuthUI();
 
         // 2. Kích hoạt ngay view ban đầu để UI hiển thị tức thì
-        const initView = state.currentView || state.actualRole || 'student';
+        const detectedPortal = detectInitialPortal();
+        const initView = (detectedPortal === 'admin' && state.isAdmin) ? 'admin' : (detectedPortal || state.currentView || state.actualRole || 'student');
         await switchView(initView);
+        if (initView === 'admin') {
+          switchAdminTab('rounds');
+        }
 
         // 3. Tải dữ liệu đợt và loại hình đồ án với timeout bảo vệ
         showLoading('Đang tải dữ liệu đợt tốt nghiệp...');
@@ -847,6 +900,8 @@ async function loadRounds() {
 
     renderRoundsDropdowns();
     renderAdminRoundsTable();
+    if (typeof renderAdminRoundsCards === 'function') renderAdminRoundsCards();
+    if (typeof renderAdminRoundsCards === 'function') renderAdminRoundsCards();
 
     // Check ?x=SHORTCODE URL parameter
     const urlParams = new URLSearchParams(window.location.search);
@@ -2054,21 +2109,43 @@ export async function loadAdminStats() {
   }
 }
 
+window.toggleAdminRoundsAccordion = function(forceOpen) {
+  const sub = document.getElementById('atab-sub-rounds');
+  const chevron = document.getElementById('atab-chevron-rounds');
+  if (!sub) return;
+  const isCurrentlyOpen = !sub.classList.contains('hidden');
+  const shouldOpen = forceOpen !== undefined ? forceOpen : !isCurrentlyOpen;
+
+  if (shouldOpen) {
+    sub.classList.remove('hidden');
+    if (chevron) chevron.classList.add('rotate-180');
+  } else {
+    sub.classList.add('hidden');
+    if (chevron) chevron.classList.remove('rotate-180');
+  }
+};
+
 window.switchAdminTab = function(tabKey) {
-  document.querySelectorAll('.admin-tab-btn').forEach(b => {
-    b.classList.remove('bg-slate-900', 'text-white', 'shadow-sm', 'font-bold');
-    b.classList.add('text-slate-600', 'hover:bg-slate-100', 'hover:text-slate-900', 'font-semibold');
-    const dot = b.querySelector('span');
-    if (dot) dot.classList.replace('bg-blue-400', 'bg-slate-400');
-  });
-  const activeBtn = document.getElementById('atab-btn-' + tabKey);
-  if (activeBtn) {
-    activeBtn.classList.remove('text-slate-600', 'hover:bg-slate-100', 'hover:text-slate-900', 'font-semibold');
-    activeBtn.classList.add('bg-slate-900', 'text-white', 'shadow-sm', 'font-bold');
-    const dot = activeBtn.querySelector('span');
-    if (dot) dot.classList.replace('bg-slate-400', 'bg-blue-400');
+  state.currentAdminTab = tabKey;
+
+  // 1. Always bind currentRoundId to state.selectedRoundId
+  if (!state.selectedRoundId && state.rounds && state.rounds.length > 0) {
+    state.selectedRoundId = state.rounds[0].id;
   }
 
+  // 2. Active button styling in clean sidebar
+  document.querySelectorAll('.admin-tab-btn').forEach(b => {
+    b.classList.remove('bg-slate-900', 'text-white', 'shadow-xs', 'font-bold');
+    b.classList.add('text-slate-600', 'hover:bg-slate-100', 'hover:text-slate-900', 'font-medium');
+  });
+
+  const activeBtn = document.getElementById('atab-btn-' + tabKey);
+  if (activeBtn) {
+    activeBtn.classList.remove('text-slate-600', 'hover:bg-slate-100', 'hover:text-slate-900', 'font-medium');
+    activeBtn.classList.add('bg-slate-900', 'text-white', 'shadow-xs', 'font-bold');
+  }
+
+  // 3. Tab panels toggle
   ['overview', 'review', 'rounds', 'faculty-students', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash', 'timeline', 'scoring-dashboard'].forEach(t => {
     const p = document.getElementById('atab-panel-' + t);
     if (p) {
@@ -2077,19 +2154,32 @@ window.switchAdminTab = function(tabKey) {
     }
   });
 
+  // 4. Update Breadcrumb for sub-views
+  if (typeof updateRoundBreadcrumb === 'function') {
+    updateRoundBreadcrumb(tabKey);
+  }
+
+  // 5. Data loaders bound to current round
+  const roundId = state.selectedRoundId;
   if (tabKey === 'overview') loadAdminStats();
   else if (tabKey === 'faculty-students') openFacultyStudentsTab();
-  else if (tabKey === 'review') { if (state.selectedRoundId) loadAdminReviewData(state.selectedRoundId); }
-  else if (tabKey === 'rounds') renderAdminRoundsTable();
+  else if (tabKey === 'review') { if (roundId) loadAdminReviewData(roundId); }
+  else if (tabKey === 'rounds') {
+    if (typeof renderAdminRoundsCards === 'function') renderAdminRoundsCards();
+    renderAdminRoundsTable();
+  }
   else if (tabKey === 'supervisors-master') loadAdminSupervisorsMaster();
-  else if (tabKey === 'round-supervisors' && state.selectedRoundId) loadAdminRoundSupervisors(state.selectedRoundId);
-  else if (tabKey === 'eligible-students' && state.selectedRoundId) loadAdminEligibleStudents(state.selectedRoundId);
-  else if (tabKey === 'registrations' && state.selectedRoundId) loadAdminRegistrations(state.selectedRoundId);
+  else if (tabKey === 'round-supervisors' && roundId) loadAdminRoundSupervisors(roundId);
+  else if (tabKey === 'eligible-students' && roundId) {
+    const sel = document.getElementById('admin-round-student-select');
+    if (sel && sel.value !== roundId) sel.value = roundId;
+    loadAdminEligibleStudents(roundId);
+  }
+  else if (tabKey === 'registrations' && roundId) loadAdminRegistrations(roundId);
   else if (tabKey === 'preview-student') preparePreviewStudentDropdown();
   else if (tabKey === 'trash') renderAdminTrashTable();
   else if (tabKey === 'scoring-dashboard') loadAdminScoringDashboard();
   else if (tabKey === 'timeline') {
-    const roundId = state.selectedRoundId || (state.rounds && state.rounds[0] ? state.rounds[0].id : null);
     if (roundId) {
       const sel = document.getElementById('admin-timeline-round-select');
       if (sel) sel.value = roundId;
@@ -2098,8 +2188,6 @@ window.switchAdminTab = function(tabKey) {
   }
 };
 
-
-// --- ACTIVE ROUND TOGGLE ---
 window.setActiveRound = async function(roundId) {
   if (!state.isAdmin) return;
   try {
@@ -2534,6 +2622,21 @@ window.editRoundModal = async function(roundId) {
   const phoneToggle = document.getElementById('round-form-show-phone-after-publish');
   if (phoneToggle) phoneToggle.checked = (r.showPhoneAfterPublish !== false);
 
+  const driveInput = document.getElementById('round-drive-folder-url');
+  if (driveInput) {
+    driveInput.value = r.driveRootFolderId ? `https://drive.google.com/drive/folders/${r.driveRootFolderId}` : '';
+    const statusEl = document.getElementById('round-drive-folder-status');
+    if (statusEl) {
+      if (r.driveRootFolderId) {
+        statusEl.textContent = `✅ Đã lưu (Folder ID: ${r.driveRootFolderId})`;
+        statusEl.classList.remove('hidden', 'text-red-600');
+        statusEl.classList.add('text-green-600');
+      } else {
+        statusEl.classList.add('hidden');
+      }
+    }
+  }
+
   const pad = n => String(n).padStart(2, '0');
 
   const openImm = document.getElementById('round-form-open-immediately');
@@ -2951,6 +3054,37 @@ window.selectAllRoundModalSupervisors = function(select) {
 // ============================================================================
 // SAVE ROUND (HANDLES COMPLETE & INCOMPLETE CONFIG)
 // ============================================================================
+
+window.extractDriveFolderId = function(url) {
+  if (!url) return null;
+  const match = url.match(/[-\w]{25,}/);
+  return match ? match[0] : null;
+};
+
+window.testDriveFolderUrl = function(type) {
+  const inputId = type === 'round' ? 'round-drive-folder-url' : 'sub-drive-folder-url';
+  const statusId = type === 'round' ? 'round-drive-folder-status' : 'activity-drive-folder-status';
+  
+  const url = document.getElementById(inputId).value;
+  const statusEl = document.getElementById(statusId);
+  statusEl.classList.remove('hidden', 'text-green-600', 'text-red-600');
+  
+  if (!url) {
+    statusEl.textContent = 'Vui lòng nhập URL';
+    statusEl.classList.add('text-red-600');
+    return;
+  }
+  
+  const folderId = window.extractDriveFolderId(url);
+  if (folderId) {
+    statusEl.textContent = `✅ Hợp lệ (Folder ID: ${folderId})`;
+    statusEl.classList.add('text-green-600');
+  } else {
+    statusEl.textContent = '❌ Không tìm thấy Folder ID hợp lệ trong URL';
+    statusEl.classList.add('text-red-600');
+  }
+};
+
 window.saveRound = async function(e) {
   if (e && typeof e.preventDefault === 'function') e.preventDefault();
 
@@ -3011,6 +3145,9 @@ window.saveRound = async function(e) {
   const supCount = (state.roundModalSupervisors ? state.roundModalSupervisors.size : 0);
   const configStatus = (supCount > 0 && (elCount > 0 || allowRegistrationBeforeEligibility)) ? 'ready' : 'incomplete';
 
+  const driveUrl = document.getElementById('round-drive-folder-url')?.value.trim();
+  const driveRootFolderId = driveUrl ? window.extractDriveFolderId(driveUrl) : null;
+
   const payload = {
     title,
     academicYear,
@@ -3033,6 +3170,7 @@ window.saveRound = async function(e) {
     configStatus,
     eligibleCount: elCount,
     supervisorCount: supCount,
+    driveRootFolderId: driveRootFolderId || null,
     deleted: false,
     updatedAt: serverTimestamp()
   };
@@ -5966,6 +6104,9 @@ window.openRoundTimeline = function(roundId) {
 // 2. LOAD & RENDER ADMIN TIMELINE ACTIVITIES TABLE
 window.loadAdminRoundActivities = async function(roundId) {
   const tbody = document.getElementById('admin-timeline-activities-tbody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400">Đang tải và kiểm tra lỗi...</td></tr>';
+  try {
+  const tbody = document.getElementById('admin-timeline-activities-tbody');
   const statsBadge = document.getElementById('admin-timeline-stats-badge');
   if (!tbody) return;
 
@@ -6001,6 +6142,16 @@ window.loadAdminRoundActivities = async function(roundId) {
     else if (s === 'past') pastCount++;
   });
 
+  const selAdminRoundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  console.log('[DEBUG_TIMELINE] Render Start:', {
+    currentAdminRoundId: selAdminRoundId,
+    roundId: roundId,
+    targetRoundActivitiesLength: targetRound.activities?.length,
+    normalizedLength: normalized.length,
+    listLength: list.length,
+    isSubcollectionEmpty: (list === targetRound.activities) ? 'true/skipped' : 'false'
+  });
+
   if (statsBadge) {
     statsBadge.textContent = `${normalized.length} mốc (${ongoingCount} đang diễn ra, ${upcomingCount} sắp tới, ${pastCount} đã kết thúc)`;
   }
@@ -6025,78 +6176,119 @@ window.loadAdminRoundActivities = async function(roundId) {
     return;
   }
 
-  tbody.innerHTML = normalized.map((act, idx) => {
-    const typeMeta = ACTIVITY_TYPES[act.activityType] || ACTIVITY_TYPES.other;
-    const status = getActivityStatus(act);
-    const timeStr = fmtActivityTime(act.startAt, act.endAt);
+  try {
+    tbody.innerHTML = normalized.map((act, idx) => {
+      const typeMeta = ACTIVITY_TYPES[act.activityType] || ACTIVITY_TYPES.other;
+      const status = getActivityStatus(act);
+      const timeStr = fmtActivityTime(act.startAt, act.endAt);
 
-    let statusBadge = '';
-    if (status === 'ongoing') {
-      statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">● Đang diễn ra</span>';
-    } else if (status === 'upcoming') {
-      statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">○ Sắp tới</span>';
-    } else if (status === 'past') {
-      statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300">✓ Đã kết thúc</span>';
-    } else {
-      statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Kế hoạch</span>';
-    }
+      let statusBadge = '';
+      if (status === 'ongoing') {
+        statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm whitespace-nowrap">● Đang diễn ra</span>';
+      } else if (status === 'upcoming') {
+        statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 shadow-sm whitespace-nowrap">○ Sắp tới</span>';
+      } else if (status === 'past') {
+        statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-slate-50 text-slate-600 border border-slate-200 shadow-sm whitespace-nowrap">✓ Đã kết thúc</span>';
+      } else {
+        statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm whitespace-nowrap">Kế hoạch</span>';
+      }
 
-    const visBadge = act.visibility !== false
-      ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">👁️ Hiện</span>'
-      : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">🔒 Ẩn</span>';
+      const visBadge = act.visibility !== false
+        ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm whitespace-nowrap">👁️ Hiện</span>'
+        : '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm whitespace-nowrap">🔒 Ẩn</span>';
 
-    const subBadge = act.submissionEnabled
-      ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200" title="Chức năng nộp bài (Beta)">📥 Có</span>'
-      : '<span class="text-slate-300 font-bold">--</span>';
+      const subBadge = act.submissionEnabled
+        ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm whitespace-nowrap" title="Chức năng nộp bài (Beta)">📥 Có</span>'
+        : '<span class="text-slate-300 font-bold px-2 py-1">--</span>';
 
-    return `
-      <tr class="hover:bg-slate-50 transition-colors">
-        <td class="p-3 text-center whitespace-nowrap">
-          <div class="flex items-center justify-center gap-1">
-            <span class="font-mono font-bold text-slate-400 text-xs w-5">#${idx + 1}</span>
-            <div class="flex flex-col">
-              <button type="button" onclick="moveActivity('${act.id}', 'up')" ${idx === 0 ? 'disabled' : ''} class="text-[10px] text-slate-400 hover:text-slate-800 disabled:opacity-20 leading-none">▲</button>
-              <button type="button" onclick="moveActivity('${act.id}', 'down')" ${idx === normalized.length - 1 ? 'disabled' : ''} class="text-[10px] text-slate-400 hover:text-slate-800 disabled:opacity-20 leading-none">▼</button>
+      return `
+        <tr class="hover:bg-slate-50/80 transition-colors group border-b border-slate-100 last:border-b-0">
+          <td class="p-2 text-center align-middle w-10">
+            <div class="flex flex-col items-center justify-center gap-1.5">
+              <span class="font-bold text-slate-500 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">#${idx + 1}</span>
+              <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button type="button" onclick="moveActivity('${act.id}', 'up')" ${idx === 0 ? 'disabled' : ''} class="w-4 h-4 text-[9px] flex items-center justify-center rounded bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent shadow-sm" title="Lên">▲</button>
+                <button type="button" onclick="moveActivity('${act.id}', 'down')" ${idx === normalized.length - 1 ? 'disabled' : ''} class="w-4 h-4 text-[9px] flex items-center justify-center rounded bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-transparent shadow-sm" title="Xuống">▼</button>
+              </div>
             </div>
-          </div>
-        </td>
-        <td class="p-3">
-          <div class="flex items-center gap-1.5 mb-1">
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${typeMeta.color}">
-              <span>${typeMeta.icon}</span> ${typeMeta.label}
-            </span>
-          </div>
-          <span class="font-bold text-slate-900 text-xs block">${act.title}</span>
-          ${act.description ? `<p class="text-[11px] text-slate-500 mt-0.5 line-clamp-1 truncate max-w-xs" title="${escapeHtml(act.description)}">${escapeHtml(act.description)}</p>` : ''}
-        </td>
-        <td class="p-3 font-mono text-[11px] text-slate-700 whitespace-nowrap">
-          ${timeStr}
-        </td>
-        <td class="p-3 text-slate-600 text-[11px] max-w-[140px] truncate" title="${act.location || ''}">
-          ${act.location || '<span class="text-slate-300">--</span>'}
-        </td>
-        <td class="p-3 text-center whitespace-nowrap">
-          ${statusBadge}
-        </td>
-        <td class="p-3 text-center whitespace-nowrap">
-          ${visBadge}
-        </td>
-        <td class="p-3 text-center whitespace-nowrap">
-          ${subBadge}
-        </td>
-        <td class="p-3 text-right whitespace-nowrap space-x-1">
-          ${act.submissionEnabled ? `<button type="button" onclick="openActivitySubmissionDashboard('${targetRound.id}', '${act.id}')" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200 transition-colors inline-flex items-center gap-1" title="Quản lý Sinh viên Nộp bài"><span>📥 Nộp bài</span></button>` : ''}
-          ${act.councilEnabled ? `<button type="button" onclick="openActivityCouncilManagement('${targetRound.id}', '${act.id}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 transition-colors inline-flex items-center gap-1" title="Quản lý Hội đồng Mốc này"><span>⚖️ Hội đồng</span><span class="bg-indigo-200 text-indigo-900 px-1.5 py-0.2 rounded-full text-[10px]">${(act.councils || []).length}</span></button>` : ''}
-          <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Sao chép link mốc ?x=...&a=...">🔗 Link</button>
-          <button type="button" onclick="copyActivityModal('${act.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Sao chép tạo bản ghi mới">📋 Sao chép</button>
-          <button type="button" onclick="toggleActivityVisibility('${act.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Ẩn/Hiện đối với sinh viên">${act.visibility !== false ? 'Ẩn' : 'Hiện'}</button>
-          <button type="button" onclick="editActivityModal('${act.id}')" class="px-2 py-1 text-blue-600 hover:underline font-bold text-xs">Sửa</button>
-          <button type="button" onclick="deleteActivity('${act.id}')" class="px-2 py-1 text-rose-600 hover:underline font-bold text-xs">Xóa</button>
-        </td>
-      </tr>
-    `;
-  }).join('');
+          </td>
+          
+          <td class="p-2 align-top">
+            <div class="flex flex-col items-start gap-1">
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded whitespace-nowrap text-[9px] font-extrabold border shadow-sm ${typeMeta.color}">
+                <span>${typeMeta.icon}</span> ${typeMeta.label}
+              </span>
+              <div>
+                <span class="font-bold text-slate-800 text-xs leading-tight block">${act.title}</span>
+                ${act.description ? `<p class="text-[10px] text-slate-500 mt-0.5 line-clamp-1 leading-snug" title="${escapeHtml(act.description)}">${escapeHtml(act.description)}</p>` : ''}
+              </div>
+            </div>
+          </td>
+          
+          <td class="p-2 align-top text-xs text-slate-700 whitespace-nowrap">
+            <div class="text-[11px] leading-snug">
+              ${timeStr.replace('Hạn cuối:', '<span class="text-rose-600 font-bold">Hạn cuối:</span>')}
+            </div>
+          </td>
+          
+          <td class="p-2 align-top text-slate-600 text-[11px]">
+            ${act.location ? `
+              <div class="flex items-start gap-1 text-[11px]">
+                <span class="text-slate-400">📍</span>
+                <span class="line-clamp-2 leading-tight" title="${act.location}">${act.location}</span>
+              </div>
+            ` : '<span class="text-slate-300 font-bold text-[10px]">--</span>'}
+          </td>
+          
+          <td class="p-2 align-top text-center whitespace-nowrap">
+            ${statusBadge}
+          </td>
+          
+          <td class="p-2 align-top text-center whitespace-nowrap">
+            ${visBadge}
+          </td>
+          
+          <td class="p-2 align-top text-center whitespace-nowrap">
+            ${subBadge}
+          </td>
+          
+          <td class="p-2 align-top pr-3">
+            <div class="flex flex-col gap-1 items-end whitespace-nowrap">
+              <div class="flex items-center gap-1">
+                ${act.submissionEnabled ? `<button type="button" onclick="openActivitySubmissionDashboard('${targetRound.id}', '${act.id}')" class="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[10px] font-bold border border-indigo-200 shadow-sm transition-all flex items-center gap-1" title="Quản lý Sinh viên Nộp bài"><span>📥</span><span>Nộp bài</span></button>` : ''}
+                ${act.councilEnabled ? `<button type="button" onclick="openActivityCouncilManagement('${targetRound.id}', '${act.id}')" class="px-2 py-0.5 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded text-[10px] font-bold border border-violet-200 shadow-sm transition-all flex items-center gap-1" title="Quản lý Hội đồng Mốc này"><span>⚖️</span><span>Hội đồng</span><span class="bg-violet-200 text-violet-900 px-1 py-0.2 rounded-full text-[8px] leading-none">${(act.councils || []).length}</span></button>` : ''}
+              </div>
+              
+              <div class="flex items-center gap-0.5 mt-0.5">
+                <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="p-1 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded border border-slate-200 shadow-sm transition-colors text-[10px]" title="Sao chép link mốc">🔗</button>
+                <button type="button" onclick="copyActivityModal('${act.id}')" class="p-1 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded border border-slate-200 shadow-sm transition-colors text-[10px]" title="Nhân bản mốc">📋</button>
+                <button type="button" onclick="toggleActivityVisibility('${act.id}')" class="px-1.5 py-0.5 bg-white hover:bg-slate-100 text-slate-600 rounded text-[9px] font-bold border border-slate-200 shadow-sm transition-colors">${act.visibility !== false ? '👁️ Ẩn' : '🔒 Hiện'}</button>
+                <div class="w-px h-3 bg-slate-200 mx-0.5"></div>
+                <button type="button" onclick="editActivityModal('${act.id}')" class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded font-bold text-[9px] transition-colors">Sửa</button>
+                <button type="button" onclick="deleteActivity('${act.id}')" class="px-1.5 py-0.5 text-rose-600 hover:bg-rose-50 rounded font-bold text-[9px] transition-colors">Xóa</button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Lỗi khi render danh sách mốc kế hoạch:', err);
+    tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-rose-600 bg-rose-50 font-bold border border-rose-200 rounded-lg">⚠️ Đã xảy ra lỗi hiển thị danh sách mốc kế hoạch: ${err.message}. Vui lòng thử lại hoặc báo cáo kỹ thuật.</td></tr>`;
+  }
+
+  } catch (globalErr) {
+    console.error('[DEBUG_GLOBAL_CATCH] Error in loadAdminRoundActivities:', globalErr);
+    const tbodyFallback = document.getElementById('admin-timeline-activities-tbody');
+    if (tbodyFallback) {
+      tbodyFallback.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-rose-600 bg-rose-50 font-bold border border-rose-200 rounded-lg">
+        <h3 class="text-lg mb-2 text-rose-700">🔥 Lỗi nghiêm trọng (Global Catch)</h3>
+        <p class="font-mono text-left whitespace-pre-wrap text-[10px] text-rose-800">${globalErr?.stack || globalErr?.message || String(globalErr)}</p>
+      </td></tr>`;
+    }
+  }
 };
+
 
 // 3. CREATE, EDIT & COPY ACTIVITY MODAL HANDLERS
 window.openCreateActivityModal = function() {
@@ -6427,7 +6619,9 @@ window.executeCopyFromRound = async function() {
 
     let copyCount = 0;
     const nowIso = new Date().toISOString();
-
+    const batch = writeBatch(db);
+    
+    // 1. Prepare Target Activities
     for (const cb of checkedBoxes) {
       const actId = cb.value;
       const src = sourceActs.find(a => a.id === actId);
@@ -6437,41 +6631,52 @@ window.executeCopyFromRound = async function() {
       const newSlug = generateUniqueSlug(src.title, targetActs);
       const newId = 'act_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
-      const newAct = {
-        id: newId,
-        roundId: targetRoundId,
-        title: src.title || '',
-        activityType: src.activityType || 'other',
-        location: src.location || '',
-        startAt: src.startAt || '',
-        endAt: src.endAt || '',
-        description: src.description || '',
-        descriptionHtml: src.descriptionHtml || src.description || '',
-        visibility: src.visibility !== false,
-        showAfterExpired: src.showAfterExpired !== false,
-        submissionEnabled: Boolean(src.submissionEnabled),
-        slug: newSlug,
-        order: targetActs.length + 1,
-        createdAt: nowIso,
-        updatedAt: nowIso
-      };
+      // Deep clone to keep config but avoid reference sharing
+      const newAct = JSON.parse(JSON.stringify(src));
+
+      // Overwrite identifiers and metadata
+      newAct.id = newId;
+      newAct.roundId = targetRoundId;
+      newAct.slug = newSlug;
+      newAct.order = targetActs.length + 1;
+      newAct.createdAt = nowIso;
+      newAct.updatedAt = nowIso;
+
+      // EXCLUDE runtime state and avoid cross-round data pollution
+      delete newAct.submissions;
+      delete newAct.scores;
+      delete newAct.attendance;
+      delete newAct.auditLogs;
+      newAct.councils = [];
+      newAct.councilStudentAssignments = [];
+
+      // SAFETY: Explicitly clear driveFolderId so the new round doesn't upload to the old round's folder
+      newAct.driveFolderId = null;
+      if (newAct.submissionConfig) {
+        newAct.submissionConfig.driveFolderId = null;
+      }
 
       targetActs.push(newAct);
+      
       copyCount++;
     }
 
-    // Save to Firestore
+    // 2. Batch write to the target round document
     const roundRef = doc(db, 'graduationRounds', targetRoundId);
-    await updateDoc(roundRef, {
+    batch.update(roundRef, {
       activities: targetActs,
       updatedAt: serverTimestamp()
     });
 
+    // 3. Commit Firestore Transaction
+    await batch.commit();
+
+    // 4. Update Local State & UI
     targetRound.activities = targetActs;
     state.roundActivities = targetActs;
 
     closeCopyFromRoundModal();
-    loadAdminRoundActivities(targetRoundId);
+    await loadAdminRoundActivities(targetRoundId);
     if (state.selectedRoundId === targetRoundId) {
       loadStudentRoundActivities(targetRoundId);
     }
@@ -6626,6 +6831,7 @@ window.saveActivity = async function(e) {
       showAfterExpired,
       submissionEnabled,
       submissionConfig,
+      driveFolderId: submissionConfig?.driveFolderId || existingAct?.driveFolderId || null,
       councilEnabled,
       showPresentationOrderToStudents,
       scoringConfig,
@@ -6660,11 +6866,7 @@ window.saveActivity = async function(e) {
       updatedAt: serverTimestamp()
     });
 
-    // Best-effort sync to subcollection
-    try {
-      const actRef = doc(db, 'graduationRounds', roundId, 'activities', actId);
-      await setDoc(actRef, activityData, { merge: true }).catch(() => {});
-    } catch (subErr) {}
+    // Best-effort sync to subcollection has been removed as parent array is the strict source of truth.
 
     targetRound.activities = activities;
     state.roundActivities = activities;
@@ -6712,9 +6914,7 @@ window.deleteActivity = async function(actId) {
       updatedAt: serverTimestamp()
     });
 
-    try {
-      await deleteDoc(doc(db, 'graduationRounds', roundId, 'activities', actId)).catch(() => {});
-    } catch (e) {}
+    // Subcollection sync removed
 
     targetRound.activities = updated;
     state.roundActivities = updated;
@@ -10413,42 +10613,228 @@ async function persistScoreItem(roundId, dotPath, record, decisionKey) {
 // --- 6. ADMIN SCORING DASHBOARD MODULE ---
 
 window.switchAdminScoringSubTab = function(tabKey) {
-  ['overview', 'preliminary-config', 'supervisor-config', 'reviewer-assignment', 'final-score-config', 'ranking', 'export'].forEach(t => {
+  let mainTab = tabKey;
+  if (tabKey === 'overview') mainTab = 'summary';
+  else if (tabKey === 'preliminary-config') mainTab = 'preliminary';
+  else if (tabKey === 'reviewer-assignment' || tabKey === 'supervisor-config') mainTab = 'thesis';
+  else if (tabKey === 'final-score-config' || tabKey === 'ranking' || tabKey === 'export') mainTab = 'summary';
+
+  // 7 horizontal top-level navigation buttons
+  const mainTabs = ['duyet-1', 'duyet-2', 'duyet-3', 'thesis', 'preliminary', 'defense', 'summary'];
+  mainTabs.forEach(t => {
     const btn = document.getElementById('ascore-tab-btn-' + t);
-    const panel = document.getElementById('ascore-panel-' + t);
-    if (btn && panel) {
-      if (t === tabKey) {
-        btn.className = 'py-3 border-b-2 border-emerald-600 text-emerald-700 whitespace-nowrap';
-        panel.classList.remove('hidden');
+    if (btn) {
+      if (t === mainTab) {
+        btn.className = 'ascore-nav-btn px-3.5 py-2 rounded-lg bg-slate-900 text-white shadow-xs font-bold transition-all whitespace-nowrap';
       } else {
-        btn.className = 'py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap';
-        panel.classList.add('hidden');
+        btn.className = 'ascore-nav-btn px-3.5 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all whitespace-nowrap font-semibold';
       }
     }
   });
 
+  // Hide all panels
+  const allPanels = [
+    'duyet-1', 'duyet-2', 'duyet-3', 'defense',
+    'overview', 'preliminary-config', 'supervisor-config', 'reviewer-assignment', 'final-score-config', 'ranking', 'export'
+  ];
+  allPanels.forEach(pId => {
+    const p = document.getElementById('ascore-panel-' + pId);
+    if (p) p.classList.add('hidden');
+  });
+
   const roundId = document.getElementById('admin-scoring-round-select')?.value || state.selectedRoundId;
-  if (tabKey === 'overview') renderAdminScoresTable();
-  else if (tabKey === 'preliminary-config') renderAdminPreliminaryConfig();
-  else if (tabKey === 'supervisor-config') renderAdminSupervisorScoreConfig();
-  else if (tabKey === 'reviewer-assignment') renderAdminReviewerAssignmentTable();
-  else if (tabKey === 'final-score-config') loadAdminFinalScoreConfig(roundId);
-  else if (tabKey === 'ranking') loadAdminRankingTab(roundId);
-  else if (tabKey === 'export') loadAdminExportTab(roundId);
+
+  // Show target panel based on requested tabKey
+  if (tabKey === 'duyet-1') {
+    const p = document.getElementById('ascore-panel-duyet-1');
+    if (p) p.classList.remove('hidden');
+    renderAdminProgressReviewTable(1);
+  } else if (tabKey === 'duyet-2') {
+    const p = document.getElementById('ascore-panel-duyet-2');
+    if (p) p.classList.remove('hidden');
+    renderAdminProgressReviewTable(2);
+  } else if (tabKey === 'duyet-3') {
+    const p = document.getElementById('ascore-panel-duyet-3');
+    if (p) p.classList.remove('hidden');
+    renderAdminProgressReviewTable(3);
+  } else if (tabKey === 'thesis' || tabKey === 'reviewer-assignment') {
+    const p = document.getElementById('ascore-panel-reviewer-assignment');
+    if (p) p.classList.remove('hidden');
+    renderAdminReviewerAssignmentTable();
+  } else if (tabKey === 'supervisor-config') {
+    const p = document.getElementById('ascore-panel-supervisor-config');
+    if (p) p.classList.remove('hidden');
+    renderAdminSupervisorScoreConfig();
+  } else if (tabKey === 'preliminary' || tabKey === 'preliminary-config') {
+    const p = document.getElementById('ascore-panel-preliminary-config');
+    if (p) p.classList.remove('hidden');
+    renderAdminPreliminaryConfig();
+  } else if (tabKey === 'defense') {
+    const p = document.getElementById('ascore-panel-defense');
+    if (p) p.classList.remove('hidden');
+    renderAdminDefenseScoresTable();
+  } else if (tabKey === 'summary' || tabKey === 'overview') {
+    const p = document.getElementById('ascore-panel-overview');
+    if (p) p.classList.remove('hidden');
+    renderAdminScoresTable();
+  } else if (tabKey === 'final-score-config') {
+    const p = document.getElementById('ascore-panel-final-score-config');
+    if (p) p.classList.remove('hidden');
+    loadAdminFinalScoreConfig(roundId);
+  } else if (tabKey === 'ranking') {
+    const p = document.getElementById('ascore-panel-ranking');
+    if (p) p.classList.remove('hidden');
+    loadAdminRankingTab(roundId);
+  } else if (tabKey === 'export') {
+    const p = document.getElementById('ascore-panel-export');
+    if (p) p.classList.remove('hidden');
+    loadAdminExportTab(roundId);
+  }
+};
+
+window.renderAdminProgressReviewTable = function(phase) {
+  const tbody = document.getElementById('admin-duyet-' + phase + '-tbody');
+  if (!tbody) return;
+
+  const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
+  if (!targetRound) return;
+
+  const allStudents = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
+    ? state.adminReviewData.registrations
+    : (targetRound.eligibleStudents || []);
+
+  const q = String(document.getElementById('admin-duyet-' + phase + '-search')?.value || '').toLowerCase().trim();
+  const filterVal = document.getElementById('admin-duyet-' + phase + '-filter')?.value || 'all';
+
+  const filtered = allStudents.filter(s => {
+    const sid = (s.mssv || s.studentId || '').toLowerCase();
+    const name = (s.fullName || s.studentName || '').toLowerCase();
+    const topic = (s.topicTitle || '').toLowerCase();
+    if (q && !sid.includes(q) && !name.includes(q) && !topic.includes(q)) return false;
+
+    const reviewData = targetRound.progressReviews?.['duyet_' + phase]?.[s.mssv || s.studentId] || {};
+    const status = reviewData.status || 'pending';
+
+    if (filterVal !== 'all' && status !== filterVal) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">Chưa có dữ liệu duyệt tiến độ cho đợt này.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((s, idx) => {
+    const sid = s.mssv || s.studentId;
+    const name = s.fullName || s.studentName || sid;
+    const topic = s.topicTitle || '<span class="text-slate-400 italic">Chưa đăng ký đề tài</span>';
+    const supName = s.supervisorName || (targetRound.supervisors || []).find(sup => sup.id === s.supervisorId)?.name || '--';
+    const reviewData = targetRound.progressReviews?.['duyet_' + phase]?.[sid] || {};
+    const status = reviewData.status || 'pending';
+    const score = reviewData.score !== undefined ? Number(reviewData.score).toFixed(1) : '--';
+
+    let statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Chưa duyệt</span>';
+    if (status === 'passed') {
+      statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đạt yêu cầu</span>';
+    } else if (status === 'revision') {
+      statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">⚠️ Cần bổ sung</span>';
+    } else if (status === 'failed') {
+      statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">✕ Không đạt</span>';
+    }
+
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="p-3 text-center font-mono font-bold text-slate-400">${idx + 1}</td>
+        <td class="p-3 font-mono font-bold text-slate-900 whitespace-nowrap">${sid}</td>
+        <td class="p-3 font-semibold text-slate-800 whitespace-nowrap">${name}</td>
+        <td class="p-3 text-slate-600 max-w-xs truncate" title="${s.topicTitle || ''}">${topic}</td>
+        <td class="p-3 text-slate-700 whitespace-nowrap">${supName}</td>
+        <td class="p-3 text-center whitespace-nowrap">${statusBadge}</td>
+        <td class="p-3 text-center font-mono font-bold whitespace-nowrap">${score !== '--' ? `<span class="badge bg-blue-50 text-blue-800 font-bold">${score}</span>` : '--'}</td>
+      </tr>
+    `;
+  }).join('');
+};
+
+window.renderAdminDefenseScoresTable = function() {
+  const tbody = document.getElementById('admin-defense-tbody');
+  if (!tbody) return;
+
+  const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
+  if (!targetRound) return;
+
+  const allStudents = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
+    ? state.adminReviewData.registrations
+    : (targetRound.eligibleStudents || []);
+
+  const q = String(document.getElementById('admin-defense-search')?.value || '').toLowerCase().trim();
+
+  const filtered = allStudents.filter(s => {
+    const sid = (s.mssv || s.studentId || '').toLowerCase();
+    const name = (s.fullName || s.studentName || '').toLowerCase();
+    if (q && !sid.includes(q) && !name.includes(q)) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400">Không có dữ liệu sinh viên phù hợp.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((s, idx) => {
+    const sid = s.mssv || s.studentId;
+    const name = s.fullName || s.studentName || sid;
+    const gvhd = targetRound.supervisorScores?.[sid];
+    const gvhdDisplay = gvhd?.status === 'completed'
+      ? `<span class="badge bg-emerald-50 text-emerald-800 font-bold font-mono text-xs">${Number(gvhd.score).toFixed(1)}</span>`
+      : '<span class="text-slate-300 font-mono">--</span>';
+
+    const tmFinal = typeof getThesisFinalScore === 'function' ? getThesisFinalScore(sid, targetRound.id) : null;
+    const tmDisplay = tmFinal !== null
+      ? `<span class="badge bg-blue-50 text-blue-800 font-bold font-mono text-xs">${tmFinal.toFixed(2)}</span>`
+      : '<span class="text-slate-300 font-mono">--</span>';
+
+    const defScore = typeof getStudentDefenseScore === 'function' ? getStudentDefenseScore(sid, targetRound.id) : null;
+    const defDisplay = defScore !== null
+      ? `<strong class="font-mono text-xs text-purple-900 bg-purple-100/80 px-2 py-0.5 rounded-lg">${defScore.toFixed(2)}</strong>`
+      : '<span class="text-slate-300 font-mono">--</span>';
+
+    const councilId = targetRound.councilStudentAssignments?.[sid]?.councilId || s.councilId || '--';
+    const isFinalized = defScore !== null;
+    const statusPill = isFinalized
+      ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã chốt điểm</span>'
+      : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Đang đánh giá</span>';
+
+    return `
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="p-3 text-center font-mono font-bold text-slate-400">${idx + 1}</td>
+        <td class="p-3 font-mono font-bold text-slate-900 whitespace-nowrap">${sid}</td>
+        <td class="p-3 font-semibold text-slate-800 whitespace-nowrap">${name}</td>
+        <td class="p-3 text-slate-700 whitespace-nowrap font-semibold">${councilId}</td>
+        <td class="p-3 text-center whitespace-nowrap">${gvhdDisplay}</td>
+        <td class="p-3 text-center whitespace-nowrap">${tmDisplay}</td>
+        <td class="p-3 text-center whitespace-nowrap">${defDisplay}</td>
+        <td class="p-3 text-center whitespace-nowrap">${statusPill}</td>
+      </tr>
+    `;
+  }).join('');
 };
 
 window.loadAdminScoringDashboard = async function() {
   const sel = document.getElementById('admin-scoring-round-select');
   if (sel) {
-    const validRounds = (state.rounds || []).filter(r => !r.deleted);
-    sel.innerHTML = validRounds.map(r => `<option value="${r.id}" ${r.id === state.selectedRoundId ? 'selected' : ''}>${r.title} (${r.academicYear || ''})</option>`).join('');
+    sel.innerHTML = (state.rounds || []).map(r => 
+      `<option value="${r.id}" ${r.id === state.selectedRoundId ? 'selected' : ''}>${r.title || r.code || r.id}</option>`
+    ).join('');
+    if (state.selectedRoundId) sel.value = state.selectedRoundId;
   }
-  switchAdminScoringSubTab('overview');
+  switchAdminScoringSubTab('duyet-1');
 };
 
 window.onAdminScoringRoundChange = function(roundId) {
   state.selectedRoundId = roundId;
-  renderAdminScoresTable();
+  const curSubTab = document.querySelector('.ascore-nav-btn.bg-slate-900')?.id?.replace('ascore-tab-btn-', '') || 'duyet-1';
+  switchAdminScoringSubTab(curSubTab);
 };
 
 window.renderAdminScoresTable = function() {
@@ -12707,11 +13093,27 @@ window.normalizeVietnameseNoDiacritics = function(str) {
     .replace(/^_|_$/g, '');
 };
 
+window.formatPersonName = function(str) {
+  if (!str) return '';
+  const noDiacritics = String(str)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, m => m === 'đ' ? 'd' : 'D');
+  const words = noDiacritics
+    .replace(/[^a-zA-Z0-9]/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return words
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+};
+
 window.generateExpectedFilename = function({ template, student, activity, round, fileTypeCategory, extension, mode }) {
   const tpl = template || '{MSSV}_{HO_TEN}_{LOAI}';
-  const mssv = student?.studentId || student?.mssv || '12100314';
-  const hoTen = normalizeVietnameseNoDiacritics(student?.studentName || student?.name || 'NGUYEN_VAN_A');
-  const hoiDong = student?.councilCode || student?.councilId || 'HD1';
+  const mssv = (student?.studentId || student?.mssv || '12100314').trim().toUpperCase();
+  const hoTen = formatPersonName(student?.studentName || student?.name || 'Nguyen Van A');
+  const hoiDong = (student?.councilCode || student?.councilId || 'HD1').trim().toUpperCase();
   const stt = String(student?.presentationOrder || student?.stt || 1).padStart(2, '0');
   const loai = normalizeVietnameseNoDiacritics(fileTypeCategory || activity?.submissionConfig?.fileTypeCategory || 'THUYET_MINH');
   const actName = normalizeVietnameseNoDiacritics(activity?.title || 'ACTIVITY');
@@ -12726,7 +13128,14 @@ window.generateExpectedFilename = function({ template, student, activity, round,
     .replace(/\{ACTIVITY\}/gi, actName)
     .replace(/\{ROUND\}/gi, rName);
 
-  base = normalizeVietnameseNoDiacritics(base);
+  base = base
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, m => m === 'đ' ? 'd' : 'D')
+    .replace(/[\/\\?%*:|"<>]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim();
+
   const ext = extension ? ('.' + String(extension).toLowerCase().replace(/^\./, '')) : '';
   return base + ext;
 };
@@ -12771,15 +13180,7 @@ window.validateFilename = function({ filename, template, student, activity, roun
 
   const expectedFilename = expectedBase + (ext ? '.' + ext : (allowed[0] ? '.' + allowed[0] : ''));
 
-  if (!valid) {
-    return {
-      valid: false,
-      error: `Tên file chưa đúng định dạng ${ruleMode === 'exact' ? 'chính xác' : 'tiền tố'}. Tên yêu cầu: ${expectedFilename}`,
-      expectedFilename,
-      actualFilename: filename
-    };
-  }
-
+  // Always consider it valid for auto-rename, unless it failed the extension check
   return {
     valid: true,
     expectedFilename,
@@ -12900,8 +13301,20 @@ window.populateActivitySubmissionForm = function(cfg) {
   if (document.getElementById('sub-vis-reviewer')) document.getElementById('sub-vis-reviewer').checked = cfg.visibility?.reviewer !== false;
   if (document.getElementById('sub-vis-council')) document.getElementById('sub-vis-council').checked = cfg.visibility?.council !== false;
 
-  if (document.getElementById('sub-storage-provider')) document.getElementById('sub-storage-provider').value = cfg.storageProvider || 'google_drive';
-  if (document.getElementById('sub-drive-folder-id')) document.getElementById('sub-drive-folder-id').value = cfg.driveFolderId || '';
+  const subDriveInput = document.getElementById('sub-drive-folder-url');
+  if (subDriveInput) {
+    subDriveInput.value = cfg.driveFolderId ? `https://drive.google.com/drive/folders/${cfg.driveFolderId}` : '';
+    const statusEl = document.getElementById('activity-drive-folder-status');
+    if (statusEl) {
+      if (cfg.driveFolderId) {
+        statusEl.textContent = `✅ Đã lưu (Folder ID: ${cfg.driveFolderId})`;
+        statusEl.classList.remove('hidden', 'text-red-600');
+        statusEl.classList.add('text-green-600');
+      } else {
+        statusEl.classList.add('hidden');
+      }
+    }
+  }
 
   updateFilenamePreviewInAdmin();
 };
@@ -12942,8 +13355,9 @@ window.readActivitySubmissionForm = function() {
   const visReviewer = document.getElementById('sub-vis-reviewer')?.checked !== false;
   const visCouncil = document.getElementById('sub-vis-council')?.checked !== false;
 
-  const storageProvider = document.getElementById('sub-storage-provider')?.value || 'google_drive';
-  const driveFolderId = (document.getElementById('sub-drive-folder-id')?.value || '').trim();
+  const storageProvider = 'google_drive';
+  const driveUrl = document.getElementById('sub-drive-folder-url')?.value.trim();
+  const driveFolderId = driveUrl ? window.extractDriveFolderId(driveUrl) : null;
 
   return {
     enabled: true,
@@ -12997,7 +13411,10 @@ window.getEffectiveSubmissionRules = function(studentId, activity, round) {
 
   // Submissions record
   const subRecord = round?.activitySubmissions?.[activity?.id]?.[studentId] || null;
-  const completedAttempts = Array.isArray(subRecord?.attempts) ? subRecord.attempts.length : (subRecord?.currentSubmission ? 1 : 0);
+  const attemptsList = Array.isArray(subRecord?.attempts)
+    ? subRecord.attempts
+    : (subRecord?.currentSubmission ? [subRecord.currentSubmission] : []);
+  const completedAttempts = attemptsList.filter(a => a.status !== 'withdrawn').length;
   const remainingAttempts = Math.max(0, totalAllowedAttempts - completedAttempts);
 
   // Time status
@@ -13059,15 +13476,88 @@ window.GoogleDriveTrustedUploader = {
         error: 'Google Drive chưa được kết nối an toàn. Cần cấu hình dịch vụ tải tệp phía máy chủ (Trusted Backend Service).'
       };
     }
-    // Future Resumable Upload Implementation:
-    // 1. POST /upload-session
-    // 2. Chunks upload via resumable session URL
-    // 3. Finalize metadata
-    return {
-      success: false,
-      status: 'backendRequired',
-      error: 'Google Drive chưa được kết nối an toàn. Cần cấu hình dịch vụ tải tệp phía máy chủ (Trusted Backend Service).'
-    };
+    try {
+      const idToken = state.user ? await state.user.getIdToken() : null;
+      if (!idToken) {
+        return { success: false, error: 'Chưa đăng nhập. Vui lòng tải lại trang và đăng nhập lại.' };
+      }
+
+      const sessionRes = await fetch(endpoint + '/api/graduation/upload-session', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + idToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          activityId: activity.id,
+          roundId: round.id,
+          studentId: student.studentId || student.mssv,
+          folderId: activity?.submissionConfig?.driveFolderId || activity?.driveFolderId || round?.driveRootFolderId || '1M37ovlEHS3ufftFPZHGj1mQWec7r8Tj7',
+          file: {
+            name: file.name,
+            type: file.type || 'application/octet-stream',
+            size: file.size
+          }
+        }),
+        signal: abortSignal
+      });
+
+      const sessionData = await sessionRes.json().catch(() => ({}));
+      if (!sessionRes.ok) {
+        return { success: false, error: sessionData.error || `Lỗi máy chủ (${sessionRes.status}).` };
+      }
+
+      const sessionUri = sessionData.sessionUri;
+      if (!sessionUri) {
+        return { success: false, error: 'Không thể tạo phiên tải lên (Session URI rỗng).' };
+      }
+
+      return await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', sessionUri, true);
+        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+        if (abortSignal) {
+          abortSignal.addEventListener('abort', () => {
+            xhr.abort();
+            resolve({ success: false, error: 'Đã hủy tải lên.' });
+          });
+        }
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable && onProgress) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            onProgress(pct);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status === 200 || xhr.status === 201 || xhr.status === 308) {
+            let resObj = {};
+            try { resObj = JSON.parse(xhr.responseText); } catch (e) {}
+            resolve({
+              success: true,
+              status: 'submitted',
+              providerFileId: resObj.id || 'drive_file_unknown',
+              providerUrl: resObj.id ? `https://drive.google.com/file/d/${resObj.id}/view` : null,
+              storageProvider: 'google_drive'
+            });
+          } else {
+            resolve({ success: false, error: `Lỗi lưu trữ Drive (${xhr.status}).` });
+          }
+        };
+
+        xhr.onerror = (e) => {
+          console.error('[GoogleDriveTrustedUploader] XHR error:', e, xhr.status, xhr.statusText);
+          resolve({ success: false, error: 'Lỗi mạng khi tải lên Drive.' });
+        };
+        xhr.send(file);
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') return { success: false, error: 'Đã hủy tải lên.' };
+      console.error('[GoogleDriveTrustedUploader] error:', err);
+      return { success: false, error: 'Lỗi hệ thống trong quá trình tải lên.' };
+    }
   }
 };
 
@@ -13159,11 +13649,14 @@ window.validateFileSubmission = function(files, student, activity, round) {
 
 // 6. STUDENT SUBMISSION PANEL RENDERING IN TIMELINE CARD
 window.renderStudentSubmissionPanel = function(act, round) {
-  const userMssv = state.userStudentId || (state.currentUser?.email ? state.currentUser.email.split('@')[0] : '');
-  const targetStudent = (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
-    studentId: userMssv,
-    studentName: state.currentUser?.displayName || 'Sinh viên'
-  };
+  const userMssv = state.userStudentId || (state.user?.email ? state.user.email.split('@')[0] : '');
+  const targetStudent =
+    (round?.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
+    (state.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
+    (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
+      studentId: userMssv,
+      studentName: state.user?.displayName || (userMssv ? userMssv : 'Sinh viên')
+    };
 
   const cfg = act.submissionConfig || {};
   const rules = getEffectiveSubmissionRules(userMssv, act, round);
@@ -13228,7 +13721,7 @@ window.renderStudentSubmissionPanel = function(act, round) {
                   <span class="text-[10px] text-slate-400 font-mono block">Biên nhận: ${att.receiptId || '--'} • ${timeFormatted}</span>
                 </div>
                 ${isLatest && att.status !== 'withdrawn' ? `
-                  <button type="button" onclick="withdrawStudentSubmission('${act.id}', ${att.attempt || 1})" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded text-[10px] font-bold transition-colors">
+                  <button type="button" onclick="withdrawStudentSubmission('${act.id}', ${att.attempt || 1}, '${round.id}')" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded text-[10px] font-bold transition-colors">
                     Rút bài
                   </button>
                 ` : ''}
@@ -13370,11 +13863,14 @@ window.checkStudentFileSubmission = function(actId) {
 
   if (!round || !act) return;
   const files = fileInput?.files ? Array.from(fileInput.files) : [];
-  const userMssv = state.userStudentId || (state.currentUser?.email ? state.currentUser.email.split('@')[0] : '');
-  const targetStudent = (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
-    studentId: userMssv,
-    studentName: state.currentUser?.displayName || 'Sinh viên'
-  };
+  const userMssv = state.userStudentId || (state.user?.email ? state.user.email.split('@')[0] : '');
+  const targetStudent =
+    (round?.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
+    (state.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
+    (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
+      studentId: userMssv,
+      studentName: state.user?.displayName || (userMssv ? userMssv : 'Sinh viên')
+    };
 
   const valRes = validateFileSubmission(files, targetStudent, act, round);
   if (!valRes.valid) {
@@ -13411,11 +13907,14 @@ window.submitStudentFiles = async function(actId) {
 
   if (!round || !act) return;
   const files = fileInput?.files ? Array.from(fileInput.files) : [];
-  const userMssv = state.userStudentId || (state.currentUser?.email ? state.currentUser.email.split('@')[0] : '');
-  const targetStudent = (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
-    studentId: userMssv,
-    studentName: state.currentUser?.displayName || 'Sinh viên'
-  };
+  const userMssv = state.userStudentId || (state.user?.email ? state.user.email.split('@')[0] : '');
+  const targetStudent =
+    (round?.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
+    (state.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
+    (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
+      studentId: userMssv,
+      studentName: state.user?.displayName || (userMssv ? userMssv : 'Sinh viên')
+    };
 
   // Client-side Validation
   const valRes = validateFileSubmission(files, targetStudent, act, round);
@@ -13439,7 +13938,10 @@ window.submitStudentFiles = async function(actId) {
   window._currentUploadAbort = abortController;
 
   try {
-    const file = files[0];
+    let file = files[0];
+    if (valRes.expectedFilename) {
+      file = new File([file], valRes.expectedFilename, { type: file.type });
+    }
     const attemptNum = valRes.rules.completedAttempts + 1;
 
     // Call storage provider abstraction
@@ -13495,7 +13997,7 @@ window.submitStudentFiles = async function(actId) {
       submittedAt: new Date().toISOString(),
       isLate: valRes.isLate,
       status: 'submitted',
-      submittedBy: state.currentUser?.email || userMssv
+      submittedBy: state.user?.email || userMssv
     };
 
     if (!round.activitySubmissions) round.activitySubmissions = {};
@@ -13540,59 +14042,93 @@ window.submitStudentFiles = async function(actId) {
   }
 };
 
-window.withdrawStudentSubmission = async function(actId, attemptNum) {
-  const round = (state.rounds || []).find(r => r.id === state.selectedRoundId);
+window.withdrawStudentSubmission = async function(actId, attemptNum, optRoundId) {
+  const round = (state.rounds || []).find(r => r.id === (optRoundId || state.selectedRoundId)) || state.rounds?.[0];
   const act = (round?.activities || []).find(a => a.id === actId);
-  if (!round || !act) return;
+  if (!round || !act) {
+    showToast('Không tìm thấy thông tin hoạt động!', 'error');
+    return;
+  }
 
-  const userMssv = state.userStudentId || (state.currentUser?.email ? state.currentUser.email.split('@')[0] : '');
+  const userMssv = state.userStudentId || (state.user?.email ? state.user.email.split('@')[0] : '');
   const subEntry = round?.activitySubmissions?.[actId]?.[userMssv];
   if (!subEntry || !subEntry.currentSubmission) {
     showToast('Không tìm thấy bài nộp để rút!', 'warning');
     return;
   }
 
-  showConfirm(
+  const confirmed = await showConfirm(
     'Xác nhận rút bài nộp?',
-    'Lịch sử nộp bài vẫn được lưu lại trong hệ thống nhưng bài nộp này sẽ được chuyển sang trạng thái "Đã rút". Bạn có thể nộp lại nếu còn lượt.',
-    async () => {
-      try {
-        const withdrawnSubmission = {
-          ...subEntry.currentSubmission,
-          status: 'withdrawn',
-          withdrawnAt: new Date().toISOString()
-        };
+    'Tệp trên Google Drive sẽ được tự động xóa để giải phóng dung lượng. Bài nộp này sẽ chuyển sang trạng thái "Đã rút" và bạn có thể nộp lại nếu còn lượt.',
+    { confirmText: 'Rút bài nộp', cancelText: 'Hủy', danger: true }
+  );
+  if (!confirmed) return;
 
-        const updatedAttempts = (subEntry.attempts || []).map(att => {
-          if (att.receiptId === withdrawnSubmission.receiptId) {
-            return withdrawnSubmission;
-          }
-          return att;
-        });
+  try {
+    showToast('Đang xử lý rút bài và xóa tệp Drive...', 'info');
 
-        round.activitySubmissions[actId][userMssv] = {
-          currentSubmission: withdrawnSubmission,
-          attempts: updatedAttempts
-        };
+    const withdrawnSubmission = {
+      ...subEntry.currentSubmission,
+      status: 'withdrawn',
+      withdrawnAt: new Date().toISOString()
+    };
 
+    const updatedAttempts = (subEntry.attempts || []).map(att => {
+      if (att.receiptId === withdrawnSubmission.receiptId || (!att.receiptId && att.attempt === attemptNum)) {
+        return { ...att, status: 'withdrawn', withdrawnAt: new Date().toISOString() };
+      }
+      return att;
+    });
+
+    // Call backend to delete file from Google Drive
+    const endpoint = window.IFA_CONFIG?.driveUploadEndpoint;
+    const idToken = state.user ? await state.user.getIdToken() : null;
+    const filesToDelete = (subEntry.currentSubmission.files || []).filter(f => f.providerFileId && f.storageProvider === 'google_drive');
+
+    if (endpoint && idToken && filesToDelete.length > 0) {
+      for (const f of filesToDelete) {
         try {
-          const roundRef = doc(db, 'graduationRounds', round.id);
-          await updateDoc(roundRef, {
-            [`activitySubmissions.${actId}.${userMssv}`]: {
-              currentSubmission: withdrawnSubmission,
-              attempts: updatedAttempts
+          const delRes = await fetch(endpoint + '/api/graduation/delete-file', {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer ' + idToken,
+              'Content-Type': 'application/json'
             },
-            updatedAt: serverTimestamp()
+            body: JSON.stringify({ fileId: f.providerFileId })
           });
-        } catch (e) {}
-
-        showToast('Đã rút bài nộp thành công!', 'info');
-        loadStudentRoundActivities(round.id);
-      } catch (err) {
-        showToast('Lỗi khi rút bài: ' + err.message, 'error');
+          console.log('[withdraw] Delete Drive file response status:', delRes.status);
+        } catch (errDel) {
+          console.warn('[withdraw] Error deleting file from Drive:', errDel);
+        }
       }
     }
-  );
+
+    if (!round.activitySubmissions) round.activitySubmissions = {};
+    if (!round.activitySubmissions[actId]) round.activitySubmissions[actId] = {};
+    round.activitySubmissions[actId][userMssv] = {
+      currentSubmission: withdrawnSubmission,
+      attempts: updatedAttempts
+    };
+
+    try {
+      const roundRef = doc(db, 'graduationRounds', round.id);
+      await updateDoc(roundRef, {
+        [`activitySubmissions.${actId}.${userMssv}`]: {
+          currentSubmission: withdrawnSubmission,
+          attempts: updatedAttempts
+        },
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.warn('[withdraw] Could not update Firestore directly:', e);
+    }
+
+    showToast('Đã rút bài nộp và xóa tệp thành công!', 'success');
+    loadStudentRoundActivities(round.id);
+  } catch (err) {
+    console.error('Withdraw error:', err);
+    showToast('Lỗi khi rút bài: ' + (err.message || String(err)), 'error');
+  }
 };
 
 // 7. ADMIN ACTIVITY SUBMISSIONS DASHBOARD
@@ -13838,7 +14374,7 @@ window.saveSubmissionOverride = async function() {
     extraAttempts,
     reason,
     createdAt: new Date().toISOString(),
-    createdBy: state.currentUser?.email || 'admin'
+    createdBy: state.user?.email || 'admin'
   };
 
   if (!round.submissionOverrides) round.submissionOverrides = {};
@@ -13863,7 +14399,7 @@ window.saveSubmissionOverride = async function() {
       action: 'Gia hạn / cấp lượt nộp bài',
       target: `MSSV: ${studentId}, Mốc: ${act.title}`,
       detail: `Gia hạn đến: ${allowUntil || 'Không'}, Cấp thêm: ${extraAttempts} lần. Lý do: ${reason}`,
-      by: state.currentUser?.email || 'admin'
+      by: state.user?.email || 'admin'
     });
   }
 
@@ -14264,7 +14800,7 @@ window.appendAuditLogRecord = async function(roundId, auditData) {
     action: auditData.action || 'Hành động',
     target: auditData.target || '',
     detail: auditData.detail || '',
-    by: auditData.by || state.currentUser?.email || 'system',
+    by: auditData.by || state.user?.email || 'system',
     timestamp: auditData.timestamp || new Date().toISOString()
   };
 
@@ -14389,3 +14925,417 @@ window.submitThesisScoreHDTransaction = async function({ roundId, studentId, sup
   });
 };
 
+
+
+// ============================================================================
+// PHASE 1: IFAA-STYLE ROUNDS MANAGEMENT & CARD VIEW
+// ============================================================================
+
+state.adminRoundsFilter = 'all';
+state.adminRoundsSearch = '';
+
+window.filterAdminRounds = function(filterKey) {
+  state.adminRoundsFilter = filterKey;
+  document.querySelectorAll('#admin-rounds-filter-pills .round-filter-btn').forEach(btn => {
+    if (btn.dataset.filter === filterKey) {
+      btn.className = 'round-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white shadow-xs transition-all';
+    } else {
+      btn.className = 'round-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all';
+    }
+  });
+  renderAdminRoundsCards();
+};
+
+window.searchAdminRounds = function(query) {
+  state.adminRoundsSearch = (query || '').trim().toLowerCase();
+  renderAdminRoundsCards();
+};
+
+function getRoundStatusCategory(r) {
+  if (r.deleted) return 'deleted';
+  if (r.hidden || r.status === 'hidden') return 'hidden';
+  
+  const now = Date.now();
+  const openTime = r.openAtDate ? new Date(r.openAtDate).getTime() : null;
+  const closeTime = r.closeAtDate ? new Date(r.closeAtDate).getTime() : null;
+  
+  if (r.status === 'closed' || (closeTime && now > closeTime)) {
+    return 'ended';
+  }
+  if (r.status === 'upcoming' || (openTime && now < openTime)) {
+    return 'upcoming';
+  }
+  return 'running';
+}
+
+window.renderAdminRoundsCards = function() {
+  const container = document.getElementById('admin-rounds-cards');
+  if (!container) return;
+
+  const totalBadge = document.getElementById('admin-rounds-total-badge');
+  const allNonDeleted = (state.rounds || []).filter(r => !r.deleted);
+  if (totalBadge) totalBadge.textContent = `${allNonDeleted.length} đợt`;
+
+  const filter = state.adminRoundsFilter || 'all';
+  const searchQuery = state.adminRoundsSearch || '';
+
+  let filtered = allNonDeleted.filter(r => {
+    const cat = getRoundStatusCategory(r);
+    if (filter === 'hidden') return cat === 'hidden';
+    if (cat === 'hidden') return false;
+    if (filter === 'upcoming') return cat === 'upcoming';
+    if (filter === 'running') return cat === 'running';
+    if (filter === 'ended') return cat === 'ended';
+    return true;
+  });
+
+  if (searchQuery) {
+    filtered = filtered.filter(r => {
+      const title = (r.title || '').toLowerCase();
+      const code = (r.shortCode || r.slug || r.roundName || r.id || '').toLowerCase();
+      const year = (r.academicYear || '').toLowerCase();
+      return title.includes(searchQuery) || code.includes(searchQuery) || year.includes(searchQuery);
+    });
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-full card-surface p-12 text-center space-y-3 bg-white border border-dashed border-slate-300 rounded-2xl">
+        <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-xl font-bold">
+          📁
+        </div>
+        <p class="text-sm font-bold text-slate-700">Không có đợt tốt nghiệp nào ở mục này</p>
+        <p class="text-xs text-slate-400">Bạn có thể chuyển bộ lọc hoặc bấm "Tạo đợt tốt nghiệp" để thêm mới.</p>
+        <div>
+          <button onclick="openCreateRoundModal()" class="mt-2 px-4 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+            + Tạo đợt tốt nghiệp
+          </button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(r => {
+    const cat = getRoundStatusCategory(r);
+    const shortCode = r.shortCode || r.slug || r.roundName || r.id;
+    const timeRangeStr = fmtDateRange24h(r.openAtDate, r.closeAtDate);
+    const isCurrentActive = Boolean(r.isActive);
+
+    let statusBadgeHtml = '';
+    if (cat === 'running') {
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Đang diễn ra</span>';
+    } else if (cat === 'upcoming') {
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Sắp mở</span>';
+    } else if (cat === 'ended') {
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Đã kết thúc</span>';
+    } else if (cat === 'hidden') {
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Đã ẩn</span>';
+    }
+
+    const activeBadgeHtml = isCurrentActive 
+      ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-900 border border-indigo-200">★ Đợt hiện hành</span>'
+      : '';
+
+    const eligibleCount = typeof r.eligibleCount === 'number' ? r.eligibleCount : (r.eligibleStudentsCount || 0);
+    const supCount = typeof r.supervisorCount === 'number' ? r.supervisorCount : (r.supervisorsCount || 0);
+    const regCount = typeof r.registrationsCount === 'number' ? r.registrationsCount : 0;
+    const actCount = typeof r.activitiesCount === 'number' ? r.activitiesCount : (r.activities ? r.activities.length : 0);
+
+    let phaseInfo = '';
+    if (r.reviewStatus === 'completed') {
+      phaseInfo = 'Đã chốt phân công GVHD';
+    } else if (r.currentRank) {
+      phaseInfo = `Đang xét NV${r.currentRank}`;
+    } else if (cat === 'running') {
+      phaseInfo = 'Đang nhận đăng ký';
+    } else if (cat === 'upcoming') {
+      phaseInfo = 'Chưa mở cổng';
+    } else {
+      phaseInfo = 'Đã đóng đợt';
+    }
+
+    const isClosed = cat === 'ended';
+    const isHidden = cat === 'hidden';
+
+    return `
+      <div class="card-surface p-5 bg-white border border-slate-200 hover:border-slate-300 rounded-2xl shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+        
+        <!-- CARD HEADER -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                ${r.academicYear || 'Đồ án TN'}
+              </span>
+              ${statusBadgeHtml}
+              ${activeBadgeHtml}
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Sao chép liên kết đợt ?x=${shortCode}" class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors text-xs flex items-center gap-1 font-mono">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                </svg>
+                <span class="text-[11px]">${shortCode}</span>
+              </button>
+            </div>
+          </div>
+
+          <h3 class="text-base font-black text-slate-900 leading-snug hover:text-tdtu-blue transition-colors">
+            ${r.title}
+          </h3>
+
+          <div class="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+            <span class="flex items-center gap-1">
+              <span>📅</span>
+              <span class="font-mono text-[11px] text-slate-700">${timeRangeStr}</span>
+            </span>
+            <span class="text-slate-300">•</span>
+            <span class="text-[11px] font-semibold text-slate-600">Trạng thái: <b>${phaseInfo}</b></span>
+          </div>
+        </div>
+
+        <!-- METRICS SUMMARY GRID -->
+        <div class="grid grid-cols-4 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+          <div>
+            <span class="text-[10px] text-slate-400 block font-bold uppercase">SV Tốt nghiệp</span>
+            <span class="text-base font-black text-slate-800">${eligibleCount}</span>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 block font-bold uppercase">GVHD</span>
+            <span class="text-base font-black text-indigo-700">${supCount}</span>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 block font-bold uppercase">Đăng ký</span>
+            <span class="text-base font-black text-emerald-700">${regCount}</span>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-400 block font-bold uppercase">Kế hoạch</span>
+            <span class="text-base font-black text-blue-700">${actCount}</span>
+          </div>
+        </div>
+
+        <!-- 6 MAIN ACTION BUTTONS (PRIMARY WORKFLOW GRID) -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+          <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            <span class="text-blue-600 group-hover:scale-110 transition-transform">📅</span>
+            <span>Kế hoạch</span>
+          </button>
+          
+          <button type="button" onclick="navigateToRoundAction('${r.id}', 'eligible-students')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            <span class="text-indigo-600 group-hover:scale-110 transition-transform">🎓</span>
+            <span>SV tốt nghiệp</span>
+          </button>
+
+          <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            <span class="text-emerald-600 group-hover:scale-110 transition-transform">📝</span>
+            <span>Đăng ký</span>
+          </button>
+
+          <button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            <span class="text-amber-600 group-hover:scale-110 transition-transform">🎯</span>
+            <span>Xét nguyện vọng</span>
+          </button>
+
+          <button type="button" onclick="navigateToRoundAction('${r.id}', 'preview-student')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            <span class="text-purple-600 group-hover:scale-110 transition-transform">👥</span>
+            <span>Phân công</span>
+          </button>
+
+          <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="p-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-bold text-xs text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            <span class="text-rose-600 group-hover:scale-110 transition-transform">📊</span>
+            <span>Quản lý điểm</span>
+          </button>
+        </div>
+
+        <!-- SECONDARY ACTIONS FOOTER -->
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 gap-2 flex-wrap">
+          <div class="flex items-center gap-1">
+            <button type="button" onclick="editRoundModal('${r.id}')" class="px-2.5 py-1 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+              ✏️ Sửa
+            </button>
+            <button type="button" onclick="duplicateRoundModal('${r.id}')" class="px-2.5 py-1 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+              📋 Sao chép
+            </button>
+            <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-2.5 py-1 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+              ${isClosed ? '↺ Mở lại' : '⏹ Kết thúc'}
+            </button>
+            <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-2.5 py-1 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+              ${isHidden ? '👁️ Hiện' : '🙈 Ẩn'}
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="text-blue-600 hover:underline font-bold text-[11px]">Đặt hiện hành</button>` : ''}
+            <button type="button" onclick="softDeleteRound('${r.id}')" class="px-2.5 py-1 rounded-lg hover:bg-rose-50 text-rose-600 font-semibold transition-colors">
+              🗑️ Xóa
+            </button>
+          </div>
+        </div>
+
+      </div>
+    `;
+  }).join('');
+};
+
+window.navigateToRoundAction = async function(roundId, actionKey) {
+  if (!roundId) return;
+  state.selectedRoundId = roundId;
+  state.activeRound = (state.rounds || []).find(r => r.id === roundId) || null;
+
+  // Sync selectors across all admin views
+  const dropdownIds = [
+    'select-active-round',
+    'admin-timeline-round-select',
+    'admin-round-student-select',
+    'admin-round-reg-select',
+    'admin-review-round-select',
+    'admin-round-sup-select',
+    'admin-scoring-round-select'
+  ];
+  dropdownIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = roundId;
+  });
+
+  window.switchAdminTab(actionKey);
+};
+
+window.updateRoundBreadcrumb = function(tabKey) {
+  const roundSubTabs = ['timeline', 'eligible-students', 'registrations', 'review', 'preview-student', 'scoring-dashboard'];
+  if (!roundSubTabs.includes(tabKey)) return;
+
+  const bEl = document.getElementById(`round-breadcrumb-${tabKey}`);
+  if (!bEl) return;
+
+  const currentRound = (state.rounds || []).find(r => r.id === state.selectedRoundId);
+  const roundTitle = currentRound ? (currentRound.title || 'Đợt tốt nghiệp') : 'Chưa chọn đợt';
+  const roundYear = currentRound ? (currentRound.academicYear || '') : '';
+
+  const tabLabels = {
+    'timeline': 'Kế hoạch đợt',
+    'eligible-students': 'Danh sách SV tốt nghiệp',
+    'registrations': 'Danh sách đăng ký',
+    'review': 'Xét nguyện vọng',
+    'preview-student': 'Kết quả phân công',
+    'scoring-dashboard': 'Quản lý điểm'
+  };
+  const currentLabel = tabLabels[tabKey] || tabKey;
+
+  bEl.innerHTML = `
+    <div class="flex items-center justify-between gap-3 bg-slate-100/90 hover:bg-slate-100 px-4 py-2.5 rounded-xl border border-slate-200/80 text-xs transition-colors">
+      <div class="flex items-center gap-2 min-w-0">
+        <button type="button" onclick="switchAdminTab('rounds')" class="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1.5 shrink-0 transition-colors">
+          <span>←</span>
+          <span>Đợt tốt nghiệp</span>
+        </button>
+        <span class="text-slate-300 font-bold">/</span>
+        <span class="font-bold text-slate-800 truncate" title="${roundTitle}">${roundTitle}</span>
+        <span class="text-slate-300 font-bold">/</span>
+        <span class="text-slate-500 font-semibold shrink-0">${currentLabel}</span>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        ${roundYear ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200">${roundYear}</span>` : ''}
+        <button type="button" onclick="switchAdminTab('rounds')" class="text-[11px] text-slate-500 hover:text-slate-900 font-medium underline">Đổi đợt</button>
+      </div>
+    </div>
+  `;
+};
+
+window.duplicateRoundModal = async function(roundId) {
+  const r = state.rounds.find(x => x.id === roundId);
+  if (!r) {
+    showToast('Không tìm thấy đợt tốt nghiệp cần sao chép!', 'error');
+    return;
+  }
+
+  // Open create round modal
+  window.openCreateRoundModal();
+
+  // Populate from source
+  document.getElementById('modal-round-title').textContent = 'Sao chép Đợt Đồ án Tốt nghiệp';
+  document.getElementById('round-form-id').value = '';
+  document.getElementById('round-form-title').value = `(Bản sao) ${r.title || ''}`;
+  document.getElementById('round-form-year').value = r.academicYear || '';
+  document.getElementById('round-form-name').value = `${(r.shortCode || r.slug || 'round')}-copy`;
+  document.getElementById('round-form-status').value = 'draft';
+  document.getElementById('round-form-pref-count').value = r.preferenceCount || '3';
+  document.getElementById('round-form-selection-mode').value = r.selectionMode || 'cards';
+  if (document.getElementById('round-form-allow-edit')) {
+    document.getElementById('round-form-allow-edit').checked = r.allowStudentEdit !== false;
+  }
+  if (document.getElementById('round-form-allow-topic-edit')) {
+    document.getElementById('round-form-allow-topic-edit').checked = r.allowTopicEdit !== false;
+  }
+  if (document.getElementById('round-form-allow-pref-edit')) {
+    document.getElementById('round-form-allow-pref-edit').checked = r.allowPreferenceEdit !== false;
+  }
+
+  showToast('Đã điền thông tin từ đợt gốc. Vui lòng kiểm tra và lưu đợt mới.', 'info');
+};
+
+window.toggleRoundCloseStatus = async function(roundId) {
+  const r = state.rounds.find(x => x.id === roundId);
+  if (!r) return;
+  const isClosed = (r.status === 'closed') || (r.closeAtDate && Date.now() > new Date(r.closeAtDate).getTime());
+  const newStatus = isClosed ? 'open' : 'closed';
+  const actionText = isClosed ? 'Mở lại' : 'Kết thúc';
+
+  const ok = await showConfirm(`Xác nhận ${actionText.toLowerCase()} đợt "${r.title}"?`);
+  if (!ok) return;
+
+  try {
+    showLoading(`Đang ${actionText.toLowerCase()} đợt...`);
+    const payload = {
+      status: newStatus,
+      updatedAt: serverTimestamp()
+    };
+    if (isClosed) {
+      const now = new Date();
+      const in30d = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
+      payload.closeAt = in30d;
+      payload.status = 'open';
+    }
+    await updateDoc(doc(db, 'graduationRounds', roundId), payload);
+    r.status = payload.status;
+    if (payload.closeAt) r.closeAtDate = payload.closeAt;
+    showToast(`Đã ${actionText.toLowerCase()} đợt thành công!`, 'success');
+    renderAdminRoundsCards();
+  } catch (err) {
+    console.error('toggleRoundCloseStatus error:', err);
+    showToast('Lỗi cập nhật trạng thái: ' + err.message, 'error');
+  } finally {
+    hideLoading();
+  }
+};
+
+window.toggleRoundHiddenStatus = async function(roundId) {
+  const r = state.rounds.find(x => x.id === roundId);
+  if (!r) return;
+  const isHidden = r.hidden || r.status === 'hidden';
+  const newHidden = !isHidden;
+  const actionText = newHidden ? 'Ẩn' : 'Bỏ ẩn (Hiện)';
+
+  const ok = await showConfirm(`Xác nhận ${actionText.toLowerCase()} đợt "${r.title}"?`);
+  if (!ok) return;
+
+  try {
+    showLoading(`Đang ${actionText.toLowerCase()} đợt...`);
+    const payload = {
+      hidden: newHidden,
+      status: newHidden ? 'hidden' : 'open',
+      updatedAt: serverTimestamp()
+    };
+    await updateDoc(doc(db, 'graduationRounds', roundId), payload);
+    r.hidden = newHidden;
+    r.status = payload.status;
+    showToast(`Đã ${actionText.toLowerCase()} đợt thành công!`, 'success');
+    renderAdminRoundsCards();
+  } catch (err) {
+    console.error('toggleRoundHiddenStatus error:', err);
+    showToast('Lỗi cập nhật trạng thái ẩn: ' + err.message, 'error');
+  } finally {
+    hideLoading();
+  }
+};

@@ -61,25 +61,34 @@ function validateActivity(activity, currentAttempt) {
 
   const now = new Date();
 
-  if (activity.submissionDeadline) {
-    const deadline = activity.submissionDeadline instanceof Date
-      ? activity.submissionDeadline
-      : new Date(activity.submissionDeadline);
-    if (now > deadline) {
+  // Check deadline
+  const deadlineStr = activity.submissionConfig?.deadlineMode === 'custom' && activity.submissionConfig?.deadlineAt
+    ? activity.submissionConfig.deadlineAt
+    : (activity.endAt || activity.submissionDeadline);
+
+  const allowLate = Boolean(activity.submissionConfig?.allowLateSubmission);
+
+  if (deadlineStr && !allowLate) {
+    const deadline = deadlineStr instanceof Date ? deadlineStr : new Date(deadlineStr);
+    if (!isNaN(deadline.getTime()) && now > deadline) {
       throw new ValidationError('Đã quá hạn nộp hồ sơ: ' + deadline.toLocaleString('vi-VN'));
     }
   }
 
-  if (activity.submissionOpenAt) {
-    const openAt = activity.submissionOpenAt instanceof Date
-      ? activity.submissionOpenAt
-      : new Date(activity.submissionOpenAt);
-    if (now < openAt) {
+  const openAtStr = activity.startAt || activity.submissionOpenAt;
+  if (openAtStr) {
+    const openAt = openAtStr instanceof Date ? openAtStr : new Date(openAtStr);
+    if (!isNaN(openAt.getTime()) && now < openAt) {
       throw new ValidationError('Chưa đến thời gian nhận hồ sơ: ' + openAt.toLocaleString('vi-VN'));
     }
   }
 
-  const attemptLimit = activity.attemptLimit || 1;
+  const attemptLimit =
+    Number(activity.submissionConfig?.maxAttempts) ||
+    Number(activity.maxAttempts) ||
+    Number(activity.attemptLimit) ||
+    3;
+
   if (currentAttempt >= attemptLimit) {
     throw new ValidationError(
       'Bạn đã nộp đủ số lần cho phép (' + attemptLimit + ' lần)'

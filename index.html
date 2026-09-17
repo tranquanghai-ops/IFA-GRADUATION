@@ -1,9 +1,15 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
+  <base href="/graduation/">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>IFA+ Graduation Beta — Đăng ký & Xét duyệt GVHD Đồ án Tốt nghiệp</title>
+  <script>
+    window.IFA_CONFIG = {
+      driveUploadEndpoint: 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi'
+    };
+  </script>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -600,7 +606,7 @@
           </div>
 
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
+            <table class="w-full min-w-[1100px] text-left text-xs">
               <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
                 <tr>
                   <th class="p-3.5">Tên đợt</th>
@@ -774,69 +780,69 @@
 
       <!-- Admin Sidebar & Main Content Layout -->
       <div class="flex flex-col lg:flex-row gap-6 items-start">
-        <!-- SIDEBAR TRÁI -->
-        <aside class="w-full lg:w-64 shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 p-3.5 space-y-1">
-          <div class="px-3 py-2 text-[11px] font-black uppercase tracking-wider text-slate-400">Quản trị Đồ án</div>
+        <!-- SIDEBAR TRÁI (IFAA STYLE) -->
+        <aside class="w-full lg:w-64 shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 p-3 space-y-4 text-xs select-none">
           
-          <button onclick="switchAdminTab('overview')" id="atab-btn-overview" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2.5 bg-slate-900 text-white shadow-sm">
-            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-            <span>Tổng quan</span>
-          </button>
-          
-          <button onclick="switchAdminTab('rounds')" id="atab-btn-rounds" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
-            <span>Đợt tốt nghiệp</span>
-          </button>
+          <!-- 1. TỔNG QUAN -->
+          <div class="space-y-1">
+            <div class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Tổng quan</div>
+            <button onclick="switchAdminTab('overview')" id="atab-btn-overview" class="admin-tab-btn w-full text-left px-3 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2.5 bg-slate-900 text-white shadow-xs">
+              <svg class="w-4 h-4 shrink-0 text-current" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+              </svg>
+              <span>Tổng quan</span>
+            </button>
+          </div>
 
-          <button onclick="switchAdminTab('timeline')" id="atab-btn-timeline" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-            <span>Kế hoạch đợt TN</span>
-          </button>
-          
-          
-          <button onclick="switchAdminTab('faculty-students')" id="atab-btn-faculty-students" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
-            <span>Danh sách SV khoa</span>
-          </button>
+          <!-- 2. QUẢN LÝ -->
+          <div class="space-y-1">
+            <div class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Quản lý</div>
+            
+            <button onclick="switchAdminTab('rounds')" id="atab-btn-rounds" class="admin-tab-btn w-full text-left px-3 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+              <svg class="w-4 h-4 shrink-0 text-current" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5" />
+              </svg>
+              <span>Đợt tốt nghiệp</span>
+            </button>
 
-<!-- Legacy sidebar item eligible-students moved into round config -->
-          
-          <button onclick="switchAdminTab('registrations')" id="atab-btn-registrations" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
-            <span>Danh sách đăng ký</span>
-          </button>
-          
-          <button onclick="switchAdminTab('supervisors-master')" id="atab-btn-supervisors-master" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
-            <span>Danh sách GVHD</span>
-          </button>
-          
-<!-- Legacy sidebar item round-supervisors moved into round config -->
-          
-          <button onclick="switchAdminTab('review')" id="atab-btn-review" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-            <span>Xét nguyện vọng</span>
-          </button>
-          
-          <button onclick="switchAdminTab('scoring-dashboard')" id="atab-btn-scoring-dashboard" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-            <span>📊 Quản lý Điểm & Sơ khảo / TM</span>
-          </button>
-          
-          <button onclick="switchAdminTab('preview-student')" id="atab-btn-preview-student" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-            <span>Kết quả phân công</span>
-          </button>
-          
-          <button onclick="switchAdminTab('project-types')" id="atab-btn-project-types" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-slate-400"></span>
-            <span>Loại hình đồ án</span>
-          </button>
-        
-          <button onclick="switchAdminTab('trash')" id="atab-btn-trash" class="admin-tab-btn w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
-            <span class="w-2 h-2 rounded-full bg-rose-400"></span>
-            <span>Thùng rác</span>
-          </button>
+            <button onclick="switchAdminTab('supervisors-master')" id="atab-btn-supervisors-master" class="admin-tab-btn w-full text-left px-3 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+              <svg class="w-4 h-4 shrink-0 text-current" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+              <span>Danh sách GVHD</span>
+            </button>
+
+            <button onclick="switchAdminTab('faculty-students')" id="atab-btn-faculty-students" class="admin-tab-btn w-full text-left px-3 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+              <svg class="w-4 h-4 shrink-0 text-current" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.999-3.199a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+              </svg>
+              <span>Danh sách SV khoa</span>
+            </button>
+          </div>
+
+          <!-- 3. CÀI ĐẶT -->
+          <div class="space-y-1">
+            <div class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Cài đặt</div>
+            <button onclick="switchAdminTab('project-types')" id="atab-btn-project-types" class="admin-tab-btn w-full text-left px-3 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+              <svg class="w-4 h-4 shrink-0 text-current" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+              </svg>
+              <span>Loại hình đồ án</span>
+            </button>
+          </div>
+
+          <!-- 4. HỆ THỐNG -->
+          <div class="space-y-1">
+            <div class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Hệ thống</div>
+            <button onclick="switchAdminTab('trash')" id="atab-btn-trash" class="admin-tab-btn w-full text-left px-3 py-2.5 rounded-xl font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-2.5">
+              <svg class="w-4 h-4 shrink-0 text-current" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+              </svg>
+              <span>Thùng rác</span>
+            </button>
+          </div>
+
         </aside>
 
         <!-- NỘI DUNG BÊN PHẢI -->
@@ -877,6 +883,8 @@
 
       <!-- ADMIN TAB: REVIEW MANAGEMENT (PHASE 2A) -->
       <div id="atab-panel-review" class="hidden space-y-6">
+        <!-- BREADCRUMB TO ROUNDS -->
+        <div id="round-breadcrumb-review" class="round-breadcrumb-container mb-4"></div>
 
         <!-- Round Selector & Status Banner -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl">
@@ -1032,37 +1040,67 @@
       </div>
 
       <!-- ADMIN TAB: ROUNDS MANAGEMENT -->
-      <div id="atab-panel-rounds" class="hidden space-y-4">
-        <div class="flex items-center justify-between">
-          <h2 class="text-base font-bold text-slate-900">Danh sách Đợt Đồ án Tốt nghiệp</h2>
-          <button onclick="openCreateRoundModal()" class="px-4 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-xl shadow-sm transition-all">
-            + Tạo đợt mới
+      <div id="atab-panel-rounds" class="hidden space-y-6">
+        <!-- TOP BAR: TITLE & CREATE ROUND BUTTON -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <span class="text-xl">🎓</span>
+              <h2 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight uppercase">Đợt tốt nghiệp</h2>
+              <span class="text-[11px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-bold border border-slate-200" id="admin-rounds-total-badge">0 đợt</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">Quản lý các đợt đồ án tốt nghiệp, kế hoạch mốc thời gian, xét duyệt nguyện vọng và phân công.</p>
+          </div>
+
+          <button type="button" onclick="openCreateRoundModal()" class="px-4 py-2.5 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 shrink-0">
+            <span class="text-sm font-black">+</span>
+            <span>Tạo đợt tốt nghiệp</span>
           </button>
         </div>
 
-        <div class="card-surface overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b">
-                <tr>
-                  <th class="p-3.5">Tên đợt</th>
-                  <th class="p-3.5">Năm học</th>
-                  <th class="p-3.5">Trạng thái</th>
-                  <th class="p-3.5">Thời gian mở / đóng</th>
-                  <th class="p-3.5">Số NV</th>
-                  <th class="p-3.5">Chế độ</th>
-                  <th class="p-3.5 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody id="admin-rounds-tbody" class="divide-y divide-slate-100">
-              </tbody>
-            </table>
+        <!-- FILTER TABS & SEARCH BAR (IFAA STYLE) -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+          <!-- Filter pills -->
+          <div class="flex flex-wrap items-center gap-1.5" id="admin-rounds-filter-pills">
+            <button type="button" data-filter="all" onclick="filterAdminRounds('all')" class="round-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 text-white shadow-xs transition-all">
+              Tất cả
+            </button>
+            <button type="button" data-filter="upcoming" onclick="filterAdminRounds('upcoming')" class="round-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">
+              Sắp mở
+            </button>
+            <button type="button" data-filter="running" onclick="filterAdminRounds('running')" class="round-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">
+              Đang diễn ra
+            </button>
+            <button type="button" data-filter="ended" onclick="filterAdminRounds('ended')" class="round-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">
+              Đã kết thúc
+            </button>
+            <button type="button" data-filter="hidden" onclick="filterAdminRounds('hidden')" class="round-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">
+              Đã ẩn
+            </button>
           </div>
+
+          <!-- Search input -->
+          <div class="relative w-full md:w-72">
+            <input type="text" id="admin-rounds-search" oninput="searchAdminRounds(this.value)" placeholder="Tìm kiếm đợt tốt nghiệp..." class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <span class="absolute left-3 top-2 text-slate-400 text-xs">🔍</span>
+          </div>
+        </div>
+
+        <!-- ROUNDS CARDS GRID -->
+        <div id="admin-rounds-cards" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <!-- Populated dynamically by renderAdminRoundsCards() -->
+        </div>
+
+        <!-- Hidden legacy table container kept for compatibility -->
+        <div class="hidden">
+          <table><tbody id="admin-rounds-tbody"></tbody></table>
         </div>
       </div>
 
       <!-- ADMIN TAB: TIMELINE / KẾ HOẠCH ĐỢT TỐT NGHIỆP -->
       <div id="atab-panel-timeline" class="hidden space-y-5">
+        <!-- BREADCRUMB TO ROUNDS -->
+        <div id="round-breadcrumb-timeline" class="round-breadcrumb-container mb-4"></div>
         <!-- TOP CONTROL BAR -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <div class="flex flex-wrap items-center gap-3">
@@ -1090,16 +1128,16 @@
         <div class="card-surface overflow-hidden">
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
-              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px] tracking-wide">
+              <thead class="bg-slate-50 text-slate-500 font-extrabold uppercase border-b border-slate-200 text-[10px] tracking-wider">
                 <tr>
-                  <th class="p-3.5 text-center w-16">Thứ tự</th>
-                  <th class="p-3.5">Loại & Tên mốc</th>
-                  <th class="p-3.5">Thời gian thực hiện</th>
-                  <th class="p-3.5">Địa điểm</th>
-                  <th class="p-3.5 text-center">Trạng thái</th>
-                  <th class="p-3.5 text-center">Hiển thị SV</th>
-                  <th class="p-3.5 text-center">Nộp bài</th>
-                  <th class="p-3.5 text-right">Thao tác</th>
+                  <th class="px-2 py-3 text-center w-10">#</th>
+                  <th class="px-2 py-3">Mốc kế hoạch</th>
+                  <th class="px-2 py-3 whitespace-nowrap">Thời gian</th>
+                  <th class="px-2 py-3">Địa điểm</th>
+                  <th class="px-2 py-3 text-center whitespace-nowrap w-24">Trạng thái</th>
+                  <th class="px-2 py-3 text-center whitespace-nowrap w-16">Hiển thị</th>
+                  <th class="px-2 py-3 text-center whitespace-nowrap w-16">Nộp bài</th>
+                  <th class="px-2 py-3 text-right whitespace-nowrap w-36 pr-3">Thao tác</th>
                 </tr>
               </thead>
               <tbody id="admin-timeline-activities-tbody" class="divide-y divide-slate-100">
@@ -1341,6 +1379,8 @@
       
       <!-- ADMIN TAB: ELIGIBLE STUDENTS (EXCEL) -->
       <div id="atab-panel-eligible-students" class="hidden space-y-6">
+        <!-- BREADCRUMB TO ROUNDS -->
+        <div id="round-breadcrumb-eligible-students" class="round-breadcrumb-container mb-4"></div>
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl">
           <div class="flex items-center gap-2">
             <label for="admin-round-student-select" class="text-xs font-bold text-slate-700">Đợt tốt nghiệp:</label>
@@ -1483,6 +1523,8 @@
 
       <!-- ADMIN TAB: REGISTRATIONS -->
       <div id="atab-panel-registrations" class="hidden space-y-4">
+        <!-- BREADCRUMB TO ROUNDS -->
+        <div id="round-breadcrumb-registrations" class="round-breadcrumb-container mb-4"></div>
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl">
           <div class="flex flex-wrap items-center gap-3">
             <div class="flex items-center gap-2">
@@ -1537,6 +1579,8 @@
 
       <!-- ADMIN TAB: PREVIEW AS STUDENT -->
       <div id="atab-panel-preview-student" class="hidden space-y-4">
+        <!-- BREADCRUMB TO ROUNDS -->
+        <div id="round-breadcrumb-preview-student" class="round-breadcrumb-container mb-4"></div>
         <div class="card-surface p-6 max-w-xl mx-auto space-y-4">
           <div class="border-b pb-3">
             <h2 class="text-base font-bold text-slate-900">👁️ Xem trước giao diện Sinh viên (Preview as Student)</h2>
@@ -1567,6 +1611,8 @@
         
       <!-- ADMIN TAB: SCORING DASHBOARD (v1.9.0-beta.1) -->
       <div id="atab-panel-scoring-dashboard" class="hidden space-y-6">
+        <!-- BREADCRUMB TO ROUNDS -->
+        <div id="round-breadcrumb-scoring-dashboard" class="round-breadcrumb-container mb-4"></div>
         
         <!-- Header & Round Selector -->
         <div class="card-surface p-5 bg-gradient-to-br from-white via-slate-50 to-emerald-50/30 border border-slate-200">
@@ -1587,29 +1633,165 @@
           </div>
         </div>
 
-        <!-- Sub-tabs Navigation -->
-        <div class="flex border-b border-slate-200 bg-white px-4 rounded-xl border border-slate-200 shrink-0 gap-3 text-xs font-bold overflow-x-auto shadow-xs">
-          <button type="button" onclick="switchAdminScoringSubTab('overview')" id="ascore-tab-btn-overview" class="py-3 border-b-2 border-emerald-600 text-emerald-700 whitespace-nowrap">
-            📊 Bảng tổng hợp Điểm SV
+        <!-- Sub-tabs Navigation: 7 Horizontal Business Tabs -->
+        <div class="flex border-b border-slate-200 bg-white p-1.5 rounded-xl border shrink-0 gap-1 text-xs font-bold overflow-x-auto shadow-xs">
+          <button type="button" onclick="switchAdminScoringSubTab('duyet-1')" id="ascore-tab-btn-duyet-1" class="ascore-nav-btn px-3.5 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all whitespace-nowrap">
+            Duyệt đợt 1
           </button>
-          <button type="button" onclick="switchAdminScoringSubTab('preliminary-config')" id="ascore-tab-btn-preliminary-config" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
-            🎯 Cấu hình Sơ khảo
+          <button type="button" onclick="switchAdminScoringSubTab('duyet-2')" id="ascore-tab-btn-duyet-2" class="ascore-nav-btn px-3.5 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all whitespace-nowrap">
+            Duyệt đợt 2
           </button>
-          <button type="button" onclick="switchAdminScoringSubTab('supervisor-config')" id="ascore-tab-btn-supervisor-config" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
-            📝 Cấu hình Điểm GVHD
+          <button type="button" onclick="switchAdminScoringSubTab('duyet-3')" id="ascore-tab-btn-duyet-3" class="ascore-nav-btn px-3.5 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all whitespace-nowrap">
+            Duyệt đợt 3
           </button>
-          <button type="button" onclick="switchAdminScoringSubTab('reviewer-assignment')" id="ascore-tab-btn-reviewer-assignment" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
-            📖 Phân công GVPB Thuyết minh
+          <button type="button" onclick="switchAdminScoringSubTab('thesis')" id="ascore-tab-btn-thesis" class="ascore-nav-btn px-3.5 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all whitespace-nowrap">
+            Thuyết minh
           </button>
-          <button type="button" onclick="switchAdminScoringSubTab('final-score-config')" id="ascore-tab-btn-final-score-config" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
-            ⚙️ Cấu hình Điểm Tổng kết
+          <button type="button" onclick="switchAdminScoringSubTab('preliminary')" id="ascore-tab-btn-preliminary" class="ascore-nav-btn px-3.5 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all whitespace-nowrap">
+            Sơ khảo
           </button>
-          <button type="button" onclick="switchAdminScoringSubTab('ranking')" id="ascore-tab-btn-ranking" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
-            🏆 Xếp hạng Toàn Đợt & Danh hiệu
+          <button type="button" onclick="switchAdminScoringSubTab('defense')" id="ascore-tab-btn-defense" class="ascore-nav-btn px-3.5 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all whitespace-nowrap">
+            Bảo vệ
           </button>
-          <button type="button" onclick="switchAdminScoringSubTab('export')" id="ascore-tab-btn-export" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
-            📥 Xuất Dữ liệu Excel
+          <button type="button" onclick="switchAdminScoringSubTab('summary')" id="ascore-tab-btn-summary" class="ascore-nav-btn px-3.5 py-2 rounded-lg bg-slate-900 text-white shadow-xs transition-all whitespace-nowrap font-bold">
+            Tổng kết
           </button>
+        </div>
+
+        <!-- NEW PANELS FOR DUYỆT ĐỢT 1, 2, 3 & BẢO VỆ -->
+        <!-- PANEL: DUYỆT ĐỢT 1 -->
+        <div id="ascore-panel-duyet-1" class="hidden space-y-4">
+          <div class="card-surface p-4 bg-slate-50 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-slate-700">Trạng thái:</span>
+              <select id="admin-duyet-1-filter" onchange="renderAdminProgressReviewTable(1)" class="p-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
+                <option value="all">Tất cả sinh viên</option>
+                <option value="passed">Đạt yêu cầu</option>
+                <option value="revision">Cần bổ sung / chỉnh sửa</option>
+                <option value="failed">Không đạt</option>
+                <option value="pending">Chưa duyệt</option>
+              </select>
+            </div>
+            <input type="text" id="admin-duyet-1-search" oninput="renderAdminProgressReviewTable(1)" placeholder="Tìm MSSV, họ tên, đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+          </div>
+          <div class="card-surface overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                <tr>
+                  <th class="p-3 text-center">#</th>
+                  <th class="p-3">MSSV</th>
+                  <th class="p-3">Họ và tên</th>
+                  <th class="p-3">Đề tài</th>
+                  <th class="p-3">GVHD</th>
+                  <th class="p-3 text-center">Tiến độ Duyệt 1</th>
+                  <th class="p-3 text-center">Đánh giá / Điểm</th>
+                </tr>
+              </thead>
+              <tbody id="admin-duyet-1-tbody" class="divide-y divide-slate-100">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PANEL: DUYỆT ĐỢT 2 -->
+        <div id="ascore-panel-duyet-2" class="hidden space-y-4">
+          <div class="card-surface p-4 bg-slate-50 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-slate-700">Trạng thái:</span>
+              <select id="admin-duyet-2-filter" onchange="renderAdminProgressReviewTable(2)" class="p-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
+                <option value="all">Tất cả sinh viên</option>
+                <option value="passed">Đạt yêu cầu</option>
+                <option value="revision">Cần bổ sung / chỉnh sửa</option>
+                <option value="failed">Không đạt</option>
+                <option value="pending">Chưa duyệt</option>
+              </select>
+            </div>
+            <input type="text" id="admin-duyet-2-search" oninput="renderAdminProgressReviewTable(2)" placeholder="Tìm MSSV, họ tên, đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+          </div>
+          <div class="card-surface overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                <tr>
+                  <th class="p-3 text-center">#</th>
+                  <th class="p-3">MSSV</th>
+                  <th class="p-3">Họ và tên</th>
+                  <th class="p-3">Đề tài</th>
+                  <th class="p-3">GVHD</th>
+                  <th class="p-3 text-center">Tiến độ Duyệt 2</th>
+                  <th class="p-3 text-center">Đánh giá / Điểm</th>
+                </tr>
+              </thead>
+              <tbody id="admin-duyet-2-tbody" class="divide-y divide-slate-100">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PANEL: DUYỆT ĐỢT 3 -->
+        <div id="ascore-panel-duyet-3" class="hidden space-y-4">
+          <div class="card-surface p-4 bg-slate-50 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-slate-700">Trạng thái:</span>
+              <select id="admin-duyet-3-filter" onchange="renderAdminProgressReviewTable(3)" class="p-1.5 border border-slate-300 rounded-lg text-xs font-semibold bg-white">
+                <option value="all">Tất cả sinh viên</option>
+                <option value="passed">Đạt yêu cầu</option>
+                <option value="revision">Cần bổ sung / chỉnh sửa</option>
+                <option value="failed">Không đạt</option>
+                <option value="pending">Chưa duyệt</option>
+              </select>
+            </div>
+            <input type="text" id="admin-duyet-3-search" oninput="renderAdminProgressReviewTable(3)" placeholder="Tìm MSSV, họ tên, đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+          </div>
+          <div class="card-surface overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                <tr>
+                  <th class="p-3 text-center">#</th>
+                  <th class="p-3">MSSV</th>
+                  <th class="p-3">Họ và tên</th>
+                  <th class="p-3">Đề tài</th>
+                  <th class="p-3">GVHD</th>
+                  <th class="p-3 text-center">Tiến độ Duyệt 3</th>
+                  <th class="p-3 text-center">Đánh giá / Điểm</th>
+                </tr>
+              </thead>
+              <tbody id="admin-duyet-3-tbody" class="divide-y divide-slate-100">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PANEL: BẢO VỆ -->
+        <div id="ascore-panel-defense" class="hidden space-y-4">
+          <div class="card-surface p-4 bg-slate-50 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm">Điểm & Đánh giá Hội đồng Bảo vệ</h3>
+              <p class="text-slate-500 text-[11px]">Xem điểm chính thức và kết quả đánh giá của từng Hội đồng Bảo vệ.</p>
+            </div>
+            <input type="text" id="admin-defense-search" oninput="renderAdminDefenseScoresTable()" placeholder="Tìm MSSV, họ tên..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+          </div>
+          <div class="card-surface overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                <tr>
+                  <th class="p-3 text-center">#</th>
+                  <th class="p-3">MSSV</th>
+                  <th class="p-3">Họ và tên</th>
+                  <th class="p-3">Hội đồng</th>
+                  <th class="p-3 text-center">Điểm GVHD</th>
+                  <th class="p-3 text-center">TM Final</th>
+                  <th class="p-3 text-center">Điểm Bảo vệ</th>
+                  <th class="p-3 text-center">Trạng thái chốt</th>
+                </tr>
+              </thead>
+              <tbody id="admin-defense-tbody" class="divide-y divide-slate-100">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- SUB-TAB 1: BẢNG TỔNG HỢP ĐIỂM -->
@@ -2398,6 +2580,17 @@
               </select>
             </div>
 
+            <!-- GOOGLE DRIVE INTEGRATION -->
+            <div class="space-y-2.5 p-3.5 bg-blue-50 border border-blue-200 rounded-xl">
+              <span class="font-bold text-blue-800 text-xs block mb-1">📁 Thư mục Google Drive (Root Folder)</span>
+              <p class="text-[11px] text-blue-700 leading-relaxed">Admin tự tạo thư mục trên Google Drive và dán đường dẫn vào đây. Các bài nộp trong đợt này sẽ được lưu vào thư mục này nếu mốc thời gian không cấu hình thư mục riêng.</p>
+              <div class="flex gap-2">
+                <input type="text" id="round-drive-folder-url" placeholder="VD: https://drive.google.com/drive/folders/1A2B3C..." class="flex-1 p-2 border border-blue-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <button type="button" onclick="testDriveFolderUrl('round')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0">Kiểm tra URL</button>
+              </div>
+              <div id="round-drive-folder-status" class="hidden text-[11px] font-bold mt-1"></div>
+            </div>
+
             <!-- PERMISSIONS CHECKBOXES -->
             <div class="space-y-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700">
               <span class="font-bold text-slate-800 text-xs block mb-1">Quyền của Sinh viên khi đợt mở</span>
@@ -3143,21 +3336,18 @@
                     <label class="font-bold text-slate-800 block">5. Dịch vụ lưu trữ (Storage Provider):</label>
                     <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">Google Drive Ready</span>
                   </div>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div class="grid grid-cols-1 gap-2">
                     <div>
-                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Nhà cung cấp:</label>
-                      <select id="sub-storage-provider" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold">
-                        <option value="google_drive" selected>Google Drive (Khoa / Tài khoản Sở hữu)</option>
-                        <option value="none">Chưa cấu hình</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Google Drive Subfolder ID:</label>
-                      <input type="text" id="sub-drive-folder-id" placeholder="Để trống sẽ dùng Root Folder của Đợt" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs">
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">URL Thư mục Google Drive riêng cho Mốc thời gian này:</label>
+                      <div class="flex gap-2">
+                        <input type="text" id="sub-drive-folder-url" placeholder="Để trống sẽ dùng Root Folder của Đợt. VD: https://drive.google.com/drive/folders/..." class="flex-1 p-1.5 border border-slate-300 rounded-lg font-mono text-xs">
+                        <button type="button" onclick="testDriveFolderUrl('activity')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-bold text-[10px] transition-colors shrink-0">Kiểm tra</button>
+                      </div>
+                      <div id="activity-drive-folder-status" class="hidden text-[10px] font-bold mt-1"></div>
                     </div>
                   </div>
                   <div class="p-2 bg-blue-50/70 border border-blue-200 rounded-lg text-[11px] text-blue-900 leading-relaxed">
-                    ℹ️ <strong>Bảo mật:</strong> Client không lưu Access/Refresh Token của chủ sở hữu. Luồng nộp file sẽ gọi qua <code>uploadProvider</code>. Nếu chưa có Trusted Backend Service, hệ thống sẽ thông báo rõ: <em>"Google Drive chưa được kết nối an toàn. Cần cấu hình dịch vụ tải tệp phía máy chủ."</em>
+                    ℹ️ <strong>Bảo mật:</strong> Backend sẽ tự động trích xuất Folder ID từ URL. Các file bài nộp sẽ được backend upload an toàn vào thư mục này.
                   </div>
                 </div>
               </div>

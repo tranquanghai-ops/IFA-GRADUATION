@@ -16,7 +16,14 @@ const { onRequest } = require('firebase-functions/v2/https');
 const { requireStudentAuth } = require('./auth.js');
 const { getDocument } = require('./firestore.js');
 const { validateFile, validateActivity, ValidationError } = require('./validation.js');
-const { isDriveConfigured, createUploadSession } = require('./drive.js');
+const { isDriveConfigured, createUploadSession, getAccessToken, loadDriveConfig, runDriveDiagnostic, deleteDriveFile } = require('./drive.js');
+const { getSecret } = require('./secrets.js');
+
+function extractFolderId(str) {
+  if (!str || typeof str !== 'string') return null;
+  const match = str.match(/[-\w]{25,}/);
+  return match ? match[0] : null;
+}
 
 // CORS: only allow from production and local development origins
 const ALLOWED_ORIGINS = new Set([
@@ -52,10 +59,27 @@ async function healthHandler(req, res) {
   if (req.method === 'OPTIONS') return handleOptions(req, res);
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const driveConfigured = await isDriveConfigured();
+  // Detailed diagnostic mode
+  if (req.query.diag === '1') {
+    const diagReport = await runDriveDiagnostic(req.query.folderId);
+    return res.status(200).json(diagReport);
+  }
+
+  const config = await loadDriveConfig();
+  let tokenTest = null;
+  if (config) {
+    try {
+      const token = await getAccessToken(config);
+      tokenTest = { ok: true };
+    } catch (e) {
+      tokenTest = { ok: false, error: e.message };
+    }
+  }
+
   return res.status(200).json({
     ok: true,
-    driveConfigured,
+    driveConfigured: !!config,
+    tokenTest,
     version: '2.4.0-beta.1',
     region: 'asia-southeast1',
   });
@@ -79,34 +103,75 @@ async function uploadSessionHandler(req, res) {
   // If middleware already responded (401/403), bail out
   if (res.headersSent) return;
 
-  const { studentId, idToken: _unused, uid } = req.auth;
+  let { studentId } = req.auth;
+  const { idToken: _unused, uid, isAdmin } = req.auth;
   const rawToken = req.headers['authorization'].slice(7).trim();
 
   try {
     const body = req.body || {};
-    const { activityId, file: fileMeta } = body;
+    const { activityId, roundId, file: fileMeta } = body;
+    
+    // Admins can upload on behalf of a student, so they provide the studentId in the body
+    if (isAdmin && body.studentId) {
+      studentId = body.studentId;
+    }
+
+    if (!studentId) {
+      return res.status(400).json({ error: 'Thiếu studentId' });
+    }
 
     if (!activityId || typeof activityId !== 'string') {
       return res.status(400).json({ error: 'Thiếu activityId' });
+    }
+    if (!roundId || typeof roundId !== 'string') {
+      return res.status(400).json({ error: 'Thiếu roundId' });
     }
 
     // 2. Validate file metadata
     validateFile(fileMeta);
 
-    // 3. Read activity config from tknt-tdtu Firestore (using user's own token)
-    const activityDoc = await getDocument('graduation/config/activities/' + activityId, rawToken);
+    // 3. Read round config from tknt-tdtu Firestore
+    const roundDoc = await getDocument('graduationRounds/' + roundId, rawToken);
+    if (!roundDoc) {
+      return res.status(404).json({ error: 'Không tìm thấy đợt xét tốt nghiệp' });
+    }
 
-    // 4. Read current attempt count for this student
-    const attemptDoc = await getDocument(
-      'graduation/config/activities/' + activityId + '/submissions/' + studentId,
-      rawToken
-    );
-    const currentAttemptCount = attemptDoc ? (attemptDoc.attemptCount || 0) : 0;
+    const activityDoc = (roundDoc.activities || []).find(a => a.id === activityId);
+    if (!activityDoc) {
+      return res.status(404).json({ error: 'Không tìm thấy hoạt động' });
+    }
+
+    // 4. Read current attempt count for this student (exclude withdrawn submissions)
+    const studentSubmissions = roundDoc.activitySubmissions?.[activityId]?.[studentId];
+    const attempts = Array.isArray(studentSubmissions?.attempts)
+      ? studentSubmissions.attempts
+      : (studentSubmissions?.currentSubmission ? [studentSubmissions.currentSubmission] : []);
+    const currentAttemptCount = attempts.filter(a => a.status !== 'withdrawn').length;
 
     // 5. Validate activity rules (deadline, attemptLimit, submissionEnabled)
     validateActivity(activityDoc, currentAttemptCount);
 
-    // 6. Check Drive is configured
+    // 6. Resolve target Drive folder ID
+    let rawFolder =
+      body.folderId ||
+      activityDoc.submissionConfig?.driveFolderId ||
+      activityDoc.driveFolderId ||
+      roundDoc.driveRootFolderId ||
+      roundDoc.driveFolderId;
+
+    if (!rawFolder) {
+      rawFolder = await getSecret('graduation-drive-folder-id');
+    }
+    if (!rawFolder) {
+      rawFolder = '1M37ovlEHS3ufftFPZHGj1mQWec7r8Tj7';
+    }
+
+    const targetFolderId = extractFolderId(rawFolder);
+    if (!targetFolderId) {
+      return res.status(400).json({ error: 'Chưa cấu hình thư mục nhận bài. Vui lòng liên hệ ban tổ chức.' });
+    }
+
+    // 7. Check Drive is configured
     const driveReady = await isDriveConfigured();
     if (!driveReady) {
       return res.status(503).json({
@@ -115,16 +180,18 @@ async function uploadSessionHandler(req, res) {
       });
     }
 
-    // 7. Create resumable Drive upload session
+    // 8. Create resumable Drive upload session
     const sessionUri = await createUploadSession({
       filename: fileMeta.name,
       mimeType: fileMeta.type || 'application/octet-stream',
       fileSize: fileMeta.size,
       studentId,
       activityId,
+      folderId: targetFolderId,
+      origin: req.headers.origin || 'https://tknt-tdtu.web.app',
     });
 
-    // 8. Return session URI to frontend (this URI is safe — it is scoped per-file)
+    // 9. Return session URI to frontend (this URI is safe — it is scoped per-file)
     return res.status(200).json({
       ok: true,
       sessionUri,
@@ -138,6 +205,35 @@ async function uploadSessionHandler(req, res) {
     }
     console.error('[upload-session] Unexpected error:', err);
     return res.status(500).json({ error: 'Lỗi hệ thống. Vui lòng thử lại sau.' });
+  }
+}
+
+// ── POST /api/graduation/delete-file ──────────────────────────────────────────
+
+async function deleteFileHandler(req, res) {
+  setCORSHeaders(req, res);
+  if (req.method === 'OPTIONS') return handleOptions(req, res);
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  await new Promise((resolve, reject) => {
+    requireStudentAuth(req, res, err => {
+      if (err) reject(err); else resolve();
+    });
+  }).catch(() => {});
+
+  if (res.writableEnded) return;
+
+  const { fileId } = req.body || {};
+  if (!fileId) {
+    return res.status(400).json({ error: 'Missing fileId' });
+  }
+
+  try {
+    const deleted = await deleteDriveFile(fileId);
+    return res.status(200).json({ ok: true, deleted });
+  } catch (err) {
+    console.error('[delete-file] Error:', err);
+    return res.status(500).json({ error: 'Không thể xóa tệp trên Google Drive.' });
   }
 }
 
@@ -161,6 +257,10 @@ exports.graduationApi = onRequest(
 
     if (urlPath === '/api/graduation/upload-session') {
       return await uploadSessionHandler(req, res);
+    }
+
+    if (urlPath === '/api/graduation/delete-file') {
+      return await deleteFileHandler(req, res);
     }
 
     setCORSHeaders(req, res);

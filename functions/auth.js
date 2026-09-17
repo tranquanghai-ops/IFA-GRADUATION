@@ -7,39 +7,26 @@
 
 'use strict';
 
-const { OAuth2Client } = require('google-auth-library');
+const admin = require('firebase-admin');
 
 const TKNT_TDTU_PROJECT_ID = 'tknt-tdtu';
-const oauthClient = new OAuth2Client();
+if (!admin.apps.length) {
+  admin.initializeApp({ projectId: TKNT_TDTU_PROJECT_ID });
+}
 
-/**
- * Verifies a Firebase ID token from the tknt-tdtu project.
- * @param {string} idToken
- * @returns {{ uid, email, studentId }}
- */
 async function verifyIdToken(idToken) {
-  const ticket = await oauthClient.verifyIdToken({
-    idToken,
-    audience: TKNT_TDTU_PROJECT_ID,
-  });
-
-  const payload = ticket.getPayload();
-  if (!payload) throw new Error('Token payload empty after verification');
-
-  const expectedIssuer = 'https://securetoken.google.com/' + TKNT_TDTU_PROJECT_ID;
-  if (payload.iss !== expectedIssuer) {
-    throw new Error('Invalid token issuer: ' + payload.iss);
-  }
-
-  const email = payload.email || '';
-  const uid = payload.sub || '';
+  const decodedToken = await admin.auth().verifyIdToken(idToken);
+  
+  const email = decodedToken.email || '';
+  const uid = decodedToken.uid || '';
   if (!email) throw new Error('Token missing email claim');
 
-  // MSSV@student.tdtu.edu.vn → studentId = MSSV (uppercased)
+  // MSSV@student.tdtu.edu.vn -> studentId = MSSV (uppercased)
   const studentMatch = email.match(/^([^@]+)@student\.tdtu\.edu\.vn$/i);
   const studentId = studentMatch ? studentMatch[1].toUpperCase() : null;
+  const isAdmin = email.endsWith('@tdtu.edu.vn');
 
-  return { uid, email, studentId };
+  return { uid, email, studentId, isAdmin };
 }
 
 /**
@@ -67,9 +54,9 @@ async function requireAuth(req, res, next) {
  */
 async function requireStudentAuth(req, res, next) {
   await requireAuth(req, res, () => {
-    if (!req.auth.studentId) {
+    if (!req.auth.studentId && !req.auth.isAdmin) {
       return res.status(403).json({
-        error: 'Chỉ sinh viên TDTU mới có thể nộp hồ sơ xét tốt nghiệp',
+        error: 'Chỉ sinh viên hoặc giảng viên TDTU mới có thể nộp hồ sơ xét tốt nghiệp',
       });
     }
     next();
