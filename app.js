@@ -16277,22 +16277,27 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
       return rules.attemptsHistory.map((att, idx) => {
         const fName = att.files?.[0]?.validatedName || att.files?.[0]?.originalName || 'Tệp đính kèm';
         const fSize = att.files?.[0]?.size ? (att.files[0].size / (1024 * 1024)).toFixed(1) + ' MB' : '';
-        const safeViewUrl = att.files?.[0]?.providerUrl || (att.files?.[0]?.providerFileId ? 'https://drive.google.com/file/d/' + att.files[0].providerFileId + '/view' : '#');
+        const timeStr = att.submittedAt ? fmtIsoToVietnameseDateTime(att.submittedAt) : '--';
+
+        let statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">✓ Đã nộp</span>';
+        if (att.status === 'withdrawn') {
+          statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500">Đã rút bài</span>';
+        } else if (att.isLate) {
+          statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">Nộp trễ</span>';
+        }
 
         return `
           <div class="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-3 text-xs">
-            <div>
+            <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
-                <span class="font-bold text-slate-900">${act.title} (Lần ${att.attempt || idx + 1})</span>
-                <span class="text-[10px] text-slate-400 font-mono">${att.submittedAt ? fmtIsoToVietnameseDateTime(att.submittedAt) : '--'}</span>
+                <span class="font-bold text-slate-900 truncate">${act.title} (Lần ${att.attempt || idx + 1})</span>
+                <span class="text-[10px] text-slate-400 font-mono shrink-0">${timeStr}</span>
               </div>
-              <span class="text-[11px] text-slate-600 font-mono block mt-0.5 truncate max-w-sm">${fName} (${fSize})</span>
+              <span class="text-[11px] text-slate-600 font-mono block mt-0.5 truncate">${fName} ${fSize ? '(' + fSize + ')' : ''}</span>
             </div>
-            ${safeViewUrl !== '#' ? `
-              <a href="${safeViewUrl}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] rounded-lg transition-colors inline-flex items-center gap-1">
-                <span>👁️</span> Xem file
-              </a>
-            ` : '<span class="text-slate-400 text-[10px]">Tệp cục bộ</span>'}
+            <div class="shrink-0">
+              ${statusBadge}
+            </div>
           </div>
         `;
       }).join('');
