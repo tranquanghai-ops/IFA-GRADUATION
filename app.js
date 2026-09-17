@@ -14938,9 +14938,9 @@ window.filterAdminRounds = function(filterKey) {
   state.adminRoundsFilter = filterKey;
   document.querySelectorAll('#admin-rounds-filter-pills .round-filter-btn').forEach(btn => {
     if (btn.dataset.filter === filterKey) {
-      btn.className = 'round-filter-btn px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-900 text-white shadow-xs transition-all';
+      btn.className = 'round-filter-btn px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-slate-900 text-white shadow-xs transition-all';
     } else {
-      btn.className = 'round-filter-btn px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all';
+      btn.className = 'round-filter-btn px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all';
     }
   });
   renderAdminRoundsCards();
@@ -15000,14 +15000,14 @@ window.renderAdminRoundsCards = function() {
 
   if (filtered.length === 0) {
     container.innerHTML = `
-      <div class="card-surface p-12 text-center space-y-3 bg-white border border-dashed border-slate-300 rounded-2xl w-full">
-        <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-2xl font-bold">
+      <div class="card-surface p-10 text-center space-y-3 bg-white border border-dashed border-slate-300 rounded-2xl w-full">
+        <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-xl font-bold">
           📁
         </div>
         <p class="text-base font-bold text-slate-800">Không có đợt tốt nghiệp nào ở mục này</p>
         <p class="text-sm text-slate-500">Bạn có thể chuyển bộ lọc hoặc bấm "Tạo đợt tốt nghiệp" để thêm mới.</p>
-        <div class="pt-2">
-          <button onclick="openCreateRoundModal()" class="px-5 py-2.5 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl text-sm font-semibold shadow-sm transition-all">
+        <div class="pt-1">
+          <button onclick="openCreateRoundModal()" class="px-4 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl text-sm font-semibold shadow-xs transition-all">
             + Tạo đợt tốt nghiệp
           </button>
         </div>
@@ -15024,19 +15024,20 @@ window.renderAdminRoundsCards = function() {
 
     let statusBadgeHtml = '';
     if (cat === 'running') {
-      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Đang diễn ra</span>';
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Đang diễn ra</span>';
     } else if (cat === 'upcoming') {
-      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">Sắp mở</span>';
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">Sắp mở</span>';
     } else if (cat === 'ended') {
-      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">Đã kết thúc</span>';
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">Đã kết thúc</span>';
     } else if (cat === 'hidden') {
-      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">Đã ẩn</span>';
+      statusBadgeHtml = '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">Đã ẩn</span>';
     }
 
     const activeBadgeHtml = isCurrentActive 
-      ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-indigo-100 text-indigo-900 border border-indigo-200">★ Đợt hiện hành</span>'
+      ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-600 text-white shadow-2xs">★ Đợt hiện hành</span>'
       : '';
 
+    // Metrics
     const eligibleCount = typeof r.eligibleCount === 'number' ? r.eligibleCount : (r.eligibleStudentsCount || 0);
     const supCount = typeof r.supervisorCount === 'number' ? r.supervisorCount : (r.supervisorsCount || 0);
     const regCount = typeof r.registrationsCount === 'number' ? r.registrationsCount : 0;
@@ -15058,127 +15059,123 @@ window.renderAdminRoundsCards = function() {
     const isClosed = cat === 'ended';
     const isHidden = cat === 'hidden';
 
+    // Highlight current active round with distinct soft light blue background
+    const cardBgClass = isCurrentActive 
+      ? 'bg-blue-50/70 border-blue-300 hover:border-blue-400 ring-1 ring-blue-200/80 shadow-xs' 
+      : 'bg-white border-slate-200 hover:border-slate-300 shadow-xs';
+
     return `
-      <article class="card-surface p-5 sm:p-6 bg-white border border-slate-200 hover:border-slate-300 rounded-2xl shadow-xs hover:shadow-md transition-all space-y-4 w-full">
+      <article class="card-surface p-4 sm:p-5 ${cardBgClass} rounded-2xl hover:shadow-md transition-all space-y-3.5 w-full">
         
-        <!-- TOP ROW: 3 COLUMNS ON DESKTOP (LEFT: TITLE, MID: TIME & STATUS, RIGHT: METRICS) -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+        <!-- TOP SECTION: BADGES & SHORTCODE (LEFT) + 4 METRICS BADGES (RIGHT) -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5 border-b border-slate-200/60 pb-3">
           
-          <!-- LEFT: Title, Year, Status Badges, Shortcode (5 cols) -->
-          <div class="lg:col-span-5 space-y-2">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-xs uppercase font-bold tracking-wider px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
-                ${r.academicYear || 'Đồ án TN'}
-              </span>
-              ${statusBadgeHtml}
-              ${activeBadgeHtml}
-              <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Sao chép liên kết đợt ?x=${shortCode}" class="px-2.5 py-1 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors text-xs flex items-center gap-1 font-mono border border-slate-200 bg-white shadow-2xs">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-                </svg>
-                <span>${shortCode}</span>
-              </button>
-            </div>
-
-            <h3 class="text-xl sm:text-[22px] font-bold text-slate-900 leading-snug hover:text-tdtu-blue transition-colors">
-              ${r.title}
-            </h3>
+          <!-- Badges Left -->
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-200/70 text-slate-700 border border-slate-300/60">
+              ${r.academicYear || 'Đồ án TN'}
+            </span>
+            ${statusBadgeHtml}
+            ${activeBadgeHtml}
+            <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Sao chép liên kết đợt ?x=${shortCode}" class="px-2 py-0.5 rounded text-slate-500 hover:text-blue-600 hover:bg-white transition-colors text-xs flex items-center gap-1 font-mono border border-slate-300/60 bg-white/80 shadow-2xs">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+              </svg>
+              <span>${shortCode}</span>
+            </button>
           </div>
 
-          <!-- MIDDLE-LEFT: Time & Registration / Phase Info (3 cols) -->
-          <div class="lg:col-span-3 space-y-2 text-sm sm:text-[15px] border-t lg:border-t-0 lg:border-l border-slate-100 pt-3 lg:pt-0 lg:pl-5">
-            <div class="flex items-start gap-2.5 text-slate-600">
-              <span class="text-base shrink-0">📅</span>
-              <div>
-                <span class="text-xs text-slate-400 font-bold block uppercase tracking-wide">Thời gian mở - đóng</span>
-                <span class="font-mono text-sm sm:text-[15px] text-slate-800 font-semibold">${timeRangeStr}</span>
-              </div>
-            </div>
-            <div class="flex items-start gap-2.5 text-slate-600">
-              <span class="text-base shrink-0">📌</span>
-              <div>
-                <span class="text-xs text-slate-400 font-bold block uppercase tracking-wide">Trạng thái đợt</span>
-                <span class="text-sm sm:text-[15px] font-bold text-slate-800">${phaseInfo}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- MIDDLE-RIGHT: 4 Metrics Summary (4 cols) -->
-          <div class="lg:col-span-4 border-t lg:border-t-0 lg:border-l border-slate-100 pt-3 lg:pt-0 lg:pl-5">
-            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-2.5 bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-center">
-              <div>
-                <span class="text-[13px] sm:text-[14px] text-slate-500 block font-semibold">SV Tốt nghiệp</span>
-                <span class="text-lg sm:text-xl font-bold text-slate-900">${eligibleCount}</span>
-              </div>
-              <div>
-                <span class="text-[13px] sm:text-[14px] text-slate-500 block font-semibold">GVHD</span>
-                <span class="text-lg sm:text-xl font-bold text-indigo-700">${supCount}</span>
-              </div>
-              <div>
-                <span class="text-[13px] sm:text-[14px] text-slate-500 block font-semibold">Đăng ký</span>
-                <span class="text-lg sm:text-xl font-bold text-emerald-700">${regCount}</span>
-              </div>
-              <div>
-                <span class="text-[13px] sm:text-[14px] text-slate-500 block font-semibold">Kế hoạch</span>
-                <span class="text-lg sm:text-xl font-bold text-blue-700">${actCount}</span>
-              </div>
-            </div>
+          <!-- Metrics Right (Moved up to top of card, renamed "SV") -->
+          <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 shadow-2xs">
+              SV: <strong class="text-slate-900 text-sm font-bold">${eligibleCount}</strong>
+            </span>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 shadow-2xs">
+              GVHD: <strong class="text-indigo-700 text-sm font-bold">${supCount}</strong>
+            </span>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 shadow-2xs">
+              Đăng ký: <strong class="text-emerald-700 text-sm font-bold">${regCount}</strong>
+            </span>
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 shadow-2xs">
+              Kế hoạch: <strong class="text-blue-700 text-sm font-bold">${actCount}</strong>
+            </span>
           </div>
 
         </div>
 
-        <!-- BOTTOM ACTIONS ROW: 6 MAIN ACTIONS (LEFT) + SECONDARY ACTIONS (RIGHT) -->
-        <div class="pt-4 border-t border-slate-100 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+        <!-- MIDDLE SECTION: ROUND TITLE & TIME/STATUS INFO -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
+          <div>
+            <h3 class="text-xl sm:text-[22px] font-bold text-slate-900 leading-snug hover:text-tdtu-blue transition-colors">
+              ${r.title}
+            </h3>
+          </div>
           
-          <!-- 6 Main Action Buttons -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 xl:flex xl:flex-wrap items-center gap-2">
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
-              <span class="text-blue-600 group-hover:scale-110 transition-transform text-base">📅</span>
+          <div class="flex items-center gap-3 text-xs sm:text-sm text-slate-600 flex-wrap shrink-0">
+            <span class="flex items-center gap-1.5">
+              <span>📅</span>
+              <span class="font-mono text-xs sm:text-sm text-slate-800 font-semibold">${timeRangeStr}</span>
+            </span>
+            <span class="text-slate-300">•</span>
+            <span class="flex items-center gap-1.5">
+              <span>📌</span>
+              <span class="text-xs sm:text-sm font-bold text-slate-800">${phaseInfo}</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- BOTTOM ACTIONS ROW: 6 MAIN ACTIONS (LEFT) + SECONDARY ACTIONS (RIGHT) -->
+        <div class="pt-3 border-t border-slate-200/60 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5">
+          
+          <!-- 6 Main Action Buttons (Primary Workflow) -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 xl:flex xl:flex-wrap items-center gap-1.5 sm:gap-2">
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-blue-600 group-hover:scale-110 transition-transform">📅</span>
               <span>Kế hoạch</span>
             </button>
             
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'eligible-students')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
-              <span class="text-indigo-600 group-hover:scale-110 transition-transform text-base">🎓</span>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'eligible-students')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-indigo-600 group-hover:scale-110 transition-transform">🎓</span>
               <span>SV tốt nghiệp</span>
             </button>
 
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
-              <span class="text-emerald-600 group-hover:scale-110 transition-transform text-base">📝</span>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-emerald-600 group-hover:scale-110 transition-transform">📝</span>
               <span>Đăng ký</span>
             </button>
 
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
-              <span class="text-amber-600 group-hover:scale-110 transition-transform text-base">🎯</span>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-amber-600 group-hover:scale-110 transition-transform">🎯</span>
               <span>Xét nguyện vọng</span>
             </button>
 
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'preview-student')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
-              <span class="text-purple-600 group-hover:scale-110 transition-transform text-base">👥</span>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'preview-student')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-purple-600 group-hover:scale-110 transition-transform">👥</span>
               <span>Phân công</span>
             </button>
 
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-semibold text-sm sm:text-[14px] text-slate-800 flex items-center justify-center gap-2 transition-all shadow-2xs group">
-              <span class="text-rose-600 group-hover:scale-110 transition-transform text-base">📊</span>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-rose-600 group-hover:scale-110 transition-transform">📊</span>
               <span>Quản lý điểm</span>
             </button>
           </div>
 
-          <!-- Secondary Actions -->
-          <div class="flex items-center justify-end gap-1.5 text-sm sm:text-[14px] text-slate-600 flex-wrap pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100">
-            <button type="button" onclick="editRoundModal('${r.id}')" class="px-3 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+          <!-- Secondary Actions (Right aligned) -->
+          <div class="flex items-center justify-end gap-1 text-xs sm:text-[13px] text-slate-600 flex-wrap pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-200/50">
+            <button type="button" onclick="editRoundModal('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
               ✏️ Sửa
             </button>
-            <button type="button" onclick="duplicateRoundModal('${r.id}')" class="px-3 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+            <button type="button" onclick="duplicateRoundModal('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
               📋 Sao chép
             </button>
-            <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-3 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+            <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
               ${isClosed ? '↺ Mở lại' : '⏹ Kết thúc'}
             </button>
-            <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-3 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 font-semibold transition-colors">
+            <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
               ${isHidden ? '👁️ Hiện' : '🙈 Ẩn'}
             </button>
-            ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-3 py-1.5 rounded-lg text-blue-600 hover:bg-blue-50 font-semibold transition-colors">⭐ Đặt hiện hành</button>` : ''}
-            <button type="button" onclick="softDeleteRound('${r.id}')" class="px-3 py-1.5 rounded-lg hover:bg-rose-50 text-rose-600 font-semibold transition-colors">
+            ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-2.5 py-1.5 rounded-lg text-blue-700 hover:bg-blue-100/70 font-bold transition-colors">⭐ Đặt hiện hành</button>` : ''}
+            <button type="button" onclick="softDeleteRound('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-rose-100/70 text-rose-600 font-semibold transition-colors">
               🗑️ Xóa
             </button>
           </div>
