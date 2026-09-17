@@ -1,5 +1,5 @@
 
-function detectInitialPortal() {
+function getCurrentPortal() {
   try {
     const path = (window.location.pathname || '').toLowerCase();
     if (path.includes('/graduation/admin') || path.endsWith('/admin') || path.endsWith('/admin/')) {
@@ -29,7 +29,8 @@ function detectInitialPortal() {
   } catch (e) {}
   return 'student';
 }
-window.detectInitialPortal = detectInitialPortal;
+window.getCurrentPortal = getCurrentPortal;
+window.detectInitialPortal = getCurrentPortal;
 
 
 window.escapeHtml = function(unsafe) {
@@ -103,7 +104,7 @@ export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   }).length;
 }
 
-/** IFA+ Graduation Beta Studio v2.4.0-beta.1 (IFAA CORS Fix + Drive Backend) **/
+/** IFA+ Graduation Beta Studio v2.5.0-beta.1 (IFAA CORS Fix + Drive Backend) **/
 
 // Override native alert to use non-blocking toast
 window.alert = function(msg) {
@@ -489,7 +490,7 @@ export async function setupAuthListener() {
         updateAuthUI();
 
         // 2. Kích hoạt ngay view ban đầu để UI hiển thị tức thì
-        const detectedPortal = detectInitialPortal();
+        const detectedPortal = getCurrentPortal();
         let initView = 'student';
         if (detectedPortal === 'admin' && state.isAdmin) {
           initView = 'admin';
@@ -6269,14 +6270,6 @@ window.loadAdminRoundActivities = async function(roundId) {
   });
 
   const selAdminRoundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
-  console.log('[DEBUG_TIMELINE] Render Start:', {
-    currentAdminRoundId: selAdminRoundId,
-    roundId: roundId,
-    targetRoundActivitiesLength: targetRound.activities?.length,
-    normalizedLength: normalized.length,
-    listLength: list.length,
-    isSubcollectionEmpty: (list === targetRound.activities) ? 'true/skipped' : 'false'
-  });
 
   if (statsBadge) {
     statsBadge.textContent = `${normalized.length} mốc (${ongoingCount} đang diễn ra, ${upcomingCount} sắp tới, ${pastCount} đã kết thúc)`;
@@ -6404,7 +6397,7 @@ window.loadAdminRoundActivities = async function(roundId) {
   }
 
   } catch (globalErr) {
-    console.error('[DEBUG_GLOBAL_CATCH] Error in loadAdminRoundActivities:', globalErr);
+    console.error('Lỗi loadAdminRoundActivities:', globalErr);
     const tbodyFallback = document.getElementById('admin-timeline-activities-tbody');
     if (tbodyFallback) {
       tbodyFallback.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-rose-600 bg-rose-50 font-bold border border-rose-200 rounded-lg">
