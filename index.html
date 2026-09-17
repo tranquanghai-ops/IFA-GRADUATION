@@ -82,7 +82,10 @@
             <a id="btn-goto-admin" href="/graduation/admin/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-300 bg-white/10 hover:bg-white/20 border border-amber-400/30 transition-all shadow-xs" title="Chuyển sang Cổng Quản trị">
               <span>⚙️</span> <span class="hidden sm:inline">Quản trị</span>
             </a>
-            <a id="btn-goto-student" href="/graduation/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-200 bg-white/10 hover:bg-white/20 border border-blue-400/30 transition-all shadow-xs" title="Xem Cổng Sinh viên">
+                        <a id="btn-goto-supervisor" href="/graduation/supervisor/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-200 bg-white/10 hover:bg-white/20 border border-emerald-400/30 transition-all shadow-xs" title="Chuyển sang Cổng GVHD">
+              <span>👨‍🏫</span> <span class="hidden sm:inline">Cổng GVHD</span>
+            </a>
+<a id="btn-goto-student" href="/graduation/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-200 bg-white/10 hover:bg-white/20 border border-blue-400/30 transition-all shadow-xs" title="Xem Cổng Sinh viên">
               <span>🎓</span> <span class="hidden sm:inline">Cổng SV</span>
             </a>
             <a id="btn-goto-assessment" href="/graduation/assessment/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-purple-200 bg-white/10 hover:bg-white/20 border border-purple-400/30 transition-all shadow-xs" title="Chuyển sang Cổng Đánh giá">
@@ -1002,7 +1005,313 @@
         </div>
       </div>
 
-    </section><section id="view-admin" class="hidden space-y-6">
+    </section>    <!-- ======================================================= -->
+    <!-- PORTAL 4: ASSESSMENT / EVALUATION PORTAL (/graduation/assessment/) -->
+    <!-- ======================================================= -->
+    <section id="view-assessment" class="hidden space-y-6">
+
+      <!-- ACCESS DENIED CARD (WHEN USER HAS NO EVALUATION ROLES) -->
+      <div id="assessment-access-denied" class="hidden max-w-2xl mx-auto my-12 p-8 bg-white rounded-2xl shadow-sm border border-slate-200 text-center space-y-4">
+        <div class="w-16 h-16 mx-auto rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-3xl">
+          🔒
+        </div>
+        <h3 class="text-lg font-black text-slate-800">Không có quyền truy cập Cổng Đánh giá</h3>
+        <p class="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+          Tài khoản của Thầy/Cô hiện không có nhiệm vụ chấm điểm hoặc đánh giá (Duyệt tiến độ, Phản biện, Sơ khảo, Hội đồng) trong đợt tốt nghiệp nào.
+        </p>
+        <div class="pt-4 flex flex-wrap items-center justify-center gap-3">
+          <a href="/graduation/" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all">
+            ← Về Cổng Sinh viên
+          </a>
+          <a href="/graduation/supervisor/" class="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 transition-all">
+            👨‍🏫 Về Cổng GVHD
+          </a>
+        </div>
+      </div>
+
+      <!-- MAIN ASSESSMENT WORKSPACE -->
+      <div id="assessment-workspace-container" class="space-y-6">
+
+        <!-- TOP BAR: ROUND SELECTOR & WORKSPACE TITLE -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 flex items-center justify-center text-2xl shadow-xs shrink-0">
+              ⚖️
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-base sm:text-lg font-black text-slate-900 leading-tight">Cổng Đánh giá & Chấm thi ĐATN</h2>
+                <span id="assessment-user-role-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                  Hội đồng / Đánh giá
+                </span>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">Không gian đánh giá tiến độ, chấm phản biện và Hội đồng bảo vệ</p>
+            </div>
+          </div>
+
+          <!-- Round Selector -->
+          <div class="flex items-center gap-2.5 bg-slate-50 p-1.5 rounded-xl border border-slate-200 shrink-0">
+            <label for="assessment-round-select" class="text-xs font-bold text-slate-600 pl-2 shrink-0 flex items-center gap-1.5">
+              <span>📅</span> Đợt:
+            </label>
+            <select id="assessment-round-select" onchange="onAssessmentRoundChange(this.value)" class="bg-white border border-slate-300 text-slate-800 font-bold text-xs rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-purple-500 focus:outline-none min-w-[200px] shadow-xs">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+        </div>
+
+        <!-- HERO DASHBOARD: EVALUATION STATS & DEADLINE -->
+        <div id="assessment-hero-card" class="bg-linear-to-r from-purple-900 via-indigo-900 to-slate-900 rounded-2xl p-5 sm:p-6 text-white shadow-md relative overflow-hidden">
+          <div class="absolute -right-6 -bottom-8 text-white/5 text-9xl pointer-events-none select-none font-black">
+            IFA+
+          </div>
+          <div class="relative z-10 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+              <div>
+                <span class="text-[11px] uppercase tracking-wider text-purple-200 font-bold">Tổng quan Đánh giá của Thầy/Cô</span>
+                <h3 id="assessment-hero-round-title" class="text-base sm:text-lg font-black text-white mt-0.5">Đang tải thông tin đợt...</h3>
+              </div>
+              <div id="assessment-stat-deadline-box" class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-xl border border-white/15 text-xs text-amber-300 font-semibold self-start sm:self-auto">
+                <span>⏳ Hạn chót gần nhất:</span>
+                <span id="assessment-stat-deadline" class="font-bold text-white">--</span>
+              </div>
+            </div>
+
+            <!-- Metric Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              <div class="p-3 rounded-xl bg-white/10 border border-white/10 backdrop-blur-xs">
+                <span class="text-[11px] text-purple-200 block font-medium">Tổng cần chấm</span>
+                <div class="text-2xl font-black text-white mt-0.5" id="assessment-stat-needed">0</div>
+                <span class="text-[10px] text-slate-300">Nhiệm vụ được giao</span>
+              </div>
+              <div class="p-3 rounded-xl bg-emerald-500/20 border border-emerald-400/30 backdrop-blur-xs">
+                <span class="text-[11px] text-emerald-200 block font-medium">Đã chấm xong</span>
+                <div class="text-2xl font-black text-emerald-300 mt-0.5" id="assessment-stat-scored">0</div>
+                <span class="text-[10px] text-emerald-200/80">Hoàn tất chính thức</span>
+              </div>
+              <div class="p-3 rounded-xl bg-amber-500/20 border border-amber-400/30 backdrop-blur-xs">
+                <span class="text-[11px] text-amber-200 block font-medium">Chưa chấm</span>
+                <div class="text-2xl font-black text-amber-300 mt-0.5" id="assessment-stat-unscored">0</div>
+                <span class="text-[10px] text-amber-200/80">Cần chấm điểm</span>
+              </div>
+              <div class="p-3 rounded-xl bg-sky-500/20 border border-sky-400/30 backdrop-blur-xs">
+                <span class="text-[11px] text-sky-200 block font-medium">Bản nháp</span>
+                <div class="text-2xl font-black text-sky-300 mt-0.5" id="assessment-stat-draft">0</div>
+                <span class="text-[10px] text-sky-200/80">Đang lưu tạm</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7 MAIN HORIZONTAL TABS CONTAINER -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 sm:p-3">
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none" id="assessment-tabs-bar">
+            <!-- Tab 1: Duyệt 1 -->
+            <button id="atab-btn-duyet-1" onclick="switchAssessmentTab('duyet-1')" class="assessment-tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all flex items-center gap-2 text-slate-600 hover:bg-slate-100">
+              <span>📌</span> <span>Duyệt 1</span>
+              <span id="atab-badge-duyet-1" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-bold border border-slate-200">0</span>
+            </button>
+
+            <!-- Tab 2: Duyệt 2 -->
+            <button id="atab-btn-duyet-2" onclick="switchAssessmentTab('duyet-2')" class="assessment-tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all flex items-center gap-2 text-slate-600 hover:bg-slate-100">
+              <span>📌</span> <span>Duyệt 2</span>
+              <span id="atab-badge-duyet-2" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-bold border border-slate-200">0</span>
+            </button>
+
+            <!-- Tab 3: Duyệt 3 -->
+            <button id="atab-btn-duyet-3" onclick="switchAssessmentTab('duyet-3')" class="assessment-tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all flex items-center gap-2 text-slate-600 hover:bg-slate-100">
+              <span>📌</span> <span>Duyệt 3</span>
+              <span id="atab-badge-duyet-3" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-bold border border-slate-200">0</span>
+            </button>
+
+            <!-- Tab 4: Thuyết minh -->
+            <button id="atab-btn-thesis" onclick="switchAssessmentTab('thesis')" class="assessment-tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all flex items-center gap-2 text-slate-600 hover:bg-slate-100">
+              <span>📖</span> <span>Thuyết minh</span>
+              <span id="atab-badge-thesis" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-bold border border-slate-200">0</span>
+            </button>
+
+            <!-- Tab 5: Sơ khảo -->
+            <button id="atab-btn-preliminary" onclick="switchAssessmentTab('preliminary')" class="assessment-tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all flex items-center gap-2 text-slate-600 hover:bg-slate-100">
+              <span>🔍</span> <span>Sơ khảo</span>
+              <span id="atab-badge-preliminary" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-bold border border-slate-200">0</span>
+            </button>
+
+            <!-- Tab 6: Bảo vệ -->
+            <button id="atab-btn-defense" onclick="switchAssessmentTab('defense')" class="assessment-tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all flex items-center gap-2 text-slate-600 hover:bg-slate-100">
+              <span>🏛️</span> <span>Bảo vệ (Hội đồng)</span>
+              <span id="atab-badge-defense" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-bold border border-slate-200">0</span>
+            </button>
+
+            <!-- Tab 7: Tổng kết -->
+            <button id="atab-btn-summary" onclick="switchAssessmentTab('summary')" class="assessment-tab-btn px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all flex items-center gap-2 text-slate-600 hover:bg-slate-100">
+              <span>📊</span> <span>Tổng kết</span>
+              <span id="atab-badge-summary" class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-bold border border-slate-200">0</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- FILTER & SEARCH TOOLBAR (COMMON FOR STUDENT LIST PANELS) -->
+        <div id="assessment-filter-toolbar" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <!-- Status Filters -->
+          <div class="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+            <button type="button" onclick="setAssessmentFilter('all')" id="afilter-btn-all" class="assessment-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-900 text-white shadow-xs">
+              Tất cả (<span id="afilter-cnt-all">0</span>)
+            </button>
+            <button type="button" onclick="setAssessmentFilter('unscored')" id="afilter-btn-unscored" class="assessment-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200">
+              Chưa chấm (<span id="afilter-cnt-unscored">0</span>)
+            </button>
+            <button type="button" onclick="setAssessmentFilter('draft')" id="afilter-btn-draft" class="assessment-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200">
+              Bản nháp (<span id="afilter-cnt-draft">0</span>)
+            </button>
+            <button type="button" onclick="setAssessmentFilter('completed')" id="afilter-btn-completed" class="assessment-filter-btn px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200">
+              Đã chấm (<span id="afilter-cnt-completed">0</span>)
+            </button>
+          </div>
+
+          <!-- Search Input -->
+          <div class="w-full sm:w-72 relative">
+            <input type="text" id="assessment-search-input" oninput="onAssessmentSearch(this.value)" placeholder="Tìm MSSV, tên SV, đề tài..." class="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-purple-500 focus:outline-none shadow-xs">
+            <span class="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
+          </div>
+        </div>
+
+        <!-- PANELS FOR TABS -->
+
+        <!-- PANEL 1: DUYỆT 1 -->
+        <div id="assessment-panel-duyet-1" class="assessment-tab-panel space-y-3">
+          <div id="assessment-list-duyet-1" class="space-y-3">
+            <!-- 1 student = 1 horizontal card -->
+          </div>
+        </div>
+
+        <!-- PANEL 2: DUYỆT 2 -->
+        <div id="assessment-panel-duyet-2" class="assessment-tab-panel hidden space-y-3">
+          <div id="assessment-list-duyet-2" class="space-y-3">
+            <!-- 1 student = 1 horizontal card -->
+          </div>
+        </div>
+
+        <!-- PANEL 3: DUYỆT 3 -->
+        <div id="assessment-panel-duyet-3" class="assessment-tab-panel hidden space-y-3">
+          <div id="assessment-list-duyet-3" class="space-y-3">
+            <!-- 1 student = 1 horizontal card -->
+          </div>
+        </div>
+
+        <!-- PANEL 4: THUYẾT MINH -->
+        <div id="assessment-panel-thesis" class="assessment-tab-panel hidden space-y-3">
+          <div id="assessment-list-thesis" class="space-y-3">
+            <!-- 1 student = 1 horizontal card -->
+          </div>
+        </div>
+
+        <!-- PANEL 5: SƠ KHẢO -->
+        <div id="assessment-panel-preliminary" class="assessment-tab-panel hidden space-y-3">
+          <div id="assessment-list-preliminary" class="space-y-3">
+            <!-- 1 student = 1 horizontal card -->
+          </div>
+        </div>
+
+        <!-- PANEL 6: BẢO VỆ (HỘI ĐỒNG) -->
+        <div id="assessment-panel-defense" class="assessment-tab-panel hidden space-y-5">
+          <!-- Council Select & Actions Card -->
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div class="space-y-1">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-purple-700">Phân công Hội đồng Bảo vệ</span>
+                <div class="flex items-center gap-2">
+                  <label for="assessment-council-select" class="text-xs font-bold text-slate-700">Chọn Hội đồng:</label>
+                  <select id="assessment-council-select" onchange="onAssessmentCouncilChange(this.value)" class="bg-slate-50 border border-slate-300 text-slate-800 font-bold text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:outline-none min-w-[240px] shadow-xs">
+                    <!-- Populated dynamically -->
+                  </select>
+                </div>
+              </div>
+
+              <!-- Button to open Council Workspace -->
+              <div id="assessment-council-action-box" class="shrink-0">
+                <button type="button" id="btn-open-assessment-council-workspace" onclick="launchAssessmentCouncilWorkspace()" class="px-5 py-2.5 bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer">
+                  <span>🚀</span> <span>Mở Không gian Hội đồng Chấm thi (Council Workspace)</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Council Detail Summary Banner -->
+            <div id="assessment-council-info-banner" class="p-4 rounded-xl bg-purple-50/60 border border-purple-200/80 text-xs text-purple-950 space-y-2">
+              <div class="flex flex-wrap items-center justify-between gap-2 border-b border-purple-200/60 pb-2">
+                <div class="font-bold flex items-center gap-2">
+                  <span class="text-base">🏛️</span>
+                  <span id="assessment-cinfo-name">Hội đồng</span>
+                  <span id="assessment-cinfo-status" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-purple-800 border border-purple-300">
+                    Chuẩn bị
+                  </span>
+                </div>
+                <div class="text-slate-600 text-[11px] font-medium" id="assessment-cinfo-time-room">
+                  📍 Phòng: -- • 📅 Ngày: --
+                </div>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
+                <div><span class="text-purple-800 font-bold">Chủ tịch:</span> <span id="assessment-cinfo-chair">--</span></div>
+                <div><span class="text-purple-800 font-bold">Thư ký:</span> <span id="assessment-cinfo-secretary">--</span></div>
+                <div><span class="text-purple-800 font-bold">Ủy viên:</span> <span id="assessment-cinfo-members">--</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Students in Council List -->
+          <div class="space-y-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 px-1">Danh sách Sinh viên trong Hội đồng</h4>
+            <div id="assessment-list-defense" class="space-y-3">
+              <!-- 1 student = 1 horizontal card -->
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 7: TỔNG KẾT (ADMIN ONLY) -->
+        <div id="assessment-panel-summary" class="assessment-tab-panel hidden space-y-4">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div>
+                <h4 class="text-sm font-bold text-slate-800">Bảng Tổng kết Điểm & Xếp hạng Đợt Tốt nghiệp</h4>
+                <p class="text-xs text-slate-500 mt-0.5">Tổng hợp điểm GVHD, Thuyết minh (HD + PB), Điểm Hội đồng và Xếp loại</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="exportRoundSummaryToExcel()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer">
+                  <span>📥</span> <span>Xuất Excel Tổng kết</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 text-[11px] uppercase tracking-wider">
+                    <th class="p-3 text-center w-12">Hạng</th>
+                    <th class="p-3">MSSV</th>
+                    <th class="p-3">Họ và tên</th>
+                    <th class="p-3">GVHD</th>
+                    <th class="p-3 text-center">Điểm GVHD</th>
+                    <th class="p-3 text-center">TM HD</th>
+                    <th class="p-3 text-center">TM PB</th>
+                    <th class="p-3 text-center">TM Chung</th>
+                    <th class="p-3 text-center">Hội đồng</th>
+                    <th class="p-3 text-center font-black text-slate-900 bg-slate-100/70">Tổng kết</th>
+                    <th class="p-3 text-center">Xếp loại</th>
+                  </tr>
+                </thead>
+                <tbody id="assessment-summary-tbody" class="divide-y divide-slate-100 font-medium text-slate-700">
+                  <tr>
+                    <td colspan="11" class="p-8 text-center text-slate-400">Đang tải bảng tổng kết...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+<section id="view-admin" class="hidden space-y-6">
 
       <!-- Admin Sidebar & Main Content Layout -->
       <div class="flex flex-col lg:flex-row gap-6 items-start">
