@@ -6921,7 +6921,8 @@ export const IFAA_FIREBASE_CONFIG = {
   appId: "1:633545868576:web:c1509233a2b5046b320345"
 };
 
-export const DEFAULT_IFAA_DATASET_URL = "https://firebasestorage.googleapis.com/v0/b/ifa-activities.firebasestorage.app/o/datasets%2Ffaculty-students.json.gz?alt=media&token=9a1e615e-3d20-48e7-8c9e-967e21140a21";
+export const DEFAULT_IFAA_DATASET_URL = "https://firebasestorage.googleapis.com/v0/b/ifa-activities.firebasestorage.app/o/datasets%2Ffaculty-students.json.gz?alt=media&token=f66324b5-2ec1-45ad-a580-5f4d4041e431";
+export const BACKUP_IFAA_DATASET_URL = "https://firebasestorage.googleapis.com/v0/b/ifa-activities.firebasestorage.app/o/datasets%2Ffaculty-students.json.gz?alt=media&token=9a1e615e-3d20-48e7-8c9e-967e21140a21";
 
 let ifaaAppInstance = null;
 let ifaaFirestoreInstance = null;
@@ -7191,7 +7192,7 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
   updateFacultyStatusUI('Đang tải dữ liệu từ IFA+ Activities...', 'info');
   let bytes = null;
 
-  // Compile candidate URLs: meta.datasetUrl first, then default tokenized Storage URL
+  // Compile candidate URLs: meta.datasetUrl first, then default and backup tokenized Storage URLs
   const candidateUrls = [];
   if (meta?.datasetUrl && typeof meta.datasetUrl === 'string') {
     candidateUrls.push(meta.datasetUrl);
@@ -7199,11 +7200,19 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
   if (DEFAULT_IFAA_DATASET_URL && !candidateUrls.includes(DEFAULT_IFAA_DATASET_URL)) {
     candidateUrls.push(DEFAULT_IFAA_DATASET_URL);
   }
+  if (typeof BACKUP_IFAA_DATASET_URL !== 'undefined' && BACKUP_IFAA_DATASET_URL && !candidateUrls.includes(BACKUP_IFAA_DATASET_URL)) {
+    candidateUrls.push(BACKUP_IFAA_DATASET_URL);
+  }
 
-  for (const url of candidateUrls) {
+  for (const rawUrl of candidateUrls) {
     if (bytes) break;
     try {
-      const res = await fetch(url, { cache: 'no-store' });
+      let fetchUrl = rawUrl;
+      if (force) {
+        const sep = fetchUrl.includes('?') ? '&' : '?';
+        fetchUrl = `${fetchUrl}${sep}v=${Date.now()}`;
+      }
+      const res = await fetch(fetchUrl, { cache: 'no-store' });
       if (res.ok) {
         const buffer = await res.arrayBuffer();
         if (buffer && buffer.byteLength > 0) {
@@ -7212,7 +7221,7 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
         }
       }
     } catch (e) {
-      console.warn('[IFAA ReadOnly] Lỗi tải từ URL:', url, e.message);
+      console.warn('[IFAA ReadOnly] Lỗi tải từ URL:', rawUrl, e.message);
     }
   }
 
@@ -7238,20 +7247,44 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
       rows.sort((a, b) => String(a.mssv).localeCompare(String(b.mssv)));
 
       if (rows.length > 0) {
+        state.lastFacultyLoadWasFallback = false;
         state.facultyStudents = rows;
         state.facultyStudentsMap = new Map(rows.map(s => [s.mssv, s]));
         state.facultyStudentsLoaded = true;
 
-        // Save to IndexedDB
-        await setFacultyCache({
+        // Save to IndexedDB with metadata
+        const metaPayload = {
           version: currentVersion || Date.now(),
           rows: rows,
           cachedAt: Date.now(),
-          count: rows.length
-        });
+          count: rows.length,
+          sourceUpdatedAt: meta?.datasetUpdatedAt || meta?.updatedAt || new Date().toISOString(),
+          generation: String(meta?.datasetVersion || currentVersion || Date.now()),
+          isLive: true
+        };
+        await setFacultyCache(metaPayload);
+        state.studentDatasetMeta = metaPayload;
+
+        // Sync metadata to tknt-tdtu if admin
+        if (state.realIsAdmin && db) {
+          setDoc(doc(db, 'facultyStudentMeta', 'current'), {
+            count: rows.length,
+            datasetVersion: currentVersion || Date.now(),
+            datasetPath: 'datasets/faculty-students.json.gz',
+            datasetUrl: candidateUrls[0] || DEFAULT_IFAA_DATASET_URL,
+            datasetEncoding: 'gzip',
+            datasetBytes: bytes.byteLength,
+            datasetUpdatedAt: meta?.datasetUpdatedAt || serverTimestamp(),
+            updatedAt: serverTimestamp()
+          }, { merge: true }).catch(() => {});
+        }
 
         populateFacultyClassFilter(rows);
         updateFacultyStatusUI(`Dữ liệu IFAA: ${rows.length.toLocaleString('vi-VN')} SV (Đã làm mới)`, 'success');
+        const metaInfoEl = document.getElementById('faculty-dataset-meta-info');
+        if (metaInfoEl) {
+          metaInfoEl.textContent = `· Nguồn: IFAA · ${rows.length.toLocaleString('vi-VN')} SV · Đồng bộ mới nhất`;
+        }
         return rows;
       }
     } catch (err) {
@@ -7261,18 +7294,21 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
 
   // 7. Fallback to cached rows if available
   if (cached && Array.isArray(cached.rows) && cached.rows.length > 0) {
+    state.lastFacultyLoadWasFallback = true;
     state.facultyStudents = cached.rows;
     state.facultyStudentsMap = new Map(cached.rows.map(s => [s.mssv, s]));
     state.facultyStudentsLoaded = true;
+    state.studentDatasetMeta = cached;
     populateFacultyClassFilter(cached.rows);
     updateFacultyStatusUI(`Dữ liệu IFAA: ${cached.rows.length.toLocaleString('vi-VN')} SV (Bản lưu offline)`, 'warning');
     if (force) {
-      showToast(`Không thể cập nhật từ IFAA. Đang dùng dữ liệu lưu gần nhất: ${cached.rows.length.toLocaleString('vi-VN')} SV.`, 'warning', 5000);
+      showToast(`⚠️ Không thể tải dữ liệu mới từ IFAA. Đang dùng bản lưu gần nhất: ${cached.rows.length.toLocaleString('vi-VN')} sinh viên.`, 'warning', 6000);
     }
     return cached.rows;
   }
 
   // 8. Error handling when both live download and cache failed
+  state.lastFacultyLoadWasFallback = false;
   state.facultyStudents = [];
   state.facultyStudentsMap = new Map();
   state.facultyStudentsLoaded = true;
@@ -7291,6 +7327,7 @@ window.syncFacultyDatasetFromIFAA = async function() {
   showToast('🔄 Đang làm mới danh mục sinh viên từ IFA+ Activities...', 'info');
   updateFacultyStatusUI('Đang làm mới từ IFAA...', 'info');
   try {
+    state.lastFacultyLoadWasFallback = false;
     const rows = await loadFacultyDatasetFromIFAA({ force: true });
     if (!rows || rows.length === 0) {
       showToast('⚠️ Không tìm thấy sinh viên nào từ IFAA.', 'warning');
@@ -7298,7 +7335,12 @@ window.syncFacultyDatasetFromIFAA = async function() {
       return;
     }
     applyFacultyFiltersAndRender(1);
-    showToast(`✓ Đã tải ${rows.length.toLocaleString('vi-VN')} sinh viên từ IFAA.`, 'success', 5000);
+    const totalCountEl = document.getElementById('faculty-students-total-count');
+    if (totalCountEl) totalCountEl.textContent = rows.length.toLocaleString('vi-VN');
+
+    if (!state.lastFacultyLoadWasFallback) {
+      showToast(`✓ Đã tải ${rows.length.toLocaleString('vi-VN')} sinh viên mới nhất từ IFAA.`, 'success', 5000);
+    }
   } catch (err) {
     showToast('Lỗi đồng bộ dữ liệu: ' + err.message, 'error', 5000);
   }
