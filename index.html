@@ -4097,6 +4097,14 @@
                       <span>ZIP</span>
                     </label>
                     <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-rar" value="rar" class="rounded text-emerald-600">
+                      <span>RAR</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-7z" value="7z" class="rounded text-emerald-600">
+                      <span>7Z</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
                       <input type="checkbox" id="sub-ext-jpg" value="jpg" class="rounded text-emerald-600">
                       <span>JPG/JPEG</span>
                     </label>
@@ -4130,41 +4138,41 @@
                     <input type="number" id="sub-max-files" value="1" min="1" max="20" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
                   </div>
                   <div>
-                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">Dung lượng tối đa (MB/file)</label>
-                    <input type="number" id="sub-max-size" value="100" min="1" max="1024" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
+                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">Dung lượng tối đa (MB)</label>
+                    <input type="number" id="sub-max-size" value="100" min="1" max="500" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
                   </div>
                   <div>
                     <label class="text-[11px] font-bold text-slate-700 block mb-0.5">Số lần nộp tối đa</label>
-                    <input type="number" id="sub-max-attempts" value="3" min="1" max="20" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
+                    <input type="number" id="sub-max-attempts" value="3" min="1" max="10" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
                   </div>
                 </div>
 
-                <!-- 3. Deadline & Late submission -->
-                <div class="border-t border-emerald-100 pt-2 space-y-2">
-                  <label class="font-bold text-slate-800 block mb-1">2. Hạn chót nộp bài (Deadline):</label>
+                <!-- 3. Deadline mode -->
+                <div class="space-y-1.5 pt-1">
+                  <label class="font-bold text-slate-800 block">2. Hạn chót nhận bài:</label>
                   <div class="flex items-center gap-4 text-xs font-semibold">
                     <label class="flex items-center gap-1.5 cursor-pointer">
                       <input type="radio" name="sub_deadline_mode" value="activity_end" checked onchange="toggleSubCustomDeadline(false)">
-                      <span>Dùng thời gian kết thúc của Mốc (endAt)</span>
+                      <span>Theo thời gian kết thúc mốc</span>
                     </label>
                     <label class="flex items-center gap-1.5 cursor-pointer">
                       <input type="radio" name="sub_deadline_mode" value="custom" onchange="toggleSubCustomDeadline(true)">
-                      <span>Hạn nộp riêng</span>
+                      <span>Hạn riêng cho nộp bài</span>
                     </label>
                   </div>
-                  <div id="sub-custom-deadline-wrap" class="hidden grid grid-cols-2 gap-2 mt-1">
+                  <div id="sub-custom-deadline-wrap" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 bg-slate-50 p-2 rounded-lg border border-slate-200">
                     <div>
-                      <label class="text-[10px] text-slate-500 font-bold block">Ngày hạn nộp (DD/MM/YYYY)</label>
-                      <input type="text" id="sub-deadline-date" placeholder="DD/MM/YYYY" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono">
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Ngày hết hạn (DD/MM/YYYY):</label>
+                      <input type="text" id="sub-deadline-date" placeholder="DD/MM/YYYY" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs">
                     </div>
                     <div>
-                      <label class="text-[10px] text-slate-500 font-bold block">Giờ hạn nộp (HH:mm - 24h)</label>
-                      <input type="text" id="sub-deadline-time" placeholder="23:59" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono">
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Giờ hết hạn (HH:mm):</label>
+                      <input type="text" id="sub-deadline-time" placeholder="23:59" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs">
                     </div>
                   </div>
-                  <label class="flex items-center gap-2 cursor-pointer mt-1">
+                  <label class="flex items-center gap-1.5 text-xs cursor-pointer text-slate-600 pt-0.5">
                     <input type="checkbox" id="sub-allow-late" class="rounded text-emerald-600">
-                    <span class="font-semibold text-xs text-slate-700">Cho phép nộp sau hạn (ghi nhận trạng thái Nộp trễ)</span>
+                    <span>Cho phép nộp trễ (ghi nhận nhãn "Nộp trễ")</span>
                   </label>
                 </div>
 
@@ -4177,7 +4185,7 @@
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Mẫu tên file (Template):</label>
-                      <input type="text" id="sub-filename-template" value="{MSSV}_{HO_TEN}_{LOAI}" oninput="updateFilenamePreviewInAdmin()" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs font-bold">
+                      <input type="text" id="sub-filename-template" value="{HOI_DONG}_{MSSV}_{HO_TEN}" oninput="updateFilenamePreviewInAdmin()" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs font-bold">
                     </div>
                     <div>
                       <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Giá trị {LOAI} mặc định:</label>
@@ -4197,7 +4205,7 @@
                   <div class="p-2 bg-white rounded-lg border border-slate-200 text-xs">
                     <span class="text-[10px] text-slate-500 font-bold block">XEM TRƯỚC TÊN FILE YÊU CẦU:</span>
                     <div id="sub-filename-preview" class="font-mono font-bold text-emerald-800 mt-0.5">
-                      12100314_NGUYEN_VAN_A_THUYET_MINH.pdf
+                      HD1_12100314_NGUYEN_VAN_A.pdf
                     </div>
                     <div class="text-[10px] text-slate-400 mt-0.5">
                       Biến: {MSSV}, {HO_TEN}, {HOI_DONG}, {STT}, {LOAI}, {ACTIVITY}, {ROUND}
@@ -4219,35 +4227,47 @@
                     </label>
                     <label class="flex items-center gap-1.5 cursor-pointer">
                       <input type="checkbox" id="sub-vis-council" checked class="rounded text-emerald-600">
-                      <span>Thành viên HĐ (Xem SV trong HĐ)</span>
+                      <span>Hội đồng (Xem SV thuộc HĐ)</span>
                     </label>
                   </div>
                 </div>
 
-                <!-- 5. Google Drive Storage Provider Config -->
+                <!-- 6. Google Drive Storage Integration -->
                 <div class="border-t border-emerald-100 pt-2 space-y-2">
                   <div class="flex items-center justify-between">
-                    <label class="font-bold text-slate-800 block">5. Thư mục Google Drive nhận bài / hồ sơ:</label>
-                    <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">Tự động tạo từ Root</span>
+                    <label class="font-bold text-slate-800 block">5. Nơi lưu trữ (Google Drive):</label>
+                    <span class="text-[10px] text-blue-600 font-bold">Resumable Chunked Upload</span>
                   </div>
+                  <input type="hidden" id="sub-storage-provider" value="google_drive">
                   <input type="hidden" id="activity-form-drive-folder-id">
-                  <div>
-                    <label class="text-[10px] font-bold text-slate-600 block mb-1">Tên thư mục con hoặc URL Drive riêng:</label>
-                    <div class="flex gap-2 mb-1.5">
-                      <input type="text" id="activity-form-drive-folder-name" placeholder="VD: SƠ KHẢO, BÁO CÁO GIỮA KỲ..." class="flex-1 p-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                      <button type="button" id="btn-connect-activity-drive" onclick="connectActivityDriveFolder()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center gap-1 cursor-pointer">
-                        <span>Tạo / Kết nối</span>
+
+                  <div class="space-y-1.5">
+                    <label class="text-[10px] font-bold text-slate-600 block">Tên thư mục Drive cho mốc này:</label>
+                    <div class="flex gap-2">
+                      <input type="text" id="activity-form-drive-folder-name" placeholder="VD: NỘP THUYẾT MINH ĐỢT 1"
+                        class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                      <button type="button" id="btn-connect-activity-drive" onclick="connectActivityDriveFolder()"
+                        class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center gap-1 cursor-pointer">
+                        <span>📁 Tạo / Kết nối Thư mục</span>
                       </button>
                     </div>
-                    <div class="flex gap-2">
-                      <input type="text" id="sub-drive-folder-url" placeholder="URL thư mục Drive riêng (nếu không tạo tự động)" class="flex-1 p-1.5 border border-slate-300 rounded-lg font-mono text-xs bg-white">
-                      <button type="button" onclick="testDriveFolderUrl('activity')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-bold text-[10px] transition-colors shrink-0">Kiểm tra URL</button>
+                    <p class="text-[10px] text-slate-400">
+                      Hệ thống tự động kiểm tra/tạo thư mục con từ <strong>Thư mục gốc của Đợt</strong>.
+                    </p>
+                  </div>
+
+                  <div id="activity-drive-folder-status" class="hidden"></div>
+
+                  <!-- Fallback URL input (collapsed by default) -->
+                  <details class="text-[10px] text-slate-500 pt-1">
+                    <summary class="cursor-pointer hover:text-slate-800 font-semibold">Tùy chọn nâng cao: Nhập URL thư mục Drive thủ công</summary>
+                    <div class="mt-1.5 space-y-1">
+                      <input type="url" id="sub-drive-folder-url" placeholder="https://drive.google.com/drive/folders/..."
+                        class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-[10px]"
+                        onchange="onActivityDriveFolderUrlChange(this.value)">
+                      <span class="text-[9px] text-slate-400 block">Dùng khi muốn chỉ định thư mục riêng biệt ngoài Thư mục gốc của Đợt.</span>
                     </div>
-                    <div id="activity-drive-folder-status" class="hidden text-[10px] font-bold mt-1"></div>
-                  </div>
-                  <div class="p-2 bg-blue-50/70 border border-blue-200 rounded-lg text-[11px] text-blue-900 leading-relaxed">
-                    ℹ️ <strong>Tự động:</strong> Nhập tên thư mục và bấm <em>Tạo / Kết nối</em> để tự tạo thư mục con trong Thư mục gốc của Đợt. Nếu để trống cả 2 ô trên, hệ thống sẽ lưu trực tiếp vào Thư mục gốc.
-                  </div>
+                  </details>
                 </div>
               </div>
             </div>
@@ -4262,6 +4282,31 @@
                   <input type="checkbox" id="activity-form-show-order" class="rounded text-tdtu-blue">
                   <span class="font-semibold text-xs text-slate-600">Cho Sinh viên xem thứ tự trình bày (showPresentationOrderToStudents)</span>
                 </label>
+
+                <!-- Phân Hội đồng & Thành viên (Item D) -->
+                <div class="border-t border-indigo-100 pt-3 space-y-2 bg-indigo-50/40 p-3 rounded-xl border border-indigo-200">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <label class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                        <span>🏛️</span> Cấu hình Hội đồng & Phân thành viên:
+                      </label>
+                      <p class="text-[10px] text-slate-500 mt-0.5">Tạo hội đồng cho mốc này, thêm Giảng viên nội bộ hoặc Khách mời ngoài qua Email.</p>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <button type="button" onclick="openAddCouncilFromMilestoneModal()" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-xs">
+                        <span>+ Thêm Hội đồng</span>
+                      </button>
+                      <button type="button" id="btn-open-advanced-councils" onclick="openAdvancedCouncilManagementFromMilestone()" class="hidden px-2.5 py-1.5 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-all shadow-2xs" title="Mở modal phân sinh viên & thứ tự trình bày">
+                        <span>⚙️ Phân Sinh viên</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Danh sách card Hội đồng trong mốc -->
+                  <div id="activity-councils-list-container" class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                    <!-- Rendered dynamically by renderActivityCouncilsInModal() -->
+                  </div>
+                </div>
 
                 <!-- SCORING CONFIGURATION (v1.9.0-beta.1) -->
                 <div class="border-t border-slate-200 pt-2.5 space-y-2">
@@ -4781,6 +4826,129 @@
       <div class="flex justify-end gap-2 p-3 bg-slate-50 border-t border-slate-100 text-xs font-bold">
         <button type="button" onclick="closeLetterOptionModal()" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg">Hủy</button>
         <button type="button" onclick="saveLetterOption()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs">Lưu mức điểm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================
+       MODAL: QUICK COUNCIL IN MILESTONE (Item D)
+       ============================================================================ -->
+  <div id="modal-milestone-quick-council" class="hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-indigo-50/50">
+        <h4 id="modal-milestone-quick-council-title" class="font-bold text-slate-900 text-sm">Thêm Hội đồng cho Mốc</h4>
+        <button type="button" onclick="closeMilestoneQuickCouncilModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
+      </div>
+      <div class="p-4 space-y-3 text-xs">
+        <input type="hidden" id="quick-council-id">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Tên Hội đồng <span class="text-rose-500">*</span></label>
+          <input type="text" id="quick-council-name" placeholder="Ví dụ: Hội đồng 1, Hội đồng Đồ án..." class="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Phòng / Địa điểm</label>
+          <input type="text" id="quick-council-room" placeholder="Ví dụ: Phòng D501A, Online MS Teams..." class="w-full p-2 border border-slate-300 rounded-lg text-xs">
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Ngày đánh giá</label>
+            <input type="text" id="quick-council-date" placeholder="DD/MM/YYYY" class="w-full p-2 border border-slate-300 rounded-lg font-mono text-xs">
+          </div>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Khung giờ</label>
+            <input type="text" id="quick-council-time" placeholder="08:00 - 11:30" class="w-full p-2 border border-slate-300 rounded-lg font-mono text-xs">
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 p-3 bg-slate-50 border-t border-slate-100 text-xs font-bold">
+        <button type="button" onclick="closeMilestoneQuickCouncilModal()" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg">Hủy</button>
+        <button type="button" onclick="saveMilestoneQuickCouncil()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs">Lưu Hội đồng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================
+       MODAL: ADD INTERNAL MEMBER TO COUNCIL (Item D)
+       ============================================================================ -->
+  <div id="modal-add-council-internal-member" class="hidden fixed inset-0 z-[75] modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm">Thêm Thành viên Nội bộ</h4>
+          <p id="internal-member-council-label" class="text-[11px] text-slate-500 mt-0.5">Hội đồng: ...</p>
+        </div>
+        <button type="button" onclick="closeAddCouncilInternalMemberModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
+      </div>
+      <div class="p-4 space-y-3 text-xs">
+        <input type="hidden" id="internal-member-council-id">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Chọn Giảng viên / Cán bộ <span class="text-rose-500">*</span></label>
+          <select id="internal-member-select" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="">-- Chọn giảng viên --</option>
+          </select>
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Vai trò trong Hội đồng <span class="text-rose-500">*</span></label>
+          <select id="internal-member-role" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="chair">Chủ tịch Hội đồng</option>
+            <option value="member" selected>Ủy viên Hội đồng</option>
+            <option value="secretary">Thư ký Hội đồng</option>
+            <option value="reviewer">Ủy viên Phản biện</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 p-3 bg-slate-50 border-t border-slate-100 text-xs font-bold">
+        <button type="button" onclick="closeAddCouncilInternalMemberModal()" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg">Hủy</button>
+        <button type="button" onclick="saveCouncilInternalMember()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs">Thêm thành viên</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================
+       MODAL: ADD GUEST MEMBER TO COUNCIL (Item D)
+       ============================================================================ -->
+  <div id="modal-add-council-guest-member" class="hidden fixed inset-0 z-[75] modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-amber-50/50">
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+            <span>🌐</span> Thêm Khách mời / Doanh nghiệp ngoài trường
+          </h4>
+          <p id="guest-member-council-label" class="text-[11px] text-slate-500 mt-0.5">Hội đồng: ...</p>
+        </div>
+        <button type="button" onclick="closeAddCouncilGuestMemberModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
+      </div>
+      <div class="p-4 space-y-3 text-xs">
+        <input type="hidden" id="guest-member-council-id">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Họ và tên khách mời <span class="text-rose-500">*</span></label>
+          <input type="text" id="guest-member-name" required placeholder="Ví dụ: TS. Lê Văn C, Ông Nguyễn Văn D..." class="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">
+            Email khách mời <span class="text-rose-500">*</span>
+            <span class="text-[10px] text-amber-600 font-normal ml-1">(Bắt buộc để định danh và phân quyền)</span>
+          </label>
+          <input type="email" id="guest-member-email" required placeholder="name@company.com" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono lowercase">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Đơn vị / Doanh nghiệp công tác</label>
+          <input type="text" id="guest-member-org" placeholder="Ví dụ: Công ty Cổ phần ABC, Viện Nghiên cứu XYZ..." class="w-full p-2 border border-slate-300 rounded-lg text-xs">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Vai trò trong Hội đồng <span class="text-rose-500">*</span></label>
+          <select id="guest-member-role" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="guest_business" selected>Ủy viên Khách mời / Doanh nghiệp</option>
+            <option value="member">Ủy viên Hội đồng</option>
+            <option value="reviewer">Ủy viên Phản biện</option>
+            <option value="chair">Chủ tịch Hội đồng</option>
+            <option value="secretary">Thư ký Hội đồng</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 p-3 bg-slate-50 border-t border-slate-100 text-xs font-bold">
+        <button type="button" onclick="closeAddCouncilGuestMemberModal()" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg">Hủy</button>
+        <button type="button" onclick="saveCouncilGuestMember()" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg shadow-xs">Thêm khách mời</button>
       </div>
     </div>
   </div>

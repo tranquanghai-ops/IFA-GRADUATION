@@ -9323,15 +9323,19 @@ export function generateUniqueSlug(title, existingActivities = []) {
 }
 
 export const DEFAULT_LETTER_GRADE_SCALE = [
-  { id: 'opt_app', key: 'A++', code: 'A++', label: 'Xuất sắc', numericValue: 10.0, description: 'Xuất sắc' },
-  { id: 'opt_ap',  key: 'A+',  code: 'A+',  label: 'Rất tốt',  numericValue: 9.5,  description: 'Rất tốt' },
-  { id: 'opt_a',   key: 'A',   code: 'A',   label: 'Tốt',      numericValue: 9.0,  description: 'Tốt' },
-  { id: 'opt_am',  key: 'A-',  code: 'A-',  label: 'Khá tốt',  numericValue: 8.5,  description: 'Khá tốt' },
-  { id: 'opt_bp',  key: 'B+',  code: 'B+',  label: 'Khá',      numericValue: 8.0,  description: 'Khá' },
-  { id: 'opt_b',   key: 'B',   code: 'B',   label: 'Khá',      numericValue: 7.5,  description: 'Khá' },
-  { id: 'opt_bm',  key: 'B-',  code: 'B-',  label: 'Trung bình khá', numericValue: 7.0, description: 'Trung bình khá' },
-  { id: 'opt_c',   key: 'C',   code: 'C',   label: 'Đạt',      numericValue: 6.0,  description: 'Đạt' },
-  { id: 'opt_d',   key: 'D',   code: 'D',   label: 'Chưa đạt', numericValue: 5.0,  description: 'Chưa đạt' },
+  { id: 'opt_app', key: 'A++', code: 'A++', label: 'Xuất sắc',       numericValue: 10.0, description: 'Xuất sắc' },
+  { id: 'opt_ap',  key: 'A+',  code: 'A+',  label: 'Rất tốt',        numericValue: 9.5,  description: 'Rất tốt' },
+  { id: 'opt_a',   key: 'A',   code: 'A',   label: 'Tốt',            numericValue: 9.0,  description: 'Tốt' },
+  { id: 'opt_am',  key: 'A-',  code: 'A-',  label: 'Khá tốt',        numericValue: 8.5,  description: 'Khá tốt' },
+  { id: 'opt_bp',  key: 'B+',  code: 'B+',  label: 'Khá',            numericValue: 8.0,  description: 'Khá' },
+  { id: 'opt_b',   key: 'B',   code: 'B',   label: 'Khá',            numericValue: 7.5,  description: 'Khá' },
+  { id: 'opt_bm',  key: 'B-',  code: 'B-',  label: 'Trung bình khá', numericValue: 7.0,  description: 'Trung bình khá' },
+  { id: 'opt_cp',  key: 'C+',  code: 'C+',  label: 'Trung bình',     numericValue: 6.5,  description: 'Trung bình' },
+  { id: 'opt_c',   key: 'C',   code: 'C',   label: 'Đạt',            numericValue: 6.0,  description: 'Đạt' },
+  { id: 'opt_cm',  key: 'C-',  code: 'C-',  label: 'Trung bình yếu', numericValue: 5.5,  description: 'Trung bình yếu' },
+  { id: 'opt_dp',  key: 'D+',  code: 'D+',  label: 'Yếu',            numericValue: 5.0,  description: 'Yếu' },
+  { id: 'opt_d',   key: 'D',   code: 'D',   label: 'Chưa đạt',       numericValue: 4.5,  description: 'Chưa đạt' },
+  { id: 'opt_dm',  key: 'D-',  code: 'D-',  label: 'Kém',            numericValue: 4.0,  description: 'Kém' }
 ];
 
 export function normalizeActivity(a, roundId, idx = 0) {
@@ -9655,9 +9659,13 @@ window.openCreateActivityModal = function() {
     { id: 'crit_tech', key: 'technique', label: 'Kỹ thuật thể hiện', maxScore: 2, order: 3, description: 'Kỹ thuật thể hiện và hoàn thiện' },
     { id: 'crit_pres', key: 'presentation', label: 'Trình bày', maxScore: 1, order: 4, description: 'Báo cáo và trả lời câu hỏi' }
   ];
+  state._currentActivityCouncils = [];
   switchActivityScoringMode('numeric');
   renderActivityLetterOptions();
   renderActivityRubricList();
+  if (typeof renderActivityCouncilsInModal === 'function') renderActivityCouncilsInModal();
+  const advBtn = document.getElementById('btn-open-advanced-councils');
+  if (advBtn) advBtn.classList.add('hidden');
 
   document.getElementById('modal-activity-title').textContent = 'Thêm Mốc Kế hoạch Đợt TN';
   document.getElementById('modal-activity').classList.remove('hidden');
@@ -9737,8 +9745,14 @@ window.editActivityModal = function(actId) {
         { id: 'crit_tech', key: 'technique', label: 'Kỹ thuật thể hiện', maxScore: 2, order: 3, description: 'Kỹ thuật thể hiện và hoàn thiện' },
         { id: 'crit_pres', key: 'presentation', label: 'Trình bày', maxScore: 1, order: 4, description: 'Báo cáo và trả lời câu hỏi' }
       ];
+  state._currentActivityCouncils = Array.isArray(act.councils)
+    ? JSON.parse(JSON.stringify(act.councils))
+    : [];
   renderActivityLetterOptions();
   renderActivityRubricList();
+  if (typeof renderActivityCouncilsInModal === 'function') renderActivityCouncilsInModal();
+  const advBtn = document.getElementById('btn-open-advanced-councils');
+  if (advBtn) advBtn.classList.add('hidden');
 
   document.getElementById('modal-activity-title').textContent = 'Chỉnh sửa Mốc Kế hoạch';
   document.getElementById('modal-activity').classList.remove('hidden');
@@ -9784,7 +9798,50 @@ window.copyActivityModal = function(actId) {
   document.getElementById('activity-form-visibility').checked = act.visibility !== false;
   document.getElementById('activity-form-show-expired').checked = act.showAfterExpired !== false;
   if (document.getElementById('activity-form-is-tentative')) document.getElementById('activity-form-is-tentative').checked = Boolean(act.isTentative);
-  document.getElementById('activity-form-submission').checked = Boolean(act.submissionEnabled);
+  const subEnabled = Boolean(act.submissionEnabled);
+  document.getElementById('activity-form-submission').checked = subEnabled;
+  if (typeof toggleActivitySubmissionConfig === 'function') toggleActivitySubmissionConfig(subEnabled);
+  if (typeof populateActivitySubmissionForm === 'function') populateActivitySubmissionForm(act.submissionConfig);
+
+  const councilEnabled = Boolean(act.councilEnabled);
+  if (document.getElementById('activity-form-council-enabled')) {
+    document.getElementById('activity-form-council-enabled').checked = councilEnabled;
+    toggleActivityCouncilFields(councilEnabled);
+  }
+  if (document.getElementById('activity-form-show-order')) {
+    document.getElementById('activity-form-show-order').checked = Boolean(act.showPresentationOrderToStudents);
+  }
+  const scoringEnabled = Boolean(act.scoringConfig?.enabled);
+  if (document.getElementById('activity-form-scoring-enabled')) {
+    document.getElementById('activity-form-scoring-enabled').checked = scoringEnabled;
+    toggleActivityScoringConfig(scoringEnabled);
+  }
+  const sMode = act.scoringConfig?.mode || 'numeric';
+  switchActivityScoringMode(sMode);
+  if (act.scoringConfig?.numericConfig) {
+    if (document.getElementById('activity-scoring-min')) document.getElementById('activity-scoring-min').value = act.scoringConfig.numericConfig.min ?? 0;
+    if (document.getElementById('activity-scoring-max')) document.getElementById('activity-scoring-max').value = act.scoringConfig.numericConfig.max ?? 10;
+    if (document.getElementById('activity-scoring-step')) document.getElementById('activity-scoring-step').value = act.scoringConfig.numericConfig.step ?? 0.1;
+  }
+  state._currentActivityLetterOptions = Array.isArray(act.scoringConfig?.letterOptions) && act.scoringConfig.letterOptions.length > 0
+    ? JSON.parse(JSON.stringify(act.scoringConfig.letterOptions))
+    : JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE));
+  state._currentActivityRubric = Array.isArray(act.scoringConfig?.rubric) && act.scoringConfig.rubric.length > 0
+    ? JSON.parse(JSON.stringify(act.scoringConfig.rubric))
+    : [
+        { id: 'crit_idea', key: 'idea', label: 'Ý tưởng', maxScore: 4, order: 1, description: 'Ý tưởng và tính sáng tạo' },
+        { id: 'crit_prac', key: 'practicality', label: 'Tính ứng dụng', maxScore: 3, order: 2, description: 'Tính ứng dụng và khả thi' },
+        { id: 'crit_tech', key: 'technique', label: 'Kỹ thuật thể hiện', maxScore: 2, order: 3, description: 'Kỹ thuật thể hiện và hoàn thiện' },
+        { id: 'crit_pres', key: 'presentation', label: 'Trình bày', maxScore: 1, order: 4, description: 'Báo cáo và trả lời câu hỏi' }
+      ];
+  state._currentActivityCouncils = Array.isArray(act.councils)
+    ? JSON.parse(JSON.stringify(act.councils))
+    : [];
+  renderActivityLetterOptions();
+  renderActivityRubricList();
+  if (typeof renderActivityCouncilsInModal === 'function') renderActivityCouncilsInModal();
+  const advBtn = document.getElementById('btn-open-advanced-councils');
+  if (advBtn) advBtn.classList.add('hidden');
 
   document.getElementById('modal-activity-title').textContent = 'Sao chép Mốc Kế hoạch (Bản mới)';
   document.getElementById('modal-activity').classList.remove('hidden');
@@ -10259,7 +10316,7 @@ window.saveActivity = async function(e) {
           { key: 'secretary', label: 'Thư ký', name: 'Thư ký Hội đồng', type: 'mandatory' }
         ]
       },
-      councils: existingAct?.councils || [],
+      councils: Array.isArray(state._currentActivityCouncils) ? state._currentActivityCouncils : (existingAct?.councils || []),
       councilStudentAssignments: existingAct?.councilStudentAssignments || [],
       slug,
       updatedAt: new Date().toISOString()
@@ -10951,6 +11008,327 @@ window.toggleActivityCouncilFields = function(checked) {
   }
 };
 
+// ============================================================================
+// MILESTONE COUNCIL & GUEST MEMBER ASSIGNMENT (Item D)
+// ============================================================================
+
+window.renderActivityCouncilsInModal = function() {
+  const container = document.getElementById('activity-councils-list-container');
+  if (!container) return;
+
+  const councils = state._currentActivityCouncils || [];
+  if (councils.length === 0) {
+    container.innerHTML = `
+      <div class="p-4 text-center bg-white/90 rounded-xl border border-dashed border-indigo-200">
+        <span class="text-2xl block mb-1">🏛️</span>
+        <p class="font-bold text-slate-700 text-xs">Chưa có Hội đồng nào trong Mốc này</p>
+        <p class="text-[10px] text-slate-400 mt-0.5">Bấm "+ Thêm Hội đồng" ở trên để tạo hội đồng và phân công thành viên.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = councils.map((c, cIdx) => {
+    const members = Object.entries(c.membersBySlot || {}).filter(([k, m]) => Boolean(m && (m.memberName || m.name)));
+
+    const membersHtml = members.length === 0
+      ? '<span class="text-[11px] text-slate-400 italic">Chưa có thành viên nào được gán.</span>'
+      : members.map(([slotKey, m]) => {
+          const isGuest = (m.type === 'guest' || m.isExternalGuest);
+          const badgeClass = isGuest ? 'bg-amber-100 text-amber-900 border-amber-200' : 'bg-indigo-100 text-indigo-900 border-indigo-200';
+          const icon = isGuest ? '🌐' : '🏫';
+          const typeLabel = isGuest ? 'Khách mời' : 'Nội bộ';
+          const subInfo = isGuest ? (m.organization ? ` (${escapeHtml(m.organization)})` : '') : (m.department ? ` (${escapeHtml(m.department)})` : '');
+          const roleLabel = m.role || m.slotKey || 'Thành viên';
+          return `
+            <div class="flex items-center justify-between gap-2 p-1.5 bg-white border border-slate-200 rounded-lg text-xs shadow-2xs">
+              <div class="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+                <span class="px-1.5 py-0.5 text-[9px] font-bold rounded-md border ${badgeClass} shrink-0">${icon} ${typeLabel}</span>
+                <span class="font-bold text-slate-800">${escapeHtml(m.memberName || m.name || '')}</span>
+                <span class="text-[10px] text-slate-400 shrink-0">${subInfo}</span>
+                <span class="text-[10px] text-indigo-600 font-semibold shrink-0">• ${escapeHtml(roleLabel)}</span>
+                ${m.memberEmail ? `<span class="text-[10px] font-mono text-slate-500 shrink-0">&lt;${escapeHtml(m.memberEmail)}&gt;</span>` : ''}
+              </div>
+              <button type="button" onclick="removeCouncilMemberFromMilestone('${c.id}', '${slotKey}')" class="text-rose-500 hover:text-rose-700 font-bold text-xs p-1 shrink-0" title="Xóa thành viên khỏi Hội đồng">✕</button>
+            </div>
+          `;
+        }).join('');
+
+    return `
+      <div class="bg-white p-3 rounded-xl border border-indigo-100 shadow-xs space-y-2.5">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-mono font-bold text-indigo-700 text-xs">#${cIdx + 1}</span>
+              <h5 class="font-black text-xs text-slate-900">${escapeHtml(c.name || 'Hội đồng')}</h5>
+              ${c.room ? `<span class="text-[10px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">📍 ${escapeHtml(c.room)}</span>` : ''}
+            </div>
+            ${(c.date || c.startTime) ? `<p class="text-[10px] text-slate-400 font-mono mt-0.5">📅 ${c.date || '--'} • 🕒 ${c.startTime || '--'}${c.endTime ? ' → ' + c.endTime : ''}</p>` : ''}
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button type="button" onclick="deleteCouncilFromMilestone('${c.id}')" class="px-2 py-0.5 text-rose-600 hover:bg-rose-50 rounded text-[11px] font-bold transition-colors">
+              Xóa HĐ
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-1 pl-1">
+          <span class="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">Thành viên (${members.length}):</span>
+          <div class="space-y-1">
+            ${membersHtml}
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between flex-wrap gap-1.5">
+          <div class="flex items-center gap-1.5">
+            <button type="button" onclick="openAddCouncilInternalMemberModal('${c.id}')" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold border border-indigo-200 transition-colors flex items-center gap-1">
+              <span>+ TV Nội bộ</span>
+            </button>
+            <button type="button" onclick="openAddCouncilGuestMemberModal('${c.id}')" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-[11px] font-bold border border-amber-200 transition-colors flex items-center gap-1">
+              <span>+ Khách mời (Email)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+};
+
+window.openAddCouncilFromMilestoneModal = function() {
+  const currentCount = (state._currentActivityCouncils || []).length;
+  document.getElementById('quick-council-id').value = '';
+  document.getElementById('quick-council-name').value = `Hội đồng ${currentCount + 1}`;
+  document.getElementById('quick-council-room').value = '';
+  document.getElementById('quick-council-date').value = '';
+  document.getElementById('quick-council-time').value = '';
+  document.getElementById('modal-milestone-quick-council-title').textContent = 'Thêm Hội đồng mới cho Mốc';
+  document.getElementById('modal-milestone-quick-council')?.classList.remove('hidden');
+};
+
+window.closeMilestoneQuickCouncilModal = function() {
+  document.getElementById('modal-milestone-quick-council')?.classList.add('hidden');
+};
+
+window.saveMilestoneQuickCouncil = function() {
+  const name = document.getElementById('quick-council-name')?.value?.trim();
+  if (!name) {
+    showToast('Vui lòng nhập tên Hội đồng!', 'warning');
+    return;
+  }
+  const room = document.getElementById('quick-council-room')?.value?.trim() || '';
+  const date = document.getElementById('quick-council-date')?.value?.trim() || '';
+  const time = document.getElementById('quick-council-time')?.value?.trim() || '';
+
+  state._currentActivityCouncils = state._currentActivityCouncils || [];
+  const councilId = 'council_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5);
+  const newCouncil = {
+    id: councilId,
+    slug: 'c-' + slugify(name) + '-' + Date.now().toString(36).substr(-4),
+    name,
+    room,
+    date,
+    startTime: time,
+    status: 'preparing',
+    membersBySlot: {},
+    auditLogs: [],
+    guestInclusion: {},
+    finalDefenseScores: {},
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  state._currentActivityCouncils.push(newCouncil);
+  closeMilestoneQuickCouncilModal();
+  renderActivityCouncilsInModal();
+  showToast(`Đã thêm Hội đồng "${name}"!`, 'success');
+};
+
+window.deleteCouncilFromMilestone = async function(councilId) {
+  const council = (state._currentActivityCouncils || []).find(c => c.id === councilId);
+  if (!council) return;
+  const ok = confirm(`Bạn có chắc chắn muốn xóa "${council.name}" khỏi mốc này?`);
+  if (!ok) return;
+
+  state._currentActivityCouncils = (state._currentActivityCouncils || []).filter(c => c.id !== councilId);
+  renderActivityCouncilsInModal();
+  showToast(`Đã xóa Hội đồng "${council.name}".`, 'info');
+};
+
+window.openAddCouncilInternalMemberModal = function(councilId) {
+  const council = (state._currentActivityCouncils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  document.getElementById('internal-member-council-id').value = councilId;
+  const labelEl = document.getElementById('internal-member-council-label');
+  if (labelEl) labelEl.textContent = `Hội đồng: ${council.name}`;
+
+  const selectEl = document.getElementById('internal-member-select');
+  if (selectEl) {
+    const supervisors = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
+      ? state.supervisorsMaster
+      : (state.roundSupervisors || []);
+    selectEl.innerHTML = '<option value="">-- Chọn giảng viên --</option>' + supervisors.map(s => {
+      const emailText = s.email ? ` • ${s.email}` : '';
+      return `<option value="${s.id}">${escapeHtml(s.name)} (${s.department || 'Khoa MTCN'}${emailText})</option>`;
+    }).join('');
+  }
+
+  document.getElementById('modal-add-council-internal-member')?.classList.remove('hidden');
+};
+
+window.closeAddCouncilInternalMemberModal = function() {
+  document.getElementById('modal-add-council-internal-member')?.classList.add('hidden');
+};
+
+window.saveCouncilInternalMember = function() {
+  const councilId = document.getElementById('internal-member-council-id')?.value;
+  const council = (state._currentActivityCouncils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  const supId = document.getElementById('internal-member-select')?.value;
+  if (!supId) {
+    showToast('Vui lòng chọn giảng viên!', 'warning');
+    return;
+  }
+
+  const supervisors = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
+    ? state.supervisorsMaster
+    : (state.roundSupervisors || []);
+  const supObj = supervisors.find(s => s.id === supId);
+  const supEmail = (supObj?.email || '').trim().toLowerCase();
+
+  // Validate duplicate email in council
+  const membersBySlot = council.membersBySlot || {};
+  for (const m of Object.values(membersBySlot)) {
+    if (m && m.memberEmail && supEmail && m.memberEmail.toLowerCase() === supEmail) {
+      showToast(`Email "${supEmail}" đã tồn tại trong Hội đồng "${council.name}"!`, 'warning');
+      return;
+    }
+  }
+
+  const roleSelect = document.getElementById('internal-member-role');
+  const roleKey = roleSelect?.value || 'member';
+  const roleName = roleSelect?.options[roleSelect.selectedIndex]?.text || 'Ủy viên Hội đồng';
+
+  // Find slotKey or generate new slot key
+  let targetSlotKey = roleKey;
+  if (membersBySlot[targetSlotKey] && (membersBySlot[targetSlotKey].memberName || membersBySlot[targetSlotKey].name)) {
+    targetSlotKey = `${roleKey}_${Date.now().toString(36)}`;
+  }
+
+  membersBySlot[targetSlotKey] = {
+    type: 'internal',
+    isExternalGuest: false,
+    memberId: supId,
+    memberName: supObj?.name || 'Giảng viên',
+    memberEmail: supEmail,
+    department: supObj?.department || '',
+    role: roleName,
+    slotKey: targetSlotKey
+  };
+
+  council.membersBySlot = membersBySlot;
+  closeAddCouncilInternalMemberModal();
+  renderActivityCouncilsInModal();
+  showToast(`Đã thêm "${supObj?.name}" vào "${council.name}"!`, 'success');
+};
+
+window.openAddCouncilGuestMemberModal = function(councilId) {
+  const council = (state._currentActivityCouncils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  document.getElementById('guest-member-council-id').value = councilId;
+  const labelEl = document.getElementById('guest-member-council-label');
+  if (labelEl) labelEl.textContent = `Hội đồng: ${council.name}`;
+
+  document.getElementById('guest-member-name').value = '';
+  document.getElementById('guest-member-email').value = '';
+  document.getElementById('guest-member-org').value = '';
+  document.getElementById('modal-add-council-guest-member')?.classList.remove('hidden');
+};
+
+window.closeAddCouncilGuestMemberModal = function() {
+  document.getElementById('modal-add-council-guest-member')?.classList.add('hidden');
+};
+
+window.saveCouncilGuestMember = function() {
+  const councilId = document.getElementById('guest-member-council-id')?.value;
+  const council = (state._currentActivityCouncils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  const gName = document.getElementById('guest-member-name')?.value?.trim();
+  if (!gName) {
+    showToast('Vui lòng nhập họ và tên khách mời!', 'warning');
+    return;
+  }
+
+  const gEmail = document.getElementById('guest-member-email')?.value?.trim().toLowerCase();
+  if (!gEmail) {
+    showToast('Email khách mời là bắt buộc để định danh!', 'warning');
+    return;
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(gEmail)) {
+    showToast('Email khách mời không đúng định dạng!', 'warning');
+    return;
+  }
+
+  // Validate duplicate email in this council
+  const membersBySlot = council.membersBySlot || {};
+  for (const m of Object.values(membersBySlot)) {
+    if (m && m.memberEmail && m.memberEmail.toLowerCase() === gEmail) {
+      showToast(`Email "${gEmail}" đã tồn tại trong Hội đồng "${council.name}"!`, 'warning');
+      return;
+    }
+  }
+
+  const gOrg = document.getElementById('guest-member-org')?.value?.trim() || '';
+  const roleSelect = document.getElementById('guest-member-role');
+  const roleKey = roleSelect?.value || 'guest_business';
+  const roleName = roleSelect?.options[roleSelect.selectedIndex]?.text || 'Ủy viên Khách mời / Doanh nghiệp';
+
+  const newSlotKey = `guest_${Date.now().toString(36)}`;
+  membersBySlot[newSlotKey] = {
+    type: 'guest',
+    isExternalGuest: true,
+    memberId: 'ext_' + gEmail.replace(/[^a-zA-Z0-9]/g, '_'),
+    memberName: gName,
+    memberEmail: gEmail,
+    organization: gOrg,
+    role: roleName,
+    slotKey: newSlotKey
+  };
+
+  council.membersBySlot = membersBySlot;
+  closeAddCouncilGuestMemberModal();
+  renderActivityCouncilsInModal();
+  showToast(`Đã thêm khách mời "${gName}" (${gEmail}) vào "${council.name}"!`, 'success');
+};
+
+window.removeCouncilMemberFromMilestone = function(councilId, slotKey) {
+  const council = (state._currentActivityCouncils || []).find(c => c.id === councilId);
+  if (!council || !council.membersBySlot) return;
+
+  const mem = council.membersBySlot[slotKey];
+  const name = mem?.memberName || mem?.name || slotKey;
+  if (!confirm(`Bạn có chắc muốn xóa thành viên "${name}" khỏi "${council.name}"?`)) return;
+
+  delete council.membersBySlot[slotKey];
+  renderActivityCouncilsInModal();
+  showToast(`Đã xóa thành viên khỏi "${council.name}".`, 'info');
+};
+
+window.openAdvancedCouncilManagementFromMilestone = function() {
+  const actId = document.getElementById('activity-form-id')?.value?.trim();
+  const roundId = document.getElementById('activity-form-round-id')?.value || state.selectedRoundId;
+  if (!actId) {
+    showToast('Vui lòng lưu mốc kế hoạch trước khi mở phân sinh viên nâng cao!', 'info');
+    return;
+  }
+  openActivityCouncilManagement(roundId, actId);
+};
+
 state.activeCouncilManagement = {
   roundId: null,
   activityId: null,
@@ -11632,9 +12010,12 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
         </div>
 
         <!-- Guest manual inputs -->
-        <div id="slot-guest-wrap-${s.key}" class="${isGuest ? '' : 'hidden'} grid grid-cols-2 gap-2">
-          <input type="text" id="slot-guest-name-${s.key}" value="${isGuest ? memberName : ''}" placeholder="Họ và tên khách mời..." class="p-2 border border-slate-300 rounded-lg text-xs">
-          <input type="text" id="slot-guest-org-${s.key}" value="${assigned.organization || ''}" placeholder="Đơn vị / Doanh nghiệp..." class="p-2 border border-slate-300 rounded-lg text-xs">
+        <div id="slot-guest-wrap-${s.key}" class="${isGuest ? '' : 'hidden'} space-y-1.5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input type="text" id="slot-guest-name-${s.key}" value="${isGuest ? memberName : ''}" placeholder="Họ và tên khách mời (*)" class="p-2 border border-slate-300 rounded-lg text-xs font-semibold">
+            <input type="email" id="slot-guest-email-${s.key}" value="${isGuest ? (assigned.memberEmail || '') : ''}" placeholder="Email khách mời (*) bắt buộc" class="p-2 border border-slate-300 rounded-lg text-xs font-mono lowercase">
+          </div>
+          <input type="text" id="slot-guest-org-${s.key}" value="${assigned.organization || ''}" placeholder="Đơn vị / Doanh nghiệp công tác (tùy chọn)..." class="w-full p-2 border border-slate-300 rounded-lg text-xs">
         </div>
       </div>
     `;
@@ -11704,23 +12085,50 @@ window.saveCouncil = async function(e) {
     }
   }
 
-  // Extract membersBySlot
+  // Extract membersBySlot with strict email validation & duplicate checking
   const slots = act.councilStructure?.slots || [];
   const membersBySlot = {};
   const supervisors = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
     ? state.supervisorsMaster
     : (state.roundSupervisors || []);
 
+  const seenEmails = new Set();
+  let emailError = null;
+
   slots.forEach(s => {
+    if (emailError) return;
     const isGuest = document.getElementById(`chk-guest-${s.key}`)?.checked === true;
     if (isGuest) {
       const gName = document.getElementById(`slot-guest-name-${s.key}`)?.value?.trim();
+      const gEmail = document.getElementById(`slot-guest-email-${s.key}`)?.value?.trim().toLowerCase();
       const gOrg = document.getElementById(`slot-guest-org-${s.key}`)?.value?.trim();
-      if (gName) {
+      if (gName || gEmail) {
+        if (!gName) {
+          emailError = `Vui lòng nhập họ và tên khách mời cho vị trí "${s.name || s.label}"`;
+          return;
+        }
+        if (!gEmail) {
+          emailError = `Email là bắt buộc đối với khách mời "${gName}" (${s.name || s.label})`;
+          return;
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(gEmail)) {
+          emailError = `Email "${gEmail}" của khách mời "${gName}" không đúng định dạng!`;
+          return;
+        }
+        if (seenEmails.has(gEmail)) {
+          emailError = `Email "${gEmail}" bị trùng lặp trong cùng Hội đồng!`;
+          return;
+        }
+        seenEmails.add(gEmail);
         membersBySlot[s.key] = {
           type: 'guest',
+          isExternalGuest: true,
+          memberId: 'ext_' + gEmail.replace(/[^a-zA-Z0-9]/g, '_'),
           memberName: gName,
+          memberEmail: gEmail,
           organization: gOrg || '',
+          role: s.label || s.name || 'Khách mời',
           slotKey: s.key
         };
       }
@@ -11728,17 +12136,32 @@ window.saveCouncil = async function(e) {
       const supId = document.getElementById(`slot-sup-${s.key}`)?.value;
       if (supId) {
         const supObj = supervisors.find(x => x.id === supId);
+        const sEmail = (supObj?.email || '').trim().toLowerCase();
+        if (sEmail) {
+          if (seenEmails.has(sEmail)) {
+            emailError = `Email "${sEmail}" của giảng viên "${supObj?.name}" bị trùng lặp trong cùng Hội đồng!`;
+            return;
+          }
+          seenEmails.add(sEmail);
+        }
         membersBySlot[s.key] = {
-          type: 'supervisor',
+          type: 'internal',
+          isExternalGuest: false,
           memberId: supId,
           memberName: supObj?.name || 'Giảng viên',
-          memberEmail: supObj?.email || '',
+          memberEmail: sEmail,
           department: supObj?.department || '',
+          role: s.label || s.name || 'Ủy viên',
           slotKey: s.key
         };
       }
     }
   });
+
+  if (emailError) {
+    showToast(emailError, 'warning');
+    return;
+  }
 
   const slug = id ? ((act.councils || []).find(c => c.id === id)?.slug || slugify(name)) : ('c-' + slugify(name) + '-' + Date.now().toString(36).substr(-4));
   const councilId = id || ('council_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
@@ -12192,12 +12615,12 @@ window.renderActivityLetterOptions = function() {
 };
 
 window.resetDefaultLetterOptions = function() {
-  if (!confirm('Thao tác sẽ thay thế danh sách mức điểm chữ hiện tại bằng bộ mặc định A++ → D. Bạn có muốn tiếp tục?')) {
+  if (!confirm('Thao tác sẽ thay thế danh sách mức điểm chữ hiện tại bằng bộ mặc định đầy đủ 13 mức (A++ → D-). Bạn có muốn tiếp tục?')) {
     return;
   }
   state._currentActivityLetterOptions = JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE));
   renderActivityLetterOptions();
-  showToast('Đã khôi phục bộ 9 mức điểm chữ mặc định (A++ → D)!', 'success');
+  showToast('Đã khôi phục bộ 13 mức điểm chữ mặc định (A++ → D-)!', 'success');
 };
 
 window.openAddLetterOptionModal = function() {
@@ -16737,10 +17160,11 @@ window.formatPersonName = function(str) {
 };
 
 window.generateExpectedFilename = function({ template, student, activity, round, fileTypeCategory, extension, mode }) {
-  const tpl = template || '{MSSV}_{HO_TEN}_{LOAI}';
+  const tpl = template || '{HOI_DONG}_{MSSV}_{HO_TEN}';
   const mssv = (student?.studentId || student?.mssv || '12100314').trim().toUpperCase();
   const hoTen = formatPersonName(student?.studentName || student?.name || 'Nguyen Van A');
-  const hoiDong = (student?.councilCode || student?.councilId || 'HD1').trim().toUpperCase();
+  const rawHoiDong = student?.councilCode || student?.councilId || student?.assignedCouncilName || 'HD1';
+  const hoiDong = normalizeVietnameseNoDiacritics(rawHoiDong).replace(/\s+/g, '').toUpperCase() || 'HD1';
   const stt = String(student?.presentationOrder || student?.stt || 1).padStart(2, '0');
   const loai = normalizeVietnameseNoDiacritics(fileTypeCategory || activity?.submissionConfig?.fileTypeCategory || 'THUYET_MINH');
   const actName = normalizeVietnameseNoDiacritics(activity?.title || 'ACTIVITY');
@@ -16771,9 +17195,9 @@ window.validateFilename = function({ filename, template, student, activity, roun
   if (!filename) {
     return { valid: false, error: 'Chưa có tệp nào được chọn' };
   }
-  const lastDot = filename.lastIndexOf('.');
-  const ext = lastDot >= 0 ? filename.substring(lastDot + 1).toLowerCase() : '';
-  const actualBase = lastDot >= 0 ? filename.substring(0, lastDot) : filename;
+
+  const parts = filename.split('.');
+  const ext = parts.length > 1 ? parts.pop().toLowerCase() : '';
 
   // Extension check
   const allowed = Array.isArray(acceptedExtensions) && acceptedExtensions.length > 0
@@ -16782,32 +17206,44 @@ window.validateFilename = function({ filename, template, student, activity, roun
   if (!allowed.includes(ext)) {
     return {
       valid: false,
-      error: `Định dạng file ".${ext}" không hợp lệ. Chỉ chấp nhận: ${allowed.join(', ')}`,
-      expectedExtension: allowed.join(', '),
-      actualExtension: ext
+      error: `Định dạng .${ext || 'không đuôi'} không được chấp nhận. Định dạng hợp lệ: ${allowed.map(e => '.' + e).join(', ')}`
     };
   }
 
-  const expectedBase = generateExpectedFilename({
+  const expectedFilename = generateExpectedFilename({
     template,
     student,
     activity,
     round,
     fileTypeCategory,
-    extension: ''
+    extension: ext,
+    mode
   });
 
-  const ruleMode = mode || activity?.submissionConfig?.filenameMode || 'exact';
-  let valid = false;
-  if (ruleMode === 'exact') {
-    valid = actualBase.toUpperCase() === expectedBase.toUpperCase();
+  const baseActual = parts.join('.');
+  const expectedBase = expectedFilename.replace(new RegExp(`\\.${ext}$`, 'i'), '');
+
+  const isExact = (mode !== 'prefix');
+  if (isExact) {
+    if (baseActual.toLowerCase() !== expectedBase.toLowerCase()) {
+      return {
+        valid: false,
+        error: `Tên tệp không khớp mẫu yêu cầu: "${expectedFilename}"`,
+        expectedFilename,
+        actualFilename: filename
+      };
+    }
   } else {
-    valid = actualBase.toUpperCase().startsWith(expectedBase.toUpperCase());
+    if (!baseActual.toLowerCase().startsWith(expectedBase.toLowerCase())) {
+      return {
+        valid: false,
+        error: `Tên tệp phải bắt đầu bằng mẫu: "${expectedBase}..."`,
+        expectedFilename,
+        actualFilename: filename
+      };
+    }
   }
 
-  const expectedFilename = expectedBase + (ext ? '.' + ext : (allowed[0] ? '.' + allowed[0] : ''));
-
-  // Always consider it valid for auto-rename, unless it failed the extension check
   return {
     valid: true,
     expectedFilename,
@@ -16816,7 +17252,7 @@ window.validateFilename = function({ filename, template, student, activity, roun
 };
 
 window.updateFilenamePreviewInAdmin = function() {
-  const tpl = document.getElementById('sub-filename-template')?.value || '{MSSV}_{HO_TEN}_{LOAI}';
+  const tpl = document.getElementById('sub-filename-template')?.value || '{HOI_DONG}_{MSSV}_{HO_TEN}';
   const loai = document.getElementById('sub-loai-val')?.value || 'THUYET_MINH';
   const mode = document.querySelector('input[name="sub_filename_mode"]:checked')?.value || 'exact';
   const previewEl = document.getElementById('sub-filename-preview');
@@ -16857,7 +17293,7 @@ window.toggleSubCustomDeadline = function(isCustom) {
 };
 
 window.resetActivitySubmissionForm = function() {
-  ['pdf', 'zip', 'jpg', 'png', 'docx', 'xlsx', 'pptx'].forEach(ext => {
+  ['pdf', 'zip', 'rar', '7z', 'jpg', 'png', 'docx', 'xlsx', 'pptx'].forEach(ext => {
     const el = document.getElementById('sub-ext-' + ext);
     if (el) el.checked = (ext === 'pdf');
   });
@@ -16873,7 +17309,7 @@ window.resetActivitySubmissionForm = function() {
   if (document.getElementById('sub-deadline-time')) document.getElementById('sub-deadline-time').value = '';
   if (document.getElementById('sub-allow-late')) document.getElementById('sub-allow-late').checked = false;
 
-  if (document.getElementById('sub-filename-template')) document.getElementById('sub-filename-template').value = '{MSSV}_{HO_TEN}_{LOAI}';
+  if (document.getElementById('sub-filename-template')) document.getElementById('sub-filename-template').value = '{HOI_DONG}_{MSSV}_{HO_TEN}';
   if (document.getElementById('sub-loai-val')) document.getElementById('sub-loai-val').value = 'THUYET_MINH';
   const exactRadio = document.querySelector('input[name="sub_filename_mode"][value="exact"]');
   if (exactRadio) exactRadio.checked = true;
@@ -16906,7 +17342,7 @@ window.populateActivitySubmissionForm = function(cfg) {
     return;
   }
   const accepted = (cfg.acceptedExtensions || ['pdf']).map(e => e.toLowerCase());
-  ['pdf', 'zip', 'jpg', 'png', 'docx', 'xlsx', 'pptx'].forEach(ext => {
+  ['pdf', 'zip', 'rar', '7z', 'jpg', 'png', 'docx', 'xlsx', 'pptx'].forEach(ext => {
     const el = document.getElementById('sub-ext-' + ext);
     if (el) el.checked = accepted.includes(ext);
   });
@@ -16931,7 +17367,7 @@ window.populateActivitySubmissionForm = function(cfg) {
 
   if (document.getElementById('sub-allow-late')) document.getElementById('sub-allow-late').checked = Boolean(cfg.allowLateSubmission);
 
-  if (document.getElementById('sub-filename-template')) document.getElementById('sub-filename-template').value = cfg.filenameTemplate || '{MSSV}_{HO_TEN}_{LOAI}';
+  if (document.getElementById('sub-filename-template')) document.getElementById('sub-filename-template').value = cfg.filenameTemplate || '{HOI_DONG}_{MSSV}_{HO_TEN}';
   if (document.getElementById('sub-loai-val')) document.getElementById('sub-loai-val').value = cfg.fileTypeCategory || 'THUYET_MINH';
   const fModeRadio = document.querySelector(`input[name="sub_filename_mode"][value="${cfg.filenameMode || 'exact'}"]`);
   if (fModeRadio) fModeRadio.checked = true;
@@ -16977,7 +17413,7 @@ window.populateActivitySubmissionForm = function(cfg) {
 
 window.readActivitySubmissionForm = function() {
   const accepted = [];
-  ['pdf', 'zip', 'jpg', 'png', 'docx', 'xlsx', 'pptx'].forEach(ext => {
+  ['pdf', 'zip', 'rar', '7z', 'jpg', 'png', 'docx', 'xlsx', 'pptx'].forEach(ext => {
     const el = document.getElementById('sub-ext-' + ext);
     if (el && el.checked) accepted.push(ext);
   });
@@ -17003,7 +17439,7 @@ window.readActivitySubmissionForm = function() {
   }
 
   const allowLateSubmission = document.getElementById('sub-allow-late')?.checked === true;
-  const filenameTemplate = (document.getElementById('sub-filename-template')?.value || '').trim() || '{MSSV}_{HO_TEN}_{LOAI}';
+  const filenameTemplate = (document.getElementById('sub-filename-template')?.value || '').trim() || '{HOI_DONG}_{MSSV}_{HO_TEN}';
   const fileTypeCategory = (document.getElementById('sub-loai-val')?.value || '').trim() || 'THUYET_MINH';
   const filenameMode = document.querySelector('input[name="sub_filename_mode"]:checked')?.value || 'exact';
 

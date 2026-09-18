@@ -5,13 +5,26 @@
 'use strict';
 
 // Allowed file extensions and MIME types for graduation document uploads
-const ALLOWED_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.docx', '.doc']);
+const ALLOWED_EXTENSIONS = new Set([
+  '.pdf', '.jpg', '.jpeg', '.png', '.docx', '.doc',
+  '.zip', '.rar', '.7z', '.xlsx', '.xls', '.pptx', '.ppt'
+]);
 const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
   'image/jpeg',
   'image/png',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/msword',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-rar-compressed',
+  'application/vnd.rar',
+  'application/x-7z-compressed',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-powerpoint',
+  'application/octet-stream', // Generic fallback from various client OS / browsers
 ]);
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
