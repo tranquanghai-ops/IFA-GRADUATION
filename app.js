@@ -3272,25 +3272,52 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
     const rootUrl = r.driveRootFolderUrl || r.rootDriveFolderUrl || (rootId ? `https://drive.google.com/drive/folders/${rootId}` : '');
     const rootName = r.driveRootFolderName || r.rootDriveFolderName || 'Google Drive';
     driveInput.value = rootUrl;
-    if (rootId) {
+    const isExplicitlyValidated = Boolean(
+      rootId &&
+      r.driveValidation?.validated === true &&
+      (r.driveValidation?.folderId === rootId || r.driveRootFolderId === rootId || r.rootDriveFolderId === rootId)
+    );
+
+    if (isExplicitlyValidated) {
+      driveInput.dataset.isValidated = 'true';
+      driveInput.dataset.validatedFolderId = rootId;
+      driveInput.dataset.validatedFolderName = rootName;
+      driveInput.dataset.validatedFolderUrl = rootUrl;
+    } else if (rootId) {
+      driveInput.dataset.isValidated = 'false';
       driveInput.dataset.validatedFolderId = rootId;
       driveInput.dataset.validatedFolderName = rootName;
       driveInput.dataset.validatedFolderUrl = rootUrl;
     } else {
+      delete driveInput.dataset.isValidated;
       delete driveInput.dataset.validatedFolderId;
       delete driveInput.dataset.validatedFolderName;
       delete driveInput.dataset.validatedFolderUrl;
     }
+
     const statusEl = document.getElementById('round-drive-folder-status');
     if (statusEl) {
-      if (rootId) {
+      if (isExplicitlyValidated) {
         statusEl.innerHTML = `
           <div class="p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-800">
             <div>
-              <span class="font-bold">✓ Thư mục gốc: ${escapeHtml(rootName)}</span>
+              <span class="font-bold flex items-center gap-1.5">🟢 Đã xác thực quyền tạo thư mục con: ${escapeHtml(rootName)}</span>
               <span class="block text-[10px] text-emerald-600 font-mono">ID: ${rootId}</span>
             </div>
             <a href="${rootUrl}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-white border border-emerald-300 text-blue-600 hover:underline font-bold text-xs rounded shadow-2xs">
+              Mở Drive ↗
+            </a>
+          </div>
+        `;
+        statusEl.classList.remove('hidden');
+      } else if (rootId) {
+        statusEl.innerHTML = `
+          <div class="p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between text-xs text-amber-800">
+            <div>
+              <span class="font-bold">🟡 Đã cấu hình thư mục Drive — Chưa kiểm tra quyền</span>
+              <span class="block text-[11px] text-amber-700 mt-0.5">Vui lòng bấm <strong>[Kiểm tra quyền Drive]</strong> để xác thực quyền tạo thư mục con.</span>
+            </div>
+            <a href="${rootUrl}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-white border border-amber-300 text-amber-800 font-bold text-xs rounded shadow-2xs">
               Mở Drive ↗
             </a>
           </div>
@@ -4184,7 +4211,7 @@ window.testDriveFolderUrl = async function(type) {
       statusEl.innerHTML = `
         <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 space-y-1">
           <div class="flex items-center justify-between">
-            <span class="font-bold">✓ Thư mục hợp lệ &amp; Đã có quyền Editor</span>
+            <span class="font-bold flex items-center gap-1.5">🟢 Đã xác thực quyền tạo thư mục con</span>
             <a href="${data.folderUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline font-bold text-xs inline-flex items-center gap-1">
               <span>Mở Drive</span> ↗
             </a>
@@ -4196,18 +4223,23 @@ window.testDriveFolderUrl = async function(type) {
       // Store validated info on form dataset
       const driveInputEl = document.getElementById('round-drive-folder-url');
       if (driveInputEl) {
+        driveInputEl.dataset.isValidated = 'true';
         driveInputEl.dataset.validatedFolderId = data.folderId;
         driveInputEl.dataset.validatedFolderName = data.folderName;
         driveInputEl.dataset.validatedFolderUrl = data.folderUrl;
       }
-      showToast(`✓ Đã xác thực quyền Editor thư mục "${data.folderName}"!`, 'success');
+      showToast(`✓ Đã xác thực quyền tạo thư mục con "${data.folderName}"!`, 'success');
     } catch (err) {
       statusEl.innerHTML = `
         <div class="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 space-y-1">
-          <p class="font-bold">✗ Không thể xác thực quyền Editor:</p>
+          <p class="font-bold flex items-center gap-1.5">🔴 Không thể xác thực quyền:</p>
           <p class="text-xs leading-relaxed">${escapeHtml(err.message)}</p>
         </div>
       `;
+      const driveInputEl = document.getElementById('round-drive-folder-url');
+      if (driveInputEl) {
+        driveInputEl.dataset.isValidated = 'false';
+      }
       showToast('Lỗi kiểm tra quyền thư mục Google Drive: ' + err.message, 'error');
     } finally {
       if (btn) {
@@ -4224,6 +4256,41 @@ window.testDriveFolderUrl = async function(type) {
     <span class="text-emerald-600">✓ Hợp lệ (Folder ID: ${folderId})</span>
     <a href="${folderUrl}" target="_blank" rel="noopener noreferrer" class="ml-2 text-blue-600 hover:underline text-xs">Mở ↗</a>
   `;
+};
+
+window.onRoundDriveUrlChange = function() {
+  const driveInput = document.getElementById('round-drive-folder-url');
+  if (!driveInput) return;
+  const curVal = (driveInput.value || '').trim();
+  const validUrl = (driveInput.dataset.validatedFolderUrl || '').trim();
+  const validId = (driveInput.dataset.validatedFolderId || '').trim();
+  const curId = window.extractDriveFolderId ? window.extractDriveFolderId(curVal) : null;
+
+  if (curVal && (!validId || (curId !== validId && curVal !== validUrl))) {
+    driveInput.dataset.isValidated = 'false';
+    const statusEl = document.getElementById('round-drive-folder-status');
+    if (statusEl) {
+      statusEl.classList.remove('hidden');
+      statusEl.innerHTML = `
+        <div class="p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between text-xs text-amber-800">
+          <div>
+            <span class="font-bold">🟡 Đã cấu hình thư mục Drive — Chưa kiểm tra quyền</span>
+            <span class="block text-[11px] text-amber-700 mt-0.5">Vui lòng bấm <strong>[Kiểm tra quyền Drive]</strong> để xác thực quyền tạo thư mục con.</span>
+          </div>
+        </div>
+      `;
+    }
+  } else if (!curVal) {
+    driveInput.dataset.isValidated = 'false';
+    delete driveInput.dataset.validatedFolderId;
+    delete driveInput.dataset.validatedFolderName;
+    delete driveInput.dataset.validatedFolderUrl;
+    const statusEl = document.getElementById('round-drive-folder-status');
+    if (statusEl) {
+      statusEl.innerHTML = '';
+      statusEl.classList.add('hidden');
+    }
+  }
 };
 
 window.connectCouncilDriveFolder = async function() {
@@ -4504,6 +4571,27 @@ window.saveRound = async function(e) {
   const driveRootFolderId = driveUrl ? window.extractDriveFolderId(driveUrl) : null;
   const driveRootFolderName = driveInput?.dataset?.validatedFolderName || null;
   const driveRootFolderUrl = driveRootFolderId ? (driveInput?.dataset?.validatedFolderUrl || `https://drive.google.com/drive/folders/${driveRootFolderId}`) : null;
+  const isValidated = Boolean(
+    driveRootFolderId &&
+    driveInput?.dataset?.isValidated === 'true' &&
+    driveInput?.dataset?.validatedFolderId === driveRootFolderId
+  );
+
+  const existingRound = (state.rounds || []).find(x => x.id === id);
+  const driveValidation = isValidated ? {
+    validated: true,
+    validatedAt: (id && existingRound?.driveValidation?.validatedAt && existingRound?.driveRootFolderId === driveRootFolderId)
+      ? existingRound.driveValidation.validatedAt
+      : new Date().toISOString(),
+    validatedBy: state.user?.email || '',
+    canCreateChildren: true,
+    folderId: driveRootFolderId,
+    folderName: driveRootFolderName || 'Google Drive',
+  } : (driveRootFolderId ? {
+    validated: false,
+    canCreateChildren: false,
+    folderId: driveRootFolderId,
+  } : null);
 
   const payload = {
     title,
@@ -4535,6 +4623,7 @@ window.saveRound = async function(e) {
     rootDriveFolderId: driveRootFolderId || null,
     rootDriveFolderUrl: driveRootFolderUrl || null,
     rootDriveFolderName: driveRootFolderName || null,
+    driveValidation: driveValidation,
     deleted: false,
     updatedAt: serverTimestamp()
   };
@@ -9233,6 +9322,18 @@ export function generateUniqueSlug(title, existingActivities = []) {
   return `${baseSlug}-${counter}`;
 }
 
+export const DEFAULT_LETTER_GRADE_SCALE = [
+  { id: 'opt_app', key: 'A++', code: 'A++', label: 'Xuất sắc', numericValue: 10.0, description: 'Xuất sắc' },
+  { id: 'opt_ap',  key: 'A+',  code: 'A+',  label: 'Rất tốt',  numericValue: 9.5,  description: 'Rất tốt' },
+  { id: 'opt_a',   key: 'A',   code: 'A',   label: 'Tốt',      numericValue: 9.0,  description: 'Tốt' },
+  { id: 'opt_am',  key: 'A-',  code: 'A-',  label: 'Khá tốt',  numericValue: 8.5,  description: 'Khá tốt' },
+  { id: 'opt_bp',  key: 'B+',  code: 'B+',  label: 'Khá',      numericValue: 8.0,  description: 'Khá' },
+  { id: 'opt_b',   key: 'B',   code: 'B',   label: 'Khá',      numericValue: 7.5,  description: 'Khá' },
+  { id: 'opt_bm',  key: 'B-',  code: 'B-',  label: 'Trung bình khá', numericValue: 7.0, description: 'Trung bình khá' },
+  { id: 'opt_c',   key: 'C',   code: 'C',   label: 'Đạt',      numericValue: 6.0,  description: 'Đạt' },
+  { id: 'opt_d',   key: 'D',   code: 'D',   label: 'Chưa đạt', numericValue: 5.0,  description: 'Chưa đạt' },
+];
+
 export function normalizeActivity(a, roundId, idx = 0) {
   const title = String(a.title || '').trim();
   const slug = String(a.slug || (title ? slugify(title) : '') || ('act-' + (idx + 1))).trim();
@@ -9253,13 +9354,8 @@ export function normalizeActivity(a, roundId, idx = 0) {
     { id: 'crit_pres', key: 'presentation', label: 'Trình bày', maxScore: 1, order: 4, description: 'Báo cáo và trả lời câu hỏi' }
   ];
 
-  // Default Letter Options & Scoring Config (v2.0.0-beta.1)
-  const defaultLetterOptions = [
-    { id: 'opt_a', key: 'A', label: 'A — Tốt', description: 'Tốt / Xuất sắc' },
-    { id: 'opt_b', key: 'B', label: 'B — Khá', description: 'Khá' },
-    { id: 'opt_c', key: 'C', label: 'C — Đạt', description: 'Đạt yêu cầu' },
-    { id: 'opt_d', key: 'D', label: 'D — Chưa đạt', description: 'Chưa đạt / Cần hoàn thiện lại' }
-  ];
+  // Default Letter Options & Scoring Config (v2.4.0)
+  const defaultLetterOptions = JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE));
 
   const scoringMode = (a.scoringConfig && ['numeric', 'letter', 'defense_rubric'].includes(a.scoringConfig.mode))
     ? a.scoringConfig.mode
@@ -9552,12 +9648,7 @@ window.openCreateActivityModal = function() {
     document.getElementById('activity-form-scoring-enabled').checked = false;
     toggleActivityScoringConfig(false);
   }
-  state._currentActivityLetterOptions = [
-    { id: 'opt_a', key: 'A', label: 'A — Tốt', description: 'Tốt / Xuất sắc' },
-    { id: 'opt_b', key: 'B', label: 'B — Khá', description: 'Khá' },
-    { id: 'opt_c', key: 'C', label: 'C — Đạt', description: 'Đạt yêu cầu' },
-    { id: 'opt_d', key: 'D', label: 'D — Chưa đạt', description: 'Chưa đạt / Cần hoàn thiện lại' }
-  ];
+  state._currentActivityLetterOptions = JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE));
   state._currentActivityRubric = [
     { id: 'crit_idea', key: 'idea', label: 'Ý tưởng', maxScore: 4, order: 1, description: 'Ý tưởng và tính sáng tạo' },
     { id: 'crit_prac', key: 'practicality', label: 'Tính ứng dụng', maxScore: 3, order: 2, description: 'Tính ứng dụng và khả thi' },
@@ -9637,12 +9728,7 @@ window.editActivityModal = function(actId) {
   }
   state._currentActivityLetterOptions = Array.isArray(act.scoringConfig?.letterOptions) && act.scoringConfig.letterOptions.length > 0
     ? JSON.parse(JSON.stringify(act.scoringConfig.letterOptions))
-    : [
-        { id: 'opt_a', key: 'A', label: 'A — Tốt', description: 'Tốt / Xuất sắc' },
-        { id: 'opt_b', key: 'B', label: 'B — Khá', description: 'Khá' },
-        { id: 'opt_c', key: 'C', label: 'C — Đạt', description: 'Đạt yêu cầu' },
-        { id: 'opt_d', key: 'D', label: 'D — Chưa đạt', description: 'Chưa đạt / Cần hoàn thiện lại' }
-      ];
+    : JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE));
   state._currentActivityRubric = Array.isArray(act.scoringConfig?.rubric) && act.scoringConfig.rubric.length > 0
     ? JSON.parse(JSON.stringify(act.scoringConfig.rubric))
     : [
@@ -12080,28 +12166,45 @@ window.renderActivityLetterOptions = function() {
   if (!container) return;
   const list = state._currentActivityLetterOptions || [];
   if (list.length === 0) {
-    container.innerHTML = '<div class="p-3 text-center text-slate-400">Chưa có mức điểm chữ nào. Bấm "+ Thêm mức điểm".</div>';
+    container.innerHTML = '<div class="p-3 text-center text-slate-400">Chưa có mức điểm chữ nào. Bấm "+ Thêm mức điểm" hoặc "↺ Khôi phục mặc định".</div>';
     return;
   }
-  container.innerHTML = list.map((opt, idx) => `
-    <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
-      <div class="flex items-center gap-2">
-        <span class="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-mono text-xs">${opt.key}</span>
-        <span class="font-bold text-slate-800 text-xs">${opt.label}</span>
-        ${opt.description ? `<span class="text-[10px] text-slate-400">(${opt.description})</span>` : ''}
+  container.innerHTML = list.map((opt, idx) => {
+    const numDisplay = (typeof opt.numericValue === 'number' && !isNaN(opt.numericValue))
+      ? `<span class="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-mono text-xs font-bold" title="Điểm quy đổi nội bộ của Admin">Quy đổi: ${opt.numericValue} điểm</span>`
+      : `<span class="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded font-mono text-[10px]" title="Chưa cấu hình điểm quy đổi">Chưa có điểm quy đổi</span>`;
+
+    return `
+    <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-mono text-xs">${escapeHtml(opt.key || opt.code || '')}</span>
+        <span class="font-bold text-slate-800 text-xs">${escapeHtml(opt.label || '')}</span>
+        ${numDisplay}
+        ${opt.description ? `<span class="text-[10px] text-slate-400">(${escapeHtml(opt.description)})</span>` : ''}
       </div>
-      <div class="flex items-center gap-1.5 text-[11px]">
+      <div class="flex items-center gap-1.5 text-[11px] shrink-0">
         <button type="button" onclick="editLetterOption('${opt.id}')" class="text-blue-600 hover:underline font-bold">Sửa</button>
         <button type="button" onclick="deleteLetterOption('${opt.id}')" class="text-rose-600 hover:underline font-bold">Xóa</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+};
+
+window.resetDefaultLetterOptions = function() {
+  if (!confirm('Thao tác sẽ thay thế danh sách mức điểm chữ hiện tại bằng bộ mặc định A++ → D. Bạn có muốn tiếp tục?')) {
+    return;
+  }
+  state._currentActivityLetterOptions = JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE));
+  renderActivityLetterOptions();
+  showToast('Đã khôi phục bộ 9 mức điểm chữ mặc định (A++ → D)!', 'success');
 };
 
 window.openAddLetterOptionModal = function() {
   document.getElementById('letter-option-id').value = '';
   document.getElementById('letter-option-key').value = '';
   document.getElementById('letter-option-label').value = '';
+  document.getElementById('letter-option-numeric').value = '';
   document.getElementById('letter-option-desc').value = '';
   document.getElementById('modal-letter-option-title').textContent = 'Thêm mức điểm chữ mới';
   document.getElementById('modal-add-letter-option')?.classList.remove('hidden');
@@ -12115,8 +12218,9 @@ window.editLetterOption = function(id) {
   const opt = (state._currentActivityLetterOptions || []).find(o => o.id === id);
   if (!opt) return;
   document.getElementById('letter-option-id').value = opt.id;
-  document.getElementById('letter-option-key').value = opt.key;
-  document.getElementById('letter-option-label').value = opt.label;
+  document.getElementById('letter-option-key').value = opt.key || opt.code || '';
+  document.getElementById('letter-option-label').value = opt.label || '';
+  document.getElementById('letter-option-numeric').value = (typeof opt.numericValue === 'number' && !isNaN(opt.numericValue)) ? opt.numericValue : '';
   document.getElementById('letter-option-desc').value = opt.description || '';
   document.getElementById('modal-letter-option-title').textContent = 'Chỉnh sửa mức điểm chữ';
   document.getElementById('modal-add-letter-option')?.classList.remove('hidden');
@@ -12129,8 +12233,9 @@ window.deleteLetterOption = function(id) {
 
 window.saveLetterOption = function() {
   const id = document.getElementById('letter-option-id')?.value?.trim();
-  const key = document.getElementById('letter-option-key')?.value?.trim();
+  const key = document.getElementById('letter-option-key')?.value?.trim().toUpperCase();
   const label = document.getElementById('letter-option-label')?.value?.trim();
+  const numRaw = document.getElementById('letter-option-numeric')?.value?.trim();
   const desc = document.getElementById('letter-option-desc')?.value?.trim() || '';
 
   if (!key || !label) {
@@ -12138,15 +12243,36 @@ window.saveLetterOption = function() {
     return;
   }
 
+  const numericValue = parseFloat(numRaw);
+  if (isNaN(numericValue) || numericValue < 0 || numericValue > 10) {
+    showToast('Vui lòng nhập Điểm quy đổi hợp lệ từ 0 đến 10 (ví dụ: 10, 9.5, 8.0...)', 'warning');
+    document.getElementById('letter-option-numeric')?.focus();
+    return;
+  }
+
   state._currentActivityLetterOptions = state._currentActivityLetterOptions || [];
   if (id) {
     const idx = state._currentActivityLetterOptions.findIndex(o => o.id === id);
     if (idx >= 0) {
-      state._currentActivityLetterOptions[idx] = { id, key, label, description: desc };
+      state._currentActivityLetterOptions[idx] = {
+        id,
+        key,
+        code: key,
+        label,
+        numericValue: Number(numericValue.toFixed(2)),
+        description: desc
+      };
     }
   } else {
     const newId = 'opt_' + Date.now().toString(36);
-    state._currentActivityLetterOptions.push({ id: newId, key, label, description: desc });
+    state._currentActivityLetterOptions.push({
+      id: newId,
+      key,
+      code: key,
+      label,
+      numericValue: Number(numericValue.toFixed(2)),
+      description: desc
+    });
   }
 
   closeLetterOptionModal();
@@ -13203,6 +13329,16 @@ window.saveCurrentScore = async function(isCompleted) {
   const scorerName = state.user?.displayName || auth.roleName || 'Thành viên Hội đồng';
   const scoreKey = `${activityId}_${councilId}_${sid}_${scorerId}`;
 
+  let selectedLetterCode = undefined;
+  let selectedLetterNumericValue = undefined;
+  if (mode === 'letter') {
+    selectedLetterCode = String(val);
+    const letterOpt = (act.scoringConfig?.letterOptions || []).find(o => String(o.key) === selectedLetterCode || String(o.code) === selectedLetterCode);
+    if (letterOpt && typeof letterOpt.numericValue === 'number') {
+      selectedLetterNumericValue = letterOpt.numericValue;
+    }
+  }
+
   const existing = state.councilScores?.[scoreKey] || {};
   const scoreRecord = {
     activityId,
@@ -13217,6 +13353,11 @@ window.saveCurrentScore = async function(isCompleted) {
     role: auth.role || 'member',
     mode,
     value: (mode === 'numeric' || mode === 'defense_rubric') ? parseFloat(val) : String(val),
+    selectedLetterCode,
+    selectedLetterNumericValue,
+    numericValue: (mode === 'numeric' || mode === 'defense_rubric')
+      ? parseFloat(val)
+      : (typeof selectedLetterNumericValue === 'number' ? selectedLetterNumericValue : undefined),
     components: mode === 'defense_rubric' ? components : undefined,
     comment: String(comment || '').trim(),
     status: isCompleted ? 'completed' : 'draft',
@@ -14787,6 +14928,18 @@ window.syncRubricSumToTotal = function() {
   showToast(`Đã cập nhật Điểm tổng: ${sum.toFixed(2)}`, 'info');
 };
 
+export function resolveScoreNumericValue(score, act) {
+  if (!score) return null;
+  if (typeof score.numericValue === 'number' && !isNaN(score.numericValue)) return score.numericValue;
+  if (typeof score.selectedLetterNumericValue === 'number' && !isNaN(score.selectedLetterNumericValue)) return score.selectedLetterNumericValue;
+  if (typeof score.value === 'number' && !isNaN(score.value)) return score.value;
+  if (typeof score.value === 'string' && act?.scoringConfig?.letterOptions) {
+    const opt = act.scoringConfig.letterOptions.find(o => String(o.key) === score.value || String(o.code) === score.value);
+    if (opt && typeof opt.numericValue === 'number' && !isNaN(opt.numericValue)) return opt.numericValue;
+  }
+  return null;
+}
+
 export function getOfficialDefenseScore(studentId, council, act, round) {
   if (!council || !act) return { score: null, isComplete: false, count: 0, mandatoryComplete: false };
   const slots = act.councilStructure?.slots || [];
@@ -14807,20 +14960,21 @@ export function getOfficialDefenseScore(studentId, council, act, round) {
     const scoreKey = `${activityId}_${councilId}_${studentId}_${scorerId}`;
     const score = state.councilScores?.[scoreKey];
     const isCompleted = (score?.status === 'completed');
+    const resolvedNumeric = resolveScoreNumericValue(score, act);
 
     if (s.type === 'mandatory') {
       mandatoryTotal++;
-      if (isCompleted && typeof score.value === 'number') {
+      if (isCompleted && typeof resolvedNumeric === 'number' && !isNaN(resolvedNumeric)) {
         mandatoryCompleted++;
-        mandatoryScores.push({ slotKey: s.key, scorerId, scorerName: assigned.memberName || scorerId, value: score.value });
+        mandatoryScores.push({ slotKey: s.key, scorerId, scorerName: assigned.memberName || scorerId, value: resolvedNumeric, displayValue: score.value });
       }
     } else if (s.type === 'guest') {
-      if (isCompleted && typeof score.value === 'number') {
+      if (isCompleted && typeof resolvedNumeric === 'number' && !isNaN(resolvedNumeric)) {
         const isIncluded = council.guestInclusion?.[studentId]?.[s.key] !== false;
         if (isIncluded) {
-          includedGuestScores.push({ slotKey: s.key, scorerId, scorerName: assigned.memberName || scorerId, value: score.value });
+          includedGuestScores.push({ slotKey: s.key, scorerId, scorerName: assigned.memberName || scorerId, value: resolvedNumeric, displayValue: score.value });
         } else {
-          excludedGuestScores.push({ slotKey: s.key, scorerId, scorerName: assigned.memberName || scorerId, value: score.value });
+          excludedGuestScores.push({ slotKey: s.key, scorerId, scorerName: assigned.memberName || scorerId, value: resolvedNumeric, displayValue: score.value });
         }
       }
     }

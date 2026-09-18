@@ -3382,7 +3382,7 @@
                 💡 <em>Vui lòng chia sẻ thư mục gốc cho tài khoản <strong>tknt.tdtu@gmail.com</strong> với quyền <strong>Người chỉnh sửa (Editor)</strong>.</em>
               </p>
               <div class="flex gap-2">
-                <input type="text" id="round-drive-folder-url" placeholder="VD: https://drive.google.com/drive/folders/1A2B3C... hoặc Folder ID" class="flex-1 p-2 border border-blue-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <input type="text" id="round-drive-folder-url" oninput="onRoundDriveUrlChange()" placeholder="VD: https://drive.google.com/drive/folders/1A2B3C... hoặc Folder ID" class="flex-1 p-2 border border-blue-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
                 <button type="button" id="btn-validate-round-drive" onclick="testDriveFolderUrl('round')" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer">
                   <span>Kiểm tra quyền Drive</span>
                 </button>
@@ -4308,8 +4308,14 @@
                     <!-- Letter Config -->
                     <div id="activity-scoring-letter-wrap" class="hidden space-y-2">
                       <div class="flex items-center justify-between">
-                        <label class="text-[11px] font-bold text-slate-700">Danh sách mức điểm chữ:</label>
-                        <button type="button" onclick="openAddLetterOptionModal()" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shadow-xs">+ Thêm mức điểm</button>
+                        <div>
+                          <label class="text-[11px] font-bold text-slate-700">Danh sách mức điểm chữ:</label>
+                          <span class="text-[10px] text-blue-600 block">(Điểm quy đổi chỉ hiển thị cho Quản trị viên)</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                          <button type="button" onclick="resetDefaultLetterOptions()" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-[11px] font-bold" title="Khôi phục thang chuẩn A++ → D">↺ Khôi phục mặc định</button>
+                          <button type="button" onclick="openAddLetterOptionModal()" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shadow-xs">+ Thêm mức điểm</button>
+                        </div>
                       </div>
                       <div id="activity-scoring-letter-list" class="space-y-1.5 max-h-48 overflow-y-auto">
                         <!-- Rendered dynamically -->
@@ -4753,12 +4759,19 @@
       <div class="p-4 space-y-3 text-xs">
         <input type="hidden" id="letter-option-id">
         <div>
-          <label class="font-bold text-slate-700 block mb-1">Mã mức điểm (Key) <span class="text-rose-500">*</span></label>
-          <input type="text" id="letter-option-key" placeholder="Ví dụ: A, B+, Đạt..." class="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold">
+          <label class="font-bold text-slate-700 block mb-1">Mã mức điểm (Key/Code) <span class="text-rose-500">*</span></label>
+          <input type="text" id="letter-option-key" placeholder="Ví dụ: A++, A+, A, B..." class="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold font-mono uppercase">
         </div>
         <div>
           <label class="font-bold text-slate-700 block mb-1">Nhãn hiển thị (Label) <span class="text-rose-500">*</span></label>
-          <input type="text" id="letter-option-label" placeholder="Ví dụ: A — Tốt, B — Khá..." class="w-full p-2 border border-slate-300 rounded-lg text-xs">
+          <input type="text" id="letter-option-label" placeholder="Ví dụ: Xuất sắc, Rất tốt, Tốt..." class="w-full p-2 border border-slate-300 rounded-lg text-xs">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">
+            Điểm quy đổi (0 – 10) <span class="text-rose-500">*</span>
+            <span class="text-[10px] text-blue-600 font-normal ml-1">(Chỉ Admin thấy để tính toán)</span>
+          </label>
+          <input type="number" id="letter-option-numeric" min="0" max="10" step="0.1" placeholder="Ví dụ: 10, 9.5, 8.0..." class="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold font-mono">
         </div>
         <div>
           <label class="font-bold text-slate-700 block mb-1">Mô tả / Ghi chú (Description)</label>

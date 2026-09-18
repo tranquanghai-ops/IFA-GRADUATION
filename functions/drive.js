@@ -327,7 +327,7 @@ async function deleteDriveFile(fileId) {
   if (!config) throw new Error('Drive not configured');
   const accessToken = await getAccessToken(config);
 
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -354,8 +354,10 @@ function extractDriveFolderId(str) {
 /**
  * Validates that a Google Drive root folder exists, is not trashed,
  * is indeed a folder, and the service account has permission to create subfolders.
+ * Uses non-destructive metadata check first, then falls back to a safe write probe
+ * if metadata is restricted under drive.file scope.
  * @param {string} folderIdOrUrl
- * @returns {Promise<{ ok: boolean, folderId: string, folderName: string, folderUrl: string, canAddChildren: boolean }>}
+ * @returns {Promise<{ ok: boolean, folderId: string, folderName: string, folderUrl: string, canAddChildren: boolean, checkMethod: string }>}
  */
 async function validateRootDriveFolder(folderIdOrUrl) {
   const folderId = extractDriveFolderId(folderIdOrUrl);
@@ -364,50 +366,107 @@ async function validateRootDriveFolder(folderIdOrUrl) {
   }
 
   const config = await loadDriveConfig();
-  if (!config) throw new Error('Hệ thống chưa cấu hình kết nối Google Drive (thiếu Secrets).');
+  if (!config) {
+    throw new Error('Hệ thống chưa cấu hình kết nối Google Drive (thiếu Secrets).');
+  }
 
-  const accessToken = await getAccessToken(config);
+  let accessToken;
+  try {
+    accessToken = await getAccessToken(config);
+  } catch (err) {
+    throw new Error('Không thể xác thực Google Drive. Vui lòng kiểm tra kết nối hệ thống.');
+  }
 
-  const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name,mimeType,capabilities,trashed,webViewLink`,
-    {
-      headers: { Authorization: `Bearer ${accessToken}` },
+  // 1. Non-destructive metadata check with supportsAllDrives=true
+  let metaData = null;
+  let metaOk = false;
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${folderId}?supportsAllDrives=true&fields=id,name,mimeType,capabilities,trashed,webViewLink`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+    if (res.ok) {
+      metaData = await res.json().catch(() => ({}));
+      metaOk = true;
     }
-  );
+  } catch (e) {
+    console.warn('[validateRootDriveFolder] metadata fetch warning:', e.message);
+  }
 
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    if (res.status === 404) {
-      throw new Error(
-        'Không tìm thấy thư mục trên Google Drive hoặc tài khoản hệ thống (tknt.tdtu@gmail.com) chưa được chia sẻ quyền truy cập. Vui lòng kiểm tra lại đường dẫn và quyền chia sẻ.'
-      );
+  if (metaOk && metaData) {
+    if (metaData.trashed) {
+      throw new Error('Thư mục này hiện đang nằm trong Thùng rác của Google Drive.');
     }
-    const errMsg = data?.error?.message || `Lỗi Drive API (HTTP ${res.status})`;
+    if (metaData.mimeType && metaData.mimeType !== 'application/vnd.google-apps.folder') {
+      throw new Error('Đối tượng được liên kết không phải là một Thư mục Google Drive.');
+    }
+
+    const canAddChildren = metaData.capabilities?.canAddChildren || metaData.capabilities?.canEdit;
+    if (canAddChildren) {
+      return {
+        ok: true,
+        folderId: metaData.id,
+        folderName: metaData.name || 'Google Drive Folder',
+        folderUrl: metaData.webViewLink || `https://drive.google.com/drive/folders/${metaData.id}`,
+        canAddChildren: true,
+        checkMethod: 'metadata',
+      };
+    }
+  }
+
+  // 2. Fallback Safe Write Probe
+  // When files.get returns 404 under drive.file scope on external shared folders,
+  // or capabilities are incomplete, test actual child creation capability.
+  const probeName = `.probe_test_ifa_${Date.now()}`;
+  let probeRes;
+  try {
+    probeRes = await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,name,webViewLink', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: probeName,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [folderId],
+        properties: { probe: 'true' },
+      }),
+    });
+  } catch (netErr) {
+    throw new Error('Không thể kết nối đến Google Drive: ' + netErr.message);
+  }
+
+  const probeData = await probeRes.json().catch(() => ({}));
+
+  if (!probeRes.ok) {
+    if (probeRes.status === 404) {
+      throw new Error('Không tìm thấy thư mục hoặc tài khoản hệ thống chưa được cấp quyền.');
+    }
+    if (probeRes.status === 403) {
+      throw new Error('Tài khoản hệ thống có thể nhìn thấy thư mục nhưng không có quyền tạo thư mục con.');
+    }
+    const errMsg = probeData?.error?.message || `HTTP ${probeRes.status}`;
     throw new Error(`Google Drive phản hồi lỗi: ${errMsg}`);
   }
 
-  if (data.trashed) {
-    throw new Error('Thư mục này hiện đang nằm trong Thùng rác của Google Drive.');
-  }
-
-  if (data.mimeType !== 'application/vnd.google-apps.folder') {
-    throw new Error('Đối tượng được liên kết không phải là một Thư mục Google Drive.');
-  }
-
-  const canAddChildren = data.capabilities?.canAddChildren || data.capabilities?.canEdit;
-  if (!canAddChildren) {
-    throw new Error(
-      'Tài khoản hệ thống (tknt.tdtu@gmail.com) chưa có quyền Người chỉnh sửa (Editor) trong thư mục này. Vui lòng chia sẻ thư mục với quyền "Người chỉnh sửa" (Editor) cho tknt.tdtu@gmail.com để hệ thống có thể tạo thư mục con cho Hội đồng & Mốc kế hoạch.'
-    );
+  // Probe succeeded -> immediately delete temporary probe folder
+  if (probeData?.id) {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${probeData.id}?supportsAllDrives=true`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }).catch(delErr => console.warn('[validateRootDriveFolder] Probe cleanup warning:', delErr.message));
   }
 
   return {
     ok: true,
-    folderId: data.id,
-    folderName: data.name,
-    folderUrl: data.webViewLink || `https://drive.google.com/drive/folders/${data.id}`,
+    folderId: folderId,
+    folderName: metaData?.name || 'Google Drive Folder',
+    folderUrl: metaData?.webViewLink || `https://drive.google.com/drive/folders/${folderId}`,
     canAddChildren: true,
+    checkMethod: 'write_probe',
   };
 }
 
@@ -438,12 +497,12 @@ async function getOrCreateDriveChildFolder({ parentFolderId, folderName, folderT
 
   const accessToken = await getAccessToken(config);
 
-  // 1. Search for existing child folder with exact name
+  // 1. Search for existing child folder with exact name (including Shared Drives)
   const escapedName = safeName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   const q = `mimeType = 'application/vnd.google-apps.folder' and trashed = false and '${cleanParentId}' in parents and name = '${escapedName}'`;
 
   const searchRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,webViewLink)&pageSize=10`,
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&supportsAllDrives=true&includeItemsFromAllDrives=true&fields=files(id,name,webViewLink)&pageSize=10`,
     {
       headers: { Authorization: `Bearer ${accessToken}` },
     }
@@ -469,8 +528,8 @@ async function getOrCreateDriveChildFolder({ parentFolderId, folderName, folderT
     };
   }
 
-  // 2. Not found -> create new folder inside parentFolderId
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink', {
+  // 2. Not found -> create new folder inside parentFolderId (supports Shared Drives)
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,name,webViewLink', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
