@@ -318,58 +318,100 @@ import {
   onSnapshot
 } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 
-// Central Read-Only Write Guard for Impersonation / Act-As Safe Mode
-export function assertNotImpersonatingForWrite(actionName = 'Thao tác') {
-  if (state.impersonation) {
-    const targetName = state.impersonation.target?.name || 'người dùng';
-    const roleLabel = state.impersonation.target?.roleLabel || state.impersonation.target?.type || 'chế độ đóng vai';
-    const msg = `[CHẾ ĐỘ CHỈ ĐỌC] Thao tác ghi (${actionName}) bị chặn khi đang đóng vai ${targetName} (${roleLabel}). Không có dữ liệu nào bị thay đổi.`;
-    console.warn(`[Impersonation Guard] Blocked write operation: ${actionName}`, state.impersonation);
-    if (typeof showToast === 'function') {
-      showToast(msg, 'warning', 6000);
-    } else {
-      alert(msg);
-    }
-    const err = new Error(msg);
-    err.code = 'permission-denied-impersonation-readonly';
-    throw err;
+// Central Write Guard & Audit Logger for Exact Act-As Test Mode
+export async function logImpersonationAudit(actionName, details = {}) {
+  try {
+    if (!state.impersonation) return;
+    const realUser = getRealUser();
+    const actor = getEffectiveActor();
+    const roundId = details.roundId || actor.roundId || state.selectedRoundId || '';
+
+    const auditPayload = {
+      realAdminUid: realUser?.uid || '',
+      realAdminEmail: realUser?.email || '',
+      effectiveActorRole: actor.targetType || actor.roleLabel || '',
+      effectiveActorId: actor.uid || '',
+      effectiveActorEmail: actor.email || '',
+      effectiveActorMssv: actor.studentMssv || '',
+      roundId: roundId,
+      action: actionName,
+      targetPath: details.targetPath || '',
+      timestamp: serverTimestamp(),
+      performedViaImpersonation: true
+    };
+
+    // Asynchronously log to auditLogs collection
+    await rawAddDoc(collection(db, 'auditLogs'), auditPayload).catch(e => {
+      console.warn('[Impersonation Audit] Failed to save audit log:', e);
+    });
+  } catch (err) {
+    console.warn('[Impersonation Audit] Error creating audit log:', err);
   }
 }
-window.assertNotImpersonatingForWrite = assertNotImpersonatingForWrite;
+window.logImpersonationAudit = logImpersonationAudit;
 
-export async function setDoc(...args) {
-  assertNotImpersonatingForWrite('setDoc');
-  return await rawSetDoc(...args);
+export function assertWriteAllowedForEffectiveActor(actionName = 'Thao tác', context = {}) {
+  if (!state.impersonation) {
+    return true; // Normal direct user / admin operation
+  }
+
+  // If in Act-As mode, verify system setting and real user authorization
+  if (!state.allowImpersonation) {
+    const msg = `[CHẾ ĐỘ ĐÓNG VAI] Tính năng đóng vai đang bị tắt trong Cài đặt hệ thống. Thao tác (${actionName}) bị chặn.`;
+    if (typeof showToast === 'function') showToast(msg, 'warning', 6000);
+    const err = new Error(msg);
+    err.code = 'permission-denied-impersonation-disabled';
+    throw err;
+  }
+
+  if (!state.realIsAdmin) {
+    const msg = `[CHẾ ĐỘ ĐÓNG VAI] Chỉ Quản trị viên mới được phép thực hiện thao tác trong chế độ đóng vai.`;
+    if (typeof showToast === 'function') showToast(msg, 'error', 6000);
+    const err = new Error(msg);
+    err.code = 'permission-denied-impersonation-unauthorized';
+    throw err;
+  }
+
+  // Audit log write operation
+  logImpersonationAudit(actionName, context);
+  return true;
+}
+window.assertWriteAllowedForEffectiveActor = assertWriteAllowedForEffectiveActor;
+window.assertNotImpersonatingForWrite = assertWriteAllowedForEffectiveActor; // Backward compatibility alias
+
+export async function setDoc(docRef, data, options) {
+  assertWriteAllowedForEffectiveActor('setDoc', { targetPath: docRef?.path });
+  return await rawSetDoc(docRef, data, options);
 }
 
-export async function updateDoc(...args) {
-  assertNotImpersonatingForWrite('updateDoc');
-  return await rawUpdateDoc(...args);
+export async function updateDoc(docRef, ...args) {
+  assertWriteAllowedForEffectiveActor('updateDoc', { targetPath: docRef?.path });
+  return await rawUpdateDoc(docRef, ...args);
 }
 
-export async function addDoc(...args) {
-  assertNotImpersonatingForWrite('addDoc');
-  return await rawAddDoc(...args);
+export async function addDoc(colRef, data) {
+  assertWriteAllowedForEffectiveActor('addDoc', { targetPath: colRef?.path });
+  return await rawAddDoc(colRef, data);
 }
 
-export async function deleteDoc(...args) {
-  assertNotImpersonatingForWrite('deleteDoc');
-  return await rawDeleteDoc(...args);
+export async function deleteDoc(docRef) {
+  assertWriteAllowedForEffectiveActor('deleteDoc', { targetPath: docRef?.path });
+  return await rawDeleteDoc(docRef);
 }
 
 export function writeBatch(firestore) {
-  assertNotImpersonatingForWrite('writeBatch');
+  assertWriteAllowedForEffectiveActor('writeBatch');
   const batch = rawWriteBatch(firestore);
   const origCommit = batch.commit.bind(batch);
   batch.commit = async function() {
-    assertNotImpersonatingForWrite('writeBatch.commit');
+    assertWriteAllowedForEffectiveActor('writeBatch.commit');
     return await origCommit();
   };
   return batch;
 }
 
 export async function runTransaction(firestore, updateFunction) {
-  assertNotImpersonatingForWrite('runTransaction');
+  assertWriteAllowedForEffectiveActor('runTransaction');
   return await rawRunTransaction(firestore, updateFunction);
 }
 
@@ -2060,8 +2102,9 @@ function renderConfirmationPanel() {
 window.submitRegistration = async function() {
   if (!checkImpersonationWriteGuard('Nộp đăng ký nguyện vọng đồ án')) return;
 
+  const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
   const roundId = state.selectedRoundId;
-  const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
+  const mssv = state.isPreviewMode ? state.previewMssv : (actor?.studentMssv || state.studentMssv);
   const topicTitle = (document.getElementById('input-topic-title')?.value || '').trim();
   const projectType = document.getElementById('select-project-type')?.value || '';
 
@@ -2079,10 +2122,13 @@ window.submitRegistration = async function() {
     const eligibilityStatus = isPending ? 'pending' : 'eligible';
     const directAssignment = isDirectSupervisorAssignment();
 
+    const studentName = actor?.displayName || state.user?.displayName || mssv;
+    const studentEmail = actor?.email || state.user?.email || `${mssv}@student.tdtu.edu.vn`;
+
     const payload = {
       studentId: mssv,
-      studentName: state.user?.displayName || mssv,
-      email: state.user?.email || `${mssv}@student.tdtu.edu.vn`,
+      studentName: studentName,
+      email: studentEmail,
       topicTitle,
       projectType,
       preferences: directAssignment ? [] : state.selectedPreferences.map(p => ({
@@ -2118,14 +2164,15 @@ window.submitRegistration = async function() {
 export async function loadSupervisorReviewData(roundId) {
   if (!roundId) return;
 
-  const emailLower = (state.user?.email || '').toLowerCase();
-  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower);
+  const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
+  const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
+  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
 
   const greetingEl = document.getElementById('supervisor-greeting-name');
   const roundInfoEl = document.getElementById('supervisor-round-info');
   const activeBadgeEl = document.getElementById('sup-active-round-badge');
 
-  if (greetingEl) greetingEl.textContent = `Kính chào Thầy/Cô ${currentSup?.name || state.user?.displayName || ''}`;
+  if (greetingEl) greetingEl.textContent = `Kính chào Thầy/Cô ${currentSup?.name || actor?.displayName || state.user?.displayName || ''}`;
   if (roundInfoEl) roundInfoEl.textContent = `Đợt tốt nghiệp: ${state.activeRound?.title || ''} (${state.activeRound?.academicYear || ''})`;
   if (activeBadgeEl) activeBadgeEl.textContent = state.activeRound?.roundName || state.activeRound?.title || 'Đợt ĐATN';
 
@@ -2307,10 +2354,11 @@ window.filterSupervisorCandidates = function() {
 window.toggleSupervisorDecision = async function(studentId) {
   if (!checkImpersonationWriteGuard('Thay đổi quyết định chọn sinh viên')) return;
 
+  const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
   const roundId = state.selectedRoundId;
   const currentRound = state.activeRound?.currentReviewRound || 1;
-  const emailLower = (state.user?.email || '').toLowerCase();
-  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower);
+  const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
+  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
 
   if (!roundId || !currentSup) return;
 
@@ -2380,10 +2428,11 @@ window.closeSupervisorConfirmModal = function() {
 window.confirmSupervisorRoundCompletion = async function() {
   if (!checkImpersonationWriteGuard('Xác nhận hoàn thành vòng chọn sinh viên')) return;
 
+  const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
   const roundId = state.selectedRoundId;
   const currentRound = state.activeRound?.currentReviewRound || 1;
-  const emailLower = (state.user?.email || '').toLowerCase();
-  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower);
+  const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
+  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
 
   if (!roundId || !currentSup) return;
 
@@ -2407,6 +2456,7 @@ window.confirmSupervisorRoundCompletion = async function() {
 };
 
 window.reopenSupervisorRound = async function() {
+  const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
   const roundId = state.selectedRoundId;
   const currentRound = state.activeRound?.currentReviewRound || 1;
   const isLocked = Boolean(state.activeRound?.reviewLocks && state.activeRound?.reviewLocks['round_' + currentRound]);
@@ -2416,8 +2466,8 @@ window.reopenSupervisorRound = async function() {
     return;
   }
 
-  const emailLower = (state.user?.email || '').toLowerCase();
-  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower);
+  const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
+  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
   if (!roundId || !currentSup) return;
 
   if (!(await showConfirm('Mở lại vòng lựa chọn', `Mở lại Vòng ${currentRound} để chỉnh sửa danh sách lựa chọn?`, { confirmText: 'Mở lại vòng', danger: false }))) return;
@@ -6280,7 +6330,7 @@ window.exitPreviewMode = function() {
 };
 
 // ============================================================================
-// FEATURE: ADMIN IMPERSONATION / ACT-AS TEST MODE (v2.6.0-beta.1)
+// FEATURE: ADMIN EXACT ACT-AS TEST MODE (v2.7.0-beta.1)
 // ============================================================================
 
 export function isImpersonating() {
@@ -6319,7 +6369,7 @@ export function getEffectiveActor() {
       councilRole: target.councilRole || '',
       activityName: target.activityName || '',
       impersonating: true,
-      readOnly: true,
+      readOnly: false, // EXACT ACT-AS MODE: real test actions enabled
       realUser: state.realUser || state.user
     };
   }
@@ -6347,8 +6397,7 @@ export function getEffectiveActor() {
 
 export function checkImpersonationWriteGuard(actionDesc = 'Thao tác') {
   if (state.impersonation) {
-    assertNotImpersonatingForWrite(actionDesc);
-    return false;
+    return assertWriteAllowedForEffectiveActor(actionDesc);
   }
   return true;
 }
@@ -6393,13 +6442,18 @@ export function setupSystemSettingsRealtimeListener() {
 
       state.allowImpersonation = isAllowed;
 
-      // Update toggle / status label in Admin Settings if open
+      // Update toggle / status label / control box in Admin Settings if open
       const toggle = document.getElementById('toggle-admin-impersonation');
       const label = document.getElementById('impersonation-status-label');
+      const box = document.getElementById('settings-actas-control-box');
       if (toggle) toggle.checked = isAllowed;
       if (label) {
         label.textContent = isAllowed ? 'Đang bật' : 'Đang tắt';
         label.className = isAllowed ? 'text-[11px] font-bold text-amber-600' : 'text-[11px] font-bold text-slate-500';
+      }
+      if (box) {
+        if (isAllowed) box.classList.remove('hidden');
+        else box.classList.add('hidden');
       }
 
       // Realtime session termination if turned off while an impersonation session is active
@@ -6423,7 +6477,7 @@ export async function loadAdminSystemSettings() {
   const toggle = document.getElementById('toggle-admin-impersonation');
   const label = document.getElementById('impersonation-status-label');
   const warning = document.getElementById('impersonation-permission-warning');
-
+  const box = document.getElementById('settings-actas-control-box');
   const isOwner = isSystemOwner();
 
   try {
@@ -6445,11 +6499,123 @@ export async function loadAdminSystemSettings() {
       if (!isOwner) warning.classList.remove('hidden');
       else warning.classList.add('hidden');
     }
+
+    if (box) {
+      if (state.allowImpersonation) {
+        box.classList.remove('hidden');
+        // Populate Round options in System Settings
+        const roundSelect = document.getElementById('settings-actas-round');
+        if (roundSelect) {
+          const rounds = (state.rounds || []).filter(r => !r.deleted);
+          let opts = '<option value="all">-- Tất cả các đợt --</option>';
+          rounds.forEach(r => {
+            const isAct = r.isActive ? ' (Hiện hành)' : '';
+            opts += `<option value="${r.id}">${escapeHtml(r.roundName || r.title || r.id)}${isAct}</option>`;
+          });
+          roundSelect.innerHTML = opts;
+          if (state.selectedRoundId && rounds.some(r => r.id === state.selectedRoundId)) {
+            roundSelect.value = state.selectedRoundId;
+          }
+        }
+        await populateSettingsActAsCandidates();
+      } else {
+        box.classList.add('hidden');
+      }
+    }
+
+    updateSettingsActAsSessionUI();
   } catch (e) {
     console.warn('[SystemSettings] Error loading settings:', e);
   }
 }
 window.loadAdminSystemSettings = loadAdminSystemSettings;
+
+function updateSettingsActAsSessionUI() {
+  const currentInfo = document.getElementById('settings-actas-current-info');
+  const exitBtn = document.getElementById('btn-settings-actas-exit');
+  const startBtn = document.getElementById('btn-settings-actas-start');
+
+  if (state.impersonation && state.impersonation.target) {
+    const t = state.impersonation.target;
+    if (currentInfo) {
+      currentInfo.innerHTML = `<span class="text-amber-800 font-bold">🎭 Đang đóng vai:</span> <span class="font-bold text-slate-900">${escapeHtml(t.name || '')}</span> <span class="text-slate-500 text-[11px]">(${escapeHtml(t.mssv || t.email || '')})</span> <span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 font-bold">${escapeHtml(t.roleLabel || t.type)}</span>`;
+    }
+    if (exitBtn) exitBtn.classList.remove('hidden');
+  } else {
+    if (currentInfo) {
+      currentInfo.innerHTML = `<span class="text-slate-500 text-xs">Chưa có phiên đóng vai nào đang kích hoạt.</span>`;
+    }
+    if (exitBtn) exitBtn.classList.add('hidden');
+  }
+}
+
+export async function onSettingsActAsRoundOrRoleChange() {
+  await populateSettingsActAsCandidates();
+}
+window.onSettingsActAsRoundOrRoleChange = onSettingsActAsRoundOrRoleChange;
+
+let settingsActAsSearchTimer = null;
+export function onSettingsActAsSearchInput(val) {
+  clearTimeout(settingsActAsSearchTimer);
+  settingsActAsSearchTimer = setTimeout(async () => {
+    await populateSettingsActAsCandidates();
+  }, 250);
+}
+window.onSettingsActAsSearchInput = onSettingsActAsSearchInput;
+
+export async function populateSettingsActAsCandidates() {
+  const roundSelect = document.getElementById('settings-actas-round');
+  const roleSelect = document.getElementById('settings-actas-role');
+  const searchInput = document.getElementById('settings-actas-search');
+  const userSelect = document.getElementById('settings-actas-user');
+  const countEl = document.getElementById('settings-actas-user-count');
+
+  if (!userSelect) return;
+
+  const roundFilter = roundSelect ? roundSelect.value : 'all';
+  const roleFilter = roleSelect ? roleSelect.value : 'student';
+  const searchQuery = searchInput ? (searchInput.value || '').trim().toLowerCase() : '';
+
+  userSelect.innerHTML = '<option value="">⏳ Đang nạp danh sách người dùng...</option>';
+
+  const candidates = await gatherRoundCandidates(roundFilter, roleFilter, searchQuery);
+  state.settingsActAsCandidates = candidates;
+
+  if (countEl) countEl.textContent = `${candidates.length} người dùng`;
+
+  if (candidates.length === 0) {
+    userSelect.innerHTML = '<option value="">(Không tìm thấy người dùng phù hợp với bộ lọc)</option>';
+    return;
+  }
+
+  userSelect.innerHTML = candidates.map((c, idx) => {
+    const ident = c.mssv || c.email || c.id || '';
+    const extra = c.department ? ` - BM: ${c.department}` : (c.roundTitle ? ` - ${c.roundTitle}` : '');
+    return `<option value="${idx}">[${escapeHtml(c.roleLabel)}] ${escapeHtml(c.name)} (${escapeHtml(ident)})${escapeHtml(extra)}</option>`;
+  }).join('');
+  userSelect.selectedIndex = 0;
+}
+window.populateSettingsActAsCandidates = populateSettingsActAsCandidates;
+
+export function onSettingsActAsStartClick() {
+  const userSelect = document.getElementById('settings-actas-user');
+  if (!userSelect || userSelect.selectedIndex < 0) {
+    showToast('Vui lòng chọn 1 người dùng từ danh sách để đóng vai.', 'warning');
+    return;
+  }
+
+  const idx = parseInt(userSelect.value, 10);
+  const candidates = state.settingsActAsCandidates || [];
+  const selectedCand = candidates[idx];
+
+  if (!selectedCand) {
+    showToast('Người dùng không hợp lệ.', 'warning');
+    return;
+  }
+
+  window.startImpersonating(selectedCand);
+}
+window.onSettingsActAsStartClick = onSettingsActAsStartClick;
 
 window.onToggleAdminImpersonation = async function(enabled) {
   const isOwner = isSystemOwner();
@@ -6476,6 +6642,16 @@ window.onToggleAdminImpersonation = async function(enabled) {
       label.className = state.allowImpersonation ? 'text-[11px] font-bold text-amber-600' : 'text-[11px] font-bold text-slate-500';
     }
 
+    const box = document.getElementById('settings-actas-control-box');
+    if (box) {
+      if (state.allowImpersonation) {
+        box.classList.remove('hidden');
+        await populateSettingsActAsCandidates();
+      } else {
+        box.classList.add('hidden');
+      }
+    }
+
     // If disabled, auto terminate any active impersonation sessions
     if (!state.allowImpersonation && state.impersonation) {
       await exitImpersonation();
@@ -6484,7 +6660,7 @@ window.onToggleAdminImpersonation = async function(enabled) {
     updateAuthUI();
     hideLoading();
     if (typeof showToast === 'function') {
-      showToast(state.allowImpersonation ? '✓ Đã bật tính năng Đóng vai người dùng.' : '✓ Đã tắt tính năng Đóng vai người dùng.', 'success', 3000);
+      showToast(state.allowImpersonation ? '✓ Đã bật tính năng Đóng vai người dùng (Exact Act-As Mode).' : '✓ Đã tắt tính năng Đóng vai người dùng.', 'success', 3000);
     }
   } catch (e) {
     hideLoading();
@@ -6579,6 +6755,8 @@ export function applyImpersonationActor(target) {
   const lockTargetRole = document.getElementById('admin-lock-target-role');
   if (lockTargetName) lockTargetName.textContent = `${target.name} (${target.email || mssv})`;
   if (lockTargetRole) lockTargetRole.textContent = target.roleLabel || target.type;
+
+  updateSettingsActAsSessionUI();
 }
 window.applyImpersonationActor = applyImpersonationActor;
 
@@ -6599,7 +6777,7 @@ window.startImpersonating = async function(target) {
       displayName: state.realUser?.displayName || ''
     },
     target: target,
-    mode: 'read_only',
+    mode: 'act_as_write', // EXACT ACT-AS TEST MODE
     startedAt: Date.now()
   };
 
@@ -6615,7 +6793,7 @@ window.startImpersonating = async function(target) {
   updateAuthUI();
 
   if (typeof showToast === 'function') {
-    showToast(`Đã bắt đầu đóng vai: ${target.name} (${target.roleLabel || target.type}) - Chế độ Chỉ đọc.`, 'info', 4000);
+    showToast(`⚡ Bắt đầu đóng vai: ${target.name} (${target.roleLabel || target.type}) — Chế độ thao tác thực tế.`, 'info', 4000);
   }
 
   // Navigate to corresponding portal
@@ -6669,6 +6847,7 @@ window.exitImpersonation = async function() {
   }
 
   updateAuthUI();
+  updateSettingsActAsSessionUI();
 
   const currentPortal = getCurrentPortal();
   if (currentPortal === 'admin' || state.currentView === 'admin') {
@@ -6702,78 +6881,7 @@ window.goToCurrentRolePortal = function() {
   }
 };
 
-window.openAdminImpersonateModal = function() {
-  if (!state.allowImpersonation || !state.realIsAdmin) {
-    alert('Tính năng đóng vai chưa được bật trong Cài đặt hệ thống hoặc bạn không có quyền.');
-    return;
-  }
-
-  const roundSelect = document.getElementById('impersonate-filter-round');
-  if (roundSelect) {
-    const rounds = (state.rounds || []).filter(r => !r.deleted);
-    let opts = '<option value="all">-- Tất cả các đợt --</option>';
-    rounds.forEach(r => {
-      const isAct = r.isActive ? ' (Hiện hành)' : '';
-      opts += `<option value="${r.id}">${escapeHtml(r.roundName || r.title || r.id)}${isAct}</option>`;
-    });
-    roundSelect.innerHTML = opts;
-    if (state.selectedRoundId && rounds.some(r => r.id === state.selectedRoundId)) {
-      roundSelect.value = state.selectedRoundId;
-    }
-  }
-
-  const roleSelect = document.getElementById('impersonate-filter-role');
-  if (roleSelect) roleSelect.value = 'all';
-
-  const searchInput = document.getElementById('impersonate-search-input');
-  if (searchInput) searchInput.value = '';
-
-  const modal = document.getElementById('modal-admin-impersonate');
-  if (modal) modal.classList.remove('hidden');
-
-  state.selectedImpersonateCandidate = null;
-  const confirmBtn = document.getElementById('btn-confirm-impersonate');
-  const confirmText = document.getElementById('btn-confirm-impersonate-text');
-  if (confirmBtn) confirmBtn.disabled = true;
-  if (confirmText) confirmText.textContent = 'Đóng vai người đã chọn';
-
-  gatherAndRenderImpersonateCandidates();
-};
-
-window.closeAdminImpersonateModal = function() {
-  const modal = document.getElementById('modal-admin-impersonate');
-  if (modal) modal.classList.add('hidden');
-};
-
-window.onImpersonateFiltersChange = function() {
-  state.selectedImpersonateCandidate = null;
-  const confirmBtn = document.getElementById('btn-confirm-impersonate');
-  const confirmText = document.getElementById('btn-confirm-impersonate-text');
-  if (confirmBtn) confirmBtn.disabled = true;
-  if (confirmText) confirmText.textContent = 'Đóng vai người đã chọn';
-
-  gatherAndRenderImpersonateCandidates();
-};
-
-let impersonateSearchTimer = null;
-window.onImpersonateSearchInput = function() {
-  clearTimeout(impersonateSearchTimer);
-  impersonateSearchTimer = setTimeout(() => {
-    gatherAndRenderImpersonateCandidates();
-  }, 250);
-};
-
-async function gatherAndRenderImpersonateCandidates() {
-  const roundFilter = document.getElementById('impersonate-filter-round')?.value || 'all';
-  const roleFilter = document.getElementById('impersonate-filter-role')?.value || 'all';
-  const searchQuery = (document.getElementById('impersonate-search-input')?.value || '').trim().toLowerCase();
-  const listEl = document.getElementById('impersonate-candidates-list');
-  const countEl = document.getElementById('impersonate-candidate-count');
-
-  if (listEl) {
-    listEl.innerHTML = '<div class="text-center py-6 text-slate-400">Đang tải danh sách người dùng thực tế...</div>';
-  }
-
+export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'all', searchQuery = '') {
   const candidates = [];
   const candidateKeys = new Set();
 
@@ -6875,12 +6983,33 @@ async function gatherAndRenderImpersonateCandidates() {
             }
           });
         } catch (e) {}
+
+        try {
+          const snapEligible = await getDocs(collection(db, 'graduationRounds', r.id, 'eligibleStudents'));
+          snapEligible.docs.forEach(d => {
+            const st = d.data();
+            const sid = d.id || st.mssv || st.studentId;
+            if (sid) {
+              addCandidate({
+                type: 'student',
+                id: sid,
+                mssv: sid,
+                name: st.studentName || st.name || sid,
+                email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
+                roundId: r.id,
+                roundTitle: r.roundName || r.title || r.id,
+                topicTitle: '',
+                roleLabel: 'Sinh viên'
+              });
+            }
+          });
+        } catch (e) {}
       }
     }
 
     // Also check facultyStudents if candidates are empty
     if (candidates.filter(c => c.type === 'student').length === 0 && Array.isArray(state.facultyStudents) && state.facultyStudents.length > 0) {
-      state.facultyStudents.slice(0, 30).forEach(fs => {
+      state.facultyStudents.slice(0, 50).forEach(fs => {
         const sid = fs.mssv || fs.studentId;
         if (sid) {
           addCandidate({
@@ -6995,6 +7124,84 @@ async function gatherAndRenderImpersonateCandidates() {
     return matchName || matchEmail || matchMssv || matchCode || matchDept || matchTopic || matchRole;
   });
 
+  return filtered;
+}
+window.gatherRoundCandidates = gatherRoundCandidates;
+
+window.openAdminImpersonateModal = function() {
+  if (!state.allowImpersonation || !state.realIsAdmin) {
+    alert('Tính năng đóng vai chưa được bật trong Cài đặt hệ thống hoặc bạn không có quyền.');
+    return;
+  }
+
+  const roundSelect = document.getElementById('impersonate-filter-round');
+  if (roundSelect) {
+    const rounds = (state.rounds || []).filter(r => !r.deleted);
+    let opts = '<option value="all">-- Tất cả các đợt --</option>';
+    rounds.forEach(r => {
+      const isAct = r.isActive ? ' (Hiện hành)' : '';
+      opts += `<option value="${r.id}">${escapeHtml(r.roundName || r.title || r.id)}${isAct}</option>`;
+    });
+    roundSelect.innerHTML = opts;
+    if (state.selectedRoundId && rounds.some(r => r.id === state.selectedRoundId)) {
+      roundSelect.value = state.selectedRoundId;
+    }
+  }
+
+  const roleSelect = document.getElementById('impersonate-filter-role');
+  if (roleSelect) roleSelect.value = 'all';
+
+  const searchInput = document.getElementById('impersonate-search-input');
+  if (searchInput) searchInput.value = '';
+
+  const modal = document.getElementById('modal-admin-impersonate');
+  if (modal) modal.classList.remove('hidden');
+
+  state.selectedImpersonateCandidate = null;
+  const confirmBtn = document.getElementById('btn-confirm-impersonate');
+  const confirmText = document.getElementById('btn-confirm-impersonate-text');
+  if (confirmBtn) confirmBtn.disabled = true;
+  if (confirmText) confirmText.textContent = 'Bắt đầu đóng vai';
+
+  gatherAndRenderImpersonateCandidates();
+};
+
+window.closeAdminImpersonateModal = function() {
+  const modal = document.getElementById('modal-admin-impersonate');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.onImpersonateFiltersChange = function() {
+  state.selectedImpersonateCandidate = null;
+  const confirmBtn = document.getElementById('btn-confirm-impersonate');
+  const confirmText = document.getElementById('btn-confirm-impersonate-text');
+  if (confirmBtn) confirmBtn.disabled = true;
+  if (confirmText) confirmText.textContent = 'Bắt đầu đóng vai';
+
+  gatherAndRenderImpersonateCandidates();
+};
+
+let impersonateSearchTimer = null;
+window.onImpersonateSearchInput = function() {
+  clearTimeout(impersonateSearchTimer);
+  impersonateSearchTimer = setTimeout(() => {
+    gatherAndRenderImpersonateCandidates();
+  }, 250);
+};
+
+async function gatherAndRenderImpersonateCandidates() {
+  const roundFilter = document.getElementById('impersonate-filter-round')?.value || 'all';
+  const roleFilter = document.getElementById('impersonate-filter-role')?.value || 'all';
+  const searchQuery = (document.getElementById('impersonate-search-input')?.value || '').trim().toLowerCase();
+  const listEl = document.getElementById('impersonate-candidates-list');
+  const countEl = document.getElementById('impersonate-candidate-count');
+
+  if (listEl) {
+    listEl.innerHTML = '<div class="text-center py-6 text-slate-400">Đang tải danh sách người dùng thực tế...</div>';
+  }
+
+  const filtered = await gatherRoundCandidates(roundFilter, roleFilter, searchQuery);
+
   filtered.forEach((c, idx) => {
     c.candKey = `cand_${idx}`;
   });
@@ -7092,7 +7299,7 @@ window.selectImpersonateCandidate = function(candKey) {
   }
   if (confirmText) {
     const ident = cand.mssv || cand.email || cand.id || '';
-    confirmText.textContent = `Đóng vai: ${cand.name} (${ident})`;
+    confirmText.textContent = `Bắt đầu đóng vai: ${cand.name} (${ident})`;
   }
 };
 

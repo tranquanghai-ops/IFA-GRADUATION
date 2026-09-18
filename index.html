@@ -45,7 +45,7 @@
     </div>
   </div>
 
-  <!-- GLOBAL IMPERSONATION BANNER (v2.6.0-beta.1) -->
+  <!-- GLOBAL IMPERSONATION BANNER (v2.7.0-beta.1) -->
   <div id="global-impersonation-banner" class="hidden bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-slate-950 px-4 py-2.5 shadow-lg border-b border-amber-400 sticky top-0 z-50">
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
       <div class="flex items-center gap-2.5">
@@ -60,7 +60,7 @@
           <span class="hidden sm:inline-block mx-1.5 text-black/30">•</span>
           <span class="hidden sm:inline-block text-amber-950 font-medium text-[11px]" id="impersonate-banner-round">Đợt tốt nghiệp</span>
           <span class="hidden md:inline-block mx-1.5 text-black/30">•</span>
-          <span class="hidden md:inline-block text-[10px] text-amber-950 font-bold bg-amber-400/50 px-1.5 py-0.5 rounded border border-amber-600/30">🔒 Read-only Safe Mode</span>
+          <span class="hidden md:inline-block text-[10px] text-amber-950 font-bold bg-amber-400/50 px-1.5 py-0.5 rounded border border-amber-600/30">⚡ Real Test Actions</span>
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
@@ -83,7 +83,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation Beta</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v2.6.0-beta.1</span>
+              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v2.7.0-beta.1</span>
             </div>
             <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
           </div>
@@ -2905,13 +2905,13 @@
           <div class="p-5 rounded-2xl border border-slate-200 bg-slate-50/80 space-y-4">
             <div class="flex items-start justify-between gap-4">
               <div class="space-y-1.5">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-xl">🎭</span>
-                  <h4 class="font-black text-sm text-slate-900">Cho phép Admin đóng vai người dùng (Impersonation / Act-as Test Mode)</h4>
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">v2.6.0</span>
+                  <h4 class="font-black text-sm text-slate-900">Cho phép Admin đóng vai người dùng (Exact Act-As Test Mode)</h4>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">v2.7.0-beta.1</span>
                 </div>
                 <p class="text-xs text-slate-600 leading-relaxed max-w-2xl">
-                  Bật công cụ cho phép Quản trị viên đóng vai một người dùng thực tế (Sinh viên, GVHD, Giảng viên phản biện, Thành viên Hội đồng) để kiểm thử giao diện và phân quyền trực tiếp.
+                  Bật công cụ cho phép Quản trị viên đóng vai một người dùng thực tế trong đợt cụ thể để kiểm thử toàn diện quy trình và phân quyền với đầy đủ quyền thao tác thực tế (Real Test Actions).
                 </p>
                 <div class="text-[11px] text-slate-500 italic mt-1">
                   🔒 Quyền cấu hình: Chỉ <strong>Chủ sở hữu hệ thống (Owner)</strong> mới có quyền bật/tắt thiết lập này. Khi tắt, tất cả phiên đóng vai đang hoạt động sẽ tự động kết thúc.
@@ -2930,6 +2930,80 @@
             <div id="impersonation-permission-warning" class="hidden p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
               <span>⚠️</span>
               <span>Bạn đang đăng nhập với quyền Quản trị viên thường. Chỉ Quản trị viên cấp cao nhất (tranquanghai@tdtu.edu.vn) mới có quyền thay đổi thiết lập này.</span>
+            </div>
+
+            <!-- INLINE EXACT ACT-AS CONTROLS (EXPANDS WHEN TOGGLE IS ON) -->
+            <div id="settings-actas-control-box" class="hidden pt-3 border-t border-slate-200 space-y-4">
+              <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <span class="font-bold text-xs uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <span>🎯</span> <span>Cấu hình phiên đóng vai (Act-As Session)</span>
+                  </span>
+                  <span id="settings-actas-active-pill" class="hidden px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white animate-pulse">
+                    ĐANG ĐÓNG VAI
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <!-- 1. Round selector -->
+                  <div>
+                    <label for="settings-actas-round" class="block font-bold text-slate-700 mb-1 text-[11px] uppercase tracking-wider">
+                      1. Đợt tốt nghiệp <span class="text-rose-500">*</span>:
+                    </label>
+                    <select id="settings-actas-round" onchange="onSettingsActAsRoundOrRoleChange()" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-amber-500">
+                      <!-- Populated dynamically -->
+                    </select>
+                  </div>
+
+                  <!-- 2. Role selector -->
+                  <div>
+                    <label for="settings-actas-role" class="block font-bold text-slate-700 mb-1 text-[11px] uppercase tracking-wider">
+                      2. Vai trò <span class="text-rose-500">*</span>:
+                    </label>
+                    <select id="settings-actas-role" onchange="onSettingsActAsRoundOrRoleChange()" class="w-full p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-amber-500">
+                      <option value="student">🎓 Sinh viên (Student)</option>
+                      <option value="supervisor">👨‍🏫 Giảng viên hướng dẫn (GVHD)</option>
+                      <option value="reviewer">🔍 Giảng viên phản biện (Reviewer)</option>
+                      <option value="preliminary">📋 Cán bộ Sơ khảo (Preliminary)</option>
+                      <option value="council">⚖️ Thành viên Hội đồng (Council)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- 3. User searchable select -->
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <label for="settings-actas-user" class="block font-bold text-slate-700 text-[11px] uppercase tracking-wider">
+                      3. Chính xác người dùng trong đợt <span class="text-rose-500">*</span>:
+                    </label>
+                    <span id="settings-actas-user-count" class="text-[11px] text-slate-400 font-medium">0 người dùng</span>
+                  </div>
+                  
+                  <div>
+                    <input type="text" id="settings-actas-search" oninput="onSettingsActAsSearchInput(this.value)" placeholder="🔍 Lọc nhanh theo họ tên, MSSV, email..." class="w-full mb-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:ring-1 focus:ring-amber-500">
+                  </div>
+                  
+                  <select id="settings-actas-user" size="5" class="w-full p-2 bg-white border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-amber-500 overflow-y-auto">
+                    <!-- Populated dynamically based on Round + Role -->
+                  </select>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <div id="settings-actas-current-info" class="text-xs text-slate-600 font-medium">
+                    <!-- Displays active session info if active -->
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" id="btn-settings-actas-exit" onclick="exitImpersonation()" class="hidden px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs transition-all cursor-pointer">
+                      Thoát đóng vai
+                    </button>
+                    <button type="button" id="btn-settings-actas-start" onclick="onSettingsActAsStartClick()" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
+                      <span>🎭</span>
+                      <span>Bắt đầu đóng vai</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -5240,7 +5314,7 @@
   </div>
 
   <!-- ============================================================================
-       MODAL: ADMIN IMPERSONATION / ACT-AS TEST MODE (v2.6.0-beta.1)
+       MODAL: ADMIN IMPERSONATION / EXACT ACT-AS TEST MODE (v2.7.0-beta.1)
        ============================================================================ -->
   <div id="modal-admin-impersonate" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[90vh]">
@@ -5248,8 +5322,8 @@
         <div class="flex items-center gap-2.5">
           <span class="text-2xl">🎭</span>
           <div>
-            <h4 class="font-black text-sm text-slate-950 uppercase tracking-tight">Đóng vai người dùng (Act-As Test Mode)</h4>
-            <p class="text-[11px] text-amber-950 font-medium">Kiểm thử giao diện & phân quyền chính xác dưới góc nhìn của người dùng thực tế</p>
+            <h4 class="font-black text-sm text-slate-950 uppercase tracking-tight">Đóng vai người dùng (Exact Act-As Test Mode)</h4>
+            <p class="text-[11px] text-amber-950 font-medium">Kiểm thử giao diện & phân quyền chính xác với đầy đủ quyền thao tác thực tế</p>
           </div>
         </div>
         <button type="button" onclick="closeAdminImpersonateModal()" class="text-slate-900 hover:text-black font-bold p-1 text-base cursor-pointer">✕</button>
@@ -5272,8 +5346,8 @@
               <option value="student">🎓 Sinh viên (Student)</option>
               <option value="supervisor">👨‍🏫 Giảng viên hướng dẫn (GVHD)</option>
               <option value="reviewer">🔍 Giảng viên phản biện (Reviewer)</option>
-              <option value="council">⚖️ Thành viên Hội đồng (Council)</option>
               <option value="preliminary">📋 Cán bộ Sơ khảo (Preliminary)</option>
+              <option value="council">⚖️ Thành viên Hội đồng (Council)</option>
             </select>
           </div>
         </div>
@@ -5289,7 +5363,7 @@
 
         <div class="flex items-center justify-between text-[11px] text-slate-500">
           <span>Tìm thấy: <strong id="impersonate-candidate-count" class="text-slate-900 font-bold">0</strong> người dùng thực tế</span>
-          <span class="text-amber-800 font-bold flex items-center gap-1">🔒 Read-only Safe Mode</span>
+          <span class="text-amber-800 font-bold flex items-center gap-1">⚡ Real Test Actions Enabled</span>
         </div>
       </div>
 
@@ -5300,12 +5374,12 @@
 
       <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div class="text-[11px] text-slate-500">
-          💡 Chọn đúng 1 người dùng để đóng vai. Hệ thống hoạt động ở chế độ <b>Chỉ đọc (Read-only Safe Mode)</b> và hoàn toàn tước quyền Admin.
+          💡 Chọn đúng 1 người dùng để đóng vai. Mọi thao tác ghi sẽ được ghi nhận cho đúng tài khoản đó kèm nhật ký kiểm toán (Audit Log).
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <button type="button" onclick="closeAdminImpersonateModal()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer">Hủy</button>
           <button type="button" id="btn-confirm-impersonate" onclick="confirmImpersonateSelectedCandidate()" disabled class="px-5 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-slate-950 font-black rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
-            <span>🎭</span> <span id="btn-confirm-impersonate-text">Đóng vai người đã chọn</span>
+            <span>🎭</span> <span id="btn-confirm-impersonate-text">Bắt đầu đóng vai</span>
           </button>
         </div>
       </div>
