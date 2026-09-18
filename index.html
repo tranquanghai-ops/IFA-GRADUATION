@@ -213,6 +213,17 @@
 
               <!-- Quick Metrics Bar inside Hero -->
               <div class="flex flex-wrap items-center gap-3 pt-2 text-xs text-blue-100">
+                <!-- Clickable Student Info Pill -->
+                <button type="button" onclick="openStudentProfileModal()" id="hero-student-profile-btn" class="flex items-center gap-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 px-3 py-1.5 rounded-xl border border-white/20 transition-all cursor-pointer shadow-2xs text-left" title="Xem thông tin chi tiết sinh viên">
+                  <img id="hero-student-avatar" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23fff'/><path fill='%23fff' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" class="w-6 h-6 rounded-md object-cover border border-white/30 shrink-0" alt="Avatar">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1">
+                      <span id="hero-student-name" class="font-bold text-white text-xs truncate">--</span>
+                      <span class="text-[9px] text-blue-200">ℹ️</span>
+                    </div>
+                    <span id="hero-student-mssv" class="text-[10px] text-blue-200 font-mono block">MSSV: --</span>
+                  </div>
+                </button>
                 <div class="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10">
                   <span>📌</span>
                   <span id="hero-milestones-count">-- mốc kế hoạch</span>
@@ -620,34 +631,6 @@
             </div>
 
         </div>
-
-        <!-- 4. BOTTOM SECTION: STUDENT PROFILE & SUPPORT CARDS -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
-
-          <!-- Student Profile & Status Summary Card -->
-          <div id="student-status-sidebar" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <!-- Populated dynamically by updateStudentPersonalSidebar() -->
-          </div>
-
-          <!-- Student Support Card -->
-          <div class="card-surface p-5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 space-y-3 flex flex-col justify-between">
-            <div class="space-y-2">
-              <div class="flex items-center gap-2 font-bold text-slate-800 text-sm">
-                <span>ℹ️</span>
-                <span>Hỗ trợ Sinh viên Đồ án Tốt nghiệp</span>
-              </div>
-              <p class="text-xs leading-relaxed text-slate-500">
-                Mọi thắc mắc về điều kiện xét duyệt, phân công GVHD hoặc sự cố nộp bài, sinh viên vui lòng liên hệ Văn phòng Khoa Mỹ thuật Công nghiệp.
-              </p>
-            </div>
-            <div class="pt-3 text-xs font-mono text-slate-700 border-t border-slate-200/80 flex flex-col gap-1.5">
-              <span>📍 <strong>Văn phòng Khoa:</strong> P.402 Nhà C</span>
-              <span>✉️ <strong>Email:</strong> mythuatcongnghiep@tdtu.edu.vn</span>
-            </div>
-          </div>
-
-        </div>
-
       </div>
 
     </section>
@@ -3605,6 +3588,22 @@
           <button type="submit" class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md">Lưu</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- 4.5. STUDENT PROFILE MODAL -->
+  <div id="modal-student-profile" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 relative">
+      <button type="button" onclick="closeStudentProfileModal()" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer">✕</button>
+
+      <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
+        <span class="text-xl">🎓</span>
+        <h3 class="font-bold text-base text-slate-900">Hồ sơ Sinh viên</h3>
+      </div>
+
+      <div id="student-profile-modal-body" class="space-y-4">
+        <!-- Injected dynamically by renderStudentProfileInfo() -->
+      </div>
     </div>
   </div>
 

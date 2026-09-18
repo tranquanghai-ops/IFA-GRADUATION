@@ -373,9 +373,10 @@ service cloud.firestore {
           || (staff() && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(email())));
         allow list: if admin() || staff();
 
-        // Tạo mới: Chỉ sinh viên chính chủ, đủ điều kiện, đợt open, trong khoảng thời gian mở/đóng
-        allow create: if student()
-          && email().matches('^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
+        // Tạo mới: Admin cấp cao / Chủ sở hữu HOẶC Sinh viên chính chủ đủ điều kiện
+        allow create: if (admin())
+          || (student()
+            && email().matches('^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
           && request.resource.data.studentId == studentId
           && request.resource.data.email == email()
           && request.resource.data.status == 'submitted'
@@ -397,7 +398,7 @@ service cloud.firestore {
           && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['openAt']) 
               || request.time >= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.openAt)
           && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt']) 
-              || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt);
+              || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt));
 
         // Cập nhật: Admin (duyệt/chốt/phân công) HOẶC Sinh viên chính chủ khi đợt mở và cho phép sửa
         allow update: if (admin())

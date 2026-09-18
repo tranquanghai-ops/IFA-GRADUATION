@@ -2090,25 +2090,17 @@ window.validateAndGoToStep2 = function() {
     return;
   }
 
-  // Check Interior Design requirement:
-  // If student major or projectType or current round contains "nội thất"
-  const studentMajor = (state.currentStudentInfo?.major || '').toLowerCase();
-  const roundName = (state.activeRound?.name || '').toLowerCase();
-  const isInteriorDesign = studentMajor.includes('nội thất') || 
-                           projectType.toLowerCase().includes('nội thất') || 
-                           roundName.includes('nội thất');
-
-  if (isInteriorDesign) {
-    if (!topic.toLowerCase().startsWith('thiết kế nội thất')) {
-      const msg = 'Tên đề tài của sinh viên ngành Thiết kế nội thất BẮT BUỘC phải bắt đầu bằng cụm từ "Thiết kế nội thất".';
-      if (errorEl) {
-        errorEl.textContent = msg;
-        errorEl.classList.remove('hidden');
-      }
-      showToast(msg, 'error');
-      topicInput?.focus();
-      return;
+  // Requirement 6: Topic title MUST start with "Thiết kế nội thất" (case-insensitive)
+  const trimmedTopic = topic.trim().toLowerCase();
+  if (!trimmedTopic.startsWith('thiết kế nội thất')) {
+    const msg = 'Tên đề tài BẮT BUỘC phải bắt đầu bằng cụm từ "Thiết kế nội thất". Ví dụ: "Thiết kế nội thất Trung tâm văn hóa..."';
+    if (errorEl) {
+      errorEl.textContent = msg;
+      errorEl.classList.remove('hidden');
     }
+    showToast(msg, 'error');
+    topicInput?.focus();
+    return;
   }
 
   if (!projectType) {
@@ -2158,17 +2150,25 @@ function renderConfirmationPanel() {
   if (preferencesSection) preferencesSection.classList.toggle('hidden', directAssignment);
   const listEl = document.getElementById('confirm-preferences-list');
   if (!listEl) return;
-  listEl.innerHTML = state.selectedPreferences.map(p => `
-    <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200">
-      <span class="w-6 h-6 rounded-full bg-tdtu-blue text-white font-extrabold flex items-center justify-center text-xs">
-        NV${p.rank}
-      </span>
-      <div>
-        <span class="font-bold text-slate-900">${p.supervisorName}</span>
-        <span class="text-[11px] text-slate-500 ml-2">${p.department || ''}</span>
+
+  listEl.innerHTML = state.selectedPreferences.map(p => {
+    const sup = (state.roundSupervisors || []).find(s => s.id === p.supervisorId) ||
+                (state.supervisorsMaster || []).find(s => s.id === p.supervisorId);
+    const avatarSrc = (sup?.showPhoto !== false && sup?.photoUrl && sup.photoUrl.trim()) 
+      ? sup.photoUrl 
+      : getSupervisorAvatarSvgDataUri(p.supervisorName);
+    const escapedName = escapeHtml(p.supervisorName || '');
+
+    return `
+      <div class="flex items-center justify-center gap-3 p-3 bg-white rounded-xl border border-slate-200 shadow-2xs text-center mx-auto max-w-lg">
+        <span class="text-xs sm:text-sm font-bold text-tdtu-blue shrink-0">
+          Nguyện Vọng ${p.rank}
+        </span>
+        <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-8 h-8 rounded-lg object-cover object-top border border-slate-200 shadow-2xs shrink-0" alt="${escapedName}">
+        <span class="font-bold text-slate-900 text-xs sm:text-sm truncate">${escapedName}</span>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 window.submitRegistration = async function() {
@@ -2182,6 +2182,12 @@ window.submitRegistration = async function() {
 
   if (!roundId || !mssv) {
     showToast('Không xác định được phiên làm việc hoặc MSSV.', 'warning');
+    return;
+  }
+
+  if (!topicTitle.toLowerCase().trim().startsWith('thiết kế nội thất')) {
+    showToast('Tên đề tài BẮT BUỘC phải bắt đầu bằng cụm từ "Thiết kế nội thất".', 'error');
+    goToStep(1);
     return;
   }
 
@@ -9885,7 +9891,21 @@ window.toggleStudentTimelineViewAll = function() {
 window.loadStudentRoundActivities = async function(roundId) {
   const container = document.getElementById('student-timeline-list');
   const actionWrap = document.getElementById('student-timeline-header-actions');
+  const timelineSection = document.getElementById('student-timeline-section');
   if (!container) return;
+
+  // Requirement 5: During registration, preference review, and assignment stages, student does NOT see detailed plan.
+  // Student only sees detailed plan once they have an official supervisor assigned.
+  const reg = state.myRegistration;
+  const officialList = reg ? getOfficialSupervisors(reg) : [];
+  const hasOfficialSup = officialList.length > 0 || Boolean(reg?.assignedSupervisorId || reg?.officialSupervisor || reg?.acceptedSupervisorId || reg?.finalSupervisorId);
+
+  const isRealAdminWithoutImp = state.isAdmin && !state.impersonation;
+  if (!hasOfficialSup && !isRealAdminWithoutImp) {
+    if (timelineSection) timelineSection.classList.add('hidden');
+    return;
+  }
+  if (timelineSection) timelineSection.classList.remove('hidden');
 
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   if (!targetRound) {
@@ -18069,19 +18089,19 @@ window.renderAdminRoundsCards = function() {
               <span>Đăng ký</span>
             </button>
 
-            ${directAssignment ? '' : `<button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            ${directAssignment ? '' : `<button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group whitespace-nowrap">
               <span class="text-amber-600 group-hover:scale-110 transition-transform">🎯</span>
-              <span>Xét nguyện vọng</span>
+              <span class="whitespace-nowrap">Xét NV</span>
             </button>`}
 
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review', 'assigned')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review', 'assigned')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group whitespace-nowrap">
               <span class="text-purple-600 group-hover:scale-110 transition-transform">👥</span>
-              <span>${directAssignment ? 'Phân công GVHD' : 'Kết quả phân công'}</span>
+              <span class="whitespace-nowrap">${directAssignment ? 'Phân công GVHD' : 'KQ phân công'}</span>
             </button>
 
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group whitespace-nowrap">
               <span class="text-rose-600 group-hover:scale-110 transition-transform">📊</span>
-              <span>Quản lý điểm</span>
+              <span class="whitespace-nowrap">Quản lý điểm</span>
             </button>
           </div>
 
@@ -18108,9 +18128,6 @@ window.renderAdminRoundsCards = function() {
 
           <!-- ROW 4: ADMIN UTILITY ACTIONS -->
           <div class="pt-3 border-t border-slate-200/60 flex items-center justify-end gap-1 text-xs sm:text-[13px] text-slate-600 flex-wrap">
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'preview-student')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors" title="Xem trước giao diện sinh viên">
-              👁️ Xem trước SV
-            </button>
             <button type="button" onclick="editRoundModal('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
               ✏️ Sửa
             </button>
@@ -18505,28 +18522,40 @@ window.updateStudentJourneyStepper = function() {
 };
 
 window.updateStudentPersonalSidebar = function() {
-  const sidebar = document.getElementById('student-status-sidebar');
-  if (!sidebar) return;
-
   const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
+  const heroName = document.getElementById('hero-student-name');
+  const heroMssv = document.getElementById('hero-student-mssv');
+  const heroAvatar = document.getElementById('hero-student-avatar');
+  const modalBody = document.getElementById('student-profile-modal-body');
+
   if (!mssv) {
-    sidebar.innerHTML = `
-      <div class="text-center py-6 text-slate-400 text-xs">
-        Vui lòng đăng nhập bằng tài khoản @student.tdtu.edu.vn để xem thông tin cá nhân.
-      </div>
-    `;
+    if (heroName) heroName.textContent = state.user?.displayName || 'Sinh viên';
+    if (heroMssv) heroMssv.textContent = 'Chưa đăng nhập';
+    if (modalBody) {
+      modalBody.innerHTML = `
+        <div class="text-center py-6 text-slate-400 text-xs">
+          Vui lòng đăng nhập bằng tài khoản @student.tdtu.edu.vn để xem thông tin cá nhân.
+        </div>
+      `;
+    }
     return;
   }
 
   const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(mssv) : null;
   const fullName = studentObj?.fullName || studentObj?.name || state.user?.displayName || `Sinh viên ${mssv}`;
   const studentClass = studentObj?.className || studentObj?.studentClass || 'Chưa cập nhật';
-  const major = studentObj?.major || 'Mỹ thuật Công nghiệp';
+  const major = studentObj?.major || 'Thiết kế nội thất';
+
+  const avatarUrl = state.user?.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%2394a3b8"/><path fill="%2394a3b8" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
+
+  // Update Hero Banner Pill
+  if (heroName) heroName.textContent = fullName;
+  if (heroMssv) heroMssv.textContent = `MSSV: ${mssv}`;
+  if (heroAvatar) heroAvatar.src = avatarUrl;
 
   if (!state.facultyStudentsLoaded && typeof loadFacultyDatasetFromIFAA === 'function') {
     loadFacultyDatasetFromIFAA().then(() => {
-      const sb = document.getElementById('student-status-sidebar');
-      if (sb) updateStudentPersonalSidebar();
+      updateStudentPersonalSidebar();
     }).catch(() => {});
   }
 
@@ -18582,64 +18611,76 @@ window.updateStudentPersonalSidebar = function() {
     }
   }
 
-  const avatarUrl = state.user?.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%2394a3b8"/><path fill="%2394a3b8" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
-
-  sidebar.innerHTML = `
-    <!-- Header -->
-    <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
-      <img src="${avatarUrl}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-sm shrink-0" alt="Avatar">
-      <div class="min-w-0 flex-1">
-        <h3 class="font-bold text-sm text-slate-900 truncate leading-snug">${fullName}</h3>
-        <p class="text-xs text-slate-500 font-mono">MSSV: <span class="font-bold text-tdtu-blue">${mssv}</span></p>
-      </div>
-    </div>
-
-    <!-- Student Details -->
-    <div class="space-y-2.5 text-xs">
-      <div class="flex items-center justify-between py-1 border-b border-slate-50">
-        <span class="text-slate-500">Lớp:</span>
-        <span class="font-bold text-slate-800 font-mono">${studentClass}</span>
-      </div>
-      <div class="flex items-center justify-between py-1 border-b border-slate-50">
-        <span class="text-slate-500">Ngành:</span>
-        <span class="font-bold text-slate-800">${major}</span>
-      </div>
-      <div class="flex items-center justify-between py-1 border-b border-slate-50">
-        <span class="text-slate-500">Điều kiện ĐATN:</span>
-        ${eligibilityBadge}
-      </div>
-      <div class="flex items-center justify-between py-1 border-b border-slate-50">
-        <span class="text-slate-500">Trạng thái đăng ký:</span>
-        ${regBadge}
-      </div>
-      <div class="flex items-center justify-between py-1 border-b border-slate-50">
-        <span class="text-slate-500">Phân công GVHD:</span>
-        ${assignBadge}
-      </div>
-      <div class="py-1 border-b border-slate-50">
-        <div class="flex items-center justify-between">
-          <span class="text-slate-500">GVHD chính:</span>
-          <span class="font-bold text-slate-900">${supDisplay}</span>
+  // Populate Modal Body
+  if (modalBody) {
+    modalBody.innerHTML = `
+      <!-- Header -->
+      <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
+        <img src="${avatarUrl}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-sm shrink-0" alt="Avatar">
+        <div class="min-w-0 flex-1">
+          <h3 class="font-bold text-sm text-slate-900 truncate leading-snug">${fullName}</h3>
+          <p class="text-xs text-slate-500 font-mono">MSSV: <span class="font-bold text-tdtu-blue">${mssv}</span></p>
         </div>
       </div>
-      <div class="pt-1">
-        <span class="text-slate-500 block mb-1">Mốc nộp bài gần nhất:</span>
-        <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
-          <span class="font-bold text-slate-800 text-[11px] block">${upcomingText}</span>
-          ${upcomingBadge ? `<div>${upcomingBadge}</div>` : ''}
+
+      <!-- Student Details -->
+      <div class="space-y-2.5 text-xs">
+        <div class="flex items-center justify-between py-1 border-b border-slate-50">
+          <span class="text-slate-500">Lớp:</span>
+          <span class="font-bold text-slate-800 font-mono">${studentClass}</span>
+        </div>
+        <div class="flex items-center justify-between py-1 border-b border-slate-50">
+          <span class="text-slate-500">Ngành:</span>
+          <span class="font-bold text-slate-800">${major}</span>
+        </div>
+        <div class="flex items-center justify-between py-1 border-b border-slate-50">
+          <span class="text-slate-500">Điều kiện ĐATN:</span>
+          ${eligibilityBadge}
+        </div>
+        <div class="flex items-center justify-between py-1 border-b border-slate-50">
+          <span class="text-slate-500">Trạng thái đăng ký:</span>
+          ${regBadge}
+        </div>
+        <div class="flex items-center justify-between py-1 border-b border-slate-50">
+          <span class="text-slate-500">Phân công GVHD:</span>
+          ${assignBadge}
+        </div>
+        <div class="py-1 border-b border-slate-50">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500">GVHD chính:</span>
+            <span class="font-bold text-slate-900">${supDisplay}</span>
+          </div>
+        </div>
+        <div class="pt-1">
+          <span class="text-slate-500 block mb-1">Mốc nộp bài gần nhất:</span>
+          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
+            <span class="font-bold text-slate-800 text-[11px] block">${upcomingText}</span>
+            ${upcomingBadge ? `<div>${upcomingBadge}</div>` : ''}
+          </div>
+        </div>
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+          <span class="text-[11px] text-slate-400">Tài khoản sinh viên</span>
+          <button type="button" onclick="handleStudentLogout()" class="px-3 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 border border-slate-200 cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+            </svg>
+            <span>Đăng xuất</span>
+          </button>
         </div>
       </div>
-      <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
-        <span class="text-[11px] text-slate-400">Tài khoản sinh viên</span>
-        <button type="button" onclick="handleStudentLogout()" class="px-3 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 border border-slate-200 cursor-pointer">
-          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-          </svg>
-          <span>Đăng xuất</span>
-        </button>
-      </div>
-    </div>
-  `;
+    `;
+  }
+};
+
+window.openStudentProfileModal = function() {
+  updateStudentPersonalSidebar();
+  const modal = document.getElementById('modal-student-profile');
+  if (modal) modal.classList.remove('hidden');
+};
+
+window.closeStudentProfileModal = function() {
+  const modal = document.getElementById('modal-student-profile');
+  if (modal) modal.classList.add('hidden');
 };
 
 window.handleStudentLogout = async function() {
