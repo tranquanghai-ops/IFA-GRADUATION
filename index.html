@@ -797,7 +797,7 @@
               <button onclick="setSupervisorStudentFilter('in_progress')" id="sup-flt-in_progress" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">Đang thực hiện (<span id="sup-cnt-in_progress">0</span>)</button>
               <button onclick="setSupervisorStudentFilter('completed')" id="sup-flt-completed" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">Đã hoàn tất (<span id="sup-cnt-completed">0</span>)</button>
               <button onclick="setSupervisorStudentFilter('primary')" id="sup-flt-primary" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">GVHD chính (<span id="sup-cnt-primary">0</span>)</button>
-              <button onclick="setSupervisorStudentFilter('support')" id="sup-flt-support" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">GVHD hỗ trợ (<span id="sup-cnt-support">0</span>)</button>
+              <button onclick="setSupervisorStudentFilter('support')" id="sup-flt-support" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">GVHD 2 (<span id="sup-cnt-support">0</span>)</button>
             </div>
 
             <!-- Search Input -->
@@ -1630,10 +1630,10 @@
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <div class="flex items-center gap-2">
-                <h3 class="font-bold text-sm text-slate-900">👥 Danh sách Sinh viên có GVHD & Quản lý GVHD Hỗ trợ</h3>
+                <h3 class="font-bold text-sm text-slate-900">👥 Danh sách Sinh viên có GVHD & Quản lý GVHD 2</h3>
                 <span id="adm-accepted-count-tag" class="badge bg-emerald-100 text-emerald-800 font-black">0 SV</span>
               </div>
-              <p class="text-xs text-slate-500 mt-0.5">Admin có thể bổ sung thêm GVHD hỗ trợ (không thuộc NV ban đầu) hoặc gỡ GVHD hỗ trợ sau khi đã chốt phân công.</p>
+              <p class="text-xs text-slate-500 mt-0.5">Admin có thể bổ sung thêm GVHD 2 (không thuộc NV ban đầu) hoặc gỡ GVHD 2 sau khi đã chốt phân công.</p>
             </div>
             <div class="flex items-center gap-2">
               <input type="text" id="admin-assigned-search" oninput="filterAdminAssignedTable(this.value)" placeholder="Tìm MSSV, họ tên, GVHD..." class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-60">
@@ -1648,7 +1648,7 @@
                   <th class="p-3.5">Họ và tên</th>
                   <th class="p-3.5">Tên đề tài & Ngành</th>
                   <th class="p-3.5">GVHD chính</th>
-                  <th class="p-3.5">GVHD hỗ trợ</th>
+                  <th class="p-3.5">GVHD 2</th>
                   <th class="p-3.5 text-right whitespace-nowrap">Thao tác</th>
                 </tr>
               </thead>
@@ -3373,13 +3373,21 @@
 
             <!-- GOOGLE DRIVE INTEGRATION -->
             <div class="space-y-2.5 p-3.5 bg-blue-50 border border-blue-200 rounded-xl">
-              <span class="font-bold text-blue-800 text-xs block mb-1">📁 Thư mục Google Drive (Root Folder)</span>
-              <p class="text-[11px] text-blue-700 leading-relaxed">Admin tự tạo thư mục trên Google Drive và dán đường dẫn vào đây. Các bài nộp trong đợt này sẽ được lưu vào thư mục này nếu mốc thời gian không cấu hình thư mục riêng.</p>
-              <div class="flex gap-2">
-                <input type="text" id="round-drive-folder-url" placeholder="VD: https://drive.google.com/drive/folders/1A2B3C..." class="flex-1 p-2 border border-blue-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                <button type="button" onclick="testDriveFolderUrl('round')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0">Kiểm tra URL</button>
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-blue-800 text-xs block">📁 Thư mục Google Drive gốc (Root Folder của Đợt)</span>
+                <span class="text-[10px] bg-blue-200/80 text-blue-900 font-bold px-2 py-0.5 rounded-full">1 Thư mục duy nhất</span>
               </div>
-              <div id="round-drive-folder-status" class="hidden text-[11px] font-bold mt-1"></div>
+              <p class="text-[11px] text-blue-700 leading-relaxed">
+                Mỗi đợt tốt nghiệp chỉ cần <strong>1 Thư mục gốc</strong>. Hệ thống sẽ <strong>tự động tạo &amp; liên kết các thư mục con</strong> (cho Hội đồng, Sơ khảo, Nộp bài...) bên trong thư mục này.<br>
+                💡 <em>Vui lòng chia sẻ thư mục gốc cho tài khoản <strong>tknt.tdtu@gmail.com</strong> với quyền <strong>Người chỉnh sửa (Editor)</strong>.</em>
+              </p>
+              <div class="flex gap-2">
+                <input type="text" id="round-drive-folder-url" placeholder="VD: https://drive.google.com/drive/folders/1A2B3C... hoặc Folder ID" class="flex-1 p-2 border border-blue-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <button type="button" id="btn-validate-round-drive" onclick="testDriveFolderUrl('round')" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer">
+                  <span>Kiểm tra quyền Drive</span>
+                </button>
+              </div>
+              <div id="round-drive-folder-status" class="hidden text-xs font-semibold mt-1"></div>
             </div>
 
             <!-- PERMISSIONS CHECKBOXES -->
@@ -3849,13 +3857,6 @@
           <select id="select-manual-supervisor" class="w-full p-2.5 bg-white border rounded-xl font-semibold text-xs text-slate-800">
           </select>
         </div>
-
-        <div>
-          <label class="flex items-center gap-2 cursor-pointer text-amber-900 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
-            <input type="checkbox" id="chk-override-capacity" class="rounded text-blue-600">
-            <span class="font-bold">Quyền High Admin: Cho phép phân công vượt chỉ tiêu (Quota)</span>
-          </label>
-        </div>
       </div>
 
       <div class="flex justify-end gap-2 pt-3 border-t">
@@ -4223,24 +4224,29 @@
                   </div>
                 </div>
 
-                <!-- 6. Google Drive Storage Provider Config -->
+                <!-- 5. Google Drive Storage Provider Config -->
                 <div class="border-t border-emerald-100 pt-2 space-y-2">
                   <div class="flex items-center justify-between">
-                    <label class="font-bold text-slate-800 block">5. Dịch vụ lưu trữ (Storage Provider):</label>
-                    <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">Google Drive Ready</span>
+                    <label class="font-bold text-slate-800 block">5. Thư mục Google Drive nhận bài / hồ sơ:</label>
+                    <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">Tự động tạo từ Root</span>
                   </div>
-                  <div class="grid grid-cols-1 gap-2">
-                    <div>
-                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">URL Thư mục Google Drive riêng cho Mốc thời gian này:</label>
-                      <div class="flex gap-2">
-                        <input type="text" id="sub-drive-folder-url" placeholder="Để trống sẽ dùng Root Folder của Đợt. VD: https://drive.google.com/drive/folders/..." class="flex-1 p-1.5 border border-slate-300 rounded-lg font-mono text-xs">
-                        <button type="button" onclick="testDriveFolderUrl('activity')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-bold text-[10px] transition-colors shrink-0">Kiểm tra</button>
-                      </div>
-                      <div id="activity-drive-folder-status" class="hidden text-[10px] font-bold mt-1"></div>
+                  <input type="hidden" id="activity-form-drive-folder-id">
+                  <div>
+                    <label class="text-[10px] font-bold text-slate-600 block mb-1">Tên thư mục con hoặc URL Drive riêng:</label>
+                    <div class="flex gap-2 mb-1.5">
+                      <input type="text" id="activity-form-drive-folder-name" placeholder="VD: SƠ KHẢO, BÁO CÁO GIỮA KỲ..." class="flex-1 p-1.5 border border-slate-300 rounded-lg text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                      <button type="button" id="btn-connect-activity-drive" onclick="connectActivityDriveFolder()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center gap-1 cursor-pointer">
+                        <span>Tạo / Kết nối</span>
+                      </button>
                     </div>
+                    <div class="flex gap-2">
+                      <input type="text" id="sub-drive-folder-url" placeholder="URL thư mục Drive riêng (nếu không tạo tự động)" class="flex-1 p-1.5 border border-slate-300 rounded-lg font-mono text-xs bg-white">
+                      <button type="button" onclick="testDriveFolderUrl('activity')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-bold text-[10px] transition-colors shrink-0">Kiểm tra URL</button>
+                    </div>
+                    <div id="activity-drive-folder-status" class="hidden text-[10px] font-bold mt-1"></div>
                   </div>
                   <div class="p-2 bg-blue-50/70 border border-blue-200 rounded-lg text-[11px] text-blue-900 leading-relaxed">
-                    ℹ️ <strong>Bảo mật:</strong> Backend sẽ tự động trích xuất Folder ID từ URL. Các file bài nộp sẽ được backend upload an toàn vào thư mục này.
+                    ℹ️ <strong>Tự động:</strong> Nhập tên thư mục và bấm <em>Tạo / Kết nối</em> để tự tạo thư mục con trong Thư mục gốc của Đợt. Nếu để trống cả 2 ô trên, hệ thống sẽ lưu trực tiếp vào Thư mục gốc.
                   </div>
                 </div>
               </div>
@@ -4397,7 +4403,7 @@
     <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
         <div>
-          <h3 class="font-bold text-base text-tdtu-blue">Thêm GVHD Hỗ trợ</h3>
+          <h3 class="font-bold text-base text-tdtu-blue">Thêm GVHD 2</h3>
           <p id="add-support-student-info" class="text-xs text-slate-500 mt-0.5">Sinh viên: ...</p>
         </div>
         <button type="button" onclick="closeAddSupportSupervisorModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
@@ -4414,9 +4420,9 @@
 
         <!-- Select Support Supervisor -->
         <div>
-          <label class="font-bold text-slate-700 block mb-1">Chọn Giảng viên hướng dẫn hỗ trợ <span class="text-rose-500">*</span></label>
+          <label class="font-bold text-slate-700 block mb-1">Chọn Giảng viên hướng dẫn 2 (GVHD 2) <span class="text-rose-500">*</span></label>
           <select id="select-support-supervisor" onchange="onSelectSupportSupervisorChange(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
-            <option value="">-- Chọn GVHD hỗ trợ --</option>
+            <option value="">-- Chọn GVHD 2 --</option>
           </select>
           <p id="support-supervisor-quota-hint" class="text-[11px] text-slate-500 mt-1 font-mono"></p>
         </div>
@@ -4424,9 +4430,9 @@
         <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-amber-900 leading-relaxed text-[11px]">
           <p>💡 <strong>Quy định nghiệp vụ:</strong></p>
           <ul class="list-disc list-inside space-y-0.5">
-            <li>GVHD hỗ trợ không cần nằm trong các nguyện vọng ban đầu của SV.</li>
+            <li>GVHD 2 không cần nằm trong các nguyện vọng ban đầu của SV.</li>
             <li>Không thay đổi GVHD chính và không sửa lịch sử xét duyệt.</li>
-            <li>Sinh viên được thêm sẽ tính vào hạn mức Quota của GVHD hỗ trợ.</li>
+            <li>Sinh viên được thêm sẽ tính vào hạn mức Quota của GVHD 2.</li>
           </ul>
         </div>
       </div>
@@ -4434,7 +4440,7 @@
       <div class="flex justify-end gap-2 p-4 bg-slate-50 border-t border-slate-100 shrink-0">
         <button type="button" onclick="closeAddSupportSupervisorModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Hủy</button>
         <button type="button" id="btn-confirm-add-support" onclick="executeAddSupportSupervisor()" disabled class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold shadow-md transition-colors">
-          Thêm GVHD Hỗ trợ
+          Thêm GVHD 2
         </button>
       </div>
     </div>
@@ -4647,6 +4653,32 @@
             </label>
             <div id="council-members-form-container" class="space-y-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <!-- Rendered dynamically based on activity.councilStructure.slots -->
+            </div>
+          </div>
+
+          <!-- Thư mục Google Drive của Hội đồng -->
+          <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="font-bold text-blue-900 text-xs flex items-center gap-1.5">
+                <span>📁</span> Thư mục Google Drive của Hội đồng
+              </label>
+              <span class="text-[10px] text-blue-600 font-medium">Tự động tạo từ Thư mục gốc</span>
+            </div>
+            <input type="hidden" id="council-form-drive-folder-id">
+            <input type="hidden" id="council-form-drive-folder-url">
+            <div>
+              <div class="flex gap-2">
+                <input type="text" id="council-form-drive-folder-name" placeholder="VD: HỘI ĐỒNG 1"
+                  class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <button type="button" id="btn-connect-council-drive" onclick="connectCouncilDriveFolder()"
+                  class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center gap-1 cursor-pointer">
+                  <span>Tạo / Kết nối</span>
+                </button>
+              </div>
+              <p class="text-[10px] text-slate-500 mt-1">Nhập tên thư mục và bấm nút để hệ thống tự tạo hoặc kết nối thư mục con trong Thư mục gốc.</p>
+            </div>
+            <div id="council-drive-folder-status" class="text-[11px] font-semibold text-slate-600">
+              <!-- Rendered dynamically -->
             </div>
           </div>
 

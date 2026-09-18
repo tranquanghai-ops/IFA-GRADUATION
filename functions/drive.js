@@ -340,4 +340,176 @@ async function deleteDriveFile(fileId) {
   return false;
 }
 
-module.exports = { isDriveConfigured, createUploadSession, getAccessToken, loadDriveConfig, runDriveDiagnostic, deleteDriveFile };
+/**
+ * Extracts a Google Drive Folder ID from a URL or raw ID string.
+ * @param {string} str
+ * @returns {string|null}
+ */
+function extractDriveFolderId(str) {
+  if (!str || typeof str !== 'string') return null;
+  const match = str.match(/[-\w]{25,}/);
+  return match ? match[0] : null;
+}
+
+/**
+ * Validates that a Google Drive root folder exists, is not trashed,
+ * is indeed a folder, and the service account has permission to create subfolders.
+ * @param {string} folderIdOrUrl
+ * @returns {Promise<{ ok: boolean, folderId: string, folderName: string, folderUrl: string, canAddChildren: boolean }>}
+ */
+async function validateRootDriveFolder(folderIdOrUrl) {
+  const folderId = extractDriveFolderId(folderIdOrUrl);
+  if (!folderId) {
+    throw new Error('Đường dẫn hoặc Folder ID Google Drive không hợp lệ (cần ít nhất 25 ký tự).');
+  }
+
+  const config = await loadDriveConfig();
+  if (!config) throw new Error('Hệ thống chưa cấu hình kết nối Google Drive (thiếu Secrets).');
+
+  const accessToken = await getAccessToken(config);
+
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name,mimeType,capabilities,trashed,webViewLink`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error(
+        'Không tìm thấy thư mục trên Google Drive hoặc tài khoản hệ thống (tknt.tdtu@gmail.com) chưa được chia sẻ quyền truy cập. Vui lòng kiểm tra lại đường dẫn và quyền chia sẻ.'
+      );
+    }
+    const errMsg = data?.error?.message || `Lỗi Drive API (HTTP ${res.status})`;
+    throw new Error(`Google Drive phản hồi lỗi: ${errMsg}`);
+  }
+
+  if (data.trashed) {
+    throw new Error('Thư mục này hiện đang nằm trong Thùng rác của Google Drive.');
+  }
+
+  if (data.mimeType !== 'application/vnd.google-apps.folder') {
+    throw new Error('Đối tượng được liên kết không phải là một Thư mục Google Drive.');
+  }
+
+  const canAddChildren = data.capabilities?.canAddChildren || data.capabilities?.canEdit;
+  if (!canAddChildren) {
+    throw new Error(
+      'Tài khoản hệ thống (tknt.tdtu@gmail.com) chưa có quyền Người chỉnh sửa (Editor) trong thư mục này. Vui lòng chia sẻ thư mục với quyền "Người chỉnh sửa" (Editor) cho tknt.tdtu@gmail.com để hệ thống có thể tạo thư mục con cho Hội đồng & Mốc kế hoạch.'
+    );
+  }
+
+  return {
+    ok: true,
+    folderId: data.id,
+    folderName: data.name,
+    folderUrl: data.webViewLink || `https://drive.google.com/drive/folders/${data.id}`,
+    canAddChildren: true,
+  };
+}
+
+/**
+ * Searches for an existing child folder by exact name inside parentFolderId.
+ * If found, reuses it. If not found, creates a new child folder.
+ * @param {{ parentFolderId: string, folderName: string, folderType?: string }} param0
+ * @returns {Promise<{ ok: boolean, folderId: string, folderName: string, folderUrl: string, reused: boolean, warning?: string }>}
+ */
+async function getOrCreateDriveChildFolder({ parentFolderId, folderName, folderType }) {
+  const cleanParentId = extractDriveFolderId(parentFolderId);
+  if (!cleanParentId) {
+    throw new Error('Thiếu hoặc không hợp lệ parentFolderId (Thư mục gốc)');
+  }
+
+  if (!folderName || typeof folderName !== 'string' || !folderName.trim()) {
+    throw new Error('Tên thư mục con không được để trống');
+  }
+
+  // Sanitize folder name
+  const safeName = folderName.trim().replace(/[\/\\?%*:|"<>]/g, '-').replace(/\s+/g, ' ');
+  if (!safeName) {
+    throw new Error('Tên thư mục con không hợp lệ');
+  }
+
+  const config = await loadDriveConfig();
+  if (!config) throw new Error('Hệ thống chưa cấu hình kết nối Google Drive (thiếu Secrets).');
+
+  const accessToken = await getAccessToken(config);
+
+  // 1. Search for existing child folder with exact name
+  const escapedName = safeName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const q = `mimeType = 'application/vnd.google-apps.folder' and trashed = false and '${cleanParentId}' in parents and name = '${escapedName}'`;
+
+  const searchRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,webViewLink)&pageSize=10`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  const searchData = await searchRes.json().catch(() => ({}));
+
+  if (!searchRes.ok) {
+    const errMsg = searchData?.error?.message || `Lỗi tìm kiếm Drive API (HTTP ${searchRes.status})`;
+    throw new Error(`Google Drive phản hồi lỗi: ${errMsg}`);
+  }
+
+  const files = searchData.files || [];
+  if (files.length > 0) {
+    const existing = files[0];
+    return {
+      ok: true,
+      folderId: existing.id,
+      folderName: existing.name,
+      folderUrl: existing.webViewLink || `https://drive.google.com/drive/folders/${existing.id}`,
+      reused: true,
+      warning: files.length > 1 ? `Tìm thấy ${files.length} thư mục cùng tên "${safeName}". Đã liên kết với thư mục đầu tiên.` : null,
+    };
+  }
+
+  // 2. Not found -> create new folder inside parentFolderId
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: safeName,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [cleanParentId],
+      properties: {
+        createdVia: 'ifa-graduation-api',
+        folderType: folderType || 'subfolder',
+      },
+    }),
+  });
+
+  const createData = await createRes.json().catch(() => ({}));
+  if (!createRes.ok) {
+    const errMsg = createData?.error?.message || `Lỗi tạo thư mục (HTTP ${createRes.status})`;
+    throw new Error(`Không thể tạo thư mục trên Google Drive: ${errMsg}`);
+  }
+
+  return {
+    ok: true,
+    folderId: createData.id,
+    folderName: createData.name,
+    folderUrl: createData.webViewLink || `https://drive.google.com/drive/folders/${createData.id}`,
+    reused: false,
+  };
+}
+
+module.exports = {
+  isDriveConfigured,
+  createUploadSession,
+  getAccessToken,
+  loadDriveConfig,
+  runDriveDiagnostic,
+  deleteDriveFile,
+  extractDriveFolderId,
+  validateRootDriveFolder,
+  getOrCreateDriveChildFolder,
+};

@@ -16,7 +16,16 @@ const { onRequest } = require('firebase-functions/v2/https');
 const { requireStudentAuth, requireAdminAuth, getStorageBucket } = require('./auth.js');
 const { getDocument } = require('./firestore.js');
 const { validateFile, validateActivity, ValidationError } = require('./validation.js');
-const { isDriveConfigured, createUploadSession, getAccessToken, loadDriveConfig, runDriveDiagnostic, deleteDriveFile } = require('./drive.js');
+const {
+  isDriveConfigured,
+  createUploadSession,
+  getAccessToken,
+  loadDriveConfig,
+  runDriveDiagnostic,
+  deleteDriveFile,
+  validateRootDriveFolder,
+  getOrCreateDriveChildFolder,
+} = require('./drive.js');
 const { getSecret } = require('./secrets.js');
 const crypto = require('crypto');
 
@@ -363,6 +372,74 @@ async function deleteSupervisorPortraitHandler(req, res) {
   }
 }
 
+// ── POST /api/graduation/drive/validate-root-folder ──────────────────────────
+
+async function validateRootFolderHandler(req, res) {
+  setCORSHeaders(req, res);
+  if (req.method === 'OPTIONS') return handleOptions(req, res);
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  await new Promise((resolve, reject) => {
+    requireAdminAuth(req, res, err => {
+      if (err) reject(err); else resolve();
+    });
+  }).catch(() => {});
+
+  if (res.headersSent) return;
+
+  const { url, folderId, rootDriveFolderUrl } = req.body || {};
+  const target = url || folderId || rootDriveFolderUrl;
+
+  if (!target || typeof target !== 'string') {
+    return res.status(400).json({ error: 'Thiếu thông tin URL hoặc Folder ID của thư mục gốc' });
+  }
+
+  try {
+    const result = await validateRootDriveFolder(target);
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('[validate-root-folder] Error:', err.message);
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+// ── POST /api/graduation/drive/get-or-create-folder ─────────────────────────
+
+async function getOrCreateFolderHandler(req, res) {
+  setCORSHeaders(req, res);
+  if (req.method === 'OPTIONS') return handleOptions(req, res);
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  await new Promise((resolve, reject) => {
+    requireAdminAuth(req, res, err => {
+      if (err) reject(err); else resolve();
+    });
+  }).catch(() => {});
+
+  if (res.headersSent) return;
+
+  const { parentFolderId, folderName, folderType, roundId } = req.body || {};
+
+  if (!parentFolderId || typeof parentFolderId !== 'string') {
+    return res.status(400).json({ error: 'Thiếu parentFolderId (Thư mục gốc của Đợt tốt nghiệp)' });
+  }
+  if (!folderName || typeof folderName !== 'string') {
+    return res.status(400).json({ error: 'Thiếu folderName (Tên thư mục con cần tạo hoặc kết nối)' });
+  }
+
+  try {
+    const result = await getOrCreateDriveChildFolder({
+      parentFolderId,
+      folderName,
+      folderType,
+    });
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('[get-or-create-folder] Error:', err.message);
+    return res.status(400).json({ error: err.message });
+  }
+}
+
 // ── Route dispatcher ─────────────────────────────────────────────────────────
 
 exports.graduationApi = onRequest(
@@ -395,6 +472,14 @@ exports.graduationApi = onRequest(
 
     if (urlPath === '/api/graduation/delete-supervisor-portrait') {
       return await deleteSupervisorPortraitHandler(req, res);
+    }
+
+    if (urlPath === '/api/graduation/drive/validate-root-folder') {
+      return await validateRootFolderHandler(req, res);
+    }
+
+    if (urlPath === '/api/graduation/drive/get-or-create-folder') {
+      return await getOrCreateFolderHandler(req, res);
     }
 
     setCORSHeaders(req, res);

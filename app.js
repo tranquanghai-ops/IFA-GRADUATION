@@ -1593,7 +1593,7 @@ function renderStudentOfficialResult(reg) {
       const isPrimary = (item.role === 'primary');
       const roleBadge = isPrimary
         ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500 text-white font-black text-[10px] shadow-sm uppercase tracking-wide">GVHD chính</span>'
-        : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500 text-white font-black text-[10px] shadow-sm uppercase tracking-wide">GVHD hỗ trợ</span>';
+        : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-500 text-white font-black text-[10px] shadow-sm uppercase tracking-wide">GVHD 2</span>';
 
       const showEmail = (state.activeRound?.showEmailAfterPublish !== false && sup?.email);
       const showPhone = (state.activeRound?.showPhoneAfterPublish !== false && sup?.phone);
@@ -1734,17 +1734,27 @@ function renderStudentExistingRegistration(reg) {
     listEl.innerHTML = '';
     return;
   }
-  listEl.innerHTML = (reg.preferences || []).map(p => `
-    <div class="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-emerald-100 shadow-sm text-xs">
-      <span class="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-[10px]">
-        NV${p.rank}
-      </span>
-      <div>
-        <span class="font-bold text-slate-800">${p.supervisorName}</span>
-        <span class="text-[11px] text-slate-400 ml-2">${p.department || ''}</span>
+  listEl.innerHTML = (reg.preferences || []).map(p => {
+    const sup = (state.roundSupervisors || []).find(s => s.id === p.supervisorId) ||
+                (state.supervisorsMaster || []).find(s => s.id === p.supervisorId);
+    const avatarSrc = (sup?.showPhoto !== false && sup?.photoUrl && sup.photoUrl.trim())
+      ? sup.photoUrl
+      : getSupervisorAvatarSvgDataUri(p.supervisorName || 'GV');
+    const escapedName = escapeHtml(p.supervisorName || '');
+
+    return `
+      <div class="flex items-center gap-3.5 p-2.5 bg-white rounded-xl border border-emerald-100 shadow-2xs text-xs">
+        <span class="w-11 sm:w-12 py-1 text-center rounded-lg bg-emerald-600 text-white font-black text-[11px] shrink-0">
+          NV${p.rank}
+        </span>
+        <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-8 h-8 rounded-lg object-cover object-top border border-emerald-200 shadow-2xs shrink-0" alt="${escapedName}">
+        <div class="flex flex-wrap items-baseline gap-x-2 min-w-0 flex-1">
+          <span class="font-bold text-slate-800">${escapedName}</span>
+          ${p.department ? `<span class="text-[11px] text-slate-400">(${escapeHtml(p.department)})</span>` : ''}
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   const btnEdit = document.getElementById('btn-edit-existing-reg');
   const canEdit = state.activeRound?.status === 'open' && state.activeRound?.allowStudentEdit !== false;
@@ -2186,12 +2196,12 @@ function renderConfirmationPanel() {
     const escapedName = escapeHtml(p.supervisorName || '');
 
     return `
-      <div class="flex items-center justify-center gap-3 p-3 bg-white rounded-xl border border-slate-200 shadow-2xs text-center mx-auto max-w-lg">
-        <span class="text-xs sm:text-sm font-bold text-tdtu-blue shrink-0">
+      <div class="flex items-center gap-3.5 p-3 bg-white rounded-xl border border-slate-200 shadow-2xs mx-auto max-w-lg">
+        <span class="w-28 sm:w-32 text-xs sm:text-sm font-bold text-tdtu-blue shrink-0 text-left">
           Nguyện Vọng ${p.rank}
         </span>
-        <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-8 h-8 rounded-lg object-cover object-top border border-slate-200 shadow-2xs shrink-0" alt="${escapedName}">
-        <span class="font-bold text-slate-900 text-xs sm:text-sm truncate">${escapedName}</span>
+        <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-9 h-9 rounded-lg object-cover object-top border border-slate-200 shadow-2xs shrink-0" alt="${escapedName}">
+        <span class="font-bold text-slate-900 text-xs sm:text-sm truncate text-left flex-1 min-w-0">${escapedName}</span>
       </div>
     `;
   }).join('');
@@ -2226,7 +2236,10 @@ window.submitRegistration = async function() {
     const eligibilityStatus = isPending ? 'pending' : 'eligible';
     const directAssignment = isDirectSupervisorAssignment();
 
-    const studentName = actor?.displayName || state.user?.displayName || mssv;
+    const resolvedName = (typeof window.resolveStudentName === 'function')
+      ? window.resolveStudentName(mssv, actor?.displayName || state.user?.displayName || '')
+      : (actor?.displayName || state.user?.displayName || mssv);
+    const studentName = resolvedName || mssv;
     const studentEmail = actor?.email || state.user?.email || `${mssv}@student.tdtu.edu.vn`;
 
     const payload = {
@@ -3202,6 +3215,20 @@ window.openCreateRoundModal = async function() {
   renderRoundModalEligibleTable();
   updateRoundModalBadges();
 
+  // Reset Drive inputs
+  const createDriveInput = document.getElementById('round-drive-folder-url');
+  if (createDriveInput) {
+    createDriveInput.value = '';
+    delete createDriveInput.dataset.validatedFolderId;
+    delete createDriveInput.dataset.validatedFolderName;
+    delete createDriveInput.dataset.validatedFolderUrl;
+  }
+  const createDriveStatusEl = document.getElementById('round-drive-folder-status');
+  if (createDriveStatusEl) {
+    createDriveStatusEl.innerHTML = '';
+    createDriveStatusEl.classList.add('hidden');
+  }
+
   switchRoundModalTab('info');
   document.getElementById('modal-round').classList.remove('hidden');
 };
@@ -3241,14 +3268,36 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
 
   const driveInput = document.getElementById('round-drive-folder-url');
   if (driveInput) {
-    driveInput.value = r.driveRootFolderId ? `https://drive.google.com/drive/folders/${r.driveRootFolderId}` : '';
+    const rootId = r.driveRootFolderId || r.rootDriveFolderId;
+    const rootUrl = r.driveRootFolderUrl || r.rootDriveFolderUrl || (rootId ? `https://drive.google.com/drive/folders/${rootId}` : '');
+    const rootName = r.driveRootFolderName || r.rootDriveFolderName || 'Google Drive';
+    driveInput.value = rootUrl;
+    if (rootId) {
+      driveInput.dataset.validatedFolderId = rootId;
+      driveInput.dataset.validatedFolderName = rootName;
+      driveInput.dataset.validatedFolderUrl = rootUrl;
+    } else {
+      delete driveInput.dataset.validatedFolderId;
+      delete driveInput.dataset.validatedFolderName;
+      delete driveInput.dataset.validatedFolderUrl;
+    }
     const statusEl = document.getElementById('round-drive-folder-status');
     if (statusEl) {
-      if (r.driveRootFolderId) {
-        statusEl.textContent = `✅ Đã lưu (Folder ID: ${r.driveRootFolderId})`;
-        statusEl.classList.remove('hidden', 'text-red-600');
-        statusEl.classList.add('text-green-600');
+      if (rootId) {
+        statusEl.innerHTML = `
+          <div class="p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-800">
+            <div>
+              <span class="font-bold">✓ Thư mục gốc: ${escapeHtml(rootName)}</span>
+              <span class="block text-[10px] text-emerald-600 font-mono">ID: ${rootId}</span>
+            </div>
+            <a href="${rootUrl}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-white border border-emerald-300 text-blue-600 hover:underline font-bold text-xs rounded shadow-2xs">
+              Mở Drive ↗
+            </a>
+          </div>
+        `;
+        statusEl.classList.remove('hidden');
       } else {
+        statusEl.innerHTML = '';
         statusEl.classList.add('hidden');
       }
     }
@@ -4070,32 +4119,301 @@ window.selectAllRoundModalSupervisors = function(select) {
 // ============================================================================
 
 window.extractDriveFolderId = function(url) {
-  if (!url) return null;
+  if (!url || typeof url !== 'string') return null;
   const match = url.match(/[-\w]{25,}/);
   return match ? match[0] : null;
 };
 
-window.testDriveFolderUrl = function(type) {
+function getGraduationApiBase() {
+  return window.IFA_CONFIG?.graduationApiEndpoint || window.IFA_CONFIG?.driveUploadEndpoint || 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi';
+}
+
+window.testDriveFolderUrl = async function(type) {
   const inputId = type === 'round' ? 'round-drive-folder-url' : 'sub-drive-folder-url';
   const statusId = type === 'round' ? 'round-drive-folder-status' : 'activity-drive-folder-status';
+  const btnId = type === 'round' ? 'btn-validate-round-drive' : null;
   
-  const url = document.getElementById(inputId).value;
+  const url = document.getElementById(inputId)?.value?.trim();
   const statusEl = document.getElementById(statusId);
-  statusEl.classList.remove('hidden', 'text-green-600', 'text-red-600');
+  if (!statusEl) return;
+  statusEl.classList.remove('hidden', 'text-green-600', 'text-red-600', 'text-amber-600');
   
   if (!url) {
-    statusEl.textContent = 'Vui lòng nhập URL';
+    statusEl.textContent = 'Vui lòng nhập URL hoặc Folder ID của thư mục';
     statusEl.classList.add('text-red-600');
     return;
   }
   
   const folderId = window.extractDriveFolderId(url);
-  if (folderId) {
-    statusEl.textContent = `✅ Hợp lệ (Folder ID: ${folderId})`;
-    statusEl.classList.add('text-green-600');
-  } else {
-    statusEl.textContent = '❌ Không tìm thấy Folder ID hợp lệ trong URL';
+  if (!folderId) {
+    statusEl.textContent = '❌ Không tìm thấy Folder ID hợp lệ (tối thiểu 25 ký tự) trong URL';
     statusEl.classList.add('text-red-600');
+    return;
+  }
+
+  // If testing round root folder, call backend API to verify permission & Editor capability
+  if (type === 'round') {
+    const btn = btnId ? document.getElementById(btnId) : null;
+    const origText = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Đang kiểm tra...</span>';
+    }
+    statusEl.innerHTML = '<span class="text-blue-600">⏳ Đang kết nối kiểm tra quyền trên Google Drive...</span>';
+
+    try {
+      const idToken = state.user ? await state.user.getIdToken() : null;
+      if (!idToken) {
+        throw new Error('Phiên đăng nhập hết hạn hoặc chưa xác thực Admin. Vui lòng đăng nhập lại.');
+      }
+
+      const res = await fetch(getGraduationApiBase() + '/api/graduation/drive/validate-root-folder', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + idToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: url, folderId: folderId }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+
+      statusEl.innerHTML = `
+        <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="font-bold">✓ Thư mục hợp lệ &amp; Đã có quyền Editor</span>
+            <a href="${data.folderUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline font-bold text-xs inline-flex items-center gap-1">
+              <span>Mở Drive</span> ↗
+            </a>
+          </div>
+          <p class="text-xs text-emerald-700">Tên thư mục: <strong>${escapeHtml(data.folderName)}</strong></p>
+          <p class="text-[10px] text-emerald-600 font-mono">ID: ${data.folderId}</p>
+        </div>
+      `;
+      // Store validated info on form dataset
+      const driveInputEl = document.getElementById('round-drive-folder-url');
+      if (driveInputEl) {
+        driveInputEl.dataset.validatedFolderId = data.folderId;
+        driveInputEl.dataset.validatedFolderName = data.folderName;
+        driveInputEl.dataset.validatedFolderUrl = data.folderUrl;
+      }
+      showToast(`✓ Đã xác thực quyền Editor thư mục "${data.folderName}"!`, 'success');
+    } catch (err) {
+      statusEl.innerHTML = `
+        <div class="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 space-y-1">
+          <p class="font-bold">✗ Không thể xác thực quyền Editor:</p>
+          <p class="text-xs leading-relaxed">${escapeHtml(err.message)}</p>
+        </div>
+      `;
+      showToast('Lỗi kiểm tra quyền thư mục Google Drive: ' + err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+      }
+    }
+    return;
+  }
+
+  // Activity type: quick regex validation with link
+  const folderUrl = `https://drive.google.com/drive/folders/${folderId}`;
+  statusEl.innerHTML = `
+    <span class="text-emerald-600">✓ Hợp lệ (Folder ID: ${folderId})</span>
+    <a href="${folderUrl}" target="_blank" rel="noopener noreferrer" class="ml-2 text-blue-600 hover:underline text-xs">Mở ↗</a>
+  `;
+};
+
+window.connectCouncilDriveFolder = async function() {
+  const { roundId } = state.activeCouncilManagement || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+
+  if (!targetRound) {
+    showToast('Không tìm thấy thông tin Đợt tốt nghiệp!', 'error');
+    return;
+  }
+
+  const rootFolderId = targetRound.driveRootFolderId || targetRound.rootDriveFolderId;
+  if (!rootFolderId) {
+    showToast('Đợt tốt nghiệp chưa cấu hình Thư mục Drive gốc! Vui lòng cấu hình Thư mục gốc trong Thông tin đợt trước.', 'warning');
+    return;
+  }
+
+  const nameInput = document.getElementById('council-form-drive-folder-name');
+  const fallbackName = document.getElementById('council-form-name')?.value?.trim();
+  let folderName = (nameInput?.value || '').trim() || fallbackName;
+
+  if (!folderName) {
+    showToast('Vui lòng nhập Tên Hội đồng hoặc Tên thư mục con (*)', 'warning');
+    nameInput?.focus();
+    return;
+  }
+
+  if (nameInput) nameInput.value = folderName;
+
+  const btn = document.getElementById('btn-connect-council-drive');
+  const statusEl = document.getElementById('council-drive-folder-status');
+  const origBtnText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ Đang xử lý...</span>';
+  }
+  if (statusEl) {
+    statusEl.innerHTML = '<span class="text-blue-600">⏳ Đang tìm kiếm hoặc tạo thư mục trên Google Drive...</span>';
+  }
+
+  try {
+    const idToken = state.user ? await state.user.getIdToken() : null;
+    if (!idToken) throw new Error('Chưa xác thực Admin hoặc phiên làm việc hết hạn.');
+
+    const res = await fetch(getGraduationApiBase() + '/api/graduation/drive/get-or-create-folder', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + idToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        parentFolderId: rootFolderId,
+        folderName: folderName,
+        folderType: 'council',
+        roundId: targetRound.id,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+
+    const idInput = document.getElementById('council-form-drive-folder-id');
+    const urlInput = document.getElementById('council-form-drive-folder-url');
+    if (idInput) idInput.value = data.folderId;
+    if (urlInput) urlInput.value = data.folderUrl;
+
+    const actionText = data.reused ? 'Đã kết nối với thư mục sẵn có' : 'Đã tạo mới thư mục con';
+    if (statusEl) {
+      statusEl.innerHTML = `
+        <div class="mt-1 p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-800">
+          <div>
+            <span class="font-bold">✓ ${actionText}: <strong>${escapeHtml(data.folderName)}</strong></span>
+            <span class="block text-[10px] text-emerald-600 font-mono">ID: ${data.folderId}</span>
+          </div>
+          <a href="${data.folderUrl}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 rounded font-bold text-xs inline-flex items-center gap-1 shadow-2xs">
+            <span>Mở Drive</span> ↗
+          </a>
+        </div>
+      `;
+    }
+
+    showToast(`✓ ${actionText} "${data.folderName}" trên Google Drive!`, 'success');
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-rose-600 font-semibold">✗ Lỗi: ${escapeHtml(err.message)}</span>`;
+    }
+    showToast('Lỗi tạo/kết nối thư mục Drive: ' + err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origBtnText;
+    }
+  }
+};
+
+window.connectActivityDriveFolder = async function() {
+  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+
+  if (!targetRound) {
+    showToast('Không tìm thấy thông tin Đợt tốt nghiệp!', 'error');
+    return;
+  }
+
+  const rootFolderId = targetRound.driveRootFolderId || targetRound.rootDriveFolderId;
+  if (!rootFolderId) {
+    showToast('Đợt tốt nghiệp chưa cấu hình Thư mục Drive gốc! Vui lòng cấu hình Thư mục gốc trong Thông tin đợt trước.', 'warning');
+    return;
+  }
+
+  const nameInput = document.getElementById('activity-form-drive-folder-name');
+  const fallbackName = document.getElementById('activity-form-title')?.value?.trim();
+  let folderName = (nameInput?.value || '').trim() || fallbackName;
+
+  if (!folderName) {
+    showToast('Vui lòng nhập Tên mốc kế hoạch hoặc Tên thư mục con (*)', 'warning');
+    nameInput?.focus();
+    return;
+  }
+
+  if (nameInput) nameInput.value = folderName;
+
+  const btn = document.getElementById('btn-connect-activity-drive');
+  const statusEl = document.getElementById('activity-drive-folder-status');
+  const origBtnText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ Đang xử lý...</span>';
+  }
+  if (statusEl) {
+    statusEl.classList.remove('hidden');
+    statusEl.innerHTML = '<span class="text-blue-600">⏳ Đang tìm kiếm hoặc tạo thư mục trên Google Drive...</span>';
+  }
+
+  try {
+    const idToken = state.user ? await state.user.getIdToken() : null;
+    if (!idToken) throw new Error('Chưa xác thực Admin hoặc phiên làm việc hết hạn.');
+
+    const res = await fetch(getGraduationApiBase() + '/api/graduation/drive/get-or-create-folder', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + idToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        parentFolderId: rootFolderId,
+        folderName: folderName,
+        folderType: 'milestone',
+        roundId: targetRound.id,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+
+    const idInput = document.getElementById('activity-form-drive-folder-id');
+    const urlInput = document.getElementById('sub-drive-folder-url');
+    if (idInput) idInput.value = data.folderId;
+    if (urlInput) urlInput.value = data.folderUrl;
+
+    const actionText = data.reused ? 'Đã kết nối với thư mục sẵn có' : 'Đã tạo mới thư mục con';
+    if (statusEl) {
+      statusEl.innerHTML = `
+        <div class="mt-1 p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-800">
+          <div>
+            <span class="font-bold">✓ ${actionText}: <strong>${escapeHtml(data.folderName)}</strong></span>
+            <span class="block text-[10px] text-emerald-600 font-mono">ID: ${data.folderId}</span>
+          </div>
+          <a href="${data.folderUrl}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 rounded font-bold text-xs inline-flex items-center gap-1 shadow-2xs">
+            <span>Mở Drive</span> ↗
+          </a>
+        </div>
+      `;
+    }
+
+    showToast(`✓ ${actionText} "${data.folderName}" trên Google Drive!`, 'success');
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="text-rose-600 font-semibold">✗ Lỗi: ${escapeHtml(err.message)}</span>`;
+    }
+    showToast('Lỗi tạo/kết nối thư mục Drive: ' + err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origBtnText;
+    }
   }
 };
 
@@ -4181,8 +4499,11 @@ window.saveRound = async function(e) {
   const supCount = newSupervisorsArray.length;
   const configStatus = (supCount > 0 && (elCount > 0 || allowRegistrationBeforeEligibility)) ? 'ready' : 'incomplete';
 
-  const driveUrl = document.getElementById('round-drive-folder-url')?.value.trim();
+  const driveInput = document.getElementById('round-drive-folder-url');
+  const driveUrl = driveInput?.value?.trim();
   const driveRootFolderId = driveUrl ? window.extractDriveFolderId(driveUrl) : null;
+  const driveRootFolderName = driveInput?.dataset?.validatedFolderName || null;
+  const driveRootFolderUrl = driveRootFolderId ? (driveInput?.dataset?.validatedFolderUrl || `https://drive.google.com/drive/folders/${driveRootFolderId}`) : null;
 
   const payload = {
     title,
@@ -4209,6 +4530,11 @@ window.saveRound = async function(e) {
     supervisorCount: supCount,
     supervisors: newSupervisorsArray,
     driveRootFolderId: driveRootFolderId || null,
+    driveRootFolderUrl: driveRootFolderUrl || null,
+    driveRootFolderName: driveRootFolderName || null,
+    rootDriveFolderId: driveRootFolderId || null,
+    rootDriveFolderUrl: driveRootFolderUrl || null,
+    rootDriveFolderName: driveRootFolderName || null,
     deleted: false,
     updatedAt: serverTimestamp()
   };
@@ -5266,36 +5592,64 @@ function renderAdminRoundSupervisorsTable(roundId, list) {
     return;
   }
 
-  tbody.innerHTML = list.map(s => `
-    <tr class="hover:bg-slate-50">
-      <td class="p-3.5 font-bold text-slate-900">${s.name}</td>
-      <td class="p-3.5 text-slate-600">${s.department || '--'}</td>
-      <td class="p-3.5">
-        <input type="number" id="cap-input-${s.id}" value="${s.capacity || 10}" min="1" max="100" class="w-20 p-1 border rounded-lg font-bold text-center">
-      </td>
-      <td class="p-3.5">
-        <label class="flex items-center gap-1.5 cursor-pointer">
-          <input type="checkbox" id="active-round-chk-${s.id}" ${s.activeInRound !== false ? 'checked' : ''} class="rounded text-blue-600">
-          <span class="text-xs font-semibold">${s.activeInRound !== false ? 'Hoạt động' : 'Tạm ẩn'}</span>
-        </label>
-      </td>
-      <td class="p-3.5 text-right space-x-2">
-        <button onclick="saveRoundSupervisorRow('${roundId}', '${s.id}')" class="text-emerald-600 font-bold hover:underline">Lưu</button>
-        <button onclick="removeRoundSupervisor('${roundId}', '${s.id}')" class="text-rose-600 font-bold hover:underline">Bỏ khỏi đợt</button>
-      </td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = list.map(s => {
+    const supMaster = (state.supervisorsMaster || []).find(x => x.id === s.id);
+    const { employmentType, maxCap, defaultQuota } = getSupervisorDefaultAndMaxQuota(supMaster || s);
+    const curCap = typeof s.capacity === 'number' ? s.capacity : defaultQuota;
+    const typeBadge = employmentType === 'adjunct'
+      ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 ml-1">Thỉnh giảng (tối đa 5)</span>'
+      : '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 ml-1">Cơ hữu (tối đa 10)</span>';
+
+    return `
+      <tr class="hover:bg-slate-50">
+        <td class="p-3.5">
+          <span class="font-bold text-slate-900 block">${escapeHtml(s.name)}</span>
+          ${typeBadge}
+        </td>
+        <td class="p-3.5 text-slate-600">${escapeHtml(s.department || '--')}</td>
+        <td class="p-3.5">
+          <input type="number" id="cap-input-${s.id}" value="${curCap}" min="1" max="${maxCap}" class="w-20 p-1 border rounded-lg font-bold text-center">
+        </td>
+        <td class="p-3.5">
+          <label class="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" id="active-round-chk-${s.id}" ${s.activeInRound !== false ? 'checked' : ''} class="rounded text-blue-600">
+            <span class="text-xs font-semibold">${s.activeInRound !== false ? 'Hoạt động' : 'Tạm ẩn'}</span>
+          </label>
+        </td>
+        <td class="p-3.5 text-right space-x-2">
+          <button onclick="saveRoundSupervisorRow('${roundId}', '${s.id}')" class="text-emerald-600 font-bold hover:underline">Lưu</button>
+          <button onclick="removeRoundSupervisor('${roundId}', '${s.id}')" class="text-rose-600 font-bold hover:underline">Bỏ khỏi đợt</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 window.saveRoundSupervisorRow = async function(roundId, supId) {
-  const capacity = parseInt(document.getElementById('cap-input-' + supId).value, 10) || 10;
-  const activeInRound = document.getElementById('active-round-chk-' + supId).checked;
+  const supMaster = (state.supervisorsMaster || []).find(x => x.id === supId);
+  const { employmentType, maxCap } = getSupervisorDefaultAndMaxQuota(supMaster);
+  const rawCap = parseInt(document.getElementById('cap-input-' + supId)?.value, 10);
+
+  if (isNaN(rawCap) || rawCap < 1) {
+    showToast('Chỉ tiêu phải lớn hơn hoặc bằng 1.', 'warning');
+    return;
+  }
+
+  if (rawCap > maxCap) {
+    const typeLabel = employmentType === 'adjunct' ? 'Thỉnh giảng (tối đa 5)' : 'Cơ hữu (tối đa 10)';
+    showToast(`Chỉ tiêu vượt quá quy định của Trường (${typeLabel}). Đã tự động điều chỉnh về mức tối đa: ${maxCap}.`, 'warning', 4500);
+  }
+
+  const capacity = Math.min(maxCap, Math.max(1, rawCap));
+  const activeInRound = document.getElementById('active-round-chk-' + supId)?.checked !== false;
 
   try {
     await updateDoc(doc(db, 'graduationRounds', roundId, 'supervisors', supId), {
       capacity, activeInRound, updatedAt: serverTimestamp()
     });
-    showToast('Đã cập nhật chỉ tiêu GVHD trong đợt thành công!', 'success');
+    const capInput = document.getElementById('cap-input-' + supId);
+    if (capInput) capInput.value = capacity;
+    showToast(`Đã cập nhật chỉ tiêu: ${capacity} SV (Tối đa Trường: ${maxCap})!`, 'success');
   } catch (e) {
     showToast('Lỗi cập nhật: ' + e.message, 'error');
   }
@@ -5381,7 +5735,7 @@ window.saveSelectedSupervisorsToRound = async function() {
       showEmail: sup.showEmail !== false,
       showPhone: Boolean(sup.showPhone),
       showPhoto: sup.showPhoto !== false,
-      capacity: 10,
+      capacity: getSupervisorDefaultAndMaxQuota(sup).defaultQuota,
       activeInRound: true,
       sortOrder: 1,
       createdAt: serverTimestamp()
@@ -5997,11 +6351,67 @@ window.applyOfficialEligibilityToRegistrations = async function() {
 
 
 // =========================================================================
+// --- CENTRAL STUDENT RESOLVER FOR REGISTRATIONS & REVIEWS ---
+// =========================================================================
+window.resolveStudentName = function(sid, fallbackName = '') {
+  if (!sid) return fallbackName || '--';
+  const cleanId = String(sid).trim().toUpperCase();
+  const raw = String(fallbackName || '').trim();
+  if (raw && raw.toUpperCase() !== cleanId && !raw.toUpperCase().startsWith('SINH VIÊN ' + cleanId)) {
+    return raw;
+  }
+
+  // 1. Check eligibleStudents in review data or state
+  const eligibleList = state.adminReviewData?.eligible || state.eligibleStudents || [];
+  const el = eligibleList.find(e => {
+    const eid = String(e.studentId || e.mssv || e.id || '').trim().toUpperCase();
+    return eid === cleanId;
+  });
+  if (el) {
+    const elName = String(el.fullName || el.name || el.studentName || '').trim();
+    if (elName && elName.toUpperCase() !== cleanId && !elName.toUpperCase().startsWith('SINH VIÊN ' + cleanId)) {
+      return elName;
+    }
+  }
+
+  // 2. Check IFAA central master lookup
+  if (typeof window.getFacultyStudentByMssv === 'function') {
+    const fac = window.getFacultyStudentByMssv(cleanId);
+    if (fac) {
+      const facName = String(fac.fullName || fac.name || '').trim();
+      if (facName && facName.toUpperCase() !== cleanId && !facName.toUpperCase().startsWith('SINH VIÊN ' + cleanId)) {
+        return facName;
+      }
+    }
+  }
+
+  // 3. Check in-memory facultyStudents array
+  if (Array.isArray(state.facultyStudents) && state.facultyStudents.length > 0) {
+    const inFac = state.facultyStudents.find(s => {
+      const sId = String(s.mssv || s.studentId || s.studentCode || '').trim().toUpperCase();
+      return sId === cleanId;
+    });
+    if (inFac) {
+      const fn = String(inFac.fullName || inFac.name || inFac.hoTen || '').trim();
+      if (fn && fn.toUpperCase() !== cleanId && !fn.toUpperCase().startsWith('SINH VIÊN ' + cleanId)) {
+        return fn;
+      }
+    }
+  }
+
+  return raw || cleanId;
+};
+
+// =========================================================================
 // --- PHASE 2A: ADMIN REVIEW MANAGEMENT MODULE ---
 // =========================================================================
 
 window.loadAdminReviewData = async function(roundId) {
   if (!roundId) return;
+
+  if (typeof ensureFacultyDatasetLoaded === 'function' && (!state.facultyStudents || state.facultyStudents.length === 0)) {
+    ensureFacultyDatasetLoaded().catch(e => console.warn('[ReviewData] Faculty dataset background load notice:', e));
+  }
 
   try {
     // 1. Fetch Round doc
@@ -6231,12 +6641,13 @@ function renderAdminManualAssignmentTable() {
   }
 
   tbody.innerHTML = unassigned.map(r => {
+    const studentDisplayName = resolveStudentName(r.studentId, r.studentName);
     const prefsText = (r.preferences || []).map(p => `NV${p.rank}: ${p.supervisorName}`).join(' • ') || '--';
 
     return `
       <tr class="hover:bg-slate-50">
         <td class="p-3.5 font-mono font-bold text-slate-900">${r.studentId}</td>
-        <td class="p-3.5 font-semibold text-slate-800">${r.studentName || '--'}</td>
+        <td class="p-3.5 font-semibold text-slate-800">${escapeHtml(studentDisplayName)}</td>
         <td class="p-3.5 max-w-xs font-medium text-slate-900" title="${r.topicTitle}">${r.topicTitle}</td>
         <td class="p-3.5 text-slate-600">${r.projectType || '--'}</td>
         ${directAssignment ? '' : `<td class="p-3.5 text-[11px] text-slate-500 max-w-xs truncate" title="${prefsText}">${prefsText}</td>`}
@@ -6437,11 +6848,12 @@ window.openAdminInspectSupModal = function(supId) {
     tbody.innerHTML = candidates.map(c => {
       const dec = decisions.find(d => d.round === currentRound && d.supervisorId === sup.id && d.studentId === c.studentId);
       const isSelected = dec && dec.decision === 'selected';
+      const cStudentName = resolveStudentName(c.studentId, c.studentName);
 
       return `
         <tr class="hover:bg-slate-50">
           <td class="p-3 font-mono font-bold text-slate-900">${c.studentId}</td>
-          <td class="p-3 font-semibold text-slate-800">${c.studentName || '--'}</td>
+          <td class="p-3 font-semibold text-slate-800">${escapeHtml(cStudentName)}</td>
           <td class="p-3 max-w-xs font-medium text-slate-700 truncate" title="${c.topicTitle}">${c.topicTitle}</td>
           <td class="p-3">
             ${isSelected ? '<span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Giảng viên đã chọn</span>' : '<span class="text-slate-400 font-semibold">Chưa chọn</span>'}
@@ -6467,14 +6879,25 @@ window.openAdminManualAssignModal = function(studentId) {
   const modalTitle = document.querySelector('#modal-admin-manual-assign h3');
   if (modalTitle) modalTitle.textContent = directAssignment ? 'Phân công GVHD trực tiếp' : 'Phân công GVHD Thủ công';
 
-  document.getElementById('manual-assign-student-info').textContent = `${reg.studentId} — ${reg.studentName || ''}`;
+  const studentDisplayName = resolveStudentName(reg.studentId, reg.studentName);
+  document.getElementById('manual-assign-student-info').textContent = `${reg.studentId} — ${studentDisplayName}`;
   document.getElementById('manual-assign-topic-info').textContent = `Đề tài: ${reg.topicTitle} (${reg.projectType})`;
 
   const select = document.getElementById('select-manual-supervisor');
   select.innerHTML = state.adminReviewData.supervisors.map(s => {
+    const supMaster = (state.supervisorsMaster || []).find(x => x.id === s.id);
+    const { employmentType, maxCap } = getSupervisorDefaultAndMaxQuota(supMaster || s);
+    const configuredCap = typeof s.capacity === 'number' ? s.capacity : (s.maxQuota || maxCap);
+    const allowedCap = Math.min(configuredCap, maxCap);
+
     const acceptedCount = (state.adminReviewData.registrations || []).filter(r => (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') && r.acceptedSupervisorId === s.id).length;
-    const remaining = (s.capacity || 10) - acceptedCount;
-    return `<option value="${s.id}">${s.name} (Còn ${remaining > 0 ? remaining : 0} chỗ • Tổng ${s.capacity || 10})</option>`;
+    const remaining = allowedCap - acceptedCount;
+    const typeLabel = employmentType === 'adjunct' ? 'Thỉnh giảng' : 'Cơ hữu';
+
+    if (remaining <= 0) {
+      return `<option value="${s.id}" disabled class="text-slate-400 bg-slate-100">${s.name} (${typeLabel} • ĐÃ ĐỦ CHỈ TIÊU: ${acceptedCount}/${allowedCap})</option>`;
+    }
+    return `<option value="${s.id}">${s.name} (${typeLabel} • Còn ${remaining} chỗ • ${acceptedCount}/${allowedCap})</option>`;
   }).join('');
 
   document.getElementById('modal-admin-manual-assign').classList.remove('hidden');
@@ -6488,16 +6911,26 @@ window.saveAdminManualAssign = async function() {
   const roundId = state.selectedRoundId;
   const studentId = state.manualAssignStudentId;
   const supervisorId = document.getElementById('select-manual-supervisor')?.value;
-  const overrideCapacity = document.getElementById('chk-override-capacity')?.checked;
 
   if (!roundId || !studentId || !supervisorId) return;
 
   const sup = state.adminReviewData.supervisors.find(s => s.id === supervisorId);
-  const acceptedCount = (state.adminReviewData.registrations || []).filter(r => (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') && r.acceptedSupervisorId === sup.id).length;
-  const remaining = (sup?.capacity || 10) - acceptedCount;
+  if (!sup) {
+    showToast('Vui lòng chọn Giảng viên hướng dẫn.', 'warning');
+    return;
+  }
 
-  if (remaining <= 0 && !overrideCapacity) {
-    showToast('Giảng viên này đã hết chỉ tiêu. Hãy chọn giảng viên khác hoặc tích vào ô "Quyền High Admin: Cho phép phân công vượt chỉ tiêu".', 'info');
+  const supMaster = (state.supervisorsMaster || []).find(x => x.id === sup.id);
+  const { employmentType, maxCap } = getSupervisorDefaultAndMaxQuota(supMaster || sup);
+  const configuredCap = typeof sup.capacity === 'number' ? sup.capacity : (sup.maxQuota || maxCap);
+  const allowedCap = Math.min(configuredCap, maxCap);
+
+  const acceptedCount = (state.adminReviewData.registrations || []).filter(r => (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') && r.acceptedSupervisorId === sup.id).length;
+  const remaining = allowedCap - acceptedCount;
+
+  if (remaining <= 0) {
+    const typeText = employmentType === 'adjunct' ? 'Thỉnh giảng (tối đa 5 SV)' : 'Cơ hữu (tối đa 10 SV)';
+    showToast(`Thầy/Cô ${sup.name} đã đủ chỉ tiêu phân công (${acceptedCount}/${allowedCap} SV - ${typeText}). Theo quy định của Nhà trường, không được phép phân công vượt quá chỉ tiêu.`, 'error', 6000);
     return;
   }
 
@@ -6524,8 +6957,11 @@ window.saveAdminManualAssign = async function() {
 
     await batch.commit();
 
+    const reg = (state.adminReviewData.registrations || []).find(r => r.studentId === studentId);
+    const studentDisplayName = resolveStudentName(studentId, reg?.studentName);
+
     closeAdminManualAssignModal();
-    showToast(`✓ Đã phân công sinh viên ${studentId} cho Thầy/Cô ${sup?.name} thành công!`, 'info');
+    showToast(`✓ Đã phân công sinh viên ${studentDisplayName} (${studentId}) cho Thầy/Cô ${sup?.name} thành công!`, 'info');
     await loadAdminReviewData(roundId);
   } catch (err) {
     showToast('Lỗi phân công: ' + err.message, 'error');
@@ -7262,7 +7698,7 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
             type: 'student',
             id: sid,
             mssv: sid,
-            name: st.studentName || st.name || sid,
+            name: resolveStudentName(sid, st.studentName || st.name || st.fullName || ''),
             email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
             roundId: r.id,
             roundTitle: r.roundName || r.title || r.id,
@@ -7283,7 +7719,7 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
             type: 'student',
             id: sid,
             mssv: sid,
-            name: st.studentName || st.name || sid,
+            name: resolveStudentName(sid, st.studentName || st.name || st.fullName || ''),
             email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
             roundId: r.id,
             roundTitle: r.roundName || r.title || r.id,
@@ -7307,7 +7743,7 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
                 type: 'student',
                 id: sid,
                 mssv: sid,
-                name: st.studentName || st.name || sid,
+                name: resolveStudentName(sid, st.studentName || st.name || st.fullName || ''),
                 email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
                 roundId: r.id,
                 roundTitle: r.roundName || r.title || r.id,
@@ -7330,7 +7766,7 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
                 type: 'student',
                 id: sid,
                 mssv: sid,
-                name: st.studentName || st.name || sid,
+                name: resolveStudentName(sid, st.studentName || st.name || st.fullName || ''),
                 email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
                 roundId: r.id,
                 roundTitle: r.roundName || r.title || r.id,
@@ -9321,8 +9757,10 @@ window.duplicateActivityWithinRound = async function(actId) {
     // Clear submission driveFolderId so newly uploaded files won't cross-contaminate
     if (newAct.submissionConfig) {
       newAct.submissionConfig.driveFolderId = null;
+      newAct.submissionConfig.driveFolderUrl = null;
     }
     newAct.driveFolderId = null;
+    newAct.driveFolderUrl = null;
 
     // Place right after the source activity in the timeline
     const srcIndex = activities.findIndex(a => a.id === actId);
@@ -9539,8 +9977,10 @@ window.executeCopyFromRound = async function() {
 
       // SAFETY: Explicitly clear driveFolderId so the new round doesn't upload to the old round's folder
       newAct.driveFolderId = null;
+      newAct.driveFolderUrl = null;
       if (newAct.submissionConfig) {
         newAct.submissionConfig.driveFolderId = null;
+        newAct.submissionConfig.driveFolderUrl = null;
       }
 
       targetActs.push(newAct);
@@ -9721,6 +10161,8 @@ window.saveActivity = async function(e) {
       submissionEnabled,
       submissionConfig,
       driveFolderId: submissionConfig?.driveFolderId || existingAct?.driveFolderId || null,
+      driveFolderName: submissionConfig?.driveFolderName || existingAct?.driveFolderName || null,
+      driveFolderUrl: submissionConfig?.driveFolderUrl || existingAct?.driveFolderUrl || null,
       councilEnabled,
       showPresentationOrderToStudents,
       scoringConfig,
@@ -10175,9 +10617,9 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
           <div class="flex items-center justify-between gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
             <div>
               <span class="font-bold text-slate-800 text-xs block">${sup.supervisorName}</span>
-              <span class="text-[9px] text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-200">GVHD hỗ trợ</span>
+              <span class="text-[9px] text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-200">GVHD 2</span>
             </div>
-            <button type="button" onclick="removeSupportSupervisor('${r.studentId}', '${sup.supervisorId}', '${escapeHtml(sup.supervisorName)}', '${escapeHtml(r.studentName || r.studentId)}')" class="px-2 py-0.5 text-rose-600 hover:bg-rose-50 rounded text-[10px] font-bold border border-rose-200 transition-colors" title="Gỡ GVHD hỗ trợ khỏi sinh viên này">
+            <button type="button" onclick="removeSupportSupervisor('${r.studentId}', '${sup.supervisorId}', '${escapeHtml(sup.supervisorName)}', '${escapeHtml(resolveStudentName(r.studentId, r.studentName))}')" class="px-2 py-0.5 text-rose-600 hover:bg-rose-50 rounded text-[10px] font-bold border border-rose-200 transition-colors" title="Gỡ GVHD 2 khỏi sinh viên này">
               Gỡ
             </button>
           </div>
@@ -10185,10 +10627,12 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
       </div>
     ` : '<span class="text-slate-400 italic text-[11px]">Chưa có</span>';
 
+    const studentDisplayName = resolveStudentName(r.studentId, r.studentName);
+
     return `
       <tr class="hover:bg-slate-50 transition-colors">
         <td class="p-3.5 font-mono font-bold text-slate-900">${r.studentId}</td>
-        <td class="p-3.5 font-semibold text-slate-800 whitespace-nowrap">${r.studentName || '--'}</td>
+        <td class="p-3.5 font-semibold text-slate-800 whitespace-nowrap">${escapeHtml(studentDisplayName)}</td>
         <td class="p-3.5 max-w-xs">
           <span class="font-medium text-slate-900 block truncate" title="${r.topicTitle}">${r.topicTitle}</span>
           <span class="text-[11px] text-slate-500">${r.projectType || '--'}</span>
@@ -10197,7 +10641,7 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
         <td class="p-3.5 min-w-[200px]">${supportsHtml}</td>
         <td class="p-3.5 text-right whitespace-nowrap">
           <button type="button" onclick="openAddSupportSupervisorModal('${r.studentId}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs border border-indigo-200 transition-colors flex items-center gap-1 inline-flex">
-            <span>+ Thêm GVHD hỗ trợ</span>
+            <span>+ Thêm GVHD 2</span>
           </button>
         </td>
       </tr>
@@ -10216,7 +10660,8 @@ window.openAddSupportSupervisorModal = function(studentId) {
 
   document.getElementById('support-target-student-id').value = studentId;
   const studentInfoEl = document.getElementById('add-support-student-info');
-  if (studentInfoEl) studentInfoEl.textContent = `Sinh viên: ${reg.studentName || studentId} (MSSV: ${studentId})`;
+  const studentDisplayName = resolveStudentName(reg.studentId, reg.studentName);
+  if (studentInfoEl) studentInfoEl.textContent = `Sinh viên: ${studentDisplayName} (MSSV: ${studentId})`;
 
   const officials = getOfficialSupervisors(reg);
   const primary = officials.find(s => s.role === 'primary') || officials[0];
@@ -10226,7 +10671,7 @@ window.openAddSupportSupervisorModal = function(studentId) {
   if (summaryEl) {
     let htmlStr = `• GVHD chính: <strong>${primary?.supervisorName || 'Chưa xác định'}</strong>`;
     if (supports.length > 0) {
-      htmlStr += `<br>• GVHD hỗ trợ: ${supports.map(s => s.supervisorName).join(', ')}`;
+      htmlStr += `<br>• GVHD 2: ${supports.map(s => s.supervisorName).join(', ')}`;
     }
     summaryEl.innerHTML = htmlStr;
   }
@@ -10236,14 +10681,16 @@ window.openAddSupportSupervisorModal = function(studentId) {
   const supervisors = state.adminReviewData?.supervisors || [];
   const assignedSupsSet = new Set(officials.map(s => s.supervisorId));
 
-  select.innerHTML = '<option value="">-- Chọn GVHD hỗ trợ --</option>' + supervisors.map(s => {
+  select.innerHTML = '<option value="">-- Chọn GVHD 2 --</option>' + supervisors.map(s => {
     const isAlreadyAssigned = assignedSupsSet.has(s.id);
-    const empType = s.employmentType || 'internal';
-    const isAdjunct = (empType === 'adjunct');
-    const cap = isAdjunct ? Math.min(5, s.capacity || s.maxQuota || 5) : Math.min(10, s.capacity || s.maxQuota || 10);
+    const supMaster = (state.supervisorsMaster || []).find(x => x.id === s.id);
+    const { employmentType, maxCap } = getSupervisorDefaultAndMaxQuota(supMaster || s);
+    const configuredCap = typeof s.capacity === 'number' ? s.capacity : (s.maxQuota || maxCap);
+    const cap = Math.min(configuredCap, maxCap);
     const totalAssigned = getSupervisorTotalAssignedCount(s.id, registrations);
     const remaining = cap - totalAssigned;
     const isFull = (remaining <= 0);
+    const isAdjunct = (employmentType === 'adjunct');
 
     let label = `${s.name} (${isAdjunct ? 'Thỉnh giảng' : 'Cơ hữu'} • ${totalAssigned}/${cap} SV)`;
     if (isAlreadyAssigned) {
@@ -10307,11 +10754,14 @@ window.executeAddSupportSupervisor = async function() {
   }
 
   // Quota validation
-  const empType = sup.employmentType || 'internal';
-  const cap = (empType === 'adjunct' ? 5 : 10);
+  const supMaster = (state.supervisorsMaster || []).find(x => x.id === sup.id);
+  const { employmentType, maxCap } = getSupervisorDefaultAndMaxQuota(supMaster || sup);
+  const configuredCap = typeof sup.capacity === 'number' ? sup.capacity : (sup.maxQuota || maxCap);
+  const cap = Math.min(configuredCap, maxCap);
   const currentAssigned = getSupervisorTotalAssignedCount(sup.id, registrations);
   if (currentAssigned >= cap) {
-    showToast(`Giảng viên ${sup.name} đã đủ chỉ tiêu tối đa (${cap} SV) theo quy định!`, 'warning');
+    const typeLabel = employmentType === 'adjunct' ? 'Thỉnh giảng tối đa 5 SV' : 'Cơ hữu tối đa 10 SV';
+    showToast(`Giảng viên ${sup.name} đã đủ chỉ tiêu (${currentAssigned}/${cap} SV - ${typeLabel}) theo quy định của Trường!`, 'warning');
     return;
   }
 
@@ -10351,14 +10801,15 @@ window.executeAddSupportSupervisor = async function() {
     renderAdminReviewDashboard();
     renderAdminReviewSupervisorsTable();
 
-    showToast(`✓ Đã thêm Thầy/Cô ${sup.name} làm GVHD hỗ trợ cho sinh viên ${reg.studentName || studentId}!`, 'success');
+    const sName = resolveStudentName(studentId, reg.studentName);
+    showToast(`✓ Đã thêm Thầy/Cô ${sup.name} làm GVHD 2 cho sinh viên ${sName}!`, 'success');
   } catch (err) {
-    console.error('Lỗi thêm GVHD hỗ trợ:', err);
+    console.error('Lỗi thêm GVHD 2:', err);
     showToast('Lỗi: ' + err.message, 'error');
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Thêm GVHD Hỗ trợ';
+      submitBtn.textContent = 'Thêm GVHD 2';
     }
   }
 };
@@ -10368,9 +10819,9 @@ window.removeSupportSupervisor = async function(studentId, supervisorId, supervi
   if (!roundId || !studentId || !supervisorId) return;
 
   const confirmed = await showConfirm(
-    'Gỡ GVHD hỗ trợ',
-    `Bạn có chắc chắn muốn gỡ Thầy/Cô "${supervisorName}" khỏi vai trò GVHD hỗ trợ của sinh viên "${studentName}" không?`,
-    { confirmText: 'Gỡ GVHD hỗ trợ', danger: true }
+    'Gỡ GVHD 2',
+    `Bạn có chắc chắn muốn gỡ Thầy/Cô "${supervisorName}" khỏi vai trò GVHD 2 của sinh viên "${studentName}" không?`,
+    { confirmText: 'Gỡ GVHD 2', danger: true }
   );
   if (!confirmed) return;
 
@@ -10394,10 +10845,10 @@ window.removeSupportSupervisor = async function(studentId, supervisorId, supervi
     renderAdminReviewDashboard();
     renderAdminReviewSupervisorsTable();
 
-    showToast(`Đã gỡ GVHD hỗ trợ khỏi sinh viên ${studentName}.`, 'info');
+    showToast(`Đã gỡ GVHD 2 khỏi sinh viên ${studentName}.`, 'info');
   } catch (err) {
-    console.error('Lỗi gỡ GVHD hỗ trợ:', err);
-    showToast('Lỗi gỡ GVHD hỗ trợ: ' + err.message, 'error');
+    console.error('Lỗi gỡ GVHD 2:', err);
+    showToast('Lỗi gỡ GVHD 2: ' + err.message, 'error');
   }
 };
 
@@ -10604,9 +11055,16 @@ function renderCouncilCards(act) {
         ${presentingStudentHtml}
 
         <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-          <button type="button" onclick="copyCouncilLink('${act.slug}', '${c.slug || c.id}')" class="text-slate-500 hover:text-indigo-600 font-semibold text-[11px] flex items-center gap-1" title="Sao chép link trực tiếp đến Hội đồng này">
-            <span>🔗 Link</span>
-          </button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="copyCouncilLink('${act.slug}', '${c.slug || c.id}')" class="text-slate-500 hover:text-indigo-600 font-semibold text-[11px] flex items-center gap-1" title="Sao chép link trực tiếp đến Hội đồng này">
+              <span>🔗 Link</span>
+            </button>
+            ${c.driveFolderUrl ? `
+              <a href="${c.driveFolderUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 font-semibold text-[11px] flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs transition-colors" title="Mở thư mục Google Drive của Hội đồng">
+                <span>📁 Drive</span> ↗
+              </a>
+            ` : ''}
+          </div>
           <div class="space-x-1.5">
             <button type="button" onclick="openCouncilWorkspace('${state.activeCouncilManagement.roundId}', '${act.id}', '${c.id}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs">▶ Vào phòng HĐ</button>
             <button type="button" onclick="copyCouncil('${c.id}')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors" title="Sao chép Hội đồng">📋 Sao chép</button>
@@ -10941,6 +11399,18 @@ window.openCreateCouncilModal = function() {
   document.getElementById('council-form-start-time').value = actStart.time || '08:00';
   document.getElementById('council-form-end-time').value = actEnd.time || '11:30';
 
+  // Reset Drive inputs
+  const driveNameInput = document.getElementById('council-form-drive-folder-name');
+  if (driveNameInput) driveNameInput.value = `HĐ${nextNum}`;
+  const driveIdInput = document.getElementById('council-form-drive-folder-id');
+  if (driveIdInput) driveIdInput.value = '';
+  const driveUrlInput = document.getElementById('council-form-drive-folder-url');
+  if (driveUrlInput) driveUrlInput.value = '';
+  const driveStatusEl = document.getElementById('council-drive-folder-status');
+  if (driveStatusEl) {
+    driveStatusEl.innerHTML = '<span class="text-slate-400">Chưa kết nối thư mục Google Drive. Nhập tên và bấm "Tạo / Kết nối".</span>';
+  }
+
   renderCouncilMembersFormSlots(act, {});
 
   document.getElementById('modal-edit-council')?.classList.remove('hidden');
@@ -10964,6 +11434,32 @@ window.editCouncilModal = function(councilId) {
   document.getElementById('council-form-start-time').value = council.startTime || '';
   document.getElementById('council-form-end-time').value = council.endTime || '';
   document.getElementById('council-form-note').value = council.note || '';
+
+  // Populate Drive inputs & status
+  const driveNameInput = document.getElementById('council-form-drive-folder-name');
+  if (driveNameInput) driveNameInput.value = council.driveFolderName || council.name || '';
+  const driveIdInput = document.getElementById('council-form-drive-folder-id');
+  if (driveIdInput) driveIdInput.value = council.driveFolderId || '';
+  const driveUrlInput = document.getElementById('council-form-drive-folder-url');
+  if (driveUrlInput) driveUrlInput.value = council.driveFolderUrl || '';
+  const driveStatusEl = document.getElementById('council-drive-folder-status');
+  if (driveStatusEl) {
+    if (council.driveFolderId) {
+      driveStatusEl.innerHTML = `
+        <div class="mt-1 p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-800">
+          <div>
+            <span class="font-bold">✓ Đã kết nối: <strong>${escapeHtml(council.driveFolderName || council.name)}</strong></span>
+            <span class="block text-[10px] text-emerald-600 font-mono">ID: ${council.driveFolderId}</span>
+          </div>
+          <a href="${council.driveFolderUrl || `https://drive.google.com/drive/folders/${council.driveFolderId}`}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 rounded font-bold text-xs inline-flex items-center gap-1 shadow-2xs">
+            <span>Mở Drive</span> ↗
+          </a>
+        </div>
+      `;
+    } else {
+      driveStatusEl.innerHTML = '<span class="text-slate-400">Chưa kết nối thư mục Google Drive. Nhập tên và bấm "Tạo / Kết nối".</span>';
+    }
+  }
 
   renderCouncilMembersFormSlots(act, council.membersBySlot || {});
 
@@ -10989,6 +11485,18 @@ window.copyCouncil = function(councilId) {
   document.getElementById('council-form-start-time').value = council.startTime || '';
   document.getElementById('council-form-end-time').value = council.endTime || '';
   document.getElementById('council-form-note').value = council.note || '';
+
+  // Clear Drive connection IDs so copy gets its own separate folder
+  const driveNameInput = document.getElementById('council-form-drive-folder-name');
+  if (driveNameInput) driveNameInput.value = `${council.driveFolderName || council.name} (Bản sao)`;
+  const driveIdInput = document.getElementById('council-form-drive-folder-id');
+  if (driveIdInput) driveIdInput.value = '';
+  const driveUrlInput = document.getElementById('council-form-drive-folder-url');
+  if (driveUrlInput) driveUrlInput.value = '';
+  const driveStatusEl = document.getElementById('council-drive-folder-status');
+  if (driveStatusEl) {
+    driveStatusEl.innerHTML = '<span class="text-amber-600 font-medium">⚠️ Bản sao chưa kết nối thư mục Drive. Vui lòng bấm "Tạo / Kết nối" để tạo thư mục mới.</span>';
+  }
 
   renderCouncilMembersFormSlots(act, council.membersBySlot || {});
 
@@ -11149,6 +11657,10 @@ window.saveCouncil = async function(e) {
   const slug = id ? ((act.councils || []).find(c => c.id === id)?.slug || slugify(name)) : ('c-' + slugify(name) + '-' + Date.now().toString(36).substr(-4));
   const councilId = id || ('council_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
 
+  const driveFolderId = document.getElementById('council-form-drive-folder-id')?.value?.trim() || null;
+  const driveFolderName = document.getElementById('council-form-drive-folder-name')?.value?.trim() || name;
+  const driveFolderUrl = document.getElementById('council-form-drive-folder-url')?.value?.trim() || (driveFolderId ? `https://drive.google.com/drive/folders/${driveFolderId}` : null);
+
   const councilData = {
     id: councilId,
     slug,
@@ -11159,6 +11671,9 @@ window.saveCouncil = async function(e) {
     startTime,
     endTime,
     note,
+    driveFolderId,
+    driveFolderName,
+    driveFolderUrl,
     membersBySlot,
     updatedAt: new Date().toISOString()
   };
@@ -12167,7 +12682,7 @@ function formatStudentSupervisorsForDisplay(reg) {
     return `GVHD: ${officials[0].supervisorName || 'Giảng viên'}`;
   }
   return officials.map(s => {
-    const role = (s.role === 'primary') ? 'GVHD chính' : 'GVHD hỗ trợ';
+    const role = (s.role === 'primary') ? 'GVHD chính' : 'GVHD 2';
     return `<div>${s.supervisorName || 'Giảng viên'} <span class="text-indigo-600 font-mono text-[10px]">(${role})</span></div>`;
   }).join('');
 }
@@ -15665,7 +16180,7 @@ window.exportRoundSummaryToExcel = function() {
 
   // 4. GVHD SHEET
   const gvhdData = [
-    ['STT', 'MSSV', 'Họ và tên', 'GVHD chính', 'GVHD hỗ trợ', 'Điểm GVHD', 'Người nhập điểm']
+    ['STT', 'MSSV', 'Họ và tên', 'GVHD chính', 'GVHD 2', 'Điểm GVHD', 'Người nhập điểm']
   ];
   let gvStt = 1;
   ranking.rankedStudents.concat(ranking.incompleteStudents).forEach(st => {
@@ -16204,6 +16719,18 @@ window.resetActivitySubmissionForm = function() {
   if (document.getElementById('sub-storage-provider')) document.getElementById('sub-storage-provider').value = 'google_drive';
   if (document.getElementById('sub-drive-folder-id')) document.getElementById('sub-drive-folder-id').value = '';
 
+  const nameInput = document.getElementById('activity-form-drive-folder-name');
+  if (nameInput) nameInput.value = '';
+  const idInput = document.getElementById('activity-form-drive-folder-id');
+  if (idInput) idInput.value = '';
+  const subDriveInput = document.getElementById('sub-drive-folder-url');
+  if (subDriveInput) subDriveInput.value = '';
+  const statusEl = document.getElementById('activity-drive-folder-status');
+  if (statusEl) {
+    statusEl.innerHTML = '';
+    statusEl.classList.add('hidden');
+  }
+
   updateFilenamePreviewInAdmin();
 };
 
@@ -16247,16 +16774,33 @@ window.populateActivitySubmissionForm = function(cfg) {
   if (document.getElementById('sub-vis-reviewer')) document.getElementById('sub-vis-reviewer').checked = cfg.visibility?.reviewer !== false;
   if (document.getElementById('sub-vis-council')) document.getElementById('sub-vis-council').checked = cfg.visibility?.council !== false;
 
-  const subDriveInput = document.getElementById('sub-drive-folder-url');
-  if (subDriveInput) {
-    subDriveInput.value = cfg.driveFolderId ? `https://drive.google.com/drive/folders/${cfg.driveFolderId}` : '';
+  const nameInputEl = document.getElementById('activity-form-drive-folder-name');
+  if (nameInputEl) nameInputEl.value = cfg.driveFolderName || '';
+  const idInputEl = document.getElementById('activity-form-drive-folder-id');
+  if (idInputEl) idInputEl.value = cfg.driveFolderId || '';
+
+  const subDriveInputEl = document.getElementById('sub-drive-folder-url');
+  if (subDriveInputEl) {
+    const fId = cfg.driveFolderId;
+    const fUrl = cfg.driveFolderUrl || (fId ? `https://drive.google.com/drive/folders/${fId}` : '');
+    subDriveInputEl.value = fUrl;
     const statusEl = document.getElementById('activity-drive-folder-status');
     if (statusEl) {
-      if (cfg.driveFolderId) {
-        statusEl.textContent = `✅ Đã lưu (Folder ID: ${cfg.driveFolderId})`;
-        statusEl.classList.remove('hidden', 'text-red-600');
-        statusEl.classList.add('text-green-600');
+      if (fId) {
+        statusEl.innerHTML = `
+          <div class="mt-1 p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between text-xs text-emerald-800">
+            <div>
+              <span class="font-bold">✓ Thư mục bài nộp: <strong>${escapeHtml(cfg.driveFolderName || 'Google Drive')}</strong></span>
+              <span class="block text-[10px] text-emerald-600 font-mono">ID: ${fId}</span>
+            </div>
+            <a href="${fUrl}" target="_blank" rel="noopener noreferrer" class="px-2 py-1 bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 rounded font-bold text-xs inline-flex items-center gap-1 shadow-2xs">
+              <span>Mở Drive</span> ↗
+            </a>
+          </div>
+        `;
+        statusEl.classList.remove('hidden');
       } else {
+        statusEl.innerHTML = '';
         statusEl.classList.add('hidden');
       }
     }
@@ -16303,7 +16847,10 @@ window.readActivitySubmissionForm = function() {
 
   const storageProvider = 'google_drive';
   const driveUrl = document.getElementById('sub-drive-folder-url')?.value.trim();
-  const driveFolderId = driveUrl ? window.extractDriveFolderId(driveUrl) : null;
+  const hiddenFolderId = document.getElementById('activity-form-drive-folder-id')?.value?.trim();
+  const driveFolderName = document.getElementById('activity-form-drive-folder-name')?.value?.trim() || null;
+  const driveFolderId = (driveUrl ? window.extractDriveFolderId(driveUrl) : null) || hiddenFolderId || null;
+  const driveFolderUrl = driveFolderId ? `https://drive.google.com/drive/folders/${driveFolderId}` : (driveUrl || null);
 
   return {
     enabled: true,
@@ -16325,7 +16872,9 @@ window.readActivitySubmissionForm = function() {
       council: visCouncil
     },
     storageProvider,
-    driveFolderId
+    driveFolderId,
+    driveFolderName,
+    driveFolderUrl
   };
 };
 
@@ -19271,7 +19820,7 @@ window.renderSupervisorAssignedStudents = function() {
 
     const roleBadge = isPrimary
       ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">GVHD chính</span>'
-      : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800 border border-indigo-300">GVHD hỗ trợ</span>';
+      : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800 border border-indigo-300">GVHD 2</span>';
 
     // Score status
     const sc = round?.supervisorScores?.[studentId];
@@ -19434,7 +19983,7 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
           <span class="text-xl">👨‍🏫</span>
           <div>
             <span class="font-bold text-slate-800 text-xs block">${s.supervisorName || 'Giảng viên Hướng dẫn'}</span>
-            <span class="text-[10px] ${s.role === 'primary' ? 'text-emerald-700 font-bold' : 'text-indigo-700'} uppercase">${s.role === 'primary' ? 'GVHD chính' : 'GVHD hỗ trợ'}</span>
+            <span class="text-[10px] ${s.role === 'primary' ? 'text-emerald-700 font-bold' : 'text-indigo-700'} uppercase">${s.role === 'primary' ? 'GVHD chính' : 'GVHD 2'}</span>
           </div>
         </div>
       `).join('');
