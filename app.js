@@ -13580,7 +13580,13 @@ function renderAdminMonitor() {
           return `<td class="p-2 text-center font-mono font-bold text-emerald-700">${score.value}</td>`;
         } else {
           letterCounts[score.value] = (letterCounts[score.value] || 0) + 1;
-          return `<td class="p-2 text-center font-mono font-bold text-indigo-700">${score.value}</td>`;
+          const numVal = resolveScoreNumericValue(score, act);
+          if (typeof numVal === 'number' && !isNaN(numVal)) {
+            totalCompletedVal += numVal;
+            completedCount++;
+          }
+          const subText = (typeof numVal === 'number' && !isNaN(numVal)) ? `<div class="text-[10px] text-slate-400 font-normal">(${numVal}đ)</div>` : '';
+          return `<td class="p-2 text-center font-mono font-bold text-indigo-700">${score.value}${subText}</td>`;
         }
       } else if (score?.status === 'draft') {
         return `<td class="p-2 text-center font-mono text-amber-600 text-[10px]">● ${score.value || 'Draft'}</td>`;
@@ -13597,7 +13603,13 @@ function renderAdminMonitor() {
     } else {
       const entries = Object.entries(letterCounts);
       if (entries.length > 0) {
-        summaryCol = entries.map(([k, c]) => `${k}: ${c}`).join(', ');
+        const countsStr = entries.map(([k, c]) => `${k}: ${c}`).join(', ');
+        if (completedCount > 0) {
+          const avg = (totalCompletedVal / completedCount).toFixed(2);
+          summaryCol = `<div class="font-bold text-slate-900">${countsStr}</div><div class="text-[10px] text-indigo-600 font-semibold mt-0.5">TB: ${avg}đ (${completedCount} chấm)</div>`;
+        } else {
+          summaryCol = `<div class="font-bold text-slate-900">${countsStr}</div>`;
+        }
       }
     }
 
