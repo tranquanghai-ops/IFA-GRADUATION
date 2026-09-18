@@ -8669,9 +8669,9 @@ window.loadAdminRoundActivities = async function(roundId) {
                 ${act.councilEnabled ? `<button type="button" onclick="openActivityCouncilManagement('${targetRound.id}', '${act.id}')" class="px-2 py-0.5 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded text-[10px] font-bold border border-violet-200 shadow-sm transition-all flex items-center gap-1" title="Quản lý Hội đồng Mốc này"><span>⚖️</span><span>Hội đồng</span><span class="bg-violet-200 text-violet-900 px-1 py-0.2 rounded-full text-[8px] leading-none">${(act.councils || []).length}</span></button>` : ''}
               </div>
               
-              <div class="flex items-center gap-0.5 mt-0.5">
+              <div class="flex items-center gap-1 mt-0.5">
                 <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="p-1 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded border border-slate-200 shadow-sm transition-colors text-[10px]" title="Sao chép link mốc">🔗</button>
-                <button type="button" onclick="copyActivityModal('${act.id}')" class="p-1 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded border border-slate-200 shadow-sm transition-colors text-[10px]" title="Nhân bản mốc">📋</button>
+                <button type="button" onclick="duplicateActivityWithinRound('${act.id}')" class="px-1.5 py-0.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded font-bold text-[9px] border border-amber-200 shadow-sm transition-colors flex items-center gap-1" title="Nhân bản mốc này trong cùng đợt"><span>📋</span><span>Sao chép</span></button>
                 <button type="button" onclick="toggleActivityVisibility('${act.id}')" class="px-1.5 py-0.5 bg-white hover:bg-slate-100 text-slate-600 rounded text-[9px] font-bold border border-slate-200 shadow-sm transition-colors">${act.visibility !== false ? '👁️ Ẩn' : '🔒 Hiện'}</button>
                 <div class="w-px h-3 bg-slate-200 mx-0.5"></div>
                 <button type="button" onclick="editActivityModal('${act.id}')" class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded font-bold text-[9px] transition-colors">Sửa</button>
@@ -8890,6 +8890,100 @@ window.copyActivityModal = function(actId) {
 
 window.closeActivityModal = function() {
   document.getElementById('modal-activity').classList.add('hidden');
+};
+
+// DUPLICATE ACTIVITY WITHIN SAME ROUND
+window.duplicateActivityWithinRound = async function(actId) {
+  if (!actId) return;
+  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) {
+    showToast('Không tìm thấy thông tin đợt tốt nghiệp!', 'warning');
+    return;
+  }
+  const list = targetRound?.activities || state.roundActivities || [];
+  const src = list.find(a => a.id === actId);
+  if (!src) {
+    showToast('Không tìm thấy thông tin mốc kế hoạch cần sao chép!', 'error');
+    return;
+  }
+
+  try {
+    showToast('Đang sao chép mốc kế hoạch...', 'info');
+    const nowIso = new Date().toISOString();
+    const newId = 'act_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    const newTitle = src.title ? `${src.title} (Bản sao)` : 'Mốc kế hoạch (Bản sao)';
+    
+    let activities = Array.isArray(targetRound.activities) ? [...targetRound.activities] : [];
+    const newSlug = typeof generateUniqueSlug === 'function' ? generateUniqueSlug(newTitle, activities) : (slugify(newTitle) + '-' + Date.now());
+
+    // Deep clone to keep configuration but avoid reference sharing
+    const newAct = JSON.parse(JSON.stringify(src));
+
+    // Overwrite identifiers & metadata
+    newAct.id = newId;
+    newAct.roundId = roundId;
+    newAct.title = newTitle;
+    newAct.slug = newSlug;
+    newAct.createdAt = nowIso;
+    newAct.updatedAt = nowIso;
+
+    // EXCLUDE runtime state & submissions/scoring data
+    delete newAct.submissions;
+    delete newAct.scores;
+    delete newAct.attendance;
+    delete newAct.auditLogs;
+    newAct.councils = [];
+    newAct.councilStudentAssignments = [];
+
+    // Clear submission driveFolderId so newly uploaded files won't cross-contaminate
+    if (newAct.submissionConfig) {
+      newAct.submissionConfig.driveFolderId = null;
+    }
+    newAct.driveFolderId = null;
+
+    // Place right after the source activity in the timeline
+    const srcIndex = activities.findIndex(a => a.id === actId);
+    if (srcIndex >= 0) {
+      activities.splice(srcIndex + 1, 0, newAct);
+    } else {
+      activities.push(newAct);
+    }
+
+    // Recalculate orders
+    activities.forEach((actItem, idx) => {
+      actItem.order = (idx + 1) * 10;
+    });
+
+    // Save to Firestore round document
+    const roundRef = doc(db, 'graduationRounds', roundId);
+    await updateDoc(roundRef, {
+      activities,
+      updatedAt: serverTimestamp()
+    });
+
+    // Update local state
+    targetRound.activities = activities;
+    state.roundActivities = activities;
+
+    // Re-render admin timeline
+    if (typeof loadAdminRoundActivities === 'function') {
+      await loadAdminRoundActivities(roundId);
+    }
+    if (state.selectedRoundId === roundId && typeof loadStudentRoundActivities === 'function') {
+      loadStudentRoundActivities(roundId);
+    }
+
+    showToast(`✓ Đã nhân bản mốc "${newTitle}" thành công!`, 'success');
+
+    // Open edit modal for the newly duplicated milestone so admin can adjust dates/times
+    if (typeof editActivityModal === 'function') {
+      editActivityModal(newAct.id);
+    }
+  } catch (err) {
+    console.error('[duplicateActivityWithinRound] Error:', err);
+    showToast('Lỗi sao chép mốc: ' + (err.message || String(err)), 'error');
+  }
 };
 
 // 4. COPY ACTIVITIES FROM ANOTHER ROUND
@@ -17563,7 +17657,7 @@ window.renderAdminRoundsCards = function() {
       return `
         <article class="card-surface p-4 sm:p-5 ${cardBgClass} rounded-2xl hover:shadow-md transition-all space-y-3.5 w-full">
           
-          <!-- TOP SECTION: BADGES & SHORTCODE (LEFT) + 4 METRICS BADGES (RIGHT) -->
+          <!-- ROW 1: BADGES & SHORTCODE (LEFT) + 4 METRICS BADGES (RIGHT) -->
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5 border-b border-slate-200/60 pb-3">
             
             <!-- Badges Left -->
@@ -17581,7 +17675,7 @@ window.renderAdminRoundsCards = function() {
               </button>
             </div>
 
-            <!-- Metrics Right (Moved up to top of card, renamed "SV") -->
+            <!-- Metrics Right -->
             <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 shadow-2xs">
                 SV: <strong class="text-slate-900 text-sm font-bold">${eligibleCount}</strong>
@@ -17599,8 +17693,41 @@ window.renderAdminRoundsCards = function() {
 
           </div>
 
-          <!-- MIDDLE SECTION: ROUND TITLE & TIME/STATUS INFO -->
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
+          <!-- ROW 2: PRIMARY WORKFLOW NAVIGATION BUTTONS -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 items-center gap-1.5 sm:gap-2">
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-blue-600 group-hover:scale-110 transition-transform">📅</span>
+              <span>Kế hoạch</span>
+            </button>
+            
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'eligible-students')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-indigo-600 group-hover:scale-110 transition-transform">🎓</span>
+              <span>SV thực hiện</span>
+            </button>
+
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-emerald-600 group-hover:scale-110 transition-transform">📝</span>
+              <span>Đăng ký</span>
+            </button>
+
+            ${directAssignment ? '' : `<button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-amber-600 group-hover:scale-110 transition-transform">🎯</span>
+              <span>Xét nguyện vọng</span>
+            </button>`}
+
+            <button type="button" onclick="navigateToRoundAction('${r.id}', '${directAssignment ? 'review' : 'preview-student'}')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-purple-600 group-hover:scale-110 transition-transform">👥</span>
+              <span>${directAssignment ? 'Phân công GVHD' : 'Phân công'}</span>
+            </button>
+
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+              <span class="text-rose-600 group-hover:scale-110 transition-transform">📊</span>
+              <span>Quản lý điểm</span>
+            </button>
+          </div>
+
+          <!-- ROW 3: ROUND TITLE & TIME/STATUS INFO -->
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2 pt-1 border-t border-slate-100">
             <div>
               <h3 class="text-xl sm:text-[22px] font-bold text-slate-900 leading-snug hover:text-tdtu-blue transition-colors">
                 ${escapeHtml(r.title || '')}
@@ -17620,62 +17747,24 @@ window.renderAdminRoundsCards = function() {
             </div>
           </div>
 
-          <!-- BOTTOM ACTIONS ROW: 6 MAIN ACTIONS (LEFT) + SECONDARY ACTIONS (RIGHT) -->
-          <div class="pt-3 border-t border-slate-200/60 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5">
-            
-            <!-- 6 Main Action Buttons (Primary Workflow) -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 xl:flex xl:flex-wrap items-center gap-1.5 sm:gap-2">
-              <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-                <span class="text-blue-600 group-hover:scale-110 transition-transform">📅</span>
-                <span>Kế hoạch</span>
-              </button>
-              
-              <button type="button" onclick="navigateToRoundAction('${r.id}', 'eligible-students')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-                <span class="text-indigo-600 group-hover:scale-110 transition-transform">🎓</span>
-                <span>SV tốt nghiệp</span>
-              </button>
-
-              <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-                <span class="text-emerald-600 group-hover:scale-110 transition-transform">📝</span>
-                <span>Đăng ký</span>
-              </button>
-
-              ${directAssignment ? '' : `<button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-                <span class="text-amber-600 group-hover:scale-110 transition-transform">🎯</span>
-                <span>Xét nguyện vọng</span>
-              </button>`}
-
-              <button type="button" onclick="navigateToRoundAction('${r.id}', '${directAssignment ? 'review' : 'preview-student'}')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-                <span class="text-purple-600 group-hover:scale-110 transition-transform">👥</span>
-                <span>${directAssignment ? 'Phân công GVHD' : 'Phân công'}</span>
-              </button>
-
-              <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-                <span class="text-rose-600 group-hover:scale-110 transition-transform">📊</span>
-                <span>Quản lý điểm</span>
-              </button>
-            </div>
-
-            <!-- Secondary Actions (Right aligned) -->
-            <div class="flex items-center justify-end gap-1 text-xs sm:text-[13px] text-slate-600 flex-wrap pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-200/50">
-              <button type="button" onclick="editRoundModal('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
-                ✏️ Sửa
-              </button>
-              <button type="button" onclick="duplicateRoundModal('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
-                📋 Sao chép
-              </button>
-              <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
-                ${isClosed ? '↺ Mở lại' : '⏹ Kết thúc'}
-              </button>
-              <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
-                ${isHidden ? '👁️ Hiện' : '🙈 Ẩn'}
-              </button>
-              ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-2.5 py-1.5 rounded-lg text-blue-700 hover:bg-blue-100/70 font-bold transition-colors">⭐ Đặt hiện hành</button>` : ''}
-              <button type="button" onclick="softDeleteRound('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-rose-100/70 text-rose-600 font-semibold transition-colors">
-                🗑️ Xóa
-              </button>
-            </div>
-
+          <!-- ROW 4: ADMIN UTILITY ACTIONS -->
+          <div class="pt-3 border-t border-slate-200/60 flex items-center justify-end gap-1 text-xs sm:text-[13px] text-slate-600 flex-wrap">
+            <button type="button" onclick="editRoundModal('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
+              ✏️ Sửa
+            </button>
+            <button type="button" onclick="duplicateRoundModal('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
+              📋 Sao chép
+            </button>
+            <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
+              ${isClosed ? '↺ Mở lại' : '⏹ Kết thúc'}
+            </button>
+            <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
+              ${isHidden ? '👁️ Hiện' : '🙈 Ẩn'}
+            </button>
+            ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-2.5 py-1.5 rounded-lg text-blue-700 hover:bg-blue-100/70 font-bold transition-colors">⭐ Đặt hiện hành</button>` : ''}
+            <button type="button" onclick="softDeleteRound('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-rose-100/70 text-rose-600 font-semibold transition-colors">
+              🗑️ Xóa
+            </button>
           </div>
 
         </article>
@@ -17734,7 +17823,7 @@ window.updateRoundBreadcrumb = function(tabKey) {
 
   const tabLabels = {
     'timeline': 'Kế hoạch đợt',
-    'eligible-students': 'Danh sách SV tốt nghiệp',
+    'eligible-students': 'Danh sách SV thực hiện',
     'registrations': 'Danh sách đăng ký',
     'review': 'Xét nguyện vọng',
     'preview-student': 'Kết quả phân công',
