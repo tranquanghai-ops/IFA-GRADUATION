@@ -678,25 +678,9 @@
       <!-- SUPERVISOR WORKSPACE CONTAINER -->
       <div id="supervisor-workspace-container" class="space-y-6">
 
-        <!-- 1. TOP ROUND SELECTOR BAR -->
-        <div class="card-surface p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div class="flex flex-wrap items-center gap-2.5">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Đợt tốt nghiệp:</span>
-            <select id="supervisor-round-select" onchange="onSupervisorRoundSelected(this.value)" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-tdtu-blue focus:outline-none transition-all">
-              <!-- Dynamically populated -->
-            </select>
-          </div>
-          <div class="flex items-center gap-2 text-xs">
-            <span id="sup-active-round-badge" class="badge bg-indigo-100 text-indigo-800 font-bold">Đang tải...</span>
-            <span id="sup-round-review-indicator" class="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200">
-              Trạng thái: Đang tải...
-            </span>
-          </div>
-        </div>
-
-        <!-- 2. SUPERVISOR DASHBOARD HERO SUMMARY -->
+        <!-- 1. SUPERVISOR DASHBOARD HERO SUMMARY -->
         <div id="supervisor-hero-card" class="card-surface p-6 bg-gradient-to-br from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl rounded-2xl border border-white/10 space-y-4">
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="space-y-1.5 flex-1">
               <div class="flex items-center gap-2">
                 <span class="badge bg-amber-400 text-slate-950 font-black text-xs">CỔNG GIẢNG VIÊN HƯỚNG DẪN</span>
@@ -708,24 +692,15 @@
               <p class="text-xs text-blue-200" id="supervisor-round-info">Đợt tốt nghiệp: Đang tải...</p>
             </div>
 
-            <!-- Stats Grid -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/20 text-center shadow-inner">
-              <div class="p-2 border-r border-white/10">
-                <span class="text-[10px] font-bold text-blue-200 block uppercase">Chỉ tiêu (Quota)</span>
-                <span id="sup-stat-total-cap" class="text-xl font-black text-white">0</span>
-              </div>
-              <div class="p-2 border-r border-white/10">
-                <span class="text-[10px] font-bold text-blue-200 block uppercase">GVHD chính</span>
-                <span id="sup-stat-primary-count" class="text-xl font-black text-emerald-400">0</span>
-              </div>
-              <div class="p-2 border-r border-white/10">
-                <span class="text-[10px] font-bold text-blue-200 block uppercase">GVHD hỗ trợ</span>
-                <span id="sup-stat-support-count" class="text-xl font-black text-indigo-300">0</span>
-              </div>
-              <div class="p-2">
-                <span class="text-[10px] font-bold text-blue-200 block uppercase">Chờ xử lý</span>
-                <span id="sup-stat-pending-count" class="text-xl font-black text-amber-300">0</span>
-              </div>
+            <!-- Simplified Hero Stat: Số SV hướng dẫn -->
+            <div class="bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/20 text-center shadow-inner shrink-0">
+              <span class="text-[11px] font-bold text-blue-200 block uppercase tracking-wider">Số SV hướng dẫn</span>
+              <span id="sup-stat-assigned-total" class="text-2xl sm:text-3xl font-black text-white">0</span>
+              <!-- Hidden compatibility counters -->
+              <span id="sup-stat-total-cap" class="hidden">0</span>
+              <span id="sup-stat-primary-count" class="hidden">0</span>
+              <span id="sup-stat-support-count" class="hidden">0</span>
+              <span id="sup-stat-pending-count" class="hidden">0</span>
             </div>
           </div>
 
@@ -736,8 +711,25 @@
               <span id="sup-hero-next-milestone" class="font-bold">Mốc tiếp theo: Đang cập nhật...</span>
             </div>
             <div id="sup-hero-milestone-deadline" class="font-mono text-amber-300 bg-black/30 px-2.5 py-1 rounded-lg border border-white/10 self-start sm:self-auto">
-              Hạn nộp: --
+              Thời gian: --
             </div>
+          </div>
+        </div>
+
+        <!-- 2. ROUND SELECTOR BAR (PLACED DIRECTLY UNDER HERO) -->
+        <div class="card-surface p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2.5">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Đợt tốt nghiệp:</span>
+            <select id="supervisor-round-select" onchange="onSupervisorRoundSelected(this.value)" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-tdtu-blue focus:outline-none transition-all">
+              <!-- Dynamically populated -->
+            </select>
+            <span id="sup-round-locked-badge" class="hidden text-xs font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg">🔒 Đang khóa theo phiên đóng vai</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span id="sup-active-round-badge" class="badge bg-indigo-100 text-indigo-800 font-bold">Đang tải...</span>
+            <span id="sup-round-review-indicator" class="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200">
+              Trạng thái: Đang tải...
+            </span>
           </div>
         </div>
 
@@ -767,8 +759,8 @@
 
           <!-- Filter & Search Toolbar -->
           <div class="card-surface p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <!-- Filter Pills -->
-            <div class="flex flex-wrap items-center gap-1.5 text-xs">
+            <!-- Filter Pills (Temporarily hidden per user request) -->
+            <div id="sup-student-filter-pills" class="hidden flex-wrap items-center gap-1.5 text-xs">
               <button onclick="setSupervisorStudentFilter('all')" id="sup-flt-all" class="px-3 py-1.5 rounded-xl font-bold bg-tdtu-blue text-white shadow-xs cursor-pointer">Tất cả (<span id="sup-cnt-all">0</span>)</button>
               <button onclick="setSupervisorStudentFilter('pending')" id="sup-flt-pending" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">Chưa xử lý (<span id="sup-cnt-pending">0</span>)</button>
               <button onclick="setSupervisorStudentFilter('in_progress')" id="sup-flt-in_progress" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">Đang thực hiện (<span id="sup-cnt-in_progress">0</span>)</button>
@@ -795,7 +787,7 @@
               👨‍🎓
             </div>
             <h3 class="text-base font-black text-slate-800 mb-1">
-              Chưa có sinh viên phân công
+              Chưa có sinh viên được phân công trong đợt này.
             </h3>
             <p class="text-xs text-slate-500 leading-relaxed">
               Hiện chưa có sinh viên nào được phân công cho Thầy/Cô trong đợt tốt nghiệp này.
@@ -3160,15 +3152,15 @@
               </div>
             </div>
 
-            <fieldset class="bg-indigo-50/60 p-3.5 rounded-xl border border-indigo-100 space-y-2.5">
-              <legend class="font-bold text-slate-800 text-xs px-1">PHƯƠNG THỨC PHÂN CÔNG GVHD</legend>
-              <label class="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700">
+            <fieldset class="bg-indigo-50/80 p-4 rounded-xl border-2 border-indigo-200 space-y-3 shadow-2xs">
+              <legend class="font-extrabold text-indigo-900 text-xs px-2 py-0.5 bg-indigo-100 rounded-md border border-indigo-200 uppercase tracking-wide">PHƯƠNG THỨC PHÂN CÔNG GVHD</legend>
+              <label class="flex items-start gap-2.5 cursor-pointer text-xs text-slate-800 p-2 rounded-lg hover:bg-white/60 transition-colors">
                 <input type="radio" name="supervisor-assignment-mode" value="student_preference" checked class="mt-0.5 text-blue-600">
-                <span><strong>Sinh viên đăng ký nguyện vọng GVHD</strong><br><span class="text-slate-500">SV chọn GVHD theo quy trình hiện tại.</span></span>
+                <span><strong class="text-slate-900 font-bold text-[13px]">Sinh viên đăng ký nguyện vọng GVHD</strong><br><span class="text-slate-500">Sinh viên nộp hồ sơ và đăng ký các nguyện vọng GVHD (NV1, NV2...).</span></span>
               </label>
-              <label class="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700">
-                <input type="radio" name="supervisor-assignment-mode" value="direct_assignment" class="mt-0.5 text-blue-600">
-                <span><strong>Khoa phân công trực tiếp</strong><br><span class="text-slate-500">SV không chọn GVHD; Admin/Khoa phân công trực tiếp sau khi SV đăng ký.</span></span>
+              <label class="flex items-start gap-2.5 cursor-pointer text-xs text-slate-800 p-2 rounded-lg hover:bg-white/60 transition-colors border border-purple-200/80 bg-purple-50/50">
+                <input type="radio" name="supervisor-assignment-mode" value="direct_assignment" class="mt-0.5 text-purple-600">
+                <span><strong class="text-purple-900 font-bold text-[13px]">Khoa phân công trực tiếp</strong><br><span class="text-purple-700 font-medium">SV bỏ qua bước chọn/xét nguyện vọng. Khoa phân công GVHD trực tiếp.</span></span>
               </label>
             </fieldset>
 
@@ -3981,6 +3973,11 @@
 
           <!-- Tùy chọn hiển thị & nộp bài -->
           <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 text-slate-700">
+            <label class="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg bg-amber-50/80 border border-amber-200 hover:bg-amber-100/60 transition-colors">
+              <input type="checkbox" id="activity-form-is-tentative" class="rounded text-amber-600 focus:ring-amber-500">
+              <span class="font-bold text-xs text-amber-900">🟡 Mốc kế hoạch Dự kiến (isTentative)</span>
+              <span class="text-[10px] text-amber-700 ml-1 font-normal">(Hiển thị nhãn Dự kiến cho SV và Giảng viên)</span>
+            </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="activity-form-visibility" checked class="rounded text-tdtu-blue">
               <span class="font-bold text-xs">Hiển thị cho sinh viên</span>
