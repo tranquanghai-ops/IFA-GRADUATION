@@ -2970,14 +2970,47 @@ window.switchRoundModalTab = function(tabKey) {
   updateRoundModalConfigSummary();
 };
 
+export function getSupervisorDefaultAndMaxQuota(s) {
+  const empType = String(s?.employmentType || 'internal').toLowerCase().trim();
+  const isAdjunct = (empType === 'adjunct' || empType === 'thinhgiang' || empType === 'thỉnh giảng' || empType === 'external');
+  const maxCap = isAdjunct ? 5 : 10;
+
+  let defQuota = maxCap;
+  if (typeof s?.defaultQuota === 'number' && s.defaultQuota > 0) {
+    defQuota = Math.min(s.defaultQuota, maxCap);
+  } else if (typeof s?.maxQuota === 'number' && s.maxQuota > 0) {
+    defQuota = Math.min(s.maxQuota, maxCap);
+  }
+  return {
+    employmentType: isAdjunct ? 'adjunct' : 'internal',
+    maxCap: maxCap,
+    defaultQuota: defQuota
+  };
+}
+window.getSupervisorDefaultAndMaxQuota = getSupervisorDefaultAndMaxQuota;
+
+export async function ensureSupervisorsMasterLoaded(force = false) {
+  if (!force && Array.isArray(state.supervisorsMaster) && state.supervisorsMaster.length > 0) {
+    return state.supervisorsMaster;
+  }
+  try {
+    const snap = await getDocs(query(collection(db, 'supervisorMaster'), orderBy('name', 'asc')));
+    state.supervisorsMaster = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.error('Error loading supervisorMaster:', e);
+  }
+  return state.supervisorsMaster || [];
+}
+window.ensureSupervisorsMasterLoaded = ensureSupervisorsMasterLoaded;
+
 function updateRoundModalBadges() {
   const elCountBadge = document.getElementById('round-tab-eligible-count');
   const elCountCard = document.getElementById('round-eligible-count-badge');
   const supCountBadge = document.getElementById('round-tab-sup-count');
   const supCountCard = document.getElementById('round-sup-count-badge');
 
-  const elCount = state.roundModalEligibleStudents.length;
-  const supCount = state.roundModalSupervisors.size;
+  const elCount = (state.roundModalEligibleStudents || []).length;
+  const supCount = state.roundModalSupervisors ? state.roundModalSupervisors.size : 0;
 
   if (elCountBadge) elCountBadge.textContent = elCount;
   if (elCountCard) elCountCard.textContent = `${elCount} SV`;
@@ -3033,7 +3066,7 @@ function updateRoundModalConfigSummary() {
 }
 
 // Open Create Round Modal
-window.openCreateRoundModal = function() {
+window.openCreateRoundModal = async function() {
   document.getElementById('form-round').reset();
   document.getElementById('round-form-id').value = '';
   document.getElementById('modal-round-title').textContent = 'Tạo Đợt Đồ án Tốt nghiệp Mới';
@@ -3067,6 +3100,9 @@ window.openCreateRoundModal = function() {
   // Reset state collections
   state.roundModalEligibleStudents = [];
   state.roundModalSupervisors = new Map();
+
+  // Ensure supervisors master loaded before rendering
+  await ensureSupervisorsMasterLoaded();
 
   // Pre-populate supervisors list from Master Pool
   renderRoundModalSupervisorsList();
@@ -3168,19 +3204,44 @@ window.editRoundModal = async function(roundId) {
     console.warn('Could not load eligible students for round modal:', e);
   }
 
-  // Load Supervisors for this round
+  // Ensure supervisors master loaded before loading round supervisors
+  await ensureSupervisorsMasterLoaded();
+
+  // Load Supervisors for this round - strictly matched to Master
   state.roundModalSupervisors = new Map();
   try {
     const supSnap = await getDocs(collection(db, 'graduationRounds', r.id, 'supervisors'));
     supSnap.docs.forEach(d => {
-      const data = d.data();
-      const supId = String(d.id || data.supervisorId || data.email || '').trim();
-      if (supId) {
-        state.roundModalSupervisors.set(supId, {
-          id: supId,
-          supervisorId: supId,
-          maxQuota: data.maxQuota || 5,
-          ...data
+      const data = d.data() || {};
+      const targetDocId = String(d.id || '').trim();
+      const targetSupId = String(data.supervisorId || '').trim();
+      const targetEmail = String(data.email || '').toLowerCase().trim();
+
+      // Find canonical master supervisor
+      const masterSup = (state.supervisorsMaster || []).find(m =>
+        m.id === targetDocId ||
+        (targetSupId && m.id === targetSupId) ||
+        (m.email && targetEmail && m.email.toLowerCase().trim() === targetEmail)
+      );
+
+      // Only include if matches a valid supervisor in Master (purges old dummy sup_* docs)
+      if (masterSup) {
+        const { employmentType, maxCap, defaultQuota } = getSupervisorDefaultAndMaxQuota(masterSup);
+        const roundQuota = (typeof data.maxQuota === 'number' && data.maxQuota > 0)
+          ? Math.min(maxCap, data.maxQuota)
+          : defaultQuota;
+
+        state.roundModalSupervisors.set(masterSup.id, {
+          id: masterSup.id,
+          supervisorId: masterSup.id,
+          name: masterSup.name || data.name || '',
+          email: masterSup.email || data.email || '',
+          department: masterSup.department || data.department || 'Thiết kế nội thất',
+          photoUrl: masterSup.photoUrl || data.photoUrl || '',
+          employmentType: employmentType,
+          maxQuota: roundQuota,
+          currentCount: data.currentCount || 0,
+          active: true
         });
       }
     });
@@ -3776,8 +3837,8 @@ function renderRoundModalSupervisorsList(filter = '') {
   if (!container) return;
 
   const allSups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
-    ? state.supervisorsMaster
-    : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
+    ? state.supervisorsMaster.filter(s => s.active !== false)
+    : [];
 
   const q = String(filter || '').trim().toLowerCase();
   const filtered = allSups.filter(s =>
@@ -3793,32 +3854,30 @@ function renderRoundModalSupervisorsList(filter = '') {
   }
 
   container.innerHTML = filtered.map(s => {
-    const supId = getSupervisorId(s);
+    const supId = s.id;
     const isSelected = state.roundModalSupervisors.has(supId);
     const roundData = isSelected ? state.roundModalSupervisors.get(supId) : null;
-    const empType = s.employmentType || 'internal';
-    const maxCap = (empType === 'adjunct' ? 5 : 10);
-    const initialQuota = roundData?.maxQuota || s.defaultQuota || maxCap;
-    const quota = Math.min(maxCap, initialQuota);
+    const { employmentType, maxCap, defaultQuota } = getSupervisorDefaultAndMaxQuota(s);
+    const quota = isSelected ? (roundData?.maxQuota ?? defaultQuota) : defaultQuota;
 
-    const typeBadge = (empType === 'adjunct')
+    const typeBadge = (employmentType === 'adjunct')
       ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Thỉnh giảng (tối đa 5)</span>'
       : '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Cơ hữu (tối đa 10)</span>';
 
     const escapedName = escapeHtml(s.name || '');
-    const avatarSrc = (s.photoUrl && s.photoUrl.trim()) ? s.photoUrl : getSupervisorAvatarSvgDataUri(s.name);
+    const avatarSrc = (s.photoUrl && s.photoUrl.trim()) ? s.photoUrl : getSupervisorAvatarSvgDataUri(s.name || 'GV');
 
     return `
       <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
         <label class="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
           <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleRoundModalSupervisor('${supId}', this.checked)" class="rounded text-tdtu-blue w-4 h-4">
-          <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0" alt="${escapedName}">
+          <img src="${avatarSrc}" data-name="${escapedName}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri(this.dataset.name || 'GV');" class="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0" alt="${escapedName}">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5">
-              <span class="font-bold text-slate-800 text-xs block truncate">${s.name}</span>
+              <span class="font-bold text-slate-800 text-xs block truncate">${escapedName}</span>
               ${typeBadge}
             </div>
-            <span class="text-[11px] text-slate-500 block truncate">${s.department || 'Thiết kế nội thất'} • ${s.email}</span>
+            <span class="text-[11px] text-slate-500 block truncate">${escapeHtml(s.department || 'Thiết kế nội thất')} • ${escapeHtml(s.email || '')}</span>
           </div>
         </label>
         <div class="flex items-center gap-1.5 ml-3 shrink-0">
@@ -3836,30 +3895,27 @@ window.filterRoundModalSupervisors = function(val) {
 
 window.toggleRoundModalSupervisor = function(supId, isChecked) {
   if (!supId || supId === 'undefined') return;
-  const allSups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
-    ? state.supervisorsMaster
-    : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
-
-  const s = allSups.find(x => getSupervisorId(x) === supId);
+  const allSups = state.supervisorsMaster || [];
+  const s = allSups.find(x => x.id === supId);
   if (!s) return;
 
   if (isChecked) {
-    // Preserve existing round quota if supervisor was previously configured in this round, otherwise default from master
+    const { employmentType, maxCap, defaultQuota } = getSupervisorDefaultAndMaxQuota(s);
     const existing = state.roundModalSupervisors.get(supId);
-    const empType = s.employmentType || 'internal';
-    const maxCap = (empType === 'adjunct' ? 5 : 10);
-    const rawQuota = existing?.maxQuota || s.defaultQuota || maxCap;
-    const initialQuota = Math.min(maxCap, Math.max(1, rawQuota));
+    const quota = (existing && typeof existing.maxQuota === 'number')
+      ? Math.min(maxCap, Math.max(1, existing.maxQuota))
+      : defaultQuota;
 
     state.roundModalSupervisors.set(supId, {
       id: supId,
       supervisorId: supId,
-      name: s.name,
-      email: s.email,
+      name: s.name || '',
+      email: s.email || '',
       department: s.department || 'Thiết kế nội thất',
       photoUrl: s.photoUrl || '',
-      employmentType: empType,
-      maxQuota: initialQuota,
+      employmentType: employmentType,
+      maxQuota: quota,
+      currentCount: existing?.currentCount || 0,
       active: true
     });
   } else {
@@ -3872,37 +3928,38 @@ window.toggleRoundModalSupervisor = function(supId, isChecked) {
 
 window.updateRoundModalSupervisorQuota = function(supId, val) {
   if (!supId || supId === 'undefined') return;
-  const allSups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
-    ? state.supervisorsMaster
-    : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
-  const s = allSups.find(x => getSupervisorId(x) === supId);
-  const maxCap = (s?.employmentType === 'adjunct') ? 5 : 10;
-  const q = parseInt(val, 10) || maxCap;
+  const allSups = state.supervisorsMaster || [];
+  const s = allSups.find(x => x.id === supId);
+  const { maxCap } = getSupervisorDefaultAndMaxQuota(s);
+  const parsed = parseInt(val, 10);
+  const q = isNaN(parsed) ? maxCap : Math.max(1, Math.min(maxCap, parsed));
+
   if (state.roundModalSupervisors.has(supId)) {
     const item = state.roundModalSupervisors.get(supId);
-    item.maxQuota = Math.max(1, Math.min(maxCap, q));
+    item.maxQuota = q;
     state.roundModalSupervisors.set(supId, item);
   }
 };
 
 window.selectAllRoundModalSupervisors = function(select) {
-  const allSups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
-    ? state.supervisorsMaster
-    : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
+  const allSups = (state.supervisorsMaster || []).filter(s => s.active !== false);
 
   if (select) {
     allSups.forEach(s => {
-      const supId = getSupervisorId(s);
+      const supId = s.id;
       if (!supId || supId === 'undefined') return;
       if (!state.roundModalSupervisors.has(supId)) {
+        const { employmentType, maxCap, defaultQuota } = getSupervisorDefaultAndMaxQuota(s);
         state.roundModalSupervisors.set(supId, {
           id: supId,
           supervisorId: supId,
-          name: s.name,
-          email: s.email,
+          name: s.name || '',
+          email: s.email || '',
           department: s.department || 'Thiết kế nội thất',
           photoUrl: s.photoUrl || '',
-          maxQuota: s.defaultQuota || 5,
+          employmentType: employmentType,
+          maxQuota: defaultQuota,
+          currentCount: 0,
           active: true
         });
       }
@@ -4007,7 +4064,28 @@ window.saveRound = async function(e) {
 
   const allowRegistrationBeforeEligibility = document.getElementById('round-allow-pre-eligibility')?.checked === true;
   const elCount = (state.roundModalEligibleStudents || []).length;
-  const supCount = (state.roundModalSupervisors ? state.roundModalSupervisors.size : 0);
+
+  const selectedSupervisorsMap = state.roundModalSupervisors || new Map();
+  const selectedSupIds = new Set(selectedSupervisorsMap.keys());
+  const newSupervisorsArray = [];
+
+  for (const [supId, supData] of selectedSupervisorsMap.entries()) {
+    if (!supId || supId === 'undefined') continue;
+    newSupervisorsArray.push({
+      id: supId,
+      supervisorId: supId,
+      name: supData.name || '',
+      email: supData.email || '',
+      department: supData.department || 'Thiết kế nội thất',
+      photoUrl: supData.photoUrl || '',
+      employmentType: supData.employmentType || 'internal',
+      maxQuota: supData.maxQuota || 10,
+      currentCount: supData.currentCount || 0,
+      active: true
+    });
+  }
+
+  const supCount = newSupervisorsArray.length;
   const configStatus = (supCount > 0 && (elCount > 0 || allowRegistrationBeforeEligibility)) ? 'ready' : 'incomplete';
 
   const driveUrl = document.getElementById('round-drive-folder-url')?.value.trim();
@@ -4036,6 +4114,7 @@ window.saveRound = async function(e) {
     configStatus,
     eligibleCount: elCount,
     supervisorCount: supCount,
+    supervisors: newSupervisorsArray,
     driveRootFolderId: driveRootFolderId || null,
     deleted: false,
     updatedAt: serverTimestamp()
@@ -4121,23 +4200,56 @@ window.saveRound = async function(e) {
       }
     }
 
-    // 2. Persist Supervisors subcollection (strictly guarded against undefined supId)
-    if (state.roundModalSupervisors && state.roundModalSupervisors.size > 0) {
-      for (const [rawSupId, supData] of state.roundModalSupervisors.entries()) {
-        const supId = String(rawSupId || supData.supervisorId || supData.id || supData.email || '').trim();
-        if (!supId || supId === 'undefined') continue;
-        const ref = doc(db, 'graduationRounds', savedId, 'supervisors', supId);
-        await setDoc(ref, {
-          supervisorId: supId,
-          name: supData.name || '',
-          email: supData.email || '',
-          department: supData.department || 'Thiết kế nội thất',
-          photoUrl: supData.photoUrl || '',
-          maxQuota: supData.maxQuota || 5,
-          currentCount: 0,
-          active: true,
-          updatedAt: serverTimestamp()
-        }, { merge: true }).catch(console.warn);
+    // 2. Persist Supervisors subcollection (Replace / Diff: delete unselected & obsolete docs, save selected)
+    try {
+      const existingSupSnap = await getDocs(collection(db, 'graduationRounds', savedId, 'supervisors'));
+      if (existingSupSnap && !existingSupSnap.empty) {
+        const toDeleteSupRefs = [];
+        existingSupSnap.docs.forEach(d => {
+          const docId = d.id;
+          const data = d.data() || {};
+          const docSupId = data.supervisorId || docId;
+          // If this document is not in current selected list, queue for deletion
+          if (!selectedSupIds.has(docId) && !selectedSupIds.has(docSupId)) {
+            toDeleteSupRefs.push(d.ref);
+          }
+        });
+        for (let offset = 0; offset < toDeleteSupRefs.length; offset += 450) {
+          const delBatch = writeBatch(db);
+          toDeleteSupRefs.slice(offset, offset + 450).forEach(ref => delBatch.delete(ref));
+          await delBatch.commit().catch(console.warn);
+        }
+      }
+    } catch (errSyncSup) {
+      console.warn('Lỗi đồng bộ xóa giảng viên trong subcollection supervisors:', errSyncSup);
+    }
+
+    if (newSupervisorsArray.length > 0) {
+      for (let offset = 0; offset < newSupervisorsArray.length; offset += 450) {
+        const batch = writeBatch(db);
+        const chunk = newSupervisorsArray.slice(offset, offset + 450);
+        chunk.forEach(supData => {
+          const ref = doc(db, 'graduationRounds', savedId, 'supervisors', supData.id);
+          batch.set(ref, {
+            supervisorId: supData.id,
+            name: supData.name,
+            email: supData.email,
+            department: supData.department,
+            photoUrl: supData.photoUrl,
+            employmentType: supData.employmentType,
+            maxQuota: supData.maxQuota,
+            currentCount: supData.currentCount || 0,
+            active: true,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        });
+        await batch.commit().catch(console.warn);
+      }
+    }
+
+    if (state.activeRound?.id === savedId || state.selectedRoundId === savedId) {
+      if (typeof loadRoundSupervisors === 'function') {
+        loadRoundSupervisors(savedId).catch(console.warn);
       }
     }
 
