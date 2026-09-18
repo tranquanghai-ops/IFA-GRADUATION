@@ -961,10 +961,29 @@ export function updateAuthUI() {
       if (btnGotoAssessment) btnGotoAssessment.classList.add('hidden');
     }
 
+    // Toggle header in student view (student portal banner sits directly at top)
+    const headerEl = document.querySelector('header');
+    if (headerEl) {
+      if (state.currentView === 'student') {
+        headerEl.classList.add('hidden');
+      } else {
+        headerEl.classList.remove('hidden');
+      }
+    }
+
   } else {
     userInfoBar.classList.add('hidden');
     userInfoBar.classList.remove('flex');
     btnHeaderLogin.classList.remove('hidden');
+
+    const headerEl = document.querySelector('header');
+    if (headerEl) {
+      if (state.currentView === 'student' || getCurrentPortal() === 'student') {
+        headerEl.classList.add('hidden');
+      } else {
+        headerEl.classList.remove('hidden');
+      }
+    }
   }
 }
 
@@ -978,6 +997,15 @@ window.switchView = async function(targetView) {
   state.currentView = targetView;
   state.role = targetView;
   updateAuthUI();
+
+  const headerEl = document.querySelector('header');
+  if (headerEl) {
+    if (targetView === 'student') {
+      headerEl.classList.add('hidden');
+    } else {
+      headerEl.classList.remove('hidden');
+    }
+  }
 
   const navBtns = {
     student: ['nav-btn-student', 'm-nav-student'],
@@ -1817,33 +1845,50 @@ function renderSupervisorsGrid() {
 
     const escapedName = escapeHtml(s.name || '');
     const avatarSrc = (s.showPhoto !== false && s.photoUrl && s.photoUrl.trim()) ? s.photoUrl : getSupervisorAvatarSvgDataUri(s.name);
+    const dept = s.department || 'Bộ môn TKNT';
+    const email = s.email || '';
+
+    // Check if supervisor has actual bio/details (hide button if empty or placeholder)
+    const hasDetails = Boolean(
+      (s.bio && s.bio.trim() && s.bio.trim() !== 'Chưa có thông tin giới thiệu.') ||
+      (s.expertise && s.expertise.trim() && s.expertise.trim() !== 'Đang cập nhật') ||
+      (s.description && s.description.trim())
+    );
+
+    const detailBtnHtml = hasDetails
+      ? `<button type="button" onclick="openBioModal('${s.id}')" class="px-2.5 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold shrink-0" title="Xem hồ sơ chi tiết">
+           ℹ️ Chi tiết
+         </button>`
+      : '';
 
     return `
-      <div class="card-surface p-5 flex flex-col justify-between card-hover relative ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20' : ''}">
-        ${isSelected ? `<span class="absolute right-3 top-3 px-2 py-0.5 rounded-full bg-amber-500 text-slate-900 font-extrabold text-[10px] shadow-sm">NV${assignedRank}</span>` : ''}
-
-        <div class="space-y-3">
-          <div class="flex items-center gap-3">
-            <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-sm" alt="${escapedName}">
-            <div>
-              <h3 class="font-bold text-slate-900 text-sm leading-tight">${s.name}</h3>
-              <p class="text-[11px] text-slate-500">${s.department || 'Bộ môn TKNT'}</p>
-            </div>
+      <div class="card-surface p-4 flex flex-col justify-between card-hover relative rounded-2xl border border-slate-200/90 shadow-sm ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20' : 'bg-white'}">
+        <div>
+          <!-- Portrait photo matching ifa.tdtu.edu.vn/gioi-thieu -->
+          <div class="relative w-full aspect-[4/5] overflow-hidden rounded-xl bg-slate-100 mb-3.5 border border-slate-200/80 shadow-2xs">
+            <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-full h-full object-cover object-top" alt="${escapedName}">
+            ${isSelected ? `<span class="absolute right-2.5 top-2.5 px-2.5 py-1 rounded-full bg-amber-500 text-slate-900 font-black text-xs shadow-md">NV${assignedRank}</span>` : ''}
           </div>
 
-          <div class="text-xs space-y-1">
-            <span class="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">Chuyên môn hướng dẫn:</span>
-            <p class="text-slate-700 leading-snug line-clamp-2" title="${s.expertise || ''}">
-              ${s.expertise || 'Đang cập nhật'}
-            </p>
+          <!-- Supervisor Information -->
+          <div class="space-y-1">
+            <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">${escapedName}</h3>
+            <p class="text-xs text-slate-500 font-medium">${escapeHtml(dept)}</p>
+            ${email ? `
+              <p class="text-xs text-blue-600 truncate flex items-center gap-1.5 font-mono pt-1">
+                <svg class="w-3.5 h-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                </svg>
+                <span class="truncate">${escapeHtml(email)}</span>
+              </p>
+            ` : ''}
           </div>
         </div>
 
+        <!-- Action Buttons -->
         <div class="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
-          <button type="button" onclick="openBioModal('${s.id}')" class="px-2.5 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold" title="Xem hồ sơ">
-            ℹ️ Chi tiết
-          </button>
-          <div class="flex-1">
+          ${detailBtnHtml}
+          <div class="flex-1 min-w-0">
             ${buttonHtml}
           </div>
         </div>
@@ -2075,16 +2120,32 @@ window.validateAndGoToStep2 = function() {
   goToStep(isDirectSupervisorAssignment() ? 3 : 2);
 };
 
-window.validateAndGoToStep3 = function() {
+window.validateAndGoToStep3 = async function() {
   if (isDirectSupervisorAssignment()) {
     goToStep(3);
     return;
   }
-  const maxPref = state.activeRound?.preferenceCount || 3;
-  if (state.selectedPreferences.length < maxPref) {
-    showToast(`Vui lòng chọn đủ ${maxPref} nguyện vọng trước khi tiếp tục.`, 'info');
+  const maxPref = parseInt(state.activeRound?.preferenceCount || 3, 10);
+  const count = state.selectedPreferences.length;
+
+  if (count === 0) {
+    showToast('Vui lòng chọn ít nhất 1 nguyện vọng GVHD trước khi tiếp tục.', 'warning');
     return;
   }
+
+  if (count < maxPref) {
+    const ok = await window.showConfirm(
+      'Xác nhận số lượng nguyện vọng',
+      `Bạn hiện chỉ mới chọn ${count}/${maxPref} nguyện vọng GVHD. Nếu không chọn đủ ${maxPref} nguyện vọng, cơ hội được phân công đúng ý nguyện có thể giảm.\n\nBạn có chắc chắn muốn tiếp tục với ${count} nguyện vọng đã chọn?`,
+      {
+        confirmText: `Tiếp tục với ${count} nguyện vọng`,
+        cancelText: 'Chọn thêm GVHD',
+        danger: false
+      }
+    );
+    if (!ok) return;
+  }
+
   goToStep(3);
 };
 
@@ -3114,7 +3175,7 @@ window.openCreateRoundModal = async function() {
 };
 
 // Open Edit Round Modal
-window.editRoundModal = async function(roundId) {
+window.editRoundModal = async function(roundId, initialTab = 'info') {
   const r = state.rounds.find(x => x.id === roundId);
   if (!r) {
     showToast('Không tìm thấy thông tin đợt tốt nghiệp!', 'error');
@@ -3261,7 +3322,7 @@ window.editRoundModal = async function(roundId) {
   }
 
   document.getElementById('modal-round-title').textContent = 'Chỉnh sửa Đợt Đồ án Tốt nghiệp';
-  switchRoundModalTab('info');
+  switchRoundModalTab(initialTab || 'info');
   document.getElementById('modal-round').classList.remove('hidden');
 };
 
@@ -6475,13 +6536,35 @@ async function preparePreviewStudentDropdown() {
   if (!roundId) return;
 
   try {
+    if (typeof ensureFacultyDatasetLoaded === 'function') {
+      try { await ensureFacultyDatasetLoaded(); } catch (e) {}
+    }
+
     const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents'));
-    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const list = snap.docs.map(d => {
+      const data = d.data() || {};
+      const mssv = String(d.id || data.studentId || data.mssv || '').trim().toUpperCase();
+      const facStudent = (typeof window.getFacultyStudentByMssv === 'function') ? window.getFacultyStudentByMssv(mssv) : null;
+      let name = (facStudent?.fullName || facStudent?.name || data.fullName || data.name || '').trim();
+      if (name === mssv || name.startsWith('Sinh viên ' + mssv)) name = '';
+      const className = (facStudent?.className || data.className || '').trim();
+      return {
+        studentId: mssv,
+        name: name,
+        className: className
+      };
+    });
 
     select.innerHTML = list.length === 0 
       ? '<option value="">(Chưa có danh sách SV đủ điều kiện)</option>'
-      : list.map(s => `<option value="${s.studentId}">${s.studentId} — ${s.name || ''} (${s.className || ''})</option>`).join('');
-  } catch (e) {}
+      : list.map(s => {
+          const namePart = s.name ? ` — ${s.name}` : '';
+          const classPart = s.className ? ` (${s.className})` : '';
+          return `<option value="${s.studentId}">${s.studentId}${namePart}${classPart}</option>`;
+        }).join('');
+  } catch (e) {
+    console.warn('[preview] preparePreviewStudentDropdown error:', e);
+  }
 }
 
 window.launchStudentPreview = function() {
@@ -17951,20 +18034,20 @@ window.renderAdminRoundsCards = function() {
               </button>
             </div>
 
-            <!-- Metrics Right -->
-            <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 shadow-2xs">
+            <!-- Metrics Right: 1 single row, flex-nowrap, clickable pills -->
+            <div class="flex items-center gap-1 sm:gap-1.5 flex-nowrap shrink-0 overflow-x-auto py-0.5">
+              <button type="button" onclick="editRoundModal('${r.id}', 'eligible')" title="Xem và chỉnh sửa danh sách SV đủ điều kiện" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-xs font-semibold text-slate-600 shadow-2xs transition-colors cursor-pointer whitespace-nowrap">
                 SV: <strong class="text-slate-900 text-sm font-bold">${eligibleCount}</strong>
-              </span>
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 shadow-2xs">
+              </button>
+              <button type="button" onclick="editRoundModal('${r.id}', 'supervisors')" title="Xem và chỉnh sửa danh sách GVHD của đợt" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-xs font-semibold text-slate-600 shadow-2xs transition-colors cursor-pointer whitespace-nowrap">
                 GVHD: <strong class="text-indigo-700 text-sm font-bold">${supCount}</strong>
-              </span>
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 shadow-2xs">
+              </button>
+              <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" title="Xem danh sách sinh viên đăng ký" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-xs font-semibold text-slate-600 shadow-2xs transition-colors cursor-pointer whitespace-nowrap">
                 Đăng ký: <strong class="text-emerald-700 text-sm font-bold">${regCount}</strong>
-              </span>
-              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 shadow-2xs">
+              </button>
+              <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" title="Xem kế hoạch đợt" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-xs font-semibold text-slate-600 shadow-2xs transition-colors cursor-pointer whitespace-nowrap">
                 Kế hoạch: <strong class="text-blue-700 text-sm font-bold">${actCount}</strong>
-              </span>
+              </button>
             </div>
 
           </div>
@@ -17991,9 +18074,9 @@ window.renderAdminRoundsCards = function() {
               <span>Xét nguyện vọng</span>
             </button>`}
 
-            <button type="button" onclick="navigateToRoundAction('${r.id}', '${directAssignment ? 'review' : 'preview-student'}')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review', 'assigned')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
               <span class="text-purple-600 group-hover:scale-110 transition-transform">👥</span>
-              <span>${directAssignment ? 'Phân công GVHD' : 'Phân công'}</span>
+              <span>${directAssignment ? 'Phân công GVHD' : 'Kết quả phân công'}</span>
             </button>
 
             <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
@@ -18025,6 +18108,9 @@ window.renderAdminRoundsCards = function() {
 
           <!-- ROW 4: ADMIN UTILITY ACTIONS -->
           <div class="pt-3 border-t border-slate-200/60 flex items-center justify-end gap-1 text-xs sm:text-[13px] text-slate-600 flex-wrap">
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'preview-student')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors" title="Xem trước giao diện sinh viên">
+              👁️ Xem trước SV
+            </button>
             <button type="button" onclick="editRoundModal('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
               ✏️ Sửa
             </button>
@@ -18063,7 +18149,7 @@ window.renderAdminRoundsCards = function() {
   }
 };
 
-window.navigateToRoundAction = async function(roundId, actionKey) {
+window.navigateToRoundAction = async function(roundId, actionKey, subSection = null) {
   if (!roundId) return;
   state.selectedRoundId = roundId;
   state.activeRound = (state.rounds || []).find(r => r.id === roundId) || null;
@@ -18084,6 +18170,17 @@ window.navigateToRoundAction = async function(roundId, actionKey) {
   });
 
   window.switchAdminTab(actionKey);
+
+  if (actionKey === 'review' && subSection === 'assigned') {
+    setTimeout(() => {
+      const targetSection = document.getElementById('admin-official-supervisors-section') ||
+                            document.getElementById('admin-assigned-supervisors-tbody') ||
+                            document.getElementById('admin-review-assigned-card');
+      if (targetSection) {
+        targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 250);
+  }
 };
 
 window.updateRoundBreadcrumb = function(tabKey) {
@@ -18102,7 +18199,7 @@ window.updateRoundBreadcrumb = function(tabKey) {
     'eligible-students': 'Danh sách SV thực hiện',
     'registrations': 'Danh sách đăng ký',
     'review': 'Xét nguyện vọng',
-    'preview-student': 'Kết quả phân công',
+    'preview-student': 'Xem trước giao diện Sinh viên',
     'scoring-dashboard': 'Quản lý điểm'
   };
   const currentLabel = tabKey === 'review' && isDirectSupervisorAssignment(currentRound)
@@ -18349,22 +18446,20 @@ window.updateStudentJourneyStepper = function() {
   }
 
   const preferenceSteps = [
-    { num: 1, title: '1. Đủ điều kiện', status: s1Status, label: s1Label },
-    { num: 2, title: '2. Đăng ký', status: s2Status, label: s2Label },
-    { num: 3, title: '3. Xét nguyện vọng', status: s3Status, label: s3Label },
-    { num: 4, title: '4. Phân công GVHD', status: s4Status, label: s4Label },
-    { num: 5, title: '5. Nộp bài', status: s5Status, label: s5Label },
-    { num: 6, title: '6. Bảo vệ', status: s6Status, label: s6Label },
-    { num: 7, title: '7. Kết quả', status: s7Status, label: s7Label }
+    { num: 1, title: '1. Đăng ký', status: s2Status, label: s2Label },
+    { num: 2, title: '2. Xét nguyện vọng', status: s3Status, label: s3Label },
+    { num: 3, title: '3. Phân công GVHD', status: s4Status, label: s4Label },
+    { num: 4, title: '4. Nộp bài', status: s5Status, label: s5Label },
+    { num: 5, title: '5. Bảo vệ', status: s6Status, label: s6Label },
+    { num: 6, title: '6. Kết quả', status: s7Status, label: s7Label }
   ];
   const steps = directAssignment
     ? [
-        { num: 1, title: '1. Đủ điều kiện', status: s1Status, label: s1Label },
-        { num: 2, title: '2. Đăng ký', status: s2Status, label: s2Label },
-        { num: 3, title: '3. Phân công GVHD', status: s4Status, label: s4Label },
-        { num: 4, title: '4. Nộp bài', status: s5Status, label: s5Label },
-        { num: 5, title: '5. Bảo vệ', status: s6Status, label: s6Label },
-        { num: 6, title: '6. Kết quả', status: s7Status, label: s7Label }
+        { num: 1, title: '1. Đăng ký', status: s2Status, label: s2Label },
+        { num: 2, title: '2. Phân công GVHD', status: s4Status, label: s4Label },
+        { num: 3, title: '3. Nộp bài', status: s5Status, label: s5Label },
+        { num: 4, title: '4. Bảo vệ', status: s6Status, label: s6Label },
+        { num: 5, title: '5. Kết quả', status: s7Status, label: s7Label }
       ]
     : preferenceSteps;
 
@@ -18402,7 +18497,7 @@ window.updateStudentJourneyStepper = function() {
         <div class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] mb-1.5 ${st.circle}">
           ${st.icon || s.num}
         </div>
-        <span class="font-bold text-[11px] text-slate-800 leading-tight mb-1 truncate w-full" title="${s.title}">${s.title}</span>
+        <span class="font-bold text-[11px] text-slate-800 leading-tight mb-1 whitespace-nowrap overflow-hidden text-ellipsis w-full" title="${s.title}">${s.title}</span>
         <span class="text-[9px] px-1.5 py-0.5 rounded-full border ${st.badge} whitespace-nowrap">${s.label}</span>
       </div>
     `;
@@ -18534,8 +18629,24 @@ window.updateStudentPersonalSidebar = function() {
           ${upcomingBadge ? `<div>${upcomingBadge}</div>` : ''}
         </div>
       </div>
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-[11px] text-slate-400">Tài khoản sinh viên</span>
+        <button type="button" onclick="handleStudentLogout()" class="px-3 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 border border-slate-200 cursor-pointer">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+          </svg>
+          <span>Đăng xuất</span>
+        </button>
+      </div>
     </div>
   `;
+};
+
+window.handleStudentLogout = async function() {
+  try {
+    await signOut(auth);
+  } catch (e) {}
+  window.location.reload();
 };
 
 

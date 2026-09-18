@@ -251,23 +251,20 @@
               <span class="text-lg">🗺️</span>
               <div>
                 <h2 class="text-sm font-black text-slate-900 uppercase tracking-wide">Lộ trình Đồ án Tốt nghiệp</h2>
-                <p class="text-[11px] text-slate-500">Quy trình 7 bước từ xét điều kiện đến công bố kết quả chính thức</p>
+                <p class="text-[11px] text-slate-500">Quy trình 6 bước từ đăng ký đến công bố kết quả chính thức</p>
               </div>
             </div>
             <span id="journey-overall-badge" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">Đang tiến hành</span>
           </div>
 
-          <!-- 7 Steps Stepper Container -->
-          <div id="journey-steps-list" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 text-xs">
+          <!-- 6 Steps Stepper Container -->
+          <div id="journey-steps-list" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
             <!-- Populated dynamically by updateStudentJourneyStepper() -->
           </div>
         </div>
 
-        <!-- 3. TWO-COLUMN LAYOUT (DESKTOP: 8 COLS LEFT / 4 COLS RIGHT) -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
-          <!-- LEFT COLUMN: MAIN CONTENT MODULES (lg:col-span-8) -->
-          <div class="lg:col-span-8 space-y-6">
+        <!-- 3. MAIN CONTENT MODULES (FULL WIDTH) -->
+        <div class="space-y-6">
 
             <!-- NON-ELIGIBLE BANNER -->
             <div id="non-eligible-alert" class="hidden card-surface bg-amber-50/90 border border-amber-200 p-5 text-amber-900 rounded-2xl shadow-sm">
@@ -622,31 +619,31 @@
               </div>
             </div>
 
+        </div>
+
+        <!-- 4. BOTTOM SECTION: STUDENT PROFILE & SUPPORT CARDS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
+
+          <!-- Student Profile & Status Summary Card -->
+          <div id="student-status-sidebar" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <!-- Populated dynamically by updateStudentPersonalSidebar() -->
           </div>
 
-          <!-- RIGHT COLUMN: PERSONAL STATUS SIDEBAR (lg:col-span-4) -->
-          <div class="lg:col-span-4 space-y-6 lg:sticky lg:top-20">
-
-            <!-- Student Profile & Status Summary Card -->
-            <div id="student-status-sidebar" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <!-- Populated dynamically by updateStudentPersonalSidebar() -->
-            </div>
-
-            <!-- Student Support Card -->
-            <div class="card-surface p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 space-y-2">
-              <div class="flex items-center gap-2 font-bold text-slate-800">
+          <!-- Student Support Card -->
+          <div class="card-surface p-5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 space-y-3 flex flex-col justify-between">
+            <div class="space-y-2">
+              <div class="flex items-center gap-2 font-bold text-slate-800 text-sm">
                 <span>ℹ️</span>
-                <span>Hỗ trợ Sinh viên ĐATN</span>
+                <span>Hỗ trợ Sinh viên Đồ án Tốt nghiệp</span>
               </div>
-              <p class="text-[11px] leading-relaxed text-slate-500">
+              <p class="text-xs leading-relaxed text-slate-500">
                 Mọi thắc mắc về điều kiện xét duyệt, phân công GVHD hoặc sự cố nộp bài, sinh viên vui lòng liên hệ Văn phòng Khoa Mỹ thuật Công nghiệp.
               </p>
-              <div class="pt-2 text-[11px] font-mono text-slate-600 border-t border-slate-200/80 flex flex-col gap-1">
-                <span>📍 Văn phòng Khoa: P.402 Nhà C</span>
-                <span>✉️ Email: mythuatcongnghiep@tdtu.edu.vn</span>
-              </div>
             </div>
-
+            <div class="pt-3 text-xs font-mono text-slate-700 border-t border-slate-200/80 flex flex-col gap-1.5">
+              <span>📍 <strong>Văn phòng Khoa:</strong> P.402 Nhà C</span>
+              <span>✉️ <strong>Email:</strong> mythuatcongnghiep@tdtu.edu.vn</span>
+            </div>
           </div>
 
         </div>
