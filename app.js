@@ -961,10 +961,10 @@ export function updateAuthUI() {
       if (btnGotoAssessment) btnGotoAssessment.classList.add('hidden');
     }
 
-    // Toggle header in student view (student portal banner sits directly at top)
+    // Toggle header: hide in student, supervisor, and assessment views (hero banners sit directly at top)
     const headerEl = document.querySelector('header');
     if (headerEl) {
-      if (state.currentView === 'student') {
+      if (state.currentView === 'student' || state.currentView === 'supervisor' || state.currentView === 'assessment') {
         headerEl.classList.add('hidden');
       } else {
         headerEl.classList.remove('hidden');
@@ -1000,7 +1000,7 @@ window.switchView = async function(targetView) {
 
   const headerEl = document.querySelector('header');
   if (headerEl) {
-    if (targetView === 'student') {
+    if (targetView === 'student' || targetView === 'supervisor' || targetView === 'assessment') {
       headerEl.classList.add('hidden');
     } else {
       headerEl.classList.remove('hidden');
@@ -1724,12 +1724,16 @@ function renderStudentExistingRegistration(reg) {
   const dateStr = reg.submittedAt ? (reg.submittedAt.toDate ? reg.submittedAt.toDate() : new Date(reg.submittedAt)).toLocaleString('vi-VN') : '--';
   document.getElementById('reg-card-time').textContent = `Thời gian nộp: ${dateStr}`;
 
+  const prefSection = document.getElementById('reg-card-preferences-section');
+  if (prefSection) {
+    prefSection.classList.toggle('hidden', Boolean(directAssignment));
+  }
+
   const listEl = document.getElementById('reg-card-preferences-list');
   if (listEl && directAssignment) {
-    listEl.closest('.bg-slate-50')?.classList.add('hidden');
+    listEl.innerHTML = '';
     return;
   }
-  listEl?.closest('.bg-slate-50')?.classList.remove('hidden');
   listEl.innerHTML = (reg.preferences || []).map(p => `
     <div class="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-emerald-100 shadow-sm text-xs">
       <span class="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-[10px]">
@@ -2016,20 +2020,36 @@ function applySupervisorAssignmentModeToRegistrationUI() {
   const nextButton = document.getElementById('btn-registration-step-1-next');
   const confirmBackButton = document.getElementById('btn-registration-confirm-back');
   const topicDescription = document.getElementById('registration-topic-step-description');
+  const confirmTitle = document.getElementById('confirm-step-title');
 
-  if (selectionStep) selectionStep.classList.toggle('hidden', directAssignment);
+  if (selectionStep) {
+    if (directAssignment) {
+      selectionStep.classList.add('hidden');
+    } else {
+      selectionStep.classList.remove('hidden');
+    }
+  }
   if (confirmStep) {
     const circle = confirmStep.querySelector('.stepper-circle');
     const label = confirmStep.querySelector('span');
     if (circle) circle.textContent = directAssignment ? '2' : '3';
     if (label) label.textContent = 'Xác nhận';
   }
-  if (nextButton) nextButton.innerHTML = directAssignment
-    ? '<span>Tiếp tục: Xem lại & Nộp</span><span>→</span>'
-    : '<span>Tiếp tục: Chọn GVHD</span><span>→</span>';
-  if (topicDescription) topicDescription.textContent = directAssignment
-    ? 'Vui lòng điền tên đề tài dự kiến và phân loại đồ án trước khi xác nhận đăng ký.'
-    : 'Vui lòng điền tên đề tài dự kiến và phân loại đồ án trước khi chọn GVHD.';
+  if (confirmTitle) {
+    confirmTitle.textContent = directAssignment
+      ? '2. Kiểm tra & Xác nhận Đăng ký'
+      : '3. Kiểm tra & Xác nhận Đăng ký';
+  }
+  if (nextButton) {
+    nextButton.innerHTML = directAssignment
+      ? '<span>Tiếp tục: Xem lại & Nộp</span><span>→</span>'
+      : '<span>Tiếp tục: Chọn GVHD</span><span>→</span>';
+  }
+  if (topicDescription) {
+    topicDescription.textContent = directAssignment
+      ? 'Vui lòng điền tên đề tài dự kiến và phân loại đồ án trước khi xác nhận đăng ký.'
+      : 'Vui lòng điền tên đề tài dự kiến và phân loại đồ án trước khi chọn GVHD.';
+  }
   if (confirmBackButton) {
     confirmBackButton.setAttribute('onclick', directAssignment ? 'goToStep(1)' : 'goToStep(2)');
     confirmBackButton.textContent = directAssignment ? '← Quay lại Thông tin đề tài' : '← Quay lại Bước 2';
@@ -2037,8 +2057,8 @@ function applySupervisorAssignmentModeToRegistrationUI() {
 }
 
 window.goToStep = function(step) {
-  applySupervisorAssignmentModeToRegistrationUI();
-  if (isDirectSupervisorAssignment() && step === 2) step = 3;
+  const directAssignment = isDirectSupervisorAssignment();
+  if (directAssignment && step === 2) step = 3;
   state.currentStep = step;
 
   [1, 2, 3].forEach(s => {
@@ -2046,12 +2066,16 @@ window.goToStep = function(step) {
     const panel = document.getElementById('step-panel-' + s);
 
     if (indicator) {
-      if (s === step) {
-        indicator.className = 'stepper-item active flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer';
-      } else if (s < step) {
-        indicator.className = 'stepper-item completed flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer';
+      if (directAssignment && s === 2) {
+        indicator.className = 'hidden';
       } else {
-        indicator.className = 'stepper-item flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer';
+        if (s === step) {
+          indicator.className = 'stepper-item active flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer';
+        } else if (s < step) {
+          indicator.className = 'stepper-item completed flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer';
+        } else {
+          indicator.className = 'stepper-item flex flex-col items-center gap-1 relative z-10 bg-white px-2 cursor-pointer';
+        }
       }
     }
 
@@ -2060,6 +2084,8 @@ window.goToStep = function(step) {
       else panel.classList.add('hidden');
     }
   });
+
+  applySupervisorAssignmentModeToRegistrationUI();
 
   if (step === 2) {
     renderSupervisorsGrid();
@@ -18690,6 +18716,78 @@ window.handleStudentLogout = async function() {
   window.location.reload();
 };
 
+window.updateTeacherPersonalModal = function() {
+  const actor = getEffectiveActor();
+  const modalBody = document.getElementById('teacher-profile-modal-body');
+  if (!modalBody) return;
+
+  const emailLower = (actor.email || '').toLowerCase().trim();
+  const currentSup = (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower) ||
+                    (state.supervisorsMaster || []).find(s => (s.email || '').toLowerCase().trim() === emailLower);
+  
+  const displayName = currentSup?.name || actor.displayName || 'Giảng viên';
+  const email = currentSup?.email || actor.email || '--';
+  const dept = currentSup?.department || 'Khoa Mỹ thuật Công nghiệp';
+  const photoUrl = currentSup?.photoUrl || actor.photoURL || '';
+  const avatarSrc = (photoUrl && photoUrl.trim()) ? photoUrl : getSupervisorAvatarSvgDataUri(displayName);
+
+  let roleBadges = [];
+  if (actor.isAdmin) roleBadges.push('<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">Quản trị viên</span>');
+  if (actor.isSupervisor || currentSup) roleBadges.push('<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Giảng viên Hướng dẫn</span>');
+  roleBadges.push('<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Hội đồng / Đánh giá</span>');
+
+  modalBody.innerHTML = `
+    <div class="flex items-center gap-3.5 p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+      <img src="${avatarSrc}" class="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-sm shrink-0" alt="${escapeHtml(displayName)}">
+      <div class="min-w-0 flex-1">
+        <h4 class="font-bold text-sm text-slate-900 truncate">${escapeHtml(displayName)}</h4>
+        <p class="text-xs text-slate-500 font-mono truncate">${escapeHtml(email)}</p>
+        <p class="text-[11px] text-tdtu-blue font-semibold mt-0.5">${escapeHtml(dept)}</p>
+      </div>
+    </div>
+
+    <div class="space-y-2 text-xs">
+      <div>
+        <span class="text-slate-500 block mb-1 font-semibold">Vai trò hệ thống:</span>
+        <div class="flex flex-wrap gap-1.5">${roleBadges.join('')}</div>
+      </div>
+      <div>
+        <span class="text-slate-500 block mb-1 font-semibold">Đợt đang xem:</span>
+        <span class="font-bold text-slate-800 block p-2 bg-slate-50 rounded-xl border border-slate-200 text-xs">${escapeHtml(state.activeRound?.title || '--')} (${escapeHtml(state.activeRound?.academicYear || '--')})</span>
+      </div>
+    </div>
+
+    <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <a href="/graduation/" class="text-xs text-blue-600 font-bold hover:underline">🎓 Cổng SV</a>
+        ${actor.isAdmin ? '<a href="/graduation/admin/" class="text-xs text-amber-600 font-bold hover:underline ml-2">⚙️ Quản trị</a>' : ''}
+      </div>
+      <button type="button" onclick="handleTeacherLogout()" class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-rose-200 cursor-pointer">
+        <span>🚪</span>
+        <span>Đăng xuất</span>
+      </button>
+    </div>
+  `;
+};
+
+window.openTeacherProfileModal = function() {
+  updateTeacherPersonalModal();
+  const modal = document.getElementById('modal-teacher-profile');
+  if (modal) modal.classList.remove('hidden');
+};
+
+window.closeTeacherProfileModal = function() {
+  const modal = document.getElementById('modal-teacher-profile');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.handleTeacherLogout = async function() {
+  try {
+    await signOut(auth);
+  } catch (e) {}
+  window.location.reload();
+};
+
 
 // ============================================================================
 // PHASE 3: SUPERVISOR PORTAL COMPLETE IMPLEMENTATION
@@ -18823,6 +18921,17 @@ window.loadSupervisorPortalData = async function(roundId) {
   if (greetingEl) greetingEl.textContent = `Kính chào Thầy/Cô ${supDisplayName}`;
   if (roundInfoEl) roundInfoEl.textContent = `Đợt: ${round.title} • Năm học ${round.academicYear || ''}`;
   if (activeBadgeEl) activeBadgeEl.textContent = round.roundName || round.title || 'Đợt ĐATN';
+
+  // Update Hero Supervisor Profile Pill
+  const supHeroName = document.getElementById('hero-supervisor-name');
+  const supHeroEmail = document.getElementById('hero-supervisor-email');
+  const supHeroAvatar = document.getElementById('hero-supervisor-avatar');
+  if (supHeroName) supHeroName.textContent = supDisplayName;
+  if (supHeroEmail) supHeroEmail.textContent = currentSup?.email || actor.email || '--';
+  if (supHeroAvatar) {
+    const photoUrl = currentSup?.photoUrl || actor.photoURL;
+    supHeroAvatar.src = (photoUrl && photoUrl.trim()) ? photoUrl : getSupervisorAvatarSvgDataUri(supDisplayName);
+  }
 
   const statusMap = {
     draft: 'Bản nháp',
@@ -19015,22 +19124,42 @@ window.loadSupervisorPortalData = async function(roundId) {
     }
   }
 
-  // Switch to the appropriate default tab if current tab is hidden
-  const currentTab = state.currentSupervisorTab || defaultTab;
-  const currentBtn = document.getElementById(`sup-tab-btn-${currentTab}`);
-  if (!currentBtn || currentBtn.classList.contains('hidden')) {
-    switchSupervisorTab(defaultTab);
+  // Requirement 6: If GVHD is not assigned to supervise in this round, show notification and hide action menus
+  const notAssignedAlert = document.getElementById('supervisor-not-assigned-alert');
+  const subTabsContainer = document.getElementById('supervisor-sub-tabs-container');
+  const assignedPanel = document.getElementById('sup-panel-assigned');
+
+  const hasSupervisorDuties = actor.isAdmin || totalAssignedCount > 0;
+
+  if (!hasSupervisorDuties) {
+    if (notAssignedAlert) notAssignedAlert.classList.remove('hidden');
+    if (subTabsContainer) subTabsContainer.classList.add('hidden');
+    if (assignedPanel) assignedPanel.classList.add('hidden');
+    const reviewPanel = document.getElementById('sup-panel-review');
+    if (reviewPanel) reviewPanel.classList.add('hidden');
+    const acceptedPanel = document.getElementById('sup-panel-accepted');
+    if (acceptedPanel) acceptedPanel.classList.add('hidden');
   } else {
-    switchSupervisorTab(currentTab);
-  }
+    if (notAssignedAlert) notAssignedAlert.classList.add('hidden');
+    if (subTabsContainer) subTabsContainer.classList.remove('hidden');
 
-  // Also load legacy review data for candidates tab if needed and tab is visible
-  if (!isDirect) {
-    await loadSupervisorReviewData(roundId);
-  }
+    // Switch to the appropriate default tab if current tab is hidden
+    const currentTab = state.currentSupervisorTab || defaultTab;
+    const currentBtn = document.getElementById(`sup-tab-btn-${currentTab}`);
+    if (!currentBtn || currentBtn.classList.contains('hidden')) {
+      switchSupervisorTab(defaultTab);
+    } else {
+      switchSupervisorTab(currentTab);
+    }
 
-  // Render assigned students list
-  renderSupervisorAssignedStudents();
+    // Also load legacy review data for candidates tab if needed and tab is visible
+    if (!isDirect) {
+      await loadSupervisorReviewData(roundId);
+    }
+
+    // Render assigned students list
+    renderSupervisorAssignedStudents();
+  }
 };
 
 window.renderSupervisorAssignedStudents = function() {
@@ -19642,6 +19771,18 @@ window.renderAssessmentHeroCard = function() {
   const targetRound = (state.rounds || []).find(r => r.id === state.selectedAssessmentRoundId) || state.activeRound;
   if (!targetRound) return;
 
+  // Update Evaluator Profile Pill
+  const actor = getEffectiveActor();
+  const evalHeroName = document.getElementById('hero-assessment-name');
+  const evalHeroEmail = document.getElementById('hero-assessment-email');
+  const evalHeroAvatar = document.getElementById('hero-assessment-avatar');
+  if (evalHeroName) evalHeroName.textContent = actor.displayName || 'Giảng viên';
+  if (evalHeroEmail) evalHeroEmail.textContent = actor.email || '--';
+  if (evalHeroAvatar) {
+    const photoUrl = actor.photoURL;
+    evalHeroAvatar.src = (photoUrl && photoUrl.trim()) ? photoUrl : getSupervisorAvatarSvgDataUri(actor.displayName || 'GV');
+  }
+
   const titleEl = document.getElementById('assessment-hero-round-title');
   if (titleEl) {
     titleEl.textContent = `${targetRound.title || 'Đồ án tốt nghiệp'} — ${targetRound.academicYear || ''}`;
@@ -19673,7 +19814,6 @@ window.renderAssessmentHeroCard = function() {
   }
 
   // Metrics computation for user
-  const actor = getEffectiveActor();
   const uEmail = (actor.email || '').toLowerCase().trim();
   const uId = actor.uid || actor.email;
   const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
