@@ -72,25 +72,24 @@
   </div>
 
   <!-- TOP HEADER & BRANDING -->
-  <header class="bg-tdtu-blue text-white shadow-lg sticky top-0 z-40">
+  <header class="ifa-global-header sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
+      <div class="ifa-header-row">
         <!-- Logo & Title -->
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center font-black text-xl text-amber-400 border border-white/20 shadow-inner">
-            IFA
-          </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-base sm:text-lg tracking-tight">IFA+ Graduation Beta</span>
-              <span class="hidden sm:inline-block text-[11px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-medium border border-amber-400/30">v2.7.0-beta.1</span>
+        <div class="ifa-header-brand">
+          <img class="ifa-header-logo" src="https://ifa-activities.web.app/ifa-logo.svg" alt="Logo Khoa Mỹ thuật Công nghiệp">
+          <div class="ifa-header-copy">
+            <div class="ifa-header-title-row">
+              <span class="ifa-header-title">IFA+ Graduation</span>
+              <span class="ifa-version-badge">v2.7.0-beta.1</span>
             </div>
-            <p class="text-[11px] text-slate-300 hidden sm:block">Khoa Mỹ thuật Công nghiệp • ĐH Tôn Đức Thắng</p>
+            <p class="ifa-header-subtitle">Quản lý Đồ án Tốt nghiệp</p>
+            <p class="ifa-header-faculty">Khoa Mỹ thuật Công nghiệp</p>
           </div>
         </div>
 
         <!-- View Navigation for Admins / Supervisors -->
-        <div id="role-nav-group" class="hidden md:flex items-center bg-black/20 p-1 rounded-xl border border-white/10">
+        <div id="role-nav-group" class="hidden">
           <button id="nav-btn-student" onclick="switchView('student')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 transition-all flex items-center gap-1.5 shadow-sm">
             <span>🎓</span> Sinh viên
           </button>
@@ -103,7 +102,7 @@
         </div>
 
         <!-- User profile or Login trigger -->
-        <div class="flex items-center gap-3">
+        <div class="ifa-header-account">
           <div id="user-info-bar" class="hidden items-center gap-2.5">
             <!-- Subtle Portal Switch Buttons -->
             <a id="btn-goto-admin" href="/graduation/admin/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-300 bg-white/10 hover:bg-white/20 border border-amber-400/30 transition-all shadow-xs" title="Chuyển sang Cổng Quản trị">
@@ -122,27 +121,35 @@
             <button id="btn-open-impersonate" onclick="openAdminImpersonateModal()" type="button" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-300 transition-all shadow-xs cursor-pointer" title="Đóng vai người dùng (Act-As Test Mode)">
               <span>🎭</span> <span class="hidden sm:inline">Đóng vai</span>
             </button>
-            <img id="user-avatar" class="w-8 h-8 rounded-full border border-white/30 object-cover shadow-sm" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23fff'/><path fill='%23fff' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" alt="User">
-            <div class="hidden lg:block text-right">
-              <div id="user-display-name" class="text-xs font-semibold text-white leading-tight">Đang tải...</div>
+            <img id="user-avatar" class="ifa-user-avatar" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%2364748b'/><path fill='%2364748b' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" alt="Ảnh đại diện người dùng">
+            <div class="ifa-account-identity">
+              <div id="user-display-name" class="ifa-account-name">Đang tải...</div>
+              <div id="user-email" class="ifa-account-email"></div>
               <div class="flex items-center justify-end gap-1.5 mt-0.5">
-                <span id="user-role-badge" class="text-[10px] bg-blue-500/30 text-blue-200 px-1.5 py-0.5 rounded font-medium border border-blue-400/30">Sinh viên</span>
-                <span id="user-viewing-badge" class="hidden text-[10px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-medium border border-amber-400/30">Đang xem: Sinh viên</span>
+                <span id="user-role-badge" class="ifa-role-badge ifa-role-student">Sinh viên</span>
+                <span id="user-viewing-badge" class="hidden ifa-role-badge ifa-role-viewing">Đang xem: Sinh viên</span>
               </div>
             </div>
-            <button id="btn-logout" title="Đăng xuất" class="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+            <button id="btn-logout" title="Đăng xuất" class="ifa-logout-button">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+              <span>Đăng xuất</span>
             </button>
           </div>
-          <button id="btn-header-login" class="hidden px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-xs rounded-xl shadow-md transition-all">
+          <button id="btn-header-login" class="hidden ifa-login-button">
             Đăng nhập Google
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Mobile View Bar -->
-    <div id="mobile-role-nav" class="md:hidden flex border-t border-white/10 bg-tdtu-dark px-4 py-2 gap-2 overflow-x-auto">
+    <nav class="ifa-portal-nav" aria-label="Điều hướng cổng Graduation">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-x-auto">
+        <div id="portal-navigation" class="ifa-portal-nav-items"></div>
+      </div>
+    </nav>
+
+    <!-- Legacy mobile view controls retained for switchView compatibility. -->
+    <div id="mobile-role-nav" class="hidden">
       <button id="m-nav-student" onclick="switchView('student')" class="px-3 py-1 rounded-lg text-xs font-semibold text-white bg-white/20 whitespace-nowrap">🎓 Sinh viên</button>
       <button id="m-nav-supervisor" onclick="switchView('supervisor')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 whitespace-nowrap hidden">👨‍🏫 Giảng viên</button>
       <button id="m-nav-admin" onclick="switchView('admin')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 whitespace-nowrap hidden">⚙️ Quản trị</button>

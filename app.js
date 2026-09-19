@@ -821,24 +821,35 @@ export function updateAuthUI() {
     document.getElementById('user-display-name').textContent = isImp
       ? `${target.name || state.user.displayName || state.user.email} (Đang đóng vai)`
       : (state.user.displayName || state.user.email);
-    document.getElementById('user-avatar').src = state.user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23fff"/><path fill="%23fff" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
+    const effectiveEmail = isImp ? (target.email || state.user.email || '') : (state.user.email || '');
+    const userEmail = document.getElementById('user-email');
+    if (userEmail) userEmail.textContent = effectiveEmail;
+    document.getElementById('user-avatar').src = (isImp && (target.photoURL || target.photoUrl)) || state.user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%2364748b"/><path fill="%2364748b" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
+
+    // Keep portal access controls in the dedicated navigation row below the header.
+    const portalNavigation = document.getElementById('portal-navigation');
+    ['btn-goto-admin', 'btn-goto-supervisor', 'btn-goto-student', 'btn-goto-assessment', 'btn-open-impersonate']
+      .forEach(id => {
+        const control = document.getElementById(id);
+        if (portalNavigation && control && control.parentElement !== portalNavigation) portalNavigation.appendChild(control);
+      });
     
     // Display ACTUAL ROLE badge
     const roleBadge = document.getElementById('user-role-badge');
     const viewingBadge = document.getElementById('user-viewing-badge');
     
     let roleName = 'Sinh viên';
-    let badgeClass = 'text-[10px] bg-blue-500/30 text-blue-200 px-1.5 py-0.5 rounded font-medium border border-blue-400/30';
+    let badgeClass = 'ifa-role-badge ifa-role-student';
 
     if (isImp) {
       roleName = `Đóng vai: ${target.roleLabel || target.type || 'Người dùng'}`;
-      badgeClass = 'text-[10px] bg-amber-500/30 text-amber-200 px-1.5 py-0.5 rounded font-black border border-amber-400/40';
+      badgeClass = 'ifa-role-badge ifa-role-impersonating';
     } else if (state.actualRole === 'admin') {
       roleName = 'Quản trị viên';
-      badgeClass = 'text-[10px] bg-rose-500/30 text-rose-200 px-1.5 py-0.5 rounded font-bold border border-rose-400/30';
+      badgeClass = 'ifa-role-badge ifa-role-admin';
     } else if (state.actualRole === 'supervisor') {
       roleName = 'Giảng viên';
-      badgeClass = 'text-[10px] bg-emerald-500/30 text-emerald-200 px-1.5 py-0.5 rounded font-medium border border-emerald-400/30';
+      badgeClass = 'ifa-role-badge ifa-role-supervisor';
     }
 
     if (roleBadge) {
