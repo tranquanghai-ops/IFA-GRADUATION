@@ -821,7 +821,7 @@ export function updateAuthUI() {
     document.getElementById('user-display-name').textContent = isImp
       ? `${target.name || state.user.displayName || state.user.email} (Đang đóng vai)`
       : (state.user.displayName || state.user.email);
-    const effectiveEmail = isImp ? (target.email || state.user.email || '') : (state.user.email || '');
+    const effectiveEmail = isImp ? (target.email || '') : (state.user.email || '');
     const userEmail = document.getElementById('user-email');
     if (userEmail) userEmail.textContent = effectiveEmail;
     document.getElementById('user-avatar').src = (isImp && (target.photoURL || target.photoUrl)) || state.user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%2364748b"/><path fill="%2364748b" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
