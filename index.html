@@ -1634,6 +1634,7 @@
                 <span id="adm-accepted-count-tag" class="badge bg-emerald-100 text-emerald-800 font-black">0 SV</span>
               </div>
               <p class="text-xs text-slate-500 mt-0.5">Admin có thể bổ sung thêm GVHD 2 (không thuộc NV ban đầu) hoặc gỡ GVHD 2 sau khi đã chốt phân công.</p>
+              <p id="adm-assignment-status-msg" class="text-xs font-semibold mt-1 text-slate-600">--</p>
             </div>
             <div class="flex items-center gap-2">
               <input type="text" id="admin-assigned-search" oninput="filterAdminAssignedTable(this.value)" placeholder="Tìm MSSV, họ tên, GVHD..." class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-60">
@@ -1644,16 +1645,18 @@
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
                 <tr>
+                  <th class="p-3.5 w-10">STT</th>
                   <th class="p-3.5 w-24">MSSV</th>
                   <th class="p-3.5">Họ và tên</th>
                   <th class="p-3.5">Tên đề tài & Ngành</th>
+                  <th class="p-3.5">Trạng thái đăng ký</th>
                   <th class="p-3.5">GVHD chính</th>
                   <th class="p-3.5">GVHD 2</th>
                   <th class="p-3.5 text-right whitespace-nowrap">Thao tác</th>
                 </tr>
               </thead>
               <tbody id="admin-assigned-supervisors-tbody" class="divide-y divide-slate-100">
-                <tr><td colspan="6" class="p-8 text-center text-slate-400">Chưa có sinh viên nào được phân công GVHD.</td></tr>
+                <tr><td colspan="8" class="p-8 text-center text-slate-400">Chưa có sinh viên nào được phân công GVHD.</td></tr>
               </tbody>
             </table>
           </div>
@@ -3838,6 +3841,54 @@
   </div>
 
   <!-- 9. ADMIN MANUAL ASSIGN MODAL -->
+  <div id="modal-admin-edit-supervisor" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b pb-3">
+        <h3 class="font-bold text-base text-tdtu-blue">Chỉnh sửa phân công GVHD</h3>
+        <button onclick="closeAdminEditSupervisorModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+      </div>
+
+      <div id="edit-sup-scoring-warning" class="hidden p-3 bg-amber-50 border border-amber-300 rounded-xl text-[11px] text-amber-900 font-semibold leading-relaxed">
+        ⚠️ Sinh viên đã có dữ liệu nhận xét/chấm điểm. Việc thay đổi GVHD không tự động chuyển hoặc xóa dữ liệu chấm điểm đã có.
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="bg-slate-50 p-3 rounded-xl border space-y-1">
+          <span class="text-slate-400 block font-semibold uppercase text-[10px] tracking-wider">Thông tin sinh viên</span>
+          <p id="edit-sup-student-info" class="font-bold text-slate-900 text-sm">--</p>
+          <p id="edit-sup-topic-info" class="text-slate-600 italic">Đề tài: --</p>
+          <p id="edit-sup-round-info" class="text-slate-500">Đợt tốt nghiệp: --</p>
+        </div>
+
+        <div class="bg-slate-50 p-3 rounded-xl border space-y-1">
+          <span class="text-slate-400 block font-semibold uppercase text-[10px] tracking-wider">Phân công hiện tại</span>
+          <p class="text-slate-700">GVHD chính: <span id="edit-sup-current-primary" class="font-bold text-slate-900">--</span></p>
+          <p class="text-slate-700">GVHD 2: <span id="edit-sup-current-secondary" class="font-bold text-slate-900">--</span></p>
+        </div>
+
+        <div class="space-y-2">
+          <span class="text-slate-400 block font-semibold uppercase text-[10px] tracking-wider">Phân công mới</span>
+          <div>
+            <label for="select-edit-primary-supervisor" class="block font-bold text-slate-700 mb-1">GVHD chính:</label>
+            <select id="select-edit-primary-supervisor" class="w-full p-2.5 bg-white border rounded-xl font-semibold text-xs text-slate-800"></select>
+          </div>
+          <div>
+            <label for="select-edit-secondary-supervisor" class="block font-bold text-slate-700 mb-1">GVHD 2:</label>
+            <select id="select-edit-secondary-supervisor" class="w-full p-2.5 bg-white border rounded-xl font-semibold text-xs text-slate-800"></select>
+          </div>
+          <p id="edit-sup-hint" class="text-[11px] text-slate-500"></p>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3 border-t">
+        <button type="button" onclick="closeAdminEditSupervisorModal()" class="px-4 py-2 bg-slate-100 rounded-xl font-bold text-xs hover:bg-slate-200">Hủy</button>
+        <button type="button" onclick="saveAdminEditSupervisor()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md">
+          💾 Lưu thay đổi
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="modal-admin-manual-assign" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b pb-3">

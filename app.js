@@ -6721,11 +6721,18 @@ function renderAdminManualAssignmentTable() {
   if (!tbody) return;
 
   const registrations = state.adminReviewData.registrations;
+  const eligible = state.adminReviewData.eligible || [];
   const directAssignment = isDirectSupervisorAssignment();
   const unassigned = registrations.filter(r => r.reviewStatus !== 'accepted' && r.reviewStatus !== 'manually_assigned');
+  const normMssv = v => String(v || '').trim().toUpperCase();
+  const regIds = new Set(registrations.map(r => normMssv(r.studentId || r.id)));
+  const unregisteredCount = eligible.filter(e => !regIds.has(normMssv(e.studentId || e.mssv || e.id))).length;
 
   if (unassigned.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${directAssignment ? 6 : 7}" class="p-6 text-center text-emerald-700 font-bold bg-emerald-50/50">🎉 Tất cả sinh viên đã được phân công Giảng viên hướng dẫn!</td></tr>`;
+    const msg = unregisteredCount > 0
+      ? `✓ Tất cả sinh viên đã đăng ký đã được phân công. Còn ${unregisteredCount} sinh viên chưa đăng ký.`
+      : '🎉 Tất cả sinh viên đã được phân công Giảng viên hướng dẫn!';
+    tbody.innerHTML = `<tr><td colspan="${directAssignment ? 6 : 7}" class="p-6 text-center text-emerald-700 font-bold bg-emerald-50/50">${msg}</td></tr>`;
     return;
   }
 
@@ -10776,47 +10783,95 @@ window.filterAdminAssignedTable = function(filterVal) {
 window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
   const tbody = document.getElementById('admin-assigned-supervisors-tbody');
   const countTag = document.getElementById('adm-accepted-count-tag');
+  const statusMsgEl = document.getElementById('adm-assignment-status-msg');
   if (!tbody) return;
 
   const registrations = state.adminReviewData?.registrations || [];
-  const assigned = registrations.filter(r => r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned');
+  const eligible = state.adminReviewData?.eligible || [];
+  const normMssv = v => String(v || '').trim().toUpperCase();
+  const regByStudent = new Map();
+  registrations.forEach(r => {
+    const key = normMssv(r.studentId || r.id);
+    if (key) regByStudent.set(key, r);
+  });
 
-  if (countTag) countTag.textContent = `${assigned.length} SV`;
+  const assignedRegs = registrations.filter(r => r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned');
+  const assignedIds = new Set(assignedRegs.map(r => normMssv(r.studentId || r.id)));
+  const registeredUnassigned = registrations.filter(r => r.reviewStatus !== 'accepted' && r.reviewStatus !== 'manually_assigned');
+  const unregistered = eligible.filter(e => !regByStudent.has(normMssv(e.studentId || e.mssv || e.id)));
+
+  // Overview must cover ALL eligible students of the round, not only registrations.
+  const allRows = eligible.length > 0
+    ? eligible.map(e => {
+        const mssv = normMssv(e.studentId || e.mssv || e.id);
+        return { mssv, reg: regByStudent.get(mssv) || null, eligibleName: e.fullName || e.name || '' };
+      })
+    : registrations.map(r => ({ mssv: normMssv(r.studentId || r.id), reg: r, eligibleName: '' }));
+
+  if (countTag) countTag.textContent = `${assignedRegs.length}/${allRows.length} SV`;
+  if (statusMsgEl) {
+    let msg = '';
+    if (registeredUnassigned.length > 0) {
+      msg = `⚠️ Còn ${registeredUnassigned.length} sinh viên đã đăng ký chưa được phân công GVHD.`;
+    } else if (unregistered.length > 0) {
+      msg = `✓ Tất cả sinh viên đã đăng ký đã được phân công. Còn ${unregistered.length} sinh viên chưa đăng ký.`;
+    } else if (allRows.length > 0 && assignedRegs.length >= allRows.length) {
+      msg = '✓ Tất cả sinh viên đã được phân công GVHD.';
+    } else {
+      msg = 'Chưa có dữ liệu sinh viên.';
+    }
+    statusMsgEl.textContent = msg;
+  }
 
   const q = String(filterVal || '').trim().toLowerCase();
-  const filtered = assigned.filter(r => {
+  const filtered = allRows.filter(({ mssv, reg, eligibleName }) => {
     if (!q) return true;
-    const supNames = getOfficialSupervisors(r).map(s => s.supervisorName || '').join(' ').toLowerCase();
-    return (r.studentId && r.studentId.toLowerCase().includes(q)) ||
-      (r.studentName && r.studentName.toLowerCase().includes(q)) ||
-      (r.topicTitle && r.topicTitle.toLowerCase().includes(q)) ||
+    const supNames = getOfficialSupervisors(reg || {}).map(s => s.supervisorName || '').join(' ').toLowerCase();
+    const name = resolveStudentName(mssv, reg?.studentName || eligibleName);
+    return mssv.toLowerCase().includes(q) ||
+      (reg?.studentName || '').toLowerCase().includes(q) ||
+      name.toLowerCase().includes(q) ||
+      (reg?.topicTitle || '').toLowerCase().includes(q) ||
       supNames.includes(q);
   });
 
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" class="p-8 text-center text-slate-400">
-          ${assigned.length === 0 ? 'Chưa có sinh viên nào có kết quả GVHD chính thức.' : 'Không tìm thấy sinh viên phù hợp từ khóa tìm kiếm.'}
+        <td colspan="8" class="p-8 text-center text-slate-400">
+          ${allRows.length === 0 ? 'Chưa có sinh viên đủ điều kiện hoặc đăng ký trong đợt này.' : 'Không tìm thấy sinh viên phù hợp từ khóa tìm kiếm.'}
         </td>
       </tr>
     `;
     return;
   }
 
-  tbody.innerHTML = filtered.map(r => {
-    const officials = getOfficialSupervisors(r);
+  tbody.innerHTML = filtered.map(({ mssv, reg, eligibleName }, idx) => {
+    const isRegistered = Boolean(reg);
+    const isAssigned = isRegistered && (reg.reviewStatus === 'accepted' || reg.reviewStatus === 'manually_assigned');
+    const studentDisplayName = resolveStudentName(mssv, reg?.studentName || eligibleName);
+
+    let regStatusHtml = '';
+    if (isAssigned) {
+      regStatusHtml = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã đăng ký</span>';
+    } else if (isRegistered) {
+      regStatusHtml = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">Đã đăng ký</span>';
+    } else {
+      regStatusHtml = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Chưa đăng ký</span>';
+    }
+
+    const officials = isAssigned ? getOfficialSupervisors(reg) : [];
     const primary = officials.find(s => s.role === 'primary') || officials[0];
     const supports = officials.filter(s => s.role === 'support');
 
-    const primaryHtml = primary ? `
+    const primaryHtml = (isAssigned && primary) ? `
       <div>
         <span class="font-bold text-slate-900 text-xs block">${primary.supervisorName || 'GVHD chính'}</span>
         <span class="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200">GVHD chính</span>
       </div>
-    ` : '<span class="text-slate-400">--</span>';
+    ` : '<span class="text-slate-400 italic text-[11px]">Chưa phân công</span>';
 
-    const supportsHtml = (supports.length > 0) ? `
+    const supportsHtml = (isAssigned && supports.length > 0) ? `
       <div class="space-y-1.5">
         ${supports.map(sup => `
           <div class="flex items-center justify-between gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
@@ -10824,7 +10879,7 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
               <span class="font-bold text-slate-800 text-xs block">${sup.supervisorName}</span>
               <span class="text-[9px] text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-200">GVHD 2</span>
             </div>
-            <button type="button" onclick="removeSupportSupervisor('${r.studentId}', '${sup.supervisorId}', '${escapeHtml(sup.supervisorName)}', '${escapeHtml(resolveStudentName(r.studentId, r.studentName))}')" class="px-2 py-0.5 text-rose-600 hover:bg-rose-50 rounded text-[10px] font-bold border border-rose-200 transition-colors" title="Gỡ GVHD 2 khỏi sinh viên này">
+            <button type="button" onclick="removeSupportSupervisor('${mssv}', '${sup.supervisorId}', '${escapeHtml(sup.supervisorName)}', '${escapeHtml(studentDisplayName)}')" class="px-2 py-0.5 text-rose-600 hover:bg-rose-50 rounded text-[10px] font-bold border border-rose-200 transition-colors" title="Gỡ GVHD 2 khỏi sinh viên này">
               Gỡ
             </button>
           </div>
@@ -10832,23 +10887,36 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
       </div>
     ` : '<span class="text-slate-400 italic text-[11px]">Chưa có</span>';
 
-    const studentDisplayName = resolveStudentName(r.studentId, r.studentName);
+    let actionHtml = '';
+    if (isAssigned) {
+      actionHtml = `
+        <button type="button" onclick="openAdminEditSupervisorModal('${mssv}')" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold text-xs border border-blue-200 transition-colors inline-flex items-center gap-1">
+          <span>✏️ Chỉnh sửa GVHD</span>
+        </button>
+      `;
+    } else if (isRegistered) {
+      actionHtml = `
+        <button type="button" onclick="openAdminManualAssignModal('${mssv}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-sm inline-flex items-center gap-1">
+          <span>Phân công</span>
+        </button>
+      `;
+    } else {
+      actionHtml = '<span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-400 border border-slate-200" title="Sinh viên chưa đăng ký đề tài trong đợt này">Chưa thể phân công</span>';
+    }
 
     return `
       <tr class="hover:bg-slate-50 transition-colors">
-        <td class="p-3.5 font-mono font-bold text-slate-900">${r.studentId}</td>
+        <td class="p-3.5 text-slate-400 font-bold">${idx + 1}</td>
+        <td class="p-3.5 font-mono font-bold text-slate-900">${mssv}</td>
         <td class="p-3.5 font-semibold text-slate-800 whitespace-nowrap">${escapeHtml(studentDisplayName)}</td>
         <td class="p-3.5 max-w-xs">
-          <span class="font-medium text-slate-900 block truncate" title="${r.topicTitle}">${r.topicTitle}</span>
-          <span class="text-[11px] text-slate-500">${r.projectType || '--'}</span>
+          <span class="font-medium text-slate-900 block truncate" title="${reg?.topicTitle || 'Chưa đăng ký đề tài'}">${reg?.topicTitle || '--'}</span>
+          <span class="text-[11px] text-slate-500">${reg?.projectType || (isRegistered ? '--' : '')}</span>
         </td>
+        <td class="p-3.5 whitespace-nowrap">${regStatusHtml}</td>
         <td class="p-3.5 whitespace-nowrap">${primaryHtml}</td>
-        <td class="p-3.5 min-w-[200px]">${supportsHtml}</td>
-        <td class="p-3.5 text-right whitespace-nowrap">
-          <button type="button" onclick="openAddSupportSupervisorModal('${r.studentId}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs border border-indigo-200 transition-colors flex items-center gap-1 inline-flex">
-            <span>+ Thêm GVHD 2</span>
-          </button>
-        </td>
+        <td class="p-3.5 min-w-[180px]">${supportsHtml}</td>
+        <td class="p-3.5 text-right whitespace-nowrap">${actionHtml}</td>
       </tr>
     `;
   }).join('');
@@ -11054,6 +11122,206 @@ window.removeSupportSupervisor = async function(studentId, supervisorId, supervi
   } catch (err) {
     console.error('Lỗi gỡ GVHD 2:', err);
     showToast('Lỗi gỡ GVHD 2: ' + err.message, 'error');
+  }
+};
+
+// --- ADMIN: EDIT / REASSIGN OFFICIAL SUPERVISOR (works even after publish) ---
+function computeSupervisorQuotaInfo(supId, excludeStudentId = null) {
+  const registrations = state.adminReviewData?.registrations || [];
+  const sup = (state.adminReviewData?.supervisors || []).find(s => s.id === supId);
+  if (!sup) return null;
+  const supMaster = (state.supervisorsMaster || []).find(x => x.id === sup.id);
+  const { employmentType, maxCap } = getSupervisorDefaultAndMaxQuota(supMaster || sup);
+  const configuredCap = typeof sup.capacity === 'number' ? sup.capacity : (sup.maxQuota || maxCap);
+  const allowedCap = Math.min(configuredCap, maxCap);
+  const used = registrations.filter(r =>
+    (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') &&
+    (!excludeStudentId || r.studentId !== excludeStudentId) &&
+    isOfficialSupervisor(r, supId)
+  ).length;
+  return { sup, employmentType, allowedCap, used, remaining: allowedCap - used };
+}
+
+function buildEditSupervisorOptions(selectEl, currentSupervisorId) {
+  const supervisors = state.adminReviewData?.supervisors || [];
+  const currentReg = state.editSupStudentId ? (state.adminReviewData?.registrations || []).find(r => r.studentId === state.editSupStudentId) : null;
+  selectEl.innerHTML = supervisors.map(s => {
+    const info = computeSupervisorQuotaInfo(s.id, state.editSupStudentId);
+    if (!info) return '';
+    const isSelf = currentReg ? isOfficialSupervisor(currentReg, s.id) : (s.id === currentSupervisorId);
+    const typeLabel = info.employmentType === 'adjunct' ? 'Thỉnh giảng' : 'Cơ hữu';
+    if (info.remaining <= 0 && !isSelf) {
+      return `<option value="${s.id}" disabled class="text-slate-400 bg-slate-100">${s.name} (${typeLabel} • ĐÃ ĐỦ CHỈ TIÊU: ${info.used}/${info.allowedCap})</option>`;
+    }
+    return `<option value="${s.id}">${s.name} (${typeLabel} • Còn ${info.remaining} chỗ • ${info.used}/${info.allowedCap})</option>`;
+  }).join('');
+}
+
+window.openAdminEditSupervisorModal = function(studentId) {
+  const reg = (state.adminReviewData?.registrations || []).find(r => r.studentId === studentId);
+  if (!reg) {
+    showToast('Không tìm thấy hồ sơ đăng ký của sinh viên này.', 'warning');
+    return;
+  }
+
+  state.editSupStudentId = studentId;
+  const officials = getOfficialSupervisors(reg);
+  const primary = officials.find(s => s.role === 'primary') || officials[0];
+  const secondary = officials.find(s => s.role === 'support');
+
+  document.getElementById('edit-sup-student-info').textContent = `${reg.studentId} — ${resolveStudentName(reg.studentId, reg.studentName)}`;
+  document.getElementById('edit-sup-topic-info').textContent = `Đề tài: ${reg.topicTitle || '--'}${reg.projectType ? ' (' + reg.projectType + ')' : ''}`;
+  document.getElementById('edit-sup-round-info').textContent = `Đợt tốt nghiệp: ${state.activeRound?.title || state.activeRound?.name || state.selectedRoundId || '--'}`;
+  document.getElementById('edit-sup-current-primary').textContent = primary?.supervisorName || 'Chưa phân công';
+  document.getElementById('edit-sup-current-secondary').textContent = secondary?.supervisorName || 'Chưa có';
+
+  buildEditSupervisorOptions(document.getElementById('select-edit-primary-supervisor'), primary?.supervisorId || '');
+  buildEditSupervisorOptions(document.getElementById('select-edit-secondary-supervisor'), secondary?.supervisorId || '');
+  document.getElementById('select-edit-primary-supervisor').value = primary?.supervisorId || '';
+  document.getElementById('select-edit-secondary-supervisor').value = secondary?.supervisorId || '';
+
+  // Warn if scoring data exists for this student (must not be moved/deleted).
+  const round = (state.rounds || []).find(r => r.id === state.selectedRoundId);
+  const hasScoring = Boolean(round?.supervisorScores?.[reg.studentId]);
+  document.getElementById('edit-sup-scoring-warning').classList.toggle('hidden', !hasScoring);
+
+  document.getElementById('edit-sup-hint').textContent = 'GVHD chính và GVHD 2 không được là cùng một người. Preference NV1/NV2/NV3 của sinh viên được giữ nguyên.';
+  document.getElementById('modal-admin-edit-supervisor').classList.remove('hidden');
+};
+
+window.closeAdminEditSupervisorModal = function() {
+  document.getElementById('modal-admin-edit-supervisor').classList.add('hidden');
+  state.editSupStudentId = null;
+};
+
+window.saveAdminEditSupervisor = async function() {
+  const roundId = state.selectedRoundId;
+  const studentId = state.editSupStudentId;
+  if (!roundId || !studentId) return;
+
+  const reg = (state.adminReviewData?.registrations || []).find(r => r.studentId === studentId);
+  if (!reg) return;
+
+  const newPrimaryId = document.getElementById('select-edit-primary-supervisor')?.value || '';
+  const newSecondaryId = document.getElementById('select-edit-secondary-supervisor')?.value || '';
+
+  if (!newPrimaryId) {
+    showToast('Vui lòng chọn GVHD chính.', 'warning');
+    return;
+  }
+  if (newSecondaryId && newSecondaryId === newPrimaryId) {
+    showToast('GVHD chính và GVHD 2 không được là cùng một người.', 'warning');
+    return;
+  }
+
+  const officials = getOfficialSupervisors(reg);
+  const oldPrimary = officials.find(s => s.role === 'primary') || officials[0];
+  const oldSecondary = officials.find(s => s.role === 'support');
+
+  // Quota validation (excluding the student being edited to avoid double-count)
+  const newPrimaryInfo = computeSupervisorQuotaInfo(newPrimaryId, studentId);
+  if (!newPrimaryInfo) {
+    showToast('Không tìm thấy thông tin GVHD chính mới.', 'warning');
+    return;
+  }
+  if (newPrimaryId !== oldPrimary?.supervisorId && newPrimaryInfo.remaining <= 0) {
+    const typeText = newPrimaryInfo.employmentType === 'adjunct' ? 'Thỉnh giảng (tối đa 5 SV)' : 'Cơ hữu (tối đa 10 SV)';
+    showToast(`Thầy/Cô ${newPrimaryInfo.sup.name} đã đủ chỉ tiêu (${newPrimaryInfo.used}/${newPrimaryInfo.allowedCap} SV - ${typeText}). Không thể phân công vượt chỉ tiêu.`, 'error', 6000);
+    return;
+  }
+  if (newSecondaryId && newSecondaryId !== oldSecondary?.supervisorId) {
+    const newSecondaryInfo = computeSupervisorQuotaInfo(newSecondaryId, studentId);
+    if (!newSecondaryInfo || newSecondaryInfo.remaining <= 0) {
+      const typeText = newSecondaryInfo?.employmentType === 'adjunct' ? 'Thỉnh giảng (tối đa 5 SV)' : 'Cơ hữu (tối đa 10 SV)';
+      showToast(`GVHD 2: Thầy/Cô ${newSecondaryInfo?.sup.name || '--'} đã đủ chỉ tiêu (${newSecondaryInfo?.used || '?'}/${newSecondaryInfo?.allowedCap || '?'} SV - ${typeText}).`, 'error', 6000);
+      return;
+    }
+  }
+
+  const newPrimary = newPrimaryInfo.sup;
+  const newSecondary = newSecondaryId ? (state.adminReviewData?.supervisors || []).find(s => s.id === newSecondaryId) : null;
+  const otherSupports = officials.filter(s => s.role === 'support' && s.supervisorId !== (oldSecondary?.supervisorId || '') && s.supervisorId !== newSecondaryId);
+
+  const nowIso = new Date().toISOString();
+  const updatedOfficials = [
+    {
+      supervisorId: newPrimary.id,
+      supervisorName: newPrimary.name,
+      source: newPrimaryId === oldPrimary?.supervisorId ? (oldPrimary.source || 'preference') : 'admin_edited',
+      role: 'primary',
+      addedAt: newPrimaryId === oldPrimary?.supervisorId ? (oldPrimary.addedAt || nowIso) : nowIso
+    },
+    ...(newSecondary ? [{
+      supervisorId: newSecondary.id,
+      supervisorName: newSecondary.name,
+      source: newSecondaryId === oldSecondary?.supervisorId ? (oldSecondary.source || 'admin_added') : 'admin_added',
+      role: 'support',
+      addedAt: nowIso
+    }] : []),
+    ...otherSupports
+  ];
+
+  try {
+    const regRef = doc(db, 'graduationRounds', roundId, 'registrations', studentId);
+    const batch = writeBatch(db);
+    batch.update(regRef, {
+      officialSupervisors: updatedOfficials,
+      // Official assignment source of truth (primary)
+      acceptedSupervisorId: newPrimary.id,
+      acceptedSupervisorName: newPrimary.name,
+      updatedAt: serverTimestamp()
+    });
+
+    // Keep per-round supervisor acceptedCount consistent with primary reassignment
+    const oldPrimaryId = oldPrimary?.supervisorId;
+    if (oldPrimaryId && oldPrimaryId !== newPrimaryId) {
+      const oldSup = (state.adminReviewData?.supervisors || []).find(s => s.id === oldPrimaryId);
+      if (oldSup) {
+        batch.update(doc(db, 'graduationRounds', roundId, 'supervisors', oldPrimaryId), {
+          acceptedCount: Math.max(0, (oldSup.acceptedCount || 0) - 1),
+          updatedAt: serverTimestamp()
+        });
+      }
+      const newSup = (state.adminReviewData?.supervisors || []).find(s => s.id === newPrimaryId);
+      batch.update(doc(db, 'graduationRounds', roundId, 'supervisors', newPrimaryId), {
+        acceptedCount: (newSup?.acceptedCount || 0) + 1,
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    await batch.commit();
+
+    // Audit log (no tokens/credentials)
+    addDoc(collection(db, 'auditLogs'), {
+      action: 'supervisor_assignment_updated',
+      roundId,
+      studentMssv: studentId,
+      oldSupervisorId: oldPrimary?.supervisorId || '',
+      newSupervisorId: newPrimary.id,
+      oldSecondarySupervisorId: oldSecondary?.supervisorId || '',
+      newSecondarySupervisorId: newSecondary?.id || '',
+      realAdminUid: state.user?.uid || '',
+      realAdminEmail: state.user?.email || '',
+      hadScoringData: Boolean((state.rounds || []).find(r => r.id === roundId)?.supervisorScores?.[studentId]),
+      timestamp: serverTimestamp()
+    }).catch(e => console.warn('[Audit] supervisor_assignment_updated log failed:', e));
+
+    // Update local cache so UI stays consistent without a refetch round-trip
+    reg.officialSupervisors = updatedOfficials;
+    reg.acceptedSupervisorId = newPrimary.id;
+    reg.acceptedSupervisorName = newPrimary.name;
+
+    closeAdminEditSupervisorModal();
+    renderAdminAssignedSupervisorsTable();
+    renderAdminManualAssignmentTable();
+    renderAdminReviewDashboard();
+    renderAdminReviewSupervisorsTable();
+
+    showToast(`✓ Đã cập nhật phân công GVHD cho sinh viên ${resolveStudentName(studentId, reg.studentName)}: GVHD chính ${newPrimary.name}${newSecondary ? `, GVHD 2 ${newSecondary.name}` : ''}.`, 'success');
+    await loadAdminReviewData(roundId);
+  } catch (err) {
+    console.error('Lỗi chỉnh sửa phân công GVHD:', err);
+    showToast('Lỗi lưu phân công: ' + err.message, 'error');
   }
 };
 
