@@ -26,12 +26,13 @@ test('Admin assignment dùng union eligible, registrations và officialAssignmen
 });
 
 test('Nguồn phân công độc lập và không tạo registration giả', () => {
-  assert.match(app, /'officialAssignments', studentId/);
+  assert.match(app, /'assignmentDrafts', studentId/);
+  assert.match(app, /'officialAssignments', row\.studentId/);
   assert.doesNotMatch(app, /setDoc\(doc\(db, 'graduationRounds', roundId, 'registrations', studentId\)/);
 });
 
 test('Phân công mới là draft và chỉ publish qua workflow công bố round', () => {
-  assert.match(app, /assignmentStatus: 'draft'/);
+  assert.match(app, /buildAssignmentDraftPayload/);
   assert.match(app, /buildOfficialAssignmentPayload\(row, supervisors, 'published'\)/);
   assert.match(app, /window\.publishAdminResults/);
 });
@@ -65,7 +66,7 @@ test('Mọi thay đổi phân công chính, GVHD 2 và công bố đều ghi aud
   assert.match(app, /action: 'Thêm GVHD 2'/);
   assert.match(app, /action: 'Gỡ GVHD 2'/);
   assert.match(app, /action: 'Cập nhật phân công GVHD'/);
-  assert.match(app, /action: 'Công bố phân công GVHD'/);
+  assert.match(app, /action: (?:alreadyPublished \? 'Công bố lại phân công GVHD' : )?'Công bố phân công GVHD'/);
 });
 
 test('Rules giới hạn draft/published và không coi mọi staff là Admin', () => {
@@ -89,7 +90,11 @@ for (const item of tests) {
     console.log(`[PASS] ${item.name}`);
   } catch (error) {
     console.error(`[FAIL] ${item.name}`);
-    console.error(error.message);
+    if (error.expected) {
+      console.error(`       Expected match: ${error.expected}`);
+    } else {
+      console.error(`       ${error.message.split('\n')[0]}`);
+    }
     process.exitCode = 1;
   }
 }

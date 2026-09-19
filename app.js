@@ -113,23 +113,27 @@ function getAdminAssignmentRows() {
   const registrations = state.adminReviewData?.registrations || [];
   const eligible = state.adminReviewData?.eligible || [];
   const assignments = state.adminReviewData?.officialAssignments || [];
+  const drafts = state.adminReviewData?.assignmentDrafts || [];
   const normalizeId = value => String(value || '').trim().toUpperCase();
   const ids = new Set();
   registrations.forEach(r => ids.add(normalizeId(r.studentId || r.id)));
   eligible.filter(e => e.eligible !== false).forEach(e => ids.add(normalizeId(e.studentId || e.mssv || e.id)));
   assignments.forEach(a => ids.add(normalizeId(a.studentId || a.id)));
+  drafts.forEach(a => ids.add(normalizeId(a.studentId || a.id)));
   ids.delete('');
 
   return [...ids].map(studentId => {
     const registration = registrations.find(r => normalizeId(r.studentId || r.id) === studentId) || null;
     const eligibleStudent = eligible.find(e => normalizeId(e.studentId || e.mssv || e.id) === studentId) || null;
     const assignment = assignments.find(a => normalizeId(a.studentId || a.id) === studentId) || null;
-    const effective = normalizeOfficialAssignment(assignment, registration) || { studentId };
+    const draft = drafts.find(a => normalizeId(a.studentId || a.id) === studentId) || null;
+    const effective = normalizeOfficialAssignment(draft || assignment, registration) || { studentId };
     return {
       studentId,
       registration,
       eligibleStudent,
       assignment,
+      draft,
       effective,
       isRegistered: Boolean(registration),
       isAssigned: getOfficialSupervisors(effective).length > 0
@@ -163,6 +167,26 @@ function buildOfficialAssignmentPayload(row, supervisors, assignmentStatus = 'dr
     updatedAt: serverTimestamp(),
     updatedBy: state.user?.email || 'admin'
   };
+}
+
+function buildAssignmentDraftPayload(row, supervisors, source = 'manually_assigned') {
+  return {
+    ...buildOfficialAssignmentPayload(row, supervisors, 'draft'),
+    source,
+    basePublishedAt: row.assignment?.publishedAt || null
+  };
+}
+
+function isAssignmentEditingLocked() {
+  const round = state.activeRound || {};
+  const published = round.status === 'published' || round.reviewStatus === 'completed';
+  return published && round.assignmentEditingUnlocked !== true;
+}
+
+function ensureAssignmentEditingAllowed() {
+  if (!isAssignmentEditingLocked()) return true;
+  showToast('Kết quả đã công bố. Vui lòng bấm “Mở khóa chỉnh sửa” trước khi thay đổi phân công.', 'warning', 5000);
+  return false;
 }
 
 function getSupervisorAssignmentCount(supervisorId, excludeStudentId = '') {
@@ -628,6 +652,7 @@ export const state = {
   previewMssv: '',
   
   // Excel Staging
+  assignmentImportPreview: [],
   excelStaging: [],
 
   // Phase 2A: Supervisor Review State
@@ -643,7 +668,8 @@ export const state = {
     registrations: [],
     decisions: [],
     eligible: [],
-    officialAssignments: []
+    officialAssignments: [],
+    assignmentDrafts: []
   },
   inspectingSupervisorId: null,
   manualAssignStudentId: null
@@ -1639,8 +1665,11 @@ async function checkStudentEligibilityAndRegistration(roundId) {
       const roundStatus = state.activeRound?.status;
       const reviewStatus = state.activeRound?.reviewStatus;
 
-      // 1. If Published / Completed: Show Official Result Card
-      if (state.myOfficialAssignment?.assignmentStatus === 'published' || roundStatus === 'published' || reviewStatus === 'completed') {
+      const publishedSupervisors = getOfficialSupervisors(state.myRegistration);
+      const hasPublishedAssignment = state.myRegistration?.assignmentStatus === 'published' && publishedSupervisors.length > 0;
+
+      // 1. Only an actually published assignment may be shown as the official result.
+      if (hasPublishedAssignment) {
         if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
         if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
         renderStudentOfficialResult(state.myRegistration);
@@ -1652,19 +1681,13 @@ async function checkStudentEligibilityAndRegistration(roundId) {
         return;
       }
 
-      // 2. If Reviewing in Progress: Show Neutral Reviewing Card
-      if (roundStatus === 'reviewing' || (reviewStatus && reviewStatus.startsWith('round_')) || reviewStatus === 'manual_assignment') {
+      // 2. Registered without a published assignment is a normal waiting state.
+      if (!hasPublishedAssignment) {
         if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
         if (officialResultCard) officialResultCard.classList.add('hidden');
         
-        let roundName = 'VÒNG XÉT NGUYỆN VỌNG';
-        if (reviewStatus === 'round_1') roundName = 'XÉT NGUYỆN VỌNG 1';
-        else if (reviewStatus === 'round_2') roundName = 'XÉT NGUYỆN VỌNG 2';
-        else if (reviewStatus === 'round_3') roundName = 'XÉT NGUYỆN VỌNG 3';
-        else if (reviewStatus === 'manual_assignment') roundName = 'ĐIỀU PHỐI BỔ SUNG';
-        
         const reviewTag = document.getElementById('review-round-tag');
-        if (reviewTag) reviewTag.textContent = roundName;
+        if (reviewTag) reviewTag.textContent = 'ĐANG XỬ LÝ';
         if (reviewInProgressCard) reviewInProgressCard.classList.remove('hidden');
         updateStudentJourneyStepper();
         updateStudentPersonalSidebar();
@@ -1765,9 +1788,9 @@ function renderStudentOfficialResult(reg) {
   } else {
     container.innerHTML = `
       <div class="bg-white/10 p-5 rounded-2xl border border-white/20 text-center space-y-3">
-        <p class="text-lg font-bold text-amber-300">Thông báo Điều phối Đề tài</p>
+        <p class="text-lg font-bold text-amber-300">ĐANG CHỜ PHÂN CÔNG GIẢNG VIÊN HƯỚNG DẪN</p>
         <p class="text-xs text-slate-200 leading-relaxed max-w-lg mx-auto">
-          Hồ sơ của bạn hiện đang chờ điều phối bổ sung từ Hội đồng Đồ án Tốt nghiệp Khoa. Vui lòng liên hệ trực tiếp Văn phòng Khoa để được hỗ trợ phân công GVHD hướng dẫn.
+          Ngành đang thực hiện phân công giảng viên hướng dẫn. Bạn vui lòng chờ và quay lại hệ thống để xem thông tin khi có kết quả.
         </p>
       </div>
     `;
@@ -6624,11 +6647,10 @@ window.resolveStudentName = function(sid, fallbackName = '') {
 window.loadAdminReviewData = async function(roundId) {
   if (!roundId) return;
 
-  if (typeof ensureFacultyDatasetLoaded === 'function' && (!state.facultyStudents || state.facultyStudents.length === 0)) {
-    ensureFacultyDatasetLoaded().catch(e => console.warn('[ReviewData] Faculty dataset background load notice:', e));
-  }
-
   try {
+    if (typeof ensureFacultyDatasetLoaded === 'function' && (!state.facultyStudents || state.facultyStudents.length === 0)) {
+      await ensureFacultyDatasetLoaded().catch(e => console.warn('[ReviewData] Faculty dataset load notice:', e));
+    }
     // 1. Fetch Round doc
     const roundDoc = await getDoc(doc(db, 'graduationRounds', roundId));
     if (roundDoc.exists()) {
@@ -6661,12 +6683,17 @@ window.loadAdminReviewData = async function(roundId) {
     const assignmentSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'officialAssignments'));
     const officialAssignments = assignmentSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+    // Admin-only working copy. Student/GVHD never read this collection.
+    const draftSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'assignmentDrafts'));
+    const assignmentDrafts = draftSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
     state.adminReviewData = {
       supervisors,
       registrations,
       decisions,
       eligible,
-      officialAssignments
+      officialAssignments,
+      assignmentDrafts
     };
 
     renderAdminReviewDashboard();
@@ -6692,6 +6719,8 @@ function renderAdminReviewDashboard() {
   const titleEl = document.getElementById('admin-review-current-title');
   const descEl = document.getElementById('admin-review-current-desc');
   const actionsWrap = document.getElementById('admin-review-actions-wrap');
+  const isPublished = round.status === 'published' || reviewStatus === 'completed';
+  const editingUnlocked = isPublished && round.assignmentEditingUnlocked === true;
 
   // Compute Stats
   const assignmentRows = getAdminAssignmentRows();
@@ -6706,7 +6735,8 @@ function renderAdminReviewDashboard() {
   document.getElementById('adm-stat-unassigned').textContent = unassignedCount;
   document.getElementById('adm-stat-total-quota').textContent = totalQuota;
   document.getElementById('adm-stat-fill-rate').textContent = `${fillRate}%`;
-  document.getElementById('adm-unassigned-count-tag').textContent = `${unassignedCount} SV`;
+  const unassignedCountTag = document.getElementById('adm-unassigned-count-tag');
+  if (unassignedCountTag) unassignedCountTag.textContent = `${unassignedCount} SV`;
 
   const reviewSupervisorsSection = document.getElementById('admin-review-supervisors-section');
   const preferencesHeader = document.getElementById('admin-manual-preferences-header');
@@ -6720,6 +6750,27 @@ function renderAdminReviewDashboard() {
   if (manualSectionDescription) manualSectionDescription.textContent = directAssignment
     ? 'Phân công trực tiếp cho sinh viên đã đăng ký. Chỉ tiêu GVHD vẫn được áp dụng.'
     : 'Dành cho sinh viên chưa trúng tuyển sau các vòng nguyện vọng, hoặc điều phối bổ sung.';
+
+  if (isPublished) {
+    statusPill.className = editingUnlocked
+      ? 'badge bg-amber-200 text-amber-900 font-black'
+      : 'badge bg-emerald-500 text-white font-black';
+    statusPill.textContent = editingUnlocked ? 'Đang chỉnh sửa bản nháp' : 'Đã hoàn tất & Công bố';
+    titleEl.textContent = editingUnlocked ? 'Đang chỉnh sửa phân công sau công bố' : 'Đã Hoàn tất & Công bố Kết quả ĐATN';
+    descEl.textContent = editingUnlocked
+      ? 'Sinh viên và giảng viên vẫn xem bản đã công bố. Các thay đổi mới chỉ hiển thị sau khi công bố lại.'
+      : 'Kết quả phân công GVHD đã được công bố chính thức cho sinh viên và giảng viên.';
+    actionsWrap.innerHTML = editingUnlocked ? `
+      <button onclick="publishAdminResults()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
+        <span>📢 Lưu & Công bố lại kết quả</span>
+      </button>
+    ` : `
+      <button onclick="unlockSupervisorAssignmentEditing()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
+        <span>🔓 Đã công bố — Mở khóa chỉnh sửa</span>
+      </button>
+    `;
+    return;
+  }
 
   if (directAssignment) {
     statusPill.className = 'badge bg-indigo-200 text-indigo-900 font-black';
@@ -6766,16 +6817,40 @@ function renderAdminReviewDashboard() {
         <span>📢 HOÀN TẤT & CÔNG BỐ KẾT QUẢ CHÍNH THỨC</span>
       </button>
     `;
-  } else if (reviewStatus === 'completed' || round.status === 'published') {
-    statusPill.className = 'badge bg-emerald-500 text-white font-black';
-    statusPill.textContent = 'Đã hoàn tất & Công bố';
-    titleEl.textContent = 'Đã Hoàn tất & Công bố Kết quả ĐATN';
-    descEl.textContent = `Kết quả phân công GVHD đã được công bố chính thức cho toàn thể sinh viên và giảng viên.`;
-    actionsWrap.innerHTML = `
-      <span class="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-sm">✓ ĐÃ CÔNG BỐ CHÍNH THỨC</span>
-    `;
   }
 }
+
+window.unlockSupervisorAssignmentEditing = async function() {
+  const roundId = state.selectedRoundId;
+  if (!roundId) return;
+  const confirmed = await showConfirm(
+    'Mở khóa chỉnh sửa phân công',
+    'Kết quả phân công đã được công bố. Bạn có muốn mở khóa để chỉnh sửa phân công GVHD?',
+    { confirmText: 'Mở khóa chỉnh sửa', danger: false }
+  );
+  if (!confirmed) return;
+
+  try {
+    await updateDoc(doc(db, 'graduationRounds', roundId), {
+      assignmentEditingUnlocked: true,
+      assignmentPublicationState: 'editing',
+      assignmentEditingUnlockedAt: serverTimestamp(),
+      assignmentEditingUnlockedBy: state.user?.email || 'admin',
+      updatedAt: serverTimestamp()
+    });
+    await window.appendAuditLogRecord?.(roundId, {
+      type: 'assignment_publication',
+      action: 'Mở khóa chỉnh sửa phân công GVHD',
+      target: roundId,
+      detail: 'Mở bản nháp chỉnh sửa; bản đã công bố tiếp tục hiển thị cho sinh viên và giảng viên',
+      by: state.user?.email || 'admin'
+    });
+    showToast('Đã mở khóa chỉnh sửa. Bản công bố hiện tại vẫn được giữ nguyên.', 'success');
+    await loadAdminReviewData(roundId);
+  } catch (error) {
+    showToast('Không thể mở khóa chỉnh sửa: ' + error.message, 'error');
+  }
+};
 
 function renderAdminReviewSupervisorsTable() {
   const tbody = document.getElementById('admin-review-supervisors-tbody');
@@ -7093,6 +7168,7 @@ window.closeAdminInspectSupModal = function() {
 };
 
 window.openAdminManualAssignModal = function(studentId) {
+  if (!ensureAssignmentEditingAllowed()) return;
   state.manualAssignStudentId = studentId;
   const row = getAdminAssignmentRows().find(item => item.studentId === String(studentId || '').trim().toUpperCase());
   if (!row) return;
@@ -7133,6 +7209,7 @@ window.closeAdminManualAssignModal = function() {
 };
 
 window.saveAdminManualAssign = async function() {
+  if (!ensureAssignmentEditingAllowed()) return;
   const roundId = state.selectedRoundId;
   const studentId = state.manualAssignStudentId;
   const supervisorId = document.getElementById('select-manual-supervisor')?.value;
@@ -7164,7 +7241,7 @@ window.saveAdminManualAssign = async function() {
 
     const row = getAdminAssignmentRows().find(item => item.studentId === String(studentId || '').trim().toUpperCase());
     if (!row) throw new Error('Không tìm thấy sinh viên trong danh sách đủ điều kiện hoặc đăng ký.');
-    const existingAssignment = row.assignment || {};
+    const existingAssignment = row.draft || row.assignment || {};
     const existingSupervisors = getOfficialSupervisors(normalizeOfficialAssignment(existingAssignment, row.registration));
     const supportSupervisors = existingSupervisors.filter(item => item.role === 'support' && item.supervisorId !== supervisorId);
     const supervisors = [{
@@ -7177,10 +7254,10 @@ window.saveAdminManualAssign = async function() {
     }, ...supportSupervisors];
     const studentDisplayName = resolveStudentName(studentId, row.registration?.studentName || row.eligibleStudent?.fullName || row.eligibleStudent?.name);
     const studentEmail = row.registration?.email || row.eligibleStudent?.email || `${studentId.toLowerCase()}@student.tdtu.edu.vn`;
-    const assignmentPayload = buildOfficialAssignmentPayload(row, supervisors, 'draft');
+    const assignmentPayload = buildAssignmentDraftPayload(row, supervisors, 'admin_assigned');
 
     // Source of truth: assignment exists independently from registration.
-    const assignmentRef = doc(db, 'graduationRounds', roundId, 'officialAssignments', studentId);
+    const assignmentRef = doc(db, 'graduationRounds', roundId, 'assignmentDrafts', studentId);
     batch.set(assignmentRef, {
       ...assignmentPayload,
       studentName: studentDisplayName,
@@ -7213,6 +7290,13 @@ window.publishAdminResults = async function() {
 
   const assignmentRows = getAdminAssignmentRows();
   const unassignedCount = assignmentRows.filter(row => !row.isAssigned).length;
+  const alreadyPublished = state.activeRound?.status === 'published' || state.activeRound?.reviewStatus === 'completed';
+  const changedRows = assignmentRows.filter(row => Boolean(row.draft));
+
+  if (alreadyPublished && changedRows.length === 0) {
+    showToast('Không có thay đổi phân công mới để công bố lại.', 'info');
+    return;
+  }
 
   if (unassignedCount > 0) {
     if (!(await showConfirm('Công bố Kết quả Chính thức', `Vẫn còn ${unassignedCount} sinh viên chưa được phân công GVHD. Bạn có chắc chắn muốn hoàn tất và CÔNG BỐ KẾT QUẢ CHÍNH THỨC không?`, { confirmText: 'Công bố kết quả', danger: true }))) return;
@@ -7225,13 +7309,16 @@ window.publishAdminResults = async function() {
     batch.update(doc(db, 'graduationRounds', roundId), {
       reviewStatus: 'completed',
       status: 'published',
+      assignmentEditingUnlocked: false,
+      assignmentPublicationState: 'published',
       publishedAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
 
     // Publish every assigned student through the existing round-level publish action.
     // Legacy registration assignments are projected into the independent source here.
-    assignmentRows.filter(row => row.isAssigned).forEach(row => {
+    const rowsToPublish = alreadyPublished ? changedRows : assignmentRows.filter(row => row.isAssigned);
+    rowsToPublish.filter(row => row.isAssigned).forEach(row => {
       const effective = row.effective;
       const supervisors = getOfficialSupervisors(effective);
       const publishedPayload = buildOfficialAssignmentPayload(row, supervisors, 'published');
@@ -7242,6 +7329,9 @@ window.publishAdminResults = async function() {
         publishedAt: serverTimestamp(),
         publishedBy: state.user?.email || 'admin'
       }, { merge: true });
+      if (row.draft) {
+        batch.delete(doc(db, 'graduationRounds', roundId, 'assignmentDrafts', row.studentId));
+      }
       if (row.registration) {
         batch.update(doc(db, 'graduationRounds', roundId, 'registrations', row.studentId), {
           reviewStatus: 'manually_assigned',
@@ -7259,9 +7349,9 @@ window.publishAdminResults = async function() {
     await batch.commit();
     await window.appendAuditLogRecord?.(roundId, {
       type: 'assignment_publication',
-      action: 'Công bố phân công GVHD',
+      action: alreadyPublished ? 'Công bố lại phân công GVHD' : 'Công bố phân công GVHD',
       target: roundId,
-      detail: `Công bố ${assignmentRows.filter(row => row.isAssigned).length} phân công chính thức`,
+      detail: `${alreadyPublished ? 'Công bố lại' : 'Công bố'} ${rowsToPublish.filter(row => row.isAssigned).length} phân công chính thức`,
       by: state.user?.email || 'admin'
     });
 
@@ -7588,6 +7678,13 @@ export async function populateSettingsActAsCandidates() {
 
   userSelect.innerHTML = '<option value="">⏳ Đang nạp danh sách người dùng...</option>';
 
+  if ((roleFilter === 'student' || roleFilter === 'all') && typeof ensureFacultyDatasetLoaded === 'function') {
+    await ensureFacultyDatasetLoaded().catch(error => console.warn('[ActAs] Student Master load notice:', error));
+  }
+  if (roleFilter !== 'student' && typeof ensureSupervisorsMasterLoaded === 'function') {
+    await ensureSupervisorsMasterLoaded().catch(error => console.warn('[ActAs] Lecturer directory load notice:', error));
+  }
+
   const candidates = await gatherRoundCandidates(roundFilter, roleFilter, searchQuery);
   state.settingsActAsCandidates = candidates;
 
@@ -7600,7 +7697,8 @@ export async function populateSettingsActAsCandidates() {
 
   userSelect.innerHTML = candidates.map((c, idx) => {
     const ident = c.mssv || c.email || c.id || '';
-    const extra = c.department ? ` - BM: ${c.department}` : (c.roundTitle ? ` - ${c.roundTitle}` : '');
+    const details = [c.registrationStatus, c.className, c.major, c.department, c.notFoundInMaster ? 'Chưa tìm thấy thông tin sinh viên' : ''].filter(Boolean).join(' • ');
+    const extra = details ? ` - ${details}` : (c.roundTitle ? ` - ${c.roundTitle}` : '');
     return `<option value="${idx}">[${escapeHtml(c.roleLabel)}] ${escapeHtml(c.name)} (${escapeHtml(ident)})${escapeHtml(extra)}</option>`;
   }).join('');
   userSelect.selectedIndex = 0;
@@ -7938,9 +8036,17 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
 
   // 1. SUPERVISORS (from state.supervisorsMaster and rounds)
   if (roleFilter === 'all' || roleFilter === 'supervisor') {
-    const sups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
+    let sups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
       ? state.supervisorsMaster
       : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
+    if (roundFilter !== 'all') {
+      try {
+        const roundSupervisorSnap = await getDocs(collection(db, 'graduationRounds', roundFilter, 'supervisors'));
+        sups = roundSupervisorSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (error) {
+        console.warn('[ActAs] Không thể tải GVHD của đợt:', error.message);
+      }
+    }
     
     const selRound = roundFilter !== 'all' ? (state.rounds || []).find(r => r.id === roundFilter) : null;
 
@@ -8160,14 +8266,17 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
       : (state.rounds || []);
 
     for (const r of targetRounds) {
-      const rSups = r.supervisors || [];
-      rSups.forEach(s => {
-        if (s.email) {
+      const scorerIds = r.preliminaryConfig?.scorerIds || [];
+      scorerIds.forEach(scorerId => {
+        const s = (state.supervisorsMaster || []).find(item => item.id === scorerId || item.email === scorerId);
+        const scorerEmail = s?.email || (String(scorerId).includes('@') ? String(scorerId) : '');
+        if (scorerEmail) {
           addCandidate({
             type: 'preliminary',
-            id: s.id || s.email,
-            name: s.name || s.email,
-            email: s.email,
+            id: s?.id || scorerId,
+            name: s?.name || scorerEmail,
+            email: scorerEmail,
+            department: s?.department || '',
             roundId: r.id,
             roundTitle: r.roundName || r.title || r.id,
             roundShortCode: r.shortCode || '',
@@ -8178,6 +8287,28 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
       });
     }
   }
+
+  // Enrich students from the authoritative Faculty Student Master after the
+  // eligibleStudents + registrations union has been built and deduplicated.
+  candidates.filter(c => c.type === 'student').forEach(candidate => {
+    const sid = String(candidate.mssv || candidate.id || '').trim().replace(/\s+/g, '').toUpperCase();
+    candidate.id = sid;
+    candidate.mssv = sid;
+    const master = typeof window.getFacultyStudentByMssv === 'function'
+      ? window.getFacultyStudentByMssv(sid)
+      : null;
+    if (master) {
+      candidate.name = master.fullName || master.name || candidate.name || sid;
+      candidate.email = master.email || candidate.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`;
+      candidate.major = master.major || master.majorName || '';
+      candidate.className = master.className || master.studentClass || '';
+      candidate.notFoundInMaster = false;
+    } else {
+      const currentName = String(candidate.name || '').trim();
+      candidate.name = currentName && currentName.toUpperCase() !== sid ? currentName : sid;
+      candidate.notFoundInMaster = state.facultyStudentsLoaded === true;
+    }
+  });
 
   // Filter candidates by search query
   const filtered = candidates.filter(c => {
@@ -8268,6 +8399,13 @@ async function gatherAndRenderImpersonateCandidates() {
     listEl.innerHTML = '<div class="text-center py-6 text-slate-400">Đang tải danh sách người dùng thực tế...</div>';
   }
 
+  if ((roleFilter === 'student' || roleFilter === 'all') && typeof ensureFacultyDatasetLoaded === 'function') {
+    await ensureFacultyDatasetLoaded().catch(error => console.warn('[ActAs] Student Master load notice:', error));
+  }
+  if (roleFilter !== 'student' && typeof ensureSupervisorsMasterLoaded === 'function') {
+    await ensureSupervisorsMasterLoaded().catch(error => console.warn('[ActAs] Lecturer directory load notice:', error));
+  }
+
   const filtered = await gatherRoundCandidates(roundFilter, roleFilter, searchQuery);
 
   filtered.forEach((c, idx) => {
@@ -8320,6 +8458,9 @@ async function gatherAndRenderImpersonateCandidates() {
               <div class="text-[11px] text-slate-500 truncate mt-0.5 flex items-center gap-2 flex-wrap">
                 <span>✉️ ${escapeHtml(c.email || '--')}</span>
                 ${c.department ? `<span>• BM: ${escapeHtml(c.department)}</span>` : ''}
+                ${c.className ? `<span>• Lớp: ${escapeHtml(c.className)}</span>` : ''}
+                ${c.major ? `<span>• Ngành: ${escapeHtml(c.major)}</span>` : ''}
+                ${c.notFoundInMaster ? '<span class="text-amber-700 font-semibold">• Chưa tìm thấy thông tin sinh viên</span>' : ''}
                 ${c.roundTitle ? `<span class="text-amber-800 font-medium">• ${escapeHtml(c.roundTitle)}</span>` : ''}
                 ${c.topicTitle ? `<span class="text-blue-700 font-medium italic truncate">• Đề tài: ${escapeHtml(c.topicTitle)}</span>` : ''}
               </div>
@@ -10967,6 +11108,237 @@ window.loadStudentRoundActivities = async function(roundId) {
 // ============================================================================
 // ADMIN OFFICIAL & SUPPORT SUPERVISORS MANAGEMENT TABLE (v1.6.0-beta.3)
 // ============================================================================
+window.exportSupervisorAssignmentsExcel = function() {
+  if (typeof window.XLSX === 'undefined') {
+    showToast('Thư viện Excel chưa được tải.', 'error');
+    return;
+  }
+  const rows = getAdminAssignmentRows();
+  if (rows.length === 0) {
+    showToast('Đợt chưa có sinh viên đủ điều kiện để xuất.', 'warning');
+    return;
+  }
+
+  const data = [[
+    'STT', 'MSSV', 'Họ và tên', 'Ngành', 'Lớp', 'Tên đề tài', 'Trạng thái đăng ký',
+    'Email GVHD 1', 'Tên GVHD 1', 'Email GVHD 2', 'Tên GVHD 2'
+  ]];
+  rows.forEach((row, index) => {
+    const master = typeof window.getFacultyStudentByMssv === 'function' ? window.getFacultyStudentByMssv(row.studentId) : null;
+    const officials = getOfficialSupervisors(row.effective);
+    const primary = officials.find(item => item.role === 'primary') || officials[0] || {};
+    const support = officials.find(item => item.role === 'support') || {};
+    data.push([
+      index + 1,
+      sanitizeExcelCell(row.studentId),
+      sanitizeExcelCell(master?.fullName || master?.name || resolveStudentName(row.studentId, row.effective?.studentName)),
+      sanitizeExcelCell(master?.major || row.eligibleStudent?.major || ''),
+      sanitizeExcelCell(master?.className || master?.studentClass || ''),
+      sanitizeExcelCell(row.registration?.topicTitle || 'Chưa đăng ký đề tài'),
+      row.isRegistered ? 'Đã đăng ký' : 'Chưa đăng ký',
+      sanitizeExcelCell(primary.supervisorEmail || ''),
+      sanitizeExcelCell(primary.supervisorName || ''),
+      sanitizeExcelCell(support.supervisorEmail || ''),
+      sanitizeExcelCell(support.supervisorName || '')
+    ]);
+  });
+
+  const workbook = window.XLSX.utils.book_new();
+  const worksheet = window.XLSX.utils.aoa_to_sheet(data);
+  worksheet['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 28 }, { wch: 24 }, { wch: 14 }, { wch: 45 }, { wch: 20 }, { wch: 30 }, { wch: 28 }, { wch: 30 }, { wch: 28 }];
+  window.XLSX.utils.book_append_sheet(workbook, worksheet, 'PHAN_CONG_GVHD');
+  const roundCode = state.activeRound?.shortCode || state.activeRound?.slug || state.selectedRoundId || 'ROUND';
+  window.XLSX.writeFile(workbook, `PHAN_CONG_GVHD_${roundCode}.xlsx`);
+  showToast(`Đã xuất ${rows.length} sinh viên ra Excel.`, 'success');
+};
+
+function normalizeAssignmentImportHeader(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function getAssignmentImportCell(row, aliases) {
+  const aliasSet = new Set(aliases.map(normalizeAssignmentImportHeader));
+  const key = Object.keys(row).find(item => aliasSet.has(normalizeAssignmentImportHeader(item)));
+  return key ? row[key] : '';
+}
+
+window.handleSupervisorAssignmentExcel = function(event) {
+  if (!ensureAssignmentEditingAllowed()) {
+    event.target.value = '';
+    return;
+  }
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = loadEvent => {
+    try {
+      const workbook = window.XLSX.read(new Uint8Array(loadEvent.target.result), { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rawRows = window.XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
+      buildSupervisorAssignmentImportPreview(rawRows);
+    } catch (error) {
+      showToast('Không đọc được file Excel: ' + error.message, 'error');
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+function buildSupervisorAssignmentImportPreview(rawRows) {
+  const allRows = getAdminAssignmentRows();
+  const rowsByStudent = new Map(allRows.map(row => [row.studentId, row]));
+  const supervisors = state.adminReviewData?.supervisors || [];
+  const supervisorByEmail = new Map(supervisors.filter(s => s.email).map(s => [String(s.email).trim().toLowerCase(), s]));
+  const seenStudents = new Map();
+
+  const preview = rawRows.map((raw, index) => {
+    const studentId = String(getAssignmentImportCell(raw, ['MSSV', 'Ma sinh vien', 'Student ID']) || '').trim().replace(/\s+/g, '').toUpperCase();
+    const primaryEmail = String(getAssignmentImportCell(raw, ['Email GVHD 1', 'GVHD 1 Email', 'Primary Supervisor Email']) || '').trim().toLowerCase();
+    const supportEmail = String(getAssignmentImportCell(raw, ['Email GVHD 2', 'GVHD 2 Email', 'Support Supervisor Email']) || '').trim().toLowerCase();
+    const row = rowsByStudent.get(studentId);
+    const errors = [];
+    if (!studentId) errors.push('Thiếu MSSV');
+    if (studentId && !row) errors.push('MSSV không thuộc Round');
+    if (studentId) {
+      if (seenStudents.has(studentId)) {
+        errors.push(`MSSV trùng với dòng ${seenStudents.get(studentId)}`);
+      } else {
+        seenStudents.set(studentId, index + 2);
+      }
+    }
+
+    const current = row ? getOfficialSupervisors(row.effective) : [];
+    const currentPrimary = current.find(item => item.role === 'primary') || current[0] || null;
+    const currentSupport = current.find(item => item.role === 'support') || null;
+    const primary = primaryEmail ? supervisorByEmail.get(primaryEmail) : null;
+    const support = supportEmail ? supervisorByEmail.get(supportEmail) : null;
+    if (primaryEmail && !primary) errors.push(`Email GVHD 1 không thuộc danh sách GVHD của Round: ${primaryEmail}`);
+    if (supportEmail && !support) errors.push(`Email GVHD 2 không thuộc danh sách GVHD của Round: ${supportEmail}`);
+    if (primaryEmail && supportEmail && primaryEmail === supportEmail) errors.push('GVHD 1 và GVHD 2 trùng nhau');
+
+    const nextPrimary = primary || currentPrimary;
+    const nextSupport = support || currentSupport;
+    if (nextPrimary && nextSupport && nextPrimary.id === nextSupport.id) errors.push('GVHD 1 và GVHD 2 trùng nhau');
+    const nextSupervisors = [
+      ...(nextPrimary ? [{
+        supervisorId: nextPrimary.id || nextPrimary.supervisorId,
+        supervisorName: nextPrimary.name || nextPrimary.supervisorName,
+        supervisorEmail: String(nextPrimary.email || nextPrimary.supervisorEmail || '').trim().toLowerCase(),
+        role: 'primary', source: 'excel_import', addedAt: new Date().toISOString()
+      }] : []),
+      ...(nextSupport ? [{
+        supervisorId: nextSupport.id || nextSupport.supervisorId,
+        supervisorName: nextSupport.name || nextSupport.supervisorName,
+        supervisorEmail: String(nextSupport.email || nextSupport.supervisorEmail || '').trim().toLowerCase(),
+        role: 'support', source: 'excel_import', addedAt: new Date().toISOString()
+      }] : [])
+    ];
+    const currentIds = current.map(item => `${item.role}:${item.supervisorId}`).sort().join('|');
+    const nextIds = nextSupervisors.map(item => `${item.role}:${item.supervisorId}`).sort().join('|');
+    const changed = currentIds !== nextIds;
+    const status = !changed ? 'unchanged' : (current.length === 0 ? 'new' : 'changed');
+    return { line: index + 2, studentId, row, primaryEmail, supportEmail, supervisors: nextSupervisors, errors, status };
+  });
+
+  // Duplicate MSSV: mark every occurrence, not only the later row.
+  const duplicateIds = new Set(preview.filter((item, index) => item.studentId && preview.some((other, otherIndex) => otherIndex !== index && other.studentId === item.studentId)).map(item => item.studentId));
+  preview.forEach(item => {
+    if (duplicateIds.has(item.studentId) && !item.errors.some(error => error.startsWith('MSSV trùng'))) item.errors.push('MSSV xuất hiện nhiều dòng trong file');
+  });
+
+  // Simulate final state and validate quota before any write.
+  const previewByStudent = new Map(preview.filter(item => item.row && item.errors.length === 0).map(item => [item.studentId, item]));
+  const studentsBySupervisor = new Map();
+  allRows.forEach(row => {
+    const planned = previewByStudent.get(row.studentId)?.supervisors || getOfficialSupervisors(row.effective);
+    new Set(planned.map(item => item.supervisorId).filter(Boolean)).forEach(supervisorId => {
+      if (!studentsBySupervisor.has(supervisorId)) studentsBySupervisor.set(supervisorId, new Set());
+      studentsBySupervisor.get(supervisorId).add(row.studentId);
+    });
+  });
+  preview.forEach(item => {
+    if (!item.row || item.errors.length > 0 || item.status === 'unchanged') return;
+    item.supervisors.forEach(assigned => {
+      const sup = supervisors.find(s => s.id === assigned.supervisorId);
+      const master = (state.supervisorsMaster || []).find(s => s.id === assigned.supervisorId);
+      const { maxCap } = getSupervisorDefaultAndMaxQuota(master || sup);
+      const configured = typeof sup?.capacity === 'number' ? sup.capacity : (sup?.maxQuota || maxCap);
+      const cap = Math.min(configured, maxCap);
+      const used = studentsBySupervisor.get(assigned.supervisorId)?.size || 0;
+      if (used > cap) item.errors.push(`${assigned.supervisorName} vượt quota ${used}/${cap}`);
+    });
+  });
+
+  state.assignmentImportPreview = preview;
+  renderSupervisorAssignmentImportPreview();
+}
+
+function renderSupervisorAssignmentImportPreview() {
+  const preview = state.assignmentImportPreview || [];
+  const valid = preview.filter(item => item.errors.length === 0);
+  const errorCount = preview.length - valid.length;
+  const counts = {
+    total: preview.length,
+    valid: valid.length,
+    errors: errorCount,
+    new: valid.filter(item => item.status === 'new').length,
+    changed: valid.filter(item => item.status === 'changed').length,
+    unchanged: valid.filter(item => item.status === 'unchanged').length
+  };
+  const summary = document.getElementById('assignment-import-summary');
+  if (summary) summary.innerHTML = [
+    ['Tổng dòng', counts.total, 'slate'], ['Hợp lệ', counts.valid, 'emerald'], ['Lỗi', counts.errors, 'rose'],
+    ['Phân công mới', counts.new, 'blue'], ['Thay đổi', counts.changed, 'amber'], ['Không đổi', counts.unchanged, 'slate']
+  ].map(([label, value, color]) => `<div class="p-2 rounded-xl bg-${color}-50 border border-${color}-200"><span class="block text-[10px] text-${color}-600">${label}</span><strong class="text-lg text-${color}-900">${value}</strong></div>`).join('');
+
+  const tbody = document.getElementById('assignment-import-preview-tbody');
+  if (tbody) tbody.innerHTML = preview.map(item => {
+    const master = item.studentId && typeof window.getFacultyStudentByMssv === 'function' ? window.getFacultyStudentByMssv(item.studentId) : null;
+    const primary = item.supervisors.find(s => s.role === 'primary');
+    const support = item.supervisors.find(s => s.role === 'support');
+    const statusText = item.errors.length > 0 ? item.errors.join('; ') : ({ new: 'Phân công mới', changed: 'Thay đổi', unchanged: 'Không thay đổi' }[item.status]);
+    return `<tr class="${item.errors.length ? 'bg-rose-50' : ''}"><td class="p-2 font-mono">${item.line}</td><td class="p-2 font-mono font-bold">${escapeHtml(item.studentId)}</td><td class="p-2">${escapeHtml(master?.fullName || master?.name || item.row?.effective?.studentName || '--')}</td><td class="p-2">${escapeHtml(primary?.supervisorName || '--')}</td><td class="p-2">${escapeHtml(support?.supervisorName || '--')}</td><td class="p-2 ${item.errors.length ? 'text-rose-700' : 'text-emerald-700'} font-semibold">${escapeHtml(statusText)}</td></tr>`;
+  }).join('');
+  const confirmButton = document.getElementById('btn-confirm-assignment-import');
+  if (confirmButton) confirmButton.disabled = errorCount > 0 || (counts.new + counts.changed) === 0;
+  document.getElementById('modal-assignment-excel-preview')?.classList.remove('hidden');
+}
+
+window.closeSupervisorAssignmentExcelPreview = function() {
+  document.getElementById('modal-assignment-excel-preview')?.classList.add('hidden');
+  state.assignmentImportPreview = [];
+};
+
+window.confirmSupervisorAssignmentExcelImport = async function() {
+  if (!ensureAssignmentEditingAllowed()) return;
+  const roundId = state.selectedRoundId;
+  const changed = (state.assignmentImportPreview || []).filter(item => item.errors.length === 0 && item.status !== 'unchanged');
+  if (!roundId || changed.length === 0) return;
+  try {
+    for (let offset = 0; offset < changed.length; offset += 400) {
+      const batch = writeBatch(db);
+      changed.slice(offset, offset + 400).forEach(item => {
+        batch.set(
+          doc(db, 'graduationRounds', roundId, 'assignmentDrafts', item.studentId),
+          buildAssignmentDraftPayload(item.row, item.supervisors, 'excel_import'),
+          { merge: true }
+        );
+      });
+      await batch.commit();
+    }
+    await window.appendAuditLogRecord?.(roundId, {
+      type: 'assignment', action: 'Import Excel phân công GVHD', target: roundId,
+      detail: `Lưu ${changed.length} thay đổi vào bản nháp; chưa công bố`, by: state.user?.email || 'admin'
+    });
+    closeSupervisorAssignmentExcelPreview();
+    showToast(`Đã lưu ${changed.length} phân công vào bản nháp.`, 'success');
+    await loadAdminReviewData(roundId);
+  } catch (error) {
+    showToast('Lỗi lưu phân công từ Excel: ' + error.message, 'error');
+  }
+};
+
 window.filterAdminAssignedTable = function(filterVal) {
   renderAdminAssignedSupervisorsTable(filterVal);
 };
@@ -11013,7 +11385,7 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" class="p-8 text-center text-slate-400">
+        <td colspan="7" class="p-8 text-center text-slate-400">
           ${allRows.length === 0 ? 'Chưa có sinh viên đủ điều kiện hoặc đăng ký trong đợt này.' : 'Không tìm thấy sinh viên phù hợp từ khóa tìm kiếm.'}
         </td>
       </tr>
@@ -11029,9 +11401,7 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
     const studentDisplayName = resolveStudentName(mssv, reg.studentName || row.eligibleStudent?.fullName || row.eligibleStudent?.name);
 
     let regStatusHtml = '';
-    if (isAssigned) {
-      regStatusHtml = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã đăng ký</span>';
-    } else if (isRegistered) {
+    if (isRegistered) {
       regStatusHtml = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">Đã đăng ký</span>';
     } else {
       regStatusHtml = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Chưa đăng ký</span>';
@@ -11041,43 +11411,35 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
     const primary = officials.find(s => s.role === 'primary') || officials[0];
     const supports = officials.filter(s => s.role === 'support');
 
+    const editingLocked = isAssignmentEditingLocked();
     const primaryHtml = (isAssigned && primary) ? `
-      <div>
-        <span class="font-bold text-slate-900 text-xs block">${primary.supervisorName || 'GVHD chính'}</span>
-        <span class="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200">GVHD chính</span>
-      </div>
-    ` : '<span class="text-slate-400 italic text-[11px]">Chưa phân công</span>';
+      <button type="button" ${editingLocked ? 'disabled' : `onclick="openAdminEditSupervisorModal('${mssv}')"`} class="text-left ${editingLocked ? 'cursor-default' : 'hover:bg-blue-50 cursor-pointer'} p-1.5 -m-1.5 rounded-lg transition-colors" title="${editingLocked ? 'Mở khóa chỉnh sửa để thay đổi GVHD 1' : 'Bấm để đổi GVHD 1'}">
+        <span class="font-bold text-slate-900 text-xs block">${escapeHtml(primary.supervisorName || 'GVHD 1')}</span>
+        <span class="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200">GVHD 1</span>
+        ${row.draft ? '<span class="block text-[9px] font-bold text-amber-700 mt-1">Chưa công bố</span>' : ''}
+      </button>
+    ` : `<button type="button" ${editingLocked ? 'disabled' : `onclick="openAdminManualAssignModal('${mssv}')"`} class="font-bold text-[11px] ${editingLocked ? 'text-slate-400 cursor-default' : 'text-indigo-700 hover:text-indigo-900 hover:underline cursor-pointer'}">Chưa phân công</button>`;
 
     const supportsHtml = (isAssigned && supports.length > 0) ? `
       <div class="space-y-1.5">
         ${supports.map(sup => `
           <div class="flex items-center justify-between gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
             <div>
-              <span class="font-bold text-slate-800 text-xs block">${sup.supervisorName}</span>
+              <button type="button" ${editingLocked ? 'disabled' : `onclick="openAdminEditSupervisorModal('${mssv}')"`} class="font-bold text-slate-800 text-xs block ${editingLocked ? 'cursor-default' : 'hover:text-indigo-700 hover:underline'}">${escapeHtml(sup.supervisorName)}</button>
               <span class="text-[9px] text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-200">GVHD 2</span>
             </div>
-            <button type="button" onclick="removeSupportSupervisor('${mssv}', '${sup.supervisorId}', '${escapeHtml(sup.supervisorName)}', '${escapeHtml(studentDisplayName)}')" class="px-2 py-0.5 text-rose-600 hover:bg-rose-50 rounded text-[10px] font-bold border border-rose-200 transition-colors" title="Gỡ GVHD 2 khỏi sinh viên này">
+            <button type="button" ${editingLocked ? 'disabled' : `onclick="removeSupportSupervisor('${mssv}', '${sup.supervisorId}', '${escapeHtml(sup.supervisorName)}', '${escapeHtml(studentDisplayName)}')"`} class="px-2 py-0.5 text-rose-600 hover:bg-rose-50 rounded text-[10px] font-bold border border-rose-200 transition-colors disabled:opacity-40" title="Gỡ GVHD 2 khỏi sinh viên này">
               Gỡ
             </button>
           </div>
         `).join('')}
       </div>
-    ` : '<span class="text-slate-400 italic text-[11px]">Chưa có</span>';
+    ` : (isAssigned
+      ? `<button type="button" ${editingLocked ? 'disabled' : `onclick="openAddSupportSupervisorModal('${mssv}')"`} class="font-bold text-[11px] ${editingLocked ? 'text-slate-400 cursor-default' : 'text-indigo-700 hover:underline cursor-pointer'}">Chưa có</button>`
+      : '<span class="text-slate-400 italic text-[11px]" title="Hãy phân công GVHD 1 trước">Chưa có</span>');
 
-    let actionHtml = '';
-    if (isAssigned) {
-      actionHtml = `
-        <button type="button" onclick="openAdminEditSupervisorModal('${mssv}')" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold text-xs border border-blue-200 transition-colors inline-flex items-center gap-1">
-          <span>✏️ Chỉnh sửa GVHD</span>
-        </button>
-      `;
-    } else {
-      actionHtml = `
-        <button type="button" onclick="openAdminManualAssignModal('${mssv}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-sm inline-flex items-center gap-1">
-          <span>Phân công GVHD</span>
-        </button>
-      `;
-    }
+    const masterStudent = typeof window.getFacultyStudentByMssv === 'function' ? window.getFacultyStudentByMssv(mssv) : null;
+    const major = masterStudent?.major || row.eligibleStudent?.major || 'Thiết kế Nội thất';
 
     return `
       <tr class="hover:bg-slate-50 transition-colors">
@@ -11085,19 +11447,19 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
         <td class="p-3.5 font-mono font-bold text-slate-900">${mssv}</td>
         <td class="p-3.5 font-semibold text-slate-800 whitespace-nowrap">${escapeHtml(studentDisplayName)}</td>
         <td class="p-3.5 max-w-xs">
-          <span class="font-medium text-slate-900 block truncate" title="${reg?.topicTitle || 'Chưa đăng ký đề tài'}">${reg?.topicTitle || '--'}</span>
-          <span class="text-[11px] text-slate-500">${reg?.projectType || (isRegistered ? '--' : '')}</span>
+          <span class="font-medium text-slate-900 block truncate" title="${escapeHtml(reg?.topicTitle || 'Chưa đăng ký đề tài')}">${escapeHtml(reg?.topicTitle || 'Chưa đăng ký đề tài')}</span>
+          <span class="text-[11px] text-slate-500">${escapeHtml(major)}${reg?.projectType ? ` • ${escapeHtml(reg.projectType)}` : ''}</span>
         </td>
         <td class="p-3.5 whitespace-nowrap">${regStatusHtml}</td>
         <td class="p-3.5 whitespace-nowrap">${primaryHtml}</td>
         <td class="p-3.5 min-w-[180px]">${supportsHtml}</td>
-        <td class="p-3.5 text-right whitespace-nowrap">${actionHtml}</td>
       </tr>
     `;
   }).join('');
 };
 
 window.openAddSupportSupervisorModal = function(studentId) {
+  if (!ensureAssignmentEditingAllowed()) return;
   const roundId = state.selectedRoundId;
   const row = getAdminAssignmentRows().find(item => item.studentId === String(studentId || '').trim().toUpperCase());
   const reg = row?.effective;
@@ -11186,6 +11548,7 @@ window.onSelectSupportSupervisorChange = function(supId) {
 };
 
 window.executeAddSupportSupervisor = async function() {
+  if (!ensureAssignmentEditingAllowed()) return;
   const roundId = state.selectedRoundId;
   const studentId = document.getElementById('support-target-student-id')?.value;
   const supervisorId = document.getElementById('select-support-supervisor')?.value;
@@ -11238,8 +11601,8 @@ window.executeAddSupportSupervisor = async function() {
 
     const batch = writeBatch(db);
     batch.set(
-      doc(db, 'graduationRounds', roundId, 'officialAssignments', studentId),
-      buildOfficialAssignmentPayload(row, updatedOfficials, 'draft'),
+      doc(db, 'graduationRounds', roundId, 'assignmentDrafts', studentId),
+      buildAssignmentDraftPayload(row, updatedOfficials, 'admin_added_support'),
       { merge: true }
     );
     await batch.commit();
@@ -11272,6 +11635,7 @@ window.executeAddSupportSupervisor = async function() {
 };
 
 window.removeSupportSupervisor = async function(studentId, supervisorId, supervisorName, studentName) {
+  if (!ensureAssignmentEditingAllowed()) return;
   const roundId = state.selectedRoundId;
   if (!roundId || !studentId || !supervisorId) return;
 
@@ -11291,8 +11655,8 @@ window.removeSupportSupervisor = async function(studentId, supervisorId, supervi
 
     const batch = writeBatch(db);
     batch.set(
-      doc(db, 'graduationRounds', roundId, 'officialAssignments', studentId),
-      buildOfficialAssignmentPayload(row, updatedOfficials, 'draft'),
+      doc(db, 'graduationRounds', roundId, 'assignmentDrafts', studentId),
+      buildAssignmentDraftPayload(row, updatedOfficials, 'admin_removed_support'),
       { merge: true }
     );
     await batch.commit();
@@ -11329,10 +11693,10 @@ function computeSupervisorQuotaInfo(supId, excludeStudentId = null) {
   return { sup, employmentType, allowedCap, used, remaining: allowedCap - used };
 }
 
-function buildEditSupervisorOptions(selectEl, currentSupervisorId) {
+function buildEditSupervisorOptions(selectEl, currentSupervisorId, allowEmpty = false) {
   const supervisors = state.adminReviewData?.supervisors || [];
   const currentReg = state.editSupStudentId ? getAdminAssignmentRows().find(row => row.studentId === state.editSupStudentId)?.effective : null;
-  selectEl.innerHTML = supervisors.map(s => {
+  selectEl.innerHTML = (allowEmpty ? '<option value="">-- Không có GVHD 2 --</option>' : '') + supervisors.map(s => {
     const info = computeSupervisorQuotaInfo(s.id, state.editSupStudentId);
     if (!info) return '';
     const isSelf = currentReg ? isOfficialSupervisor(currentReg, s.id) : (s.id === currentSupervisorId);
@@ -11345,6 +11709,7 @@ function buildEditSupervisorOptions(selectEl, currentSupervisorId) {
 }
 
 window.openAdminEditSupervisorModal = function(studentId) {
+  if (!ensureAssignmentEditingAllowed()) return;
   const row = getAdminAssignmentRows().find(item => item.studentId === String(studentId || '').trim().toUpperCase());
   const reg = row?.effective;
   if (!row || !reg || !row.isAssigned) {
@@ -11364,7 +11729,7 @@ window.openAdminEditSupervisorModal = function(studentId) {
   document.getElementById('edit-sup-current-secondary').textContent = secondary?.supervisorName || 'Chưa có';
 
   buildEditSupervisorOptions(document.getElementById('select-edit-primary-supervisor'), primary?.supervisorId || '');
-  buildEditSupervisorOptions(document.getElementById('select-edit-secondary-supervisor'), secondary?.supervisorId || '');
+  buildEditSupervisorOptions(document.getElementById('select-edit-secondary-supervisor'), secondary?.supervisorId || '', true);
   document.getElementById('select-edit-primary-supervisor').value = primary?.supervisorId || '';
   document.getElementById('select-edit-secondary-supervisor').value = secondary?.supervisorId || '';
 
@@ -11383,6 +11748,7 @@ window.closeAdminEditSupervisorModal = function() {
 };
 
 window.saveAdminEditSupervisor = async function() {
+  if (!ensureAssignmentEditingAllowed()) return;
   const roundId = state.selectedRoundId;
   const studentId = state.editSupStudentId;
   if (!roundId || !studentId) return;
@@ -11406,6 +11772,11 @@ window.saveAdminEditSupervisor = async function() {
   const officials = getOfficialSupervisors(reg);
   const oldPrimary = officials.find(s => s.role === 'primary') || officials[0];
   const oldSecondary = officials.find(s => s.role === 'support');
+
+  if (newPrimaryId === (oldPrimary?.supervisorId || '') && newSecondaryId === (oldSecondary?.supervisorId || '')) {
+    showToast('Phân công không thay đổi.', 'info');
+    return;
+  }
 
   // Quota validation (excluding the student being edited to avoid double-count)
   const newPrimaryInfo = computeSupervisorQuotaInfo(newPrimaryId, studentId);
@@ -11454,21 +11825,11 @@ window.saveAdminEditSupervisor = async function() {
 
   try {
     const batch = writeBatch(db);
-    batch.set(doc(db, 'graduationRounds', roundId, 'officialAssignments', studentId), {
-      studentId,
-      studentName: resolveStudentName(studentId, reg.studentName || row.eligibleStudent?.fullName || row.eligibleStudent?.name),
-      studentEmail: reg.email || row.eligibleStudent?.email || `${studentId.toLowerCase()}@student.tdtu.edu.vn`,
-      supervisors: updatedOfficials,
-      supervisorIds: updatedOfficials.map(item => item.supervisorId),
-      supervisorEmails: updatedOfficials.map(item => item.supervisorEmail || '').filter(Boolean),
-      acceptedSupervisorId: newPrimary.id,
-      acceptedSupervisorName: newPrimary.name,
-      acceptedRank: 'manual',
-      source: 'admin_edited',
-      assignmentStatus: 'draft',
-      updatedAt: serverTimestamp(),
-      updatedBy: state.user?.email || 'admin'
-    }, { merge: true });
+    batch.set(
+      doc(db, 'graduationRounds', roundId, 'assignmentDrafts', studentId),
+      buildAssignmentDraftPayload(row, updatedOfficials, 'admin_edited'),
+      { merge: true }
+    );
 
     await batch.commit();
 
@@ -11654,14 +12015,17 @@ window.deleteCouncilFromMilestone = async function(councilId) {
   showToast(`Đã xóa Hội đồng "${council.name}".`, 'info');
 };
 
-window.openAddCouncilInternalMemberModal = function(councilId) {
+window.openAddCouncilInternalMemberModal = async function(councilId) {
   const council = (state._currentActivityCouncils || []).find(c => c.id === councilId);
   if (!council) return;
 
   document.getElementById('internal-member-council-id').value = councilId;
+  const searchEl = document.getElementById('internal-member-search');
+  if (searchEl) searchEl.value = '';
   const labelEl = document.getElementById('internal-member-council-label');
   if (labelEl) labelEl.textContent = `Hội đồng: ${council.name}`;
 
+  await ensureSupervisorsMasterLoaded().catch(error => console.warn('[Council] Lecturer directory load notice:', error));
   const selectEl = document.getElementById('internal-member-select');
   if (selectEl) {
     const supervisors = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
@@ -11669,11 +12033,21 @@ window.openAddCouncilInternalMemberModal = function(councilId) {
       : (state.roundSupervisors || []);
     selectEl.innerHTML = '<option value="">-- Chọn giảng viên --</option>' + supervisors.map(s => {
       const emailText = s.email ? ` • ${s.email}` : '';
-      return `<option value="${s.id}">${escapeHtml(s.name)} (${s.department || 'Khoa MTCN'}${emailText})</option>`;
+      return `<option value="${s.id}">${escapeHtml(s.name)} (${escapeHtml(s.department || 'Khoa MTCN')}${escapeHtml(emailText)})</option>`;
     }).join('');
   }
 
   document.getElementById('modal-add-council-internal-member')?.classList.remove('hidden');
+};
+
+window.filterCouncilInternalMembers = function(searchValue) {
+  const queryText = String(searchValue || '').trim().toLowerCase();
+  const selectEl = document.getElementById('internal-member-select');
+  if (!selectEl) return;
+  [...selectEl.options].forEach((option, index) => {
+    if (index === 0) return;
+    option.hidden = Boolean(queryText) && !option.textContent.toLowerCase().includes(queryText);
+  });
 };
 
 window.closeAddCouncilInternalMemberModal = function() {
@@ -12341,7 +12715,7 @@ window.setStudentPresentationStatus = async function(studentId, newStatus) {
 };
 
 // --- CREATE / EDIT / COPY COUNCIL MODALS ---
-window.openCreateCouncilModal = function() {
+window.openCreateCouncilModal = async function() {
   const { roundId, activityId } = state.activeCouncilManagement;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
@@ -12375,12 +12749,13 @@ window.openCreateCouncilModal = function() {
     driveStatusEl.innerHTML = '<span class="text-slate-400">Chưa kết nối thư mục Google Drive. Nhập tên và bấm "Tạo / Kết nối".</span>';
   }
 
+  await ensureSupervisorsMasterLoaded().catch(error => console.warn('[Council] Lecturer directory load notice:', error));
   renderCouncilMembersFormSlots(act, {});
 
   document.getElementById('modal-edit-council')?.classList.remove('hidden');
 };
 
-window.editCouncilModal = function(councilId) {
+window.editCouncilModal = async function(councilId) {
   const { roundId, activityId } = state.activeCouncilManagement;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
@@ -12425,12 +12800,13 @@ window.editCouncilModal = function(councilId) {
     }
   }
 
+  await ensureSupervisorsMasterLoaded().catch(error => console.warn('[Council] Lecturer directory load notice:', error));
   renderCouncilMembersFormSlots(act, council.membersBySlot || {});
 
   document.getElementById('modal-edit-council')?.classList.remove('hidden');
 };
 
-window.copyCouncil = function(councilId) {
+window.copyCouncil = async function(councilId) {
   const { roundId, activityId } = state.activeCouncilManagement;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
@@ -12462,6 +12838,7 @@ window.copyCouncil = function(councilId) {
     driveStatusEl.innerHTML = '<span class="text-amber-600 font-medium">⚠️ Bản sao chưa kết nối thư mục Drive. Vui lòng bấm "Tạo / Kết nối" để tạo thư mục mới.</span>';
   }
 
+  await ensureSupervisorsMasterLoaded().catch(error => console.warn('[Council] Lecturer directory load notice:', error));
   renderCouncilMembersFormSlots(act, council.membersBySlot || {});
 
   document.getElementById('modal-edit-council')?.classList.remove('hidden');
@@ -12501,10 +12878,11 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
 
         <!-- Supervisor dropdown -->
         <div id="slot-sup-wrap-${s.key}" class="${isGuest ? 'hidden' : ''}">
+          <input type="search" oninput="filterCouncilSlotMembers('${s.key}', this.value)" placeholder="Tìm theo tên, email, đơn vị..." class="w-full p-2 mb-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
           <select id="slot-sup-${s.key}" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
             <option value="">-- Chưa phân công --</option>
             ${supervisors.map(sup => `
-              <option value="${sup.id}" ${memberId === sup.id ? 'selected' : ''}>${sup.name} (${sup.department || 'Khoa MTCN'})${sup.employmentType === 'adjunct' ? ' • Thỉnh giảng' : ''}</option>
+              <option value="${sup.id}" ${memberId === sup.id ? 'selected' : ''}>${sup.name} • ${sup.email || '--'} • ${sup.department || 'Khoa MTCN'}${sup.employmentType === 'adjunct' ? ' • Thỉnh giảng' : ''}</option>
             `).join('')}
           </select>
         </div>
@@ -12521,6 +12899,16 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
     `;
   }).join('');
 }
+
+window.filterCouncilSlotMembers = function(slotKey, searchValue) {
+  const queryText = String(searchValue || '').trim().toLowerCase();
+  const selectEl = document.getElementById(`slot-sup-${slotKey}`);
+  if (!selectEl) return;
+  [...selectEl.options].forEach((option, index) => {
+    if (index === 0) return;
+    option.hidden = Boolean(queryText) && !option.textContent.toLowerCase().includes(queryText);
+  });
+};
 
 window.toggleSlotGuestInput = function(slotKey, isGuest) {
   const supWrap = document.getElementById(`slot-sup-wrap-${slotKey}`);

@@ -14,6 +14,7 @@ const otherSupervisorEmail = 'other@tdtu.edu.vn';
 let env;
 
 const assignmentPath = id => `graduationRounds/${roundId}/officialAssignments/${id}`;
+const draftPath = id => `graduationRounds/${roundId}/assignmentDrafts/${id}`;
 const auth = email => ({ email, email_verified: true });
 
 before(async () => {
@@ -34,7 +35,7 @@ beforeEach(async () => {
     });
     await setDoc(doc(db, `graduationRounds/${roundId}/eligibleStudents/${studentId}`), { eligible: true, studentId });
     await setDoc(doc(db, `graduationRounds/${roundId}/eligibleStudents/${otherStudentId}`), { eligible: true, studentId: otherStudentId });
-    await setDoc(doc(db, assignmentPath(studentId)), {
+    await setDoc(doc(db, draftPath(studentId)), {
       studentId,
       studentName: 'Sinh viên Một',
       studentEmail: `${studentId}@student.tdtu.edu.vn`,
@@ -61,21 +62,21 @@ after(async () => {
 describe('officialAssignments least privilege', () => {
   test('Admin được tạo và sửa assignment', async () => {
     const db = env.authenticatedContext(adminEmail, auth(adminEmail)).firestore();
-    await assertSucceeds(setDoc(doc(db, assignmentPath(otherStudentId)), {
+    await assertSucceeds(setDoc(doc(db, draftPath(otherStudentId)), {
       studentId: otherStudentId,
       assignmentStatus: 'draft',
       supervisors: [],
       supervisorIds: [],
       supervisorEmails: []
     }));
-    await assertSucceeds(updateDoc(doc(db, assignmentPath(studentId)), { assignmentStatus: 'published' }));
+    await assertSucceeds(updateDoc(doc(db, draftPath(studentId)), { source: 'admin_edited' }));
   });
 
   test('Student và GVHD không đọc được draft', async () => {
     const studentDb = env.authenticatedContext(`${studentId}@student.tdtu.edu.vn`, auth(`${studentId}@student.tdtu.edu.vn`)).firestore();
     const supervisorDb = env.authenticatedContext(supervisorEmail, auth(supervisorEmail)).firestore();
-    await assertFails(getDoc(doc(studentDb, assignmentPath(studentId))));
-    await assertFails(getDoc(doc(supervisorDb, assignmentPath(studentId))));
+    await assertFails(getDoc(doc(studentDb, draftPath(studentId))));
+    await assertFails(getDoc(doc(supervisorDb, draftPath(studentId))));
   });
 
   test('Student chỉ đọc published của chính mình', async () => {
@@ -104,14 +105,14 @@ describe('officialAssignments least privilege', () => {
   test('Student và GVHD không được ghi assignment', async () => {
     const studentDb = env.authenticatedContext(`${studentId}@student.tdtu.edu.vn`, auth(`${studentId}@student.tdtu.edu.vn`)).firestore();
     const supervisorDb = env.authenticatedContext(supervisorEmail, auth(supervisorEmail)).firestore();
-    await assertFails(updateDoc(doc(studentDb, assignmentPath(studentId)), { assignmentStatus: 'published' }));
-    await assertFails(updateDoc(doc(supervisorDb, assignmentPath(studentId)), { assignmentStatus: 'published' }));
+    await assertFails(updateDoc(doc(studentDb, draftPath(studentId)), { source: 'student' }));
+    await assertFails(updateDoc(doc(supervisorDb, draftPath(studentId)), { source: 'supervisor' }));
   });
 
   test('GVHD không được list eligibleStudents và tài khoản TDTU thường không phải Admin', async () => {
     const supervisorDb = env.authenticatedContext(supervisorEmail, auth(supervisorEmail)).firestore();
     await assertFails(getDocs(collection(supervisorDb, `graduationRounds/${roundId}/eligibleStudents`)));
-    await assertFails(setDoc(doc(supervisorDb, assignmentPath(otherStudentId)), {
+    await assertFails(setDoc(doc(supervisorDb, draftPath(otherStudentId)), {
       studentId: otherStudentId,
       assignmentStatus: 'draft',
       supervisors: [],
@@ -147,7 +148,7 @@ describe('officialAssignments least privilege', () => {
         status: 'open',
         supervisorAssignmentMode: 'student_preference'
       }, { merge: true });
-      await setDoc(doc(db, assignmentPath(otherStudentId)), {
+      await setDoc(doc(db, draftPath(otherStudentId)), {
         studentId: otherStudentId,
         assignmentStatus: 'draft',
         supervisors: [{ supervisorId: 'gvhd-1', supervisorName: 'GVHD Một', supervisorEmail, role: 'primary' }],
@@ -170,7 +171,9 @@ describe('officialAssignments least privilege', () => {
 
     await assertFails(setDoc(registrationRef, payload));
     await env.withSecurityRulesDisabled(async context => {
-      await updateDoc(doc(context.firestore(), assignmentPath(otherStudentId)), { assignmentStatus: 'published' });
+      const adminDb = context.firestore();
+      const draft = await getDoc(doc(adminDb, draftPath(otherStudentId)));
+      await setDoc(doc(adminDb, assignmentPath(otherStudentId)), { ...draft.data(), assignmentStatus: 'published' });
     });
     await assertSucceeds(setDoc(registrationRef, payload));
   });
@@ -178,6 +181,8 @@ describe('officialAssignments least privilege', () => {
 
 async function publishAssignment() {
   await env.withSecurityRulesDisabled(async context => {
-    await updateDoc(doc(context.firestore(), assignmentPath(studentId)), { assignmentStatus: 'published' });
+    const db = context.firestore();
+    const draft = await getDoc(doc(db, draftPath(studentId)));
+    await setDoc(doc(db, assignmentPath(studentId)), { ...draft.data(), assignmentStatus: 'published' });
   });
 }

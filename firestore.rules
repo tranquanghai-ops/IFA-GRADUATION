@@ -374,14 +374,27 @@ service cloud.firestore {
             && email() in resource.data.supervisorEmails);
         allow create: if admin()
           && request.resource.data.studentId == studentId
-          && request.resource.data.assignmentStatus in ['draft', 'published']
+          && request.resource.data.assignmentStatus == 'published'
           && request.resource.data.supervisors is list
           && request.resource.data.supervisorIds is list
           && request.resource.data.supervisorEmails is list;
         allow update: if admin()
           && request.resource.data.studentId == resource.data.studentId
           && request.resource.data.studentId == studentId
-          && request.resource.data.assignmentStatus in ['draft', 'published']
+          && request.resource.data.assignmentStatus == 'published'
+          && request.resource.data.supervisors is list
+          && request.resource.data.supervisorIds is list
+          && request.resource.data.supervisorEmails is list;
+        allow delete: if admin();
+      }
+
+      // Admin-only working copy. Keeping drafts in a separate document prevents
+      // unpublished supervisor changes from being exposed through a published read.
+      match /assignmentDrafts/{studentId} {
+        allow get, list: if admin();
+        allow create, update: if admin()
+          && request.resource.data.studentId == studentId
+          && request.resource.data.assignmentStatus == 'draft'
           && request.resource.data.supervisors is list
           && request.resource.data.supervisorIds is list
           && request.resource.data.supervisorEmails is list;
