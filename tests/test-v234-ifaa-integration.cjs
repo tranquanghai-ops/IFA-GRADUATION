@@ -23,7 +23,7 @@ function test(num, title, fn) {
   }
 }
 
-const graduationDir = 'C:\\Users\\quang\\.gemini\\antigravity\\scratch\\IFA-GRADUATION';
+const graduationDir = path.resolve(__dirname, '..');
 const ifaaDir = 'C:\\Users\\quang\\.gemini\\antigravity\\scratch\\IFAA';
 const appJs = fs.readFileSync(path.join(graduationDir, 'app.js'), 'utf8');
 const indexHtml = fs.readFileSync(path.join(graduationDir, 'index.html'), 'utf8');

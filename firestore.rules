@@ -358,6 +358,36 @@ service cloud.firestore {
         allow create, update, delete: if admin();
       }
 
+      // Official supervisor assignment exists independently from registration.
+      // Draft is Admin-only; published documents are visible only to the student
+      // owner or an assigned supervisor included in supervisorEmails.
+      match /officialAssignments/{studentId} {
+        allow get: if admin()
+          || (resource.data.assignmentStatus == 'published'
+            && (
+              (student() && email().matches('^' + studentId + '@student\\.tdtu\\.edu\\.vn$'))
+              || (staff() && email() in resource.data.supervisorEmails)
+            ));
+        allow list: if admin()
+          || (staff()
+            && resource.data.assignmentStatus == 'published'
+            && email() in resource.data.supervisorEmails);
+        allow create: if admin()
+          && request.resource.data.studentId == studentId
+          && request.resource.data.assignmentStatus in ['draft', 'published']
+          && request.resource.data.supervisors is list
+          && request.resource.data.supervisorIds is list
+          && request.resource.data.supervisorEmails is list;
+        allow update: if admin()
+          && request.resource.data.studentId == resource.data.studentId
+          && request.resource.data.studentId == studentId
+          && request.resource.data.assignmentStatus in ['draft', 'published']
+          && request.resource.data.supervisors is list
+          && request.resource.data.supervisorIds is list
+          && request.resource.data.supervisorEmails is list;
+        allow delete: if admin();
+      }
+
       // Quyết định xét duyệt của GVHD từng vòng
       match /reviewDecisions/{decisionId} {
         allow read: if admin() || staff();
@@ -385,7 +415,12 @@ service cloud.firestore {
           && request.resource.data.topicTitle.size() <= 250
           && request.resource.data.projectType is string
           && request.resource.data.preferences is list
-          && request.resource.data.preferences.size() > 0
+          && (request.resource.data.preferences.size() > 0
+            || (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['supervisorAssignmentMode'])
+              && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.supervisorAssignmentMode == 'direct_assignment')
+            || (exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId))
+              && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.assignmentStatus == 'published'))
+          && !request.resource.data.keys().hasAny(['acceptedSupervisorId', 'acceptedSupervisorName', 'officialSupervisors', 'assignmentStatus'])
           && (
             (exists(/databases/$(database)/documents/graduationRounds/$(roundId)/eligibleStudents/$(studentId))
              && get(/databases/$(database)/documents/graduationRounds/$(roundId)/eligibleStudents/$(studentId)).data.eligible == true)

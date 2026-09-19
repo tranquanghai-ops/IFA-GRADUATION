@@ -1,0 +1,13 @@
+{
+  "name": "ifa-graduation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:rules": "firebase emulators:exec --only firestore --project tknt-tdtu-test \"node --test tests/firestore-official-assignments.rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0",
+    "firebase-tools": "^14.16.0"
+  }
+}
