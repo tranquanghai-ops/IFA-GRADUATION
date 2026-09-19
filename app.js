@@ -10583,10 +10583,47 @@ window.loadStudentRoundActivities = async function(roundId) {
     }
   }
 
+  // Collapsible milestone state: manual overrides persist in sessionStorage per roundId+activityId.
+  function readMilestoneOpenMap(rid) {
+    try {
+      const obj = JSON.parse(sessionStorage.getItem('grad_milestone_open_' + rid) || '{}');
+      return obj && typeof obj === 'object' ? obj : {};
+    } catch (e) { return {}; }
+  }
+  function writeMilestoneOpenMap(rid, map) {
+    try { sessionStorage.setItem('grad_milestone_open_' + rid, JSON.stringify(map)); } catch (e) {}
+  }
+  function isMilestoneExpandedDefault(act, status, rid) {
+    const map = readMilestoneOpenMap(rid);
+    if (map[act.id]) return map[act.id] === 'open';
+    // Default: only milestones currently in their real time window are expanded.
+    return status === 'ongoing';
+  }
+  function applyMilestoneExpandedDom(actId, open) {
+    const bodyEl = document.getElementById('milestone-body-' + actId);
+    const headerEl = document.getElementById('milestone-header-' + actId);
+    const btnEl = document.getElementById('milestone-toggle-btn-' + actId);
+    if (bodyEl) bodyEl.classList.toggle('hidden', !open);
+    if (headerEl) headerEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (btnEl) btnEl.innerHTML = open ? '▲ Thu gọn' : '▼ Xem chi tiết';
+  }
+  window.setMilestoneExpanded = function(rid, actId, open) {
+    const map = readMilestoneOpenMap(rid);
+    map[actId] = open ? 'open' : 'closed';
+    writeMilestoneOpenMap(rid, map);
+    applyMilestoneExpandedDom(actId, open);
+  };
+  window.toggleMilestoneCard = function(rid, actId) {
+    const bodyEl = document.getElementById('milestone-body-' + actId);
+    if (!bodyEl) return;
+    window.setMilestoneExpanded(rid, actId, bodyEl.classList.contains('hidden'));
+  };
+
   function renderActivityCard(act) {
     const typeMeta = ACTIVITY_TYPES[act.activityType] || ACTIVITY_TYPES.other;
     const status = getActivityStatus(act);
     const timeStr = fmtActivityTime(act.startAt, act.endAt);
+    const expanded = isMilestoneExpandedDefault(act, status, targetRound.id);
 
     let markerHtml = '';
     let cardBorder = 'border-slate-200';
@@ -10626,41 +10663,58 @@ window.loadStudentRoundActivities = async function(roundId) {
       `;
     }
 
+    const headerAttrs = `id="milestone-header-${act.id}" role="button" tabindex="0" aria-expanded="${expanded ? 'true' : 'false'}" aria-controls="milestone-body-${act.id}" onclick="toggleMilestoneCard('${targetRound.id}', '${act.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleMilestoneCard('${targetRound.id}', '${act.id}');}"`;
+
     return `
       <div id="activity-card-${act.slug}" data-activity-id="${act.id}" class="flex items-start gap-3.5 p-4 rounded-2xl border ${cardBorder} transition-all duration-300 relative">
         ${markerHtml}
         <div class="flex-1 min-w-0">
-          <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
-            <div class="flex flex-wrap items-center gap-1.5">
-              ${statusPill}
-              <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${typeMeta.color}">
-                <span>${typeMeta.icon}</span> ${typeMeta.label}
-              </span>
-              ${act.isTentative ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">🟡 Dự kiến</span>' : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">Chính thức</span>'}
+          <div ${headerAttrs} class="cursor-pointer select-none rounded-xl -mx-1 px-1 py-0.5 hover:bg-slate-900/[.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-tdtu-blue">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+              <div class="flex flex-wrap items-center gap-1.5">
+                ${statusPill}
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${typeMeta.color}">
+                  <span>${typeMeta.icon}</span> ${typeMeta.label}
+                </span>
+                ${act.isTentative ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">🟡 Dự kiến</span>' : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">Chính thức</span>'}
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="event.stopPropagation();copyActivityLink('${targetRound.id}', '${act.slug}')" class="text-[11px] font-semibold text-slate-400 hover:text-tdtu-blue flex items-center gap-1 transition-colors" title="Sao chép link mốc này">
+                  <span>🔗 Link</span>
+                </button>
+                <span id="milestone-toggle-btn-${act.id}" class="text-[11px] font-bold text-slate-500 hover:text-tdtu-blue flex items-center gap-1 transition-colors shrink-0" aria-hidden="true">
+                  <span>${expanded ? '▲ Thu gọn' : '▼ Xem chi tiết'}</span>
+                </span>
+              </div>
             </div>
-            <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="text-[11px] font-semibold text-slate-400 hover:text-tdtu-blue flex items-center gap-1 transition-colors" title="Sao chép link mốc này">
-              <span>🔗 Link</span>
-            </button>
+
+            <h3 class="text-sm sm:text-base font-black text-slate-900 tracking-tight">${act.title}</h3>
+
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 mt-1.5 font-medium">
+              <div class="flex items-center gap-1 font-mono text-[11px] text-slate-700">
+                <span>🕒</span> <span class="text-slate-500 font-sans font-normal">${act.isTentative ? 'Thời gian dự kiến:' : 'Thời gian chính thức:'}</span> ${timeStr}
+              </div>
+              ${!expanded && act.location ? `
+                <div class="flex items-center gap-1 text-[11px] text-slate-600">
+                  <span>📍</span> ${act.location}
+                </div>
+              ` : ''}
+            </div>
           </div>
 
-          <h3 class="text-sm sm:text-base font-black text-slate-900 tracking-tight">${act.title}</h3>
-
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 mt-1.5 font-medium">
-            <div class="flex items-center gap-1 font-mono text-[11px] text-slate-700">
-              <span>🕒</span> <span class="text-slate-500 font-sans font-normal">${act.isTentative ? 'Thời gian dự kiến:' : 'Thời gian chính thức:'}</span> ${timeStr}
-            </div>
+          <div id="milestone-body-${act.id}" class="${expanded ? '' : 'hidden'}">
             ${act.location ? `
-              <div class="flex items-center gap-1 text-[11px] text-slate-600">
+              <div class="flex items-center gap-1 text-[11px] text-slate-600 mt-1.5">
                 <span>📍</span> ${act.location}
               </div>
             ` : ''}
+
+            ${descriptionRender}
+
+            ${act.submissionEnabled && typeof renderStudentSubmissionPanel === 'function' ? renderStudentSubmissionPanel(act, targetRound) : ''}
+
+            ${renderStudentCouncilTimelineInfo(act)}
           </div>
-
-          ${descriptionRender}
-
-          ${act.submissionEnabled && typeof renderStudentSubmissionPanel === 'function' ? renderStudentSubmissionPanel(act, targetRound) : ''}
-
-          ${renderStudentCouncilTimelineInfo(act)}
         </div>
       </div>
     `;
@@ -10692,6 +10746,14 @@ window.loadStudentRoundActivities = async function(roundId) {
       const el = document.getElementById('activity-card-' + targetSlug)
         || document.getElementById('activity-card-' + slugify(targetSlug));
       if (el) {
+        // Deep-linked milestone should be visible: force-expand if collapsed.
+        const actId = el.getAttribute('data-activity-id');
+        if (actId) {
+          const bodyEl = document.getElementById('milestone-body-' + actId);
+          if (bodyEl && bodyEl.classList.contains('hidden')) {
+            window.setMilestoneExpanded(roundId, actId, true);
+          }
+        }
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.classList.add('ring-4', 'ring-amber-400', 'bg-amber-50/70');
         setTimeout(() => {
@@ -12366,7 +12428,7 @@ function renderStudentCouncilTimelineInfo(act) {
             </span>
             <div class="flex items-center justify-between gap-2 pt-1">
               <p class="text-[11px] text-blue-700">📍 Phòng: ${c.room || 'Đang cập nhật'} • 📅 Ngày: ${c.date || '--'} (${c.startTime || '--'} – ${c.endTime || '--'})</p>
-              <button type="button" onclick="openCouncilWorkspace('${targetRound?.id}', '${act.id}', '${c.id}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0">
+              <button type="button" onclick="openCouncilWorkspace('${act.roundId || ''}', '${act.id}', '${c.id}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0">
                 🏛️ Vào phòng Hội đồng & Chấm điểm
               </button>
             </div>
@@ -12377,51 +12439,14 @@ function renderStudentCouncilTimelineInfo(act) {
     }
   }
 
+  // Student-facing council assignment info is intentionally hidden (product decision):
+  // students never see council names, members, or "Chưa phân công" placeholder.
+  // Council members (teachers) still see their own assignment banner to access scoring.
   if (!council) {
-    return `
-      <div class="mt-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs text-slate-600">
-        <span class="font-semibold">⚖️ Hội đồng đánh giá: <span class="text-slate-400 italic">Chưa phân công</span></span>
-        ${act.councils?.length > 0 ? `<span class="text-[10px] text-slate-400">${act.councils.length} Hội đồng</span>` : ''}
-      </div>
-      ${memberBannerHtml}
-    `;
+    return memberBannerHtml;
   }
 
-  let statusCls = 'bg-slate-100 text-slate-700';
-  let statusText = 'Chờ trình bày';
-  if (asgn.presentationStatus === 'presenting') {
-    statusCls = 'bg-emerald-500 text-white font-black animate-pulse';
-    statusText = '● Đang trình bày';
-  } else if (asgn.presentationStatus === 'presented') {
-    statusCls = 'bg-indigo-100 text-indigo-800 font-bold';
-    statusText = '✓ Đã trình bày';
-  }
-
-  const showOrder = act.showPresentationOrderToStudents && asgn.order;
-
-  return `
-    <div class="mt-2.5 p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2 text-xs">
-      <div class="flex items-center justify-between">
-        <span class="font-black text-indigo-950 flex items-center gap-1.5 text-xs sm:text-sm">
-          <span>⚖️</span> HỘI ĐỒNG: ${council.name}
-        </span>
-        <span class="badge ${statusCls} text-[10px]">${statusText}</span>
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-indigo-900 text-[11px]">
-        <div>📍 <strong>Phòng:</strong> ${council.room || 'Đang cập nhật'}</div>
-        <div>📅 <strong>Ngày:</strong> ${council.date || '--'} (${council.startTime || '--'} – ${council.endTime || '--'})</div>
-      </div>
-
-      ${showOrder ? `
-        <div class="pt-1.5 border-t border-indigo-100 flex items-center justify-between text-indigo-900">
-          <span class="font-semibold text-[11px]">Thứ tự trình bày của bạn:</span>
-          <span class="font-black text-xs px-2 py-0.5 bg-white rounded-lg border border-indigo-200">#${asgn.order}</span>
-        </div>
-      ` : ''}
-    </div>
-    ${memberBannerHtml}
-  `;
+  return memberBannerHtml;
 }
 
 
@@ -17220,30 +17245,9 @@ window.validateFilename = function({ filename, template, student, activity, roun
     mode
   });
 
-  const baseActual = parts.join('.');
-  const expectedBase = expectedFilename.replace(new RegExp(`\\.${ext}$`, 'i'), '');
-
-  const isExact = (mode !== 'prefix');
-  if (isExact) {
-    if (baseActual.toLowerCase() !== expectedBase.toLowerCase()) {
-      return {
-        valid: false,
-        error: `Tên tệp không khớp mẫu yêu cầu: "${expectedFilename}"`,
-        expectedFilename,
-        actualFilename: filename
-      };
-    }
-  } else {
-    if (!baseActual.toLowerCase().startsWith(expectedBase.toLowerCase())) {
-      return {
-        valid: false,
-        error: `Tên tệp phải bắt đầu bằng mẫu: "${expectedBase}..."`,
-        expectedFilename,
-        actualFilename: filename
-      };
-    }
-  }
-
+  // Filename template is no longer enforced on the original file name: the upload
+  // flow renames the file to expectedFilename automatically. Students may upload
+  // with any name; validation only checks the extension here.
   return {
     valid: true,
     expectedFilename,
@@ -17784,15 +17788,6 @@ window.renderStudentSubmissionPanel = function(act, round) {
   }
 
   const deadlineStr = rules.effectiveDeadline ? fmtIsoToVietnameseDateTime(rules.effectiveDeadline.toISOString()) : 'Không giới hạn';
-  const expectedFn = generateExpectedFilename({
-    template: cfg.filenameTemplate,
-    student: targetStudent,
-    activity: act,
-    round,
-    fileTypeCategory: cfg.fileTypeCategory,
-    extension: (cfg.acceptedExtensions || ['pdf'])[0] || 'pdf',
-    mode: cfg.filenameMode
-  });
 
   const acceptAttr = (cfg.acceptedExtensions || ['pdf']).map(e => '.' + e.replace(/^\./, '')).join(',');
   const isMultiple = (cfg.maxFiles || 1) > 1;
@@ -17884,14 +17879,8 @@ window.renderStudentSubmissionPanel = function(act, round) {
         </div>
       ` : ''}
 
-      <!-- Expected Filename Rule -->
-      <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-        <span class="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">Tên file yêu cầu:</span>
-        <div class="font-mono text-xs font-bold text-emerald-900 bg-white p-1.5 rounded border border-slate-200 select-all">
-          ${expectedFn}
-        </div>
-        <span class="text-[10px] text-slate-400 block italic">Quy tắc: ${cfg.filenameMode === 'prefix' ? 'Bắt đầu đúng mẫu trên (tiền tố)' : 'Khớp chính xác tên trên'} • Không dấu, viết hoa</span>
-      </div>
+      <!-- Expected filename display intentionally hidden: system auto-normalizes the uploaded
+           file name to the configured template, students can upload with any file name. -->
 
       <!-- Upload Section -->
       ${rules.canSubmit ? `
