@@ -3377,6 +3377,9 @@ window.openCreateRoundModal = async function() {
     createDriveStatusEl.innerHTML = '';
     createDriveStatusEl.classList.add('hidden');
   }
+  const createDriveFoldersInput = document.getElementById('round-drive-subfolder-names');
+  if (createDriveFoldersInput) createDriveFoldersInput.value = '';
+  updateRoundDriveFolderPreview();
 
   switchRoundModalTab('info');
   document.getElementById('modal-round').classList.remove('hidden');
@@ -3478,6 +3481,17 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
       }
     }
   }
+
+  const driveFoldersInput = document.getElementById('round-drive-subfolder-names');
+  if (driveFoldersInput) {
+    const configuredNames = normalizeRoundDriveFolderNames(
+      Array.isArray(r.driveSubfolderNames) && r.driveSubfolderNames.length
+        ? r.driveSubfolderNames
+        : (r.driveFolderStructure || []).map(item => item?.name || item?.folderName)
+    );
+    driveFoldersInput.value = configuredNames.join('\n');
+  }
+  updateRoundDriveFolderPreview();
 
   const pad = n => String(n).padStart(2, '0');
 
@@ -4300,6 +4314,66 @@ window.extractDriveFolderId = function(url) {
   return match ? match[0] : null;
 };
 
+function normalizeRoundDriveFolderNames(value) {
+  const rawNames = Array.isArray(value) ? value : String(value || '').split(/\r?\n/);
+  const seen = new Set();
+  return rawNames
+    .map(name => String(name || '').trim().replace(/\s+/g, ' ').slice(0, 120))
+    .filter(name => {
+      if (!name) return false;
+      const key = name.toLocaleLowerCase('vi');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 20);
+}
+
+window.updateRoundDriveFolderPreview = function() {
+  const input = document.getElementById('round-drive-subfolder-names');
+  const preview = document.getElementById('round-drive-subfolder-preview');
+  const count = document.getElementById('round-drive-subfolder-count');
+  const names = normalizeRoundDriveFolderNames(input?.value || '');
+  if (count) count.textContent = `${names.length} thư mục`;
+  if (preview) {
+    preview.innerHTML = names.length
+      ? names.map(name => `<span class="inline-flex items-center gap-1 px-2 py-1 bg-white border border-blue-200 rounded-lg text-[10px] font-semibold text-blue-900"><span>📁</span>${escapeHtml(name)}</span>`).join('')
+      : '<span class="text-[10px] text-blue-600 italic">Chưa thiết lập thư mục con.</span>';
+  }
+  return names;
+};
+
+async function provisionRoundDriveFolders({ roundId, parentFolderId, folderNames }) {
+  const names = normalizeRoundDriveFolderNames(folderNames);
+  if (!roundId || !parentFolderId || names.length === 0) return [];
+
+  const idToken = state.user ? await state.user.getIdToken() : null;
+  if (!idToken) throw new Error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại để tạo thư mục Drive.');
+
+  const results = [];
+  for (const folderName of names) {
+    const res = await fetch(getGraduationApiBase() + '/api/graduation/drive/get-or-create-folder', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + idToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ parentFolderId, folderName, folderType: 'round_structure', roundId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      throw new Error(`Không thể tạo thư mục "${folderName}": ${data.error || `HTTP ${res.status}`}`);
+    }
+    results.push({
+      name: data.folderName || folderName,
+      folderId: data.folderId,
+      folderUrl: data.folderUrl || `https://drive.google.com/drive/folders/${data.folderId}`,
+      reused: data.reused === true,
+    });
+  }
+  return results;
+}
+
 function getGraduationApiBase() {
   return window.IFA_CONFIG?.graduationApiEndpoint || window.IFA_CONFIG?.driveUploadEndpoint || 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi';
 }
@@ -4720,6 +4794,7 @@ window.saveRound = async function(e) {
   const driveRootFolderId = driveUrl ? window.extractDriveFolderId(driveUrl) : null;
   const driveRootFolderName = driveInput?.dataset?.validatedFolderName || null;
   const driveRootFolderUrl = driveRootFolderId ? (driveInput?.dataset?.validatedFolderUrl || `https://drive.google.com/drive/folders/${driveRootFolderId}`) : null;
+  const driveSubfolderNames = normalizeRoundDriveFolderNames(document.getElementById('round-drive-subfolder-names')?.value || '');
   const isValidated = Boolean(
     driveRootFolderId &&
     driveInput?.dataset?.isValidated === 'true' &&
@@ -4772,11 +4847,16 @@ window.saveRound = async function(e) {
     rootDriveFolderId: driveRootFolderId || null,
     rootDriveFolderUrl: driveRootFolderUrl || null,
     rootDriveFolderName: driveRootFolderName || null,
+    driveSubfolderNames,
+    driveFolderStructure: driveSubfolderNames.length
+      ? (existingRound?.driveFolderStructure || []).filter(item => driveSubfolderNames.includes(item?.name || item?.folderName))
+      : [],
     driveValidation: driveValidation,
     deleted: false,
     updatedAt: serverTimestamp()
   };
 
+  let driveProvisionWarning = '';
   try {
     let savedId = id;
     if (id) {
@@ -4791,6 +4871,37 @@ window.saveRound = async function(e) {
 
     if (!savedId) {
       throw new Error('Không thể xác định mã ID đợt tốt nghiệp');
+    }
+
+    if (driveSubfolderNames.length > 0) {
+      if (!driveRootFolderId || !isValidated) {
+        driveProvisionWarning = 'Đã lưu danh sách thư mục con nhưng chưa tạo trên Drive vì thư mục gốc chưa được xác thực quyền.';
+      } else {
+        try {
+          const driveFolderStructure = await provisionRoundDriveFolders({
+            roundId: savedId,
+            parentFolderId: driveRootFolderId,
+            folderNames: driveSubfolderNames,
+          });
+          payload.driveFolderStructure = driveFolderStructure;
+          payload.driveStructureProvisionedAt = new Date().toISOString();
+          await updateDoc(doc(db, 'graduationRounds', savedId), {
+            driveSubfolderNames,
+            driveFolderStructure,
+            driveStructureProvisionedAt: serverTimestamp(),
+            driveStructureError: null,
+            updatedAt: serverTimestamp(),
+          });
+        } catch (driveErr) {
+          console.warn('[Round Drive] Không thể hoàn tất cấu trúc thư mục:', driveErr);
+          driveProvisionWarning = driveErr.message || 'Không thể tạo đầy đủ cấu trúc thư mục Drive.';
+          await updateDoc(doc(db, 'graduationRounds', savedId), {
+            driveSubfolderNames,
+            driveStructureError: driveProvisionWarning,
+            updatedAt: serverTimestamp(),
+          }).catch(console.warn);
+        }
+      }
     }
 
     // 1. Persist Eligible Students subcollection (strictly syncs additions, removals, and empty state)
@@ -4933,7 +5044,9 @@ window.saveRound = async function(e) {
 
     closeRoundModal();
 
-    if (configStatus === 'incomplete') {
+    if (driveProvisionWarning) {
+      showToast(`Đã lưu đợt "${title}". ${driveProvisionWarning}`, 'warning', 6500);
+    } else if (configStatus === 'incomplete') {
       showToast(`Đã lưu đợt "${title}" (Trạng thái: Chưa hoàn tất cấu hình - cần thêm SV hoặc GVHD trước khi kích hoạt).`, 'warning', 5000);
     } else {
       showToast(`✓ Đã lưu đợt "${title}" thành công (Cấu hình sẵn sàng)!`, 'success');
@@ -20000,6 +20113,15 @@ window.renderAdminRoundsCards = function() {
       const supCount = typeof r.supervisorCount === 'number' ? r.supervisorCount : (r.supervisorsCount || 0);
       const regCount = typeof r.registrationsCount === 'number' ? r.registrationsCount : 0;
       const actCount = typeof r.activitiesCount === 'number' ? r.activitiesCount : (r.activities ? r.activities.length : 0);
+      const assignedCount = typeof r.assignedCount === 'number'
+        ? r.assignedCount
+        : (typeof r.officialAssignmentsCount === 'number' ? r.officialAssignmentsCount : null);
+      const unassignedCount = assignedCount === null ? null : Math.max(eligibleCount - assignedCount, 0);
+      const driveRootId = r.driveRootFolderId || r.rootDriveFolderId || '';
+      const driveRootUrl = r.driveRootFolderUrl || r.rootDriveFolderUrl || (driveRootId ? `https://drive.google.com/drive/folders/${driveRootId}` : '');
+      const driveFoldersCount = Array.isArray(r.driveFolderStructure)
+        ? r.driveFolderStructure.length
+        : normalizeRoundDriveFolderNames(r.driveSubfolderNames || []).length;
 
       let phaseInfo = '';
       if (directAssignment && r.reviewStatus !== 'completed') {
@@ -20019,125 +20141,71 @@ window.renderAdminRoundsCards = function() {
       const isClosed = cat === 'ended';
       const isHidden = cat === 'hidden';
 
-      // Highlight current active round with distinct soft light blue background
-      const cardBgClass = isCurrentActive 
-        ? 'bg-blue-50/70 border-blue-300 hover:border-blue-400 ring-1 ring-blue-200/80 shadow-xs' 
-        : 'bg-white border-slate-200 hover:border-slate-300 shadow-xs';
-
       return `
-        <article class="card-surface p-4 sm:p-5 ${cardBgClass} rounded-2xl hover:shadow-md transition-all space-y-3.5 w-full">
-          
-          <!-- ROW 1: BADGES & SHORTCODE (LEFT) + 4 METRICS BADGES (RIGHT) -->
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-2.5 border-b border-slate-200/60 pb-3">
-            
-            <!-- Badges Left -->
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-200/70 text-slate-700 border border-slate-300/60">
-                ${r.academicYear || 'Đồ án TN'}
-              </span>
-              ${statusBadgeHtml}
-              ${activeBadgeHtml}
-              ${modeBadgeHtml}
-              <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Sao chép liên kết đợt ?x=${shortCode}" class="px-2 py-0.5 rounded text-slate-500 hover:text-blue-600 hover:bg-white transition-colors text-xs flex items-center gap-1 font-mono border border-slate-300/60 bg-white/80 shadow-2xs">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-                </svg>
-                <span>${shortCode}</span>
-              </button>
+        <article class="card-surface rounded-2xl overflow-hidden border ${isCurrentActive ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'} shadow-sm hover:shadow-lg transition-all w-full">
+          <header class="bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white p-5 sm:p-6">
+            <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+              <div class="min-w-0 space-y-2">
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <h3 class="text-xl sm:text-2xl font-black tracking-tight leading-tight">${escapeHtml(r.title || '')}</h3>
+                  <span class="font-mono text-[11px] px-2.5 py-1 rounded-full bg-white/10 text-amber-300 font-bold border border-white/10">NH ${escapeHtml(r.academicYear || '—')}</span>
+                  ${statusBadgeHtml}
+                  ${activeBadgeHtml}
+                </div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-300">
+                  <span class="inline-flex items-center gap-1.5"><span>🗓️</span><span>${timeRangeStr}</span></span>
+                  <span class="inline-flex items-center gap-1.5"><span>📌</span><strong class="text-slate-100">${phaseInfo}</strong></span>
+                  <span class="inline-flex items-center gap-1.5"><span>📁</span><span class="${driveRootUrl ? 'text-emerald-300' : 'text-amber-300'}">${driveRootUrl ? `Drive đã kết nối · ${driveFoldersCount} thư mục con` : 'Chưa cấu hình Drive'}</span></span>
+                  ${modeBadgeHtml}
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 shrink-0">
+                ${driveRootUrl ? `<a href="${escapeHtml(driveRootUrl)}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-sm"><span>↗</span><span>Thư mục Drive</span></a>` : ''}
+                <button type="button" onclick="editRoundModal('${r.id}')" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl transition">✏️ Sửa đợt</button>
+                <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-3 py-2 ${isClosed ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-amber-400 hover:bg-amber-300'} text-slate-950 font-black text-xs rounded-xl transition">${isClosed ? '↺ Mở lại' : 'Kết thúc đợt'}</button>
+                <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-bold text-xs rounded-xl transition">${isHidden ? '👁️ Hiện lại' : 'Lưu trữ'}</button>
+              </div>
             </div>
+          </header>
 
-            <!-- Metrics Right: 1 single row, flex-nowrap, clickable pills -->
-            <div class="flex items-center gap-1 sm:gap-1.5 flex-nowrap shrink-0 overflow-x-auto py-0.5">
-              <button type="button" onclick="editRoundModal('${r.id}', 'eligible')" title="Xem và chỉnh sửa danh sách SV đủ điều kiện" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-xs font-semibold text-slate-600 shadow-2xs transition-colors cursor-pointer whitespace-nowrap">
-                SV: <strong class="text-slate-900 text-sm font-bold">${eligibleCount}</strong>
-              </button>
-              <button type="button" onclick="editRoundModal('${r.id}', 'supervisors')" title="Xem và chỉnh sửa danh sách GVHD của đợt" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-xs font-semibold text-slate-600 shadow-2xs transition-colors cursor-pointer whitespace-nowrap">
-                GVHD: <strong class="text-indigo-700 text-sm font-bold">${supCount}</strong>
-              </button>
-              <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" title="Xem danh sách sinh viên đăng ký" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-xs font-semibold text-slate-600 shadow-2xs transition-colors cursor-pointer whitespace-nowrap">
-                Đăng ký: <strong class="text-emerald-700 text-sm font-bold">${regCount}</strong>
-              </button>
-              <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" title="Xem kế hoạch đợt" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-xs font-semibold text-slate-600 shadow-2xs transition-colors cursor-pointer whitespace-nowrap">
-                Kế hoạch: <strong class="text-blue-700 text-sm font-bold">${actCount}</strong>
-              </button>
-            </div>
-
+          <div class="px-5 py-3 bg-white border-b border-slate-200 flex flex-wrap items-center gap-2">
+            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Mã đợt:</span>
+            <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-xs font-mono font-bold text-slate-700 transition">🔗 ${escapeHtml(shortCode)}</button>
+            <span class="text-[11px] text-slate-400 ml-auto">Bấm các chỉ số để mở khu vực quản lý tương ứng</span>
           </div>
 
-          <!-- ROW 2: PRIMARY WORKFLOW NAVIGATION BUTTONS -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 items-center gap-1.5 sm:gap-2">
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-              <span class="text-blue-600 group-hover:scale-110 transition-transform">📅</span>
-              <span>Kế hoạch</span>
+          <div class="grid grid-cols-2 lg:grid-cols-4 bg-slate-50/80 divide-x divide-y lg:divide-y-0 divide-slate-200 border-b border-slate-200">
+            <button type="button" onclick="editRoundModal('${r.id}', 'eligible')" class="p-4 text-center hover:bg-blue-50 transition group">
+              <div class="text-[10px] font-bold text-slate-400 group-hover:text-blue-700 uppercase tracking-wider">Tổng sinh viên ↗</div>
+              <div class="text-2xl font-black text-slate-950 mt-1">${eligibleCount}</div>
             </button>
-            
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'eligible-students')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-              <span class="text-indigo-600 group-hover:scale-110 transition-transform">🎓</span>
-              <span>SV thực hiện</span>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review', 'assigned')" class="p-4 text-center hover:bg-emerald-50 transition group">
+              <div class="text-[10px] font-bold text-slate-400 group-hover:text-emerald-700 uppercase tracking-wider">Đã phân GVHD ↗</div>
+              <div class="text-2xl font-black text-emerald-600 mt-1">${assignedCount === null ? '—' : assignedCount} ${unassignedCount === null ? '<span class="text-[10px] font-normal text-slate-400">chưa tổng hợp</span>' : `<span class="text-[10px] font-normal text-slate-500">(${unassignedCount} chưa)</span>`}</div>
             </button>
-
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group">
-              <span class="text-emerald-600 group-hover:scale-110 transition-transform">📝</span>
-              <span>Đăng ký</span>
+            <button type="button" onclick="editRoundModal('${r.id}', 'supervisors')" class="p-4 text-center hover:bg-indigo-50 transition group">
+              <div class="text-[10px] font-bold text-slate-400 group-hover:text-indigo-700 uppercase tracking-wider">GVHD tham gia ↗</div>
+              <div class="text-2xl font-black text-indigo-700 mt-1">${supCount}</div>
             </button>
-
-            ${directAssignment ? '' : `<button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group whitespace-nowrap">
-              <span class="text-amber-600 group-hover:scale-110 transition-transform">🎯</span>
-              <span class="whitespace-nowrap">Xét NV</span>
-            </button>`}
-
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review', 'assigned')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-purple-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group whitespace-nowrap">
-              <span class="text-purple-600 group-hover:scale-110 transition-transform">👥</span>
-              <span class="whitespace-nowrap">${directAssignment ? 'Phân công GVHD' : 'KQ phân công'}</span>
-            </button>
-
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 hover:border-rose-400 rounded-xl font-semibold text-xs sm:text-[13px] text-slate-800 flex items-center justify-center gap-1.5 transition-all shadow-2xs group whitespace-nowrap">
-              <span class="text-rose-600 group-hover:scale-110 transition-transform">📊</span>
-              <span class="whitespace-nowrap">Quản lý điểm</span>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="p-4 text-center hover:bg-purple-50 transition group">
+              <div class="text-[10px] font-bold text-slate-400 group-hover:text-purple-700 uppercase tracking-wider">Mốc kế hoạch ↗</div>
+              <div class="text-2xl font-black text-purple-700 mt-1">${actCount}</div>
             </button>
           </div>
 
-          <!-- ROW 3: ROUND TITLE & TIME/STATUS INFO -->
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2 pt-1 border-t border-slate-100">
-            <div>
-              <h3 class="text-xl sm:text-[22px] font-bold text-slate-900 leading-snug hover:text-tdtu-blue transition-colors">
-                ${escapeHtml(r.title || '')}
-              </h3>
-            </div>
-            
-            <div class="flex items-center gap-3 text-xs sm:text-sm text-slate-600 flex-wrap shrink-0">
-              <span class="flex items-center gap-1.5">
-                <span>📅</span>
-                <span class="font-mono text-xs sm:text-sm text-slate-800 font-semibold">${timeRangeStr}</span>
-              </span>
-              <span class="text-slate-300">•</span>
-              <span class="flex items-center gap-1.5">
-                <span>📌</span>
-                <span class="text-xs sm:text-sm font-bold text-slate-800">${phaseInfo}</span>
-              </span>
+          <div class="px-5 py-4 bg-white flex flex-wrap items-center justify-center gap-2">
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-sm">📅 Kế hoạch (${actCount})</button>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'eligible-students')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-sm">🎓 Sinh viên (${eligibleCount})</button>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 transition shadow-sm">📝 Đăng ký (${regCount})</button>
+            ${directAssignment ? '' : `<button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 text-slate-800 transition shadow-sm">🎯 Xét nguyện vọng</button>`}
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review', 'assigned')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-purple-50 hover:border-purple-300 text-slate-800 transition shadow-sm">👥 ${directAssignment ? 'Phân công GVHD' : 'Kết quả phân công'}</button>
+            <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 text-slate-800 transition shadow-sm">📊 Quản lý điểm</button>
+            <div class="w-full border-t border-slate-100 mt-1 pt-3 flex justify-center gap-2 text-xs">
+              <button type="button" onclick="duplicateRoundModal('${r.id}')" class="px-2.5 py-1.5 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg font-semibold transition">📋 Sao chép</button>
+              ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-2.5 py-1.5 text-blue-700 hover:bg-blue-50 rounded-lg font-bold transition">⭐ Đặt hiện hành</button>` : ''}
+              <button type="button" onclick="softDeleteRound('${r.id}')" class="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg font-semibold transition">🗑️ Thùng rác</button>
             </div>
           </div>
-
-          <!-- ROW 4: ADMIN UTILITY ACTIONS -->
-          <div class="pt-3 border-t border-slate-200/60 flex items-center justify-end gap-1 text-xs sm:text-[13px] text-slate-600 flex-wrap">
-            <button type="button" onclick="editRoundModal('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
-              ✏️ Sửa
-            </button>
-            <button type="button" onclick="duplicateRoundModal('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
-              📋 Sao chép
-            </button>
-            <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
-              ${isClosed ? '↺ Mở lại' : '⏹ Kết thúc'}
-            </button>
-            <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-white/80 text-slate-700 font-semibold transition-colors">
-              ${isHidden ? '👁️ Hiện' : '🙈 Ẩn'}
-            </button>
-            ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-2.5 py-1.5 rounded-lg text-blue-700 hover:bg-blue-100/70 font-bold transition-colors">⭐ Đặt hiện hành</button>` : ''}
-            <button type="button" onclick="softDeleteRound('${r.id}')" class="px-2.5 py-1.5 rounded-lg hover:bg-rose-100/70 text-rose-600 font-semibold transition-colors">
-              🗑️ Xóa
-            </button>
-          </div>
-
         </article>
       `;
     }).join('');
@@ -20243,7 +20311,7 @@ window.duplicateRoundModal = async function(roundId) {
   }
 
   // Open create round modal
-  window.openCreateRoundModal();
+  await window.openCreateRoundModal();
 
   // Populate from source
   document.getElementById('modal-round-title').textContent = 'Sao chép Đợt Đồ án Tốt nghiệp';
@@ -20265,6 +20333,14 @@ window.duplicateRoundModal = async function(roundId) {
   }
   if (document.getElementById('round-form-allow-pref-edit')) {
     document.getElementById('round-form-allow-pref-edit').checked = r.allowPreferenceEdit !== false;
+  }
+
+  const folderNamesInput = document.getElementById('round-drive-subfolder-names');
+  if (folderNamesInput) {
+    folderNamesInput.value = normalizeRoundDriveFolderNames(
+      r.driveSubfolderNames || (r.driveFolderStructure || []).map(item => item?.name || item?.folderName)
+    ).join('\n');
+    updateRoundDriveFolderPreview();
   }
 
   showToast('Đã điền thông tin từ đợt gốc. Vui lòng kiểm tra và lưu đợt mới.', 'info');

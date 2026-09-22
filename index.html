@@ -3361,13 +3361,25 @@
                 Mỗi đợt tốt nghiệp chỉ cần <strong>1 Thư mục gốc</strong>. Hệ thống sẽ <strong>tự động tạo &amp; liên kết các thư mục con</strong> (cho Hội đồng, Sơ khảo, Nộp bài...) bên trong thư mục này.<br>
                 💡 <em>Vui lòng chia sẻ thư mục gốc cho tài khoản <strong>tknt.tdtu@gmail.com</strong> với quyền <strong>Người chỉnh sửa (Editor)</strong>.</em>
               </p>
-              <div class="flex gap-2">
-                <input type="text" id="round-drive-folder-url" oninput="onRoundDriveUrlChange()" placeholder="VD: https://drive.google.com/drive/folders/1A2B3C... hoặc Folder ID" class="flex-1 p-2 border border-blue-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
-                <button type="button" id="btn-validate-round-drive" onclick="testDriveFolderUrl('round')" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer">
+              <div class="flex flex-col sm:flex-row gap-2">
+                <input type="text" id="round-drive-folder-url" oninput="onRoundDriveUrlChange()" placeholder="VD: https://drive.google.com/drive/folders/1A2B3C... hoặc Folder ID" class="flex-1 min-w-0 p-2 border border-blue-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <button type="button" id="btn-validate-round-drive" onclick="testDriveFolderUrl('round')" class="w-full sm:w-auto px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center justify-center gap-1.5 cursor-pointer">
                   <span>Kiểm tra quyền Drive</span>
                 </button>
               </div>
               <div id="round-drive-folder-status" class="hidden text-xs font-semibold mt-1"></div>
+              <div class="pt-2 border-t border-blue-200/80 space-y-2">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <label for="round-drive-subfolder-names" class="font-bold text-blue-900 text-xs block">Cấu trúc thư mục con tự động</label>
+                    <p class="text-[11px] text-blue-700 mt-0.5">Nhập mỗi tên thư mục trên một dòng (tối đa 20). Khi lưu Đợt, hệ thống sẽ tạo hoặc dùng lại đúng tên trong Drive gốc.</p>
+                  </div>
+                  <span id="round-drive-subfolder-count" class="shrink-0 text-[10px] font-black bg-white text-blue-700 border border-blue-200 px-2 py-1 rounded-full">0 thư mục</span>
+                </div>
+                <textarea id="round-drive-subfolder-names" rows="4" oninput="updateRoundDriveFolderPreview()" placeholder="01 - Hồ sơ sinh viên&#10;02 - Phân công GVHD&#10;03 - Hội đồng và đánh giá&#10;04 - Bài nộp" class="w-full p-2.5 border border-blue-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none resize-y leading-relaxed"></textarea>
+                <div id="round-drive-subfolder-preview" class="flex flex-wrap gap-1.5"></div>
+                <p class="text-[10px] text-blue-700">Chỉ tạo thư mục trực tiếp bên trong Drive gốc. Tên trùng sẽ được dùng lại, không tạo bản sao. Bỏ tên khỏi danh sách không xóa thư mục đã có trên Drive.</p>
+              </div>
             </div>
 
             <!-- PERMISSIONS CHECKBOXES -->
