@@ -1102,14 +1102,10 @@ export function updateAuthUI() {
       portalNavEl.style.display = hasVisibleNav ? '' : 'none';
     }
 
-    // Toggle header: hide in supervisor and assessment views (hero banners sit directly at top)
+    // Header is always kept visible across all views (student, supervisor, admin, assessment)
     const headerEl = document.querySelector('header');
     if (headerEl) {
-      if (state.currentView === 'supervisor' || state.currentView === 'assessment') {
-        headerEl.classList.add('hidden');
-      } else {
-        headerEl.classList.remove('hidden');
-      }
+      headerEl.classList.remove('hidden');
     }
 
   } else {
@@ -1122,11 +1118,7 @@ export function updateAuthUI() {
 
     const headerEl = document.querySelector('header');
     if (headerEl) {
-      if (state.currentView === 'supervisor' || state.currentView === 'assessment' || getCurrentPortal() === 'supervisor' || getCurrentPortal() === 'assessment') {
-        headerEl.classList.add('hidden');
-      } else {
-        headerEl.classList.remove('hidden');
-      }
+      headerEl.classList.remove('hidden');
     }
   }
 }
@@ -1144,11 +1136,7 @@ window.switchView = async function(targetView) {
 
   const headerEl = document.querySelector('header');
   if (headerEl) {
-    if (targetView === 'supervisor' || targetView === 'assessment') {
-      headerEl.classList.add('hidden');
-    } else {
-      headerEl.classList.remove('hidden');
-    }
+    headerEl.classList.remove('hidden');
   }
 
   const navBtns = {

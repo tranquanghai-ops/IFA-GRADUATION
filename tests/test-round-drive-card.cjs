@@ -77,9 +77,9 @@ test('milestones stay draft until individually published and empty rounds do not
   assert.doesNotMatch(html, /id="activity-form-visibility" checked/);
 });
 
-test('student portal keeps branded header and renders assignment plus resilient countdown', () => {
-  assert.match(app, /if \(targetView === 'supervisor' \|\| targetView === 'assessment'\)/);
-  assert.doesNotMatch(app, /targetView === 'student' \|\| targetView === 'supervisor'/);
+test('all portals keep branded header and render assignment plus resilient countdown', () => {
+  assert.match(app, /headerEl\.classList\.remove\('hidden'\)/);
+  assert.doesNotMatch(app, /headerEl\.classList\.add\('hidden'\)/);
   assert.match(html, /id="round-mode-badge" class="hidden badge/);
   assert.match(app, /normalizeOfficialAssignment\(state\.myOfficialAssignment, state\.myRegistration\)/);
   assert.match(app, /typeof value\.toDate === 'function'/);
