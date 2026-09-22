@@ -46,6 +46,10 @@ body {
 .ifa-login-button { color: #fff; background: #a71930; border: 1px solid #a71930; }
 .ifa-login-button:hover { background: #861528; border-color: #861528; }
 .ifa-portal-nav { border-top: 1px solid #eef2f7; background: #f8fafc; }
+.ifa-portal-nav:empty,
+.ifa-portal-nav:not(:has(.ifa-portal-nav-items > :not(.hidden))) {
+  display: none !important;
+}
 .ifa-portal-nav-items { min-height: 42px; gap: 7px; width: max-content; min-width: 100%; }
 .ifa-portal-nav-items > a, .ifa-portal-nav-items > button { flex: 0 0 auto; background: #fff !important; color: #475569 !important; border-color: #dbe2ea !important; box-shadow: none !important; }
 .ifa-portal-nav-items > a:hover, .ifa-portal-nav-items > button:hover { background: #f6e9ec !important; color: #a71930 !important; border-color: #e9bdc6 !important; }

@@ -183,7 +183,7 @@
 
     <!-- VIEW 1: STUDENT VIEW -->
         <!-- VIEW 1: STUDENT VIEW -->
-    <section id="view-student" class="hidden space-y-6">
+    <section id="view-student" class="hidden space-y-4">
 
       <!-- EMPTY STATE WHEN NO OPEN ROUND -->
       <div id="student-empty-round" class="hidden card-surface p-12 text-center max-w-lg mx-auto my-8 border border-slate-200 shadow-sm rounded-2xl bg-white">
@@ -199,30 +199,30 @@
       </div>
 
       <!-- STUDENT WORKSPACE CONTAINER -->
-      <div id="student-workspace-container" class="space-y-6">
+      <div id="student-workspace-container" class="space-y-4">
 
         <!-- 1. CURRENT ROUND HERO CARD -->
         <div id="student-hero-card" class="card-surface p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl relative overflow-hidden rounded-2xl border border-white/10">
           <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
             <div class="space-y-2 flex-1">
               <div class="flex flex-wrap items-center gap-2">
-                <span id="round-status-badge" class="badge badge-open font-bold">Đang mở đăng ký</span>
+                <span id="round-status-badge" class="hidden badge badge-open font-bold">Đang mở đăng ký</span>
                 <span id="round-mode-badge" class="hidden badge badge-info"></span>
-                <span id="hero-student-state-badge" class="badge bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-400/30">Đủ điều kiện</span>
+                <span id="hero-student-state-badge" class="hidden badge bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-400/30">Đủ điều kiện</span>
               </div>
               <h1 id="round-title-display" class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white leading-snug">
                 Đồ án Tốt nghiệp
               </h1>
               <p id="round-academic-year" class="text-xs sm:text-sm text-blue-200 font-medium">Năm học 2026-2027</p>
-              <p id="round-time-range" class="text-xs text-slate-300 flex items-center gap-1.5 pt-0.5">
+              <p id="round-time-range" class="hidden text-xs text-slate-300 flex items-center gap-1.5 pt-0.5">
                 <span>📅 Thời gian: --</span>
               </p>
 
               <!-- Quick Metrics Bar inside Hero -->
               <div class="flex flex-wrap items-center gap-3 pt-2 text-xs text-blue-100">
-                <!-- Clickable Student Info Pill -->
-                <button type="button" onclick="openStudentProfileModal()" id="hero-student-profile-btn" class="flex items-center gap-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 px-3 py-1.5 rounded-xl border border-white/20 transition-all cursor-pointer shadow-2xs text-left" title="Xem thông tin chi tiết sinh viên">
-                  <img id="hero-student-avatar" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23fff'/><path fill='%23fff' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" class="w-6 h-6 rounded-md object-cover border border-white/30 shrink-0" alt="Avatar">
+                <!-- Student Info Pill hidden as requested (already in header) -->
+                <button type="button" onclick="openStudentProfileModal()" id="hero-student-profile-btn" class="hidden flex items-center gap-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 px-3 py-1.5 rounded-xl border border-white/20 transition-all cursor-pointer shadow-2xs text-left" title="Xem thông tin chi tiết sinh viên">
+                  <img id="hero-student-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23fff'/%3E%3Cpath fill='%23fff' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-6 h-6 rounded-md object-cover border border-white/30 shrink-0" alt="Avatar">
                   <div class="min-w-0">
                     <div class="flex items-center gap-1">
                       <span id="hero-student-name" class="font-bold text-white text-xs truncate">--</span>
@@ -235,22 +235,34 @@
                   <span>📌</span>
                   <span id="hero-milestones-count">-- mốc kế hoạch</span>
                 </div>
-                <div class="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10">
+                <div id="hero-assigned-sup-wrap" class="hidden flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10">
                   <span>👨‍🏫</span>
                   <span id="hero-assigned-sup">GVHD: Chưa phân công</span>
                 </div>
               </div>
             </div>
 
-            <!-- Countdown Widget -->
-            <div class="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-sm flex items-center gap-4 min-w-[240px] shrink-0 self-start lg:self-auto">
-              <div class="w-11 h-11 rounded-xl bg-amber-400 text-slate-900 flex items-center justify-center text-xl font-bold shadow-inner">
-                ⏱️
+            <!-- Supervisor Info Widget (Replaced Countdown / Status Widget) -->
+            <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/20 shadow-sm flex items-center gap-3.5 min-w-[260px] sm:min-w-[290px] max-w-sm shrink-0 self-start lg:self-auto">
+              <img id="hero-sup-card-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-12 h-12 rounded-xl object-cover border border-white/25 shrink-0 bg-white/10 shadow-xs" alt="GVHD Avatar">
+              <div class="min-w-0 flex-1 space-y-0.5">
+                <div class="flex items-center gap-1.5">
+                  <span id="hero-sup-card-role" class="badge bg-amber-400 text-slate-950 font-black text-[10px] px-1.5 py-0.5 uppercase tracking-wide">GVHD</span>
+                  <span id="hero-sup-card-status" class="text-[10px] text-blue-200 font-bold">Chưa phân công</span>
+                </div>
+                <h4 id="hero-sup-card-name" class="text-xs sm:text-sm font-black text-white truncate">Chưa phân công GVHD</h4>
+                <div class="text-[11px] text-blue-100 flex flex-col gap-0.5 pt-0.5">
+                  <a id="hero-sup-card-email-link" href="#" class="hover:underline truncate flex items-center gap-1 text-blue-200" title="Email GVHD">
+                    <span>✉️</span> <span id="hero-sup-card-email">--</span>
+                  </a>
+                  <a id="hero-sup-card-phone-link" href="#" class="hover:underline flex items-center gap-1 text-emerald-300 font-medium" title="Số điện thoại GVHD">
+                    <span>📞</span> <span id="hero-sup-card-phone">--</span>
+                  </a>
+                </div>
               </div>
-              <div>
-                <span id="countdown-label" class="text-[11px] font-semibold text-blue-200 block uppercase tracking-wider">Thời gian còn lại</span>
-                <span id="countdown-value" class="text-base sm:text-lg font-black text-white font-mono tracking-tight pulse-timer">-- ngày --:--:--</span>
-              </div>
+              <!-- Hidden placeholders for countdown to preserve script references without errors -->
+              <span id="countdown-label" class="hidden"></span>
+              <span id="countdown-value" class="hidden"></span>
             </div>
           </div>
 
@@ -262,21 +274,21 @@
           </div>
         </div>
 
-        <!-- 2. STUDENT PROGRESS / JOURNEY (7-STEP STEPPER) -->
+        <!-- 2. STUDENT PROGRESS / JOURNEY (10-STEP STEPPER) -->
         <div id="student-journey-card" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
           <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
             <div class="flex items-center gap-2">
               <span class="text-lg">🗺️</span>
               <div>
                 <h2 class="text-sm font-black text-slate-900 uppercase tracking-wide">Lộ trình Đồ án Tốt nghiệp</h2>
-                <p class="text-[11px] text-slate-500">Quy trình 6 bước từ đăng ký đến công bố kết quả chính thức</p>
+                <p class="text-[11px] text-slate-500">Quy trình 10 bước từ phân công GVHD đến công bố kết quả chính thức</p>
               </div>
             </div>
             <span id="journey-overall-badge" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">Đang tiến hành</span>
           </div>
 
-          <!-- 6 Steps Stepper Container -->
-          <div id="journey-steps-list" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+          <!-- 10 Steps Stepper Container -->
+          <div id="journey-steps-list" class="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2 text-xs">
             <!-- Populated dynamically by updateStudentJourneyStepper() -->
           </div>
         </div>

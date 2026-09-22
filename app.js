@@ -1095,7 +1095,14 @@ export function updateAuthUI() {
       if (btnGotoAssessment) btnGotoAssessment.classList.add('hidden');
     }
 
-    // Toggle header: hide in student, supervisor, and assessment views (hero banners sit directly at top)
+    // Automatically hide portal nav row if empty or all items hidden
+    const portalNavEl = document.querySelector('.ifa-portal-nav');
+    if (portalNavEl) {
+      const hasVisibleNav = Array.from(portalNavigation?.children || []).some(el => !el.classList.contains('hidden') && el.style.display !== 'none');
+      portalNavEl.style.display = hasVisibleNav ? '' : 'none';
+    }
+
+    // Toggle header: hide in supervisor and assessment views (hero banners sit directly at top)
     const headerEl = document.querySelector('header');
     if (headerEl) {
       if (state.currentView === 'supervisor' || state.currentView === 'assessment') {
@@ -1109,6 +1116,9 @@ export function updateAuthUI() {
     userInfoBar.classList.add('hidden');
     userInfoBar.classList.remove('flex');
     btnHeaderLogin.classList.remove('hidden');
+
+    const portalNavEl = document.querySelector('.ifa-portal-nav');
+    if (portalNavEl) portalNavEl.style.display = 'none';
 
     const headerEl = document.querySelector('header');
     if (headerEl) {
@@ -1554,9 +1564,11 @@ function renderRoundHeader() {
     milestonesCountEl.textContent = `${actCount} mốc kế hoạch`;
   }
   const assignedSupEl = document.getElementById('hero-assigned-sup');
+  const effectiveAssignment = normalizeOfficialAssignment(state.myOfficialAssignment, state.myRegistration);
+  const officialList = effectiveAssignment ? getOfficialSupervisors(effectiveAssignment) : [];
+  const hasOfficialSup = officialList.length > 0 || Boolean(effectiveAssignment?.assignedSupervisorId || effectiveAssignment?.officialSupervisor || effectiveAssignment?.acceptedSupervisorName);
+
   if (assignedSupEl) {
-    const effectiveAssignment = normalizeOfficialAssignment(state.myOfficialAssignment, state.myRegistration);
-    const officialList = effectiveAssignment ? getOfficialSupervisors(effectiveAssignment) : [];
     if (officialList.length > 0) {
       const p = officialList.find(s => s.role === 'primary') || officialList[0];
       assignedSupEl.textContent = `GVHD: ${p.supervisorName || effectiveAssignment?.acceptedSupervisorName || 'Đã phân công'}`;
@@ -1566,36 +1578,90 @@ function renderRoundHeader() {
       assignedSupEl.textContent = 'GVHD: Chưa phân công';
     }
   }
-  const studentStateBadge = document.getElementById('hero-student-state-badge');
-  if (studentStateBadge) {
-    if (state.isEligible === true) {
-      studentStateBadge.className = 'badge bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-400/30';
-      studentStateBadge.textContent = 'Đủ điều kiện';
-    } else if (state.isEligible === 'pending') {
-      studentStateBadge.className = 'badge bg-amber-500/20 text-amber-300 font-bold border border-amber-400/30';
-      studentStateBadge.textContent = 'Chờ xác nhận ĐK';
-    } else if (state.isEligible === false) {
-      studentStateBadge.className = 'badge bg-rose-500/20 text-rose-300 font-bold border border-rose-400/30';
-      studentStateBadge.textContent = 'Chưa đủ ĐK';
-    } else {
-      studentStateBadge.className = 'badge bg-white/10 text-white font-mono text-[11px] border border-white/20';
-      studentStateBadge.textContent = 'Sinh viên';
+
+  // Populate Supervisor Info Card in Student Hero
+  const supCardAvatar = document.getElementById('hero-sup-card-avatar');
+  const supCardRole = document.getElementById('hero-sup-card-role');
+  const supCardStatus = document.getElementById('hero-sup-card-status');
+  const supCardName = document.getElementById('hero-sup-card-name');
+  const supCardEmail = document.getElementById('hero-sup-card-email');
+  const supCardEmailLink = document.getElementById('hero-sup-card-email-link');
+  const supCardPhone = document.getElementById('hero-sup-card-phone');
+  const supCardPhoneLink = document.getElementById('hero-sup-card-phone-link');
+
+  if (hasOfficialSup) {
+    const primary = officialList.find(s => s.role === 'primary') || officialList[0] || {};
+    const supId = primary.supervisorId || effectiveAssignment?.assignedSupervisorId || effectiveAssignment?.acceptedSupervisorId;
+    const sup = (state.roundSupervisors || []).find(s => s.id === supId || s.supervisorId === supId)
+      || (state.supervisorsMaster || []).find(s => s.id === supId)
+      || primary;
+
+    const supName = primary.supervisorName || sup?.name || effectiveAssignment?.acceptedSupervisorName || 'Giảng viên Hướng dẫn';
+    const escapedSupName = escapeHtml(supName);
+    const supEmail = sup?.email || primary.email || effectiveAssignment?.supervisorEmail || '';
+    const supPhone = sup?.phone || primary.phone || effectiveAssignment?.supervisorPhone || '';
+    const avatarSrc = (sup?.photoUrl && sup.photoUrl.trim()) ? sup.photoUrl : getSupervisorAvatarSvgDataUri(supName);
+
+    if (supCardAvatar) {
+      supCardAvatar.src = avatarSrc;
+      supCardAvatar.onerror = function() { this.onerror = null; this.src = getSupervisorAvatarSvgDataUri(escapedSupName); };
+      supCardAvatar.alt = escapedSupName;
     }
+    if (supCardRole) supCardRole.textContent = primary.role === 'secondary' ? 'GVHD 2' : 'GVHD';
+    if (supCardStatus) {
+      supCardStatus.textContent = 'Đã phân công';
+      supCardStatus.className = 'text-[10px] text-emerald-300 font-bold';
+    }
+    if (supCardName) {
+      supCardName.textContent = supName;
+      supCardName.title = supName;
+    }
+    if (supCardEmail) supCardEmail.textContent = supEmail || '--';
+    if (supCardEmailLink) {
+      supCardEmailLink.href = supEmail ? `mailto:${supEmail}` : '#';
+      supCardEmailLink.classList.toggle('pointer-events-none', !supEmail);
+    }
+    if (supCardPhone) supCardPhone.textContent = supPhone || '--';
+    if (supCardPhoneLink) {
+      supCardPhoneLink.href = supPhone ? `tel:${supPhone}` : '#';
+      supCardPhoneLink.classList.toggle('pointer-events-none', !supPhone);
+    }
+  } else {
+    const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
+    if (supCardAvatar) {
+      supCardAvatar.src = defaultAvatar;
+      supCardAvatar.alt = 'Chưa phân công';
+    }
+    if (supCardRole) supCardRole.textContent = 'GVHD';
+    if (supCardStatus) {
+      supCardStatus.textContent = 'Chưa phân công';
+      supCardStatus.className = 'text-[10px] text-blue-200 font-bold';
+    }
+    if (supCardName) {
+      supCardName.textContent = 'Chưa phân công GVHD';
+      supCardName.title = 'Chưa phân công GVHD';
+    }
+    if (supCardEmail) supCardEmail.textContent = '--';
+    if (supCardEmailLink) { supCardEmailLink.href = '#'; supCardEmailLink.classList.add('pointer-events-none'); }
+    if (supCardPhone) supCardPhone.textContent = '--';
+    if (supCardPhoneLink) { supCardPhoneLink.href = '#'; supCardPhoneLink.classList.add('pointer-events-none'); }
   }
-  
+
+  // Tinh giản banner sinh viên theo yêu cầu: ẩn các badge và thông tin trùng lặp
+  const studentStateBadge = document.getElementById('hero-student-state-badge');
+  if (studentStateBadge) studentStateBadge.classList.add('hidden');
+
   const statusBadge = document.getElementById('round-status-badge');
-  const statusMap = {
-    draft: { text: 'Bản nháp', cls: 'badge-draft' },
-    upcoming: { text: 'Sắp mở đăng ký', cls: 'badge-upcoming' },
-    open: { text: 'Đang mở đăng ký', cls: 'badge-open' },
-    closed: { text: 'Đã đóng đăng ký', cls: 'badge-closed' },
-    reviewing: { text: 'Đang xét duyệt', cls: 'badge-upcoming' },
-    finalized: { text: 'Đã chốt kết quả', cls: 'badge-open' },
-    published: { text: 'Đã công bố', cls: 'badge-open' }
-  };
-  const st = statusMap[round.status] || { text: round.status, cls: 'badge-draft' };
-  statusBadge.className = `badge ${st.cls}`;
-  statusBadge.textContent = st.text;
+  if (statusBadge) statusBadge.classList.add('hidden');
+
+  const timeRangeEl = document.getElementById('round-time-range');
+  if (timeRangeEl) timeRangeEl.classList.add('hidden');
+
+  const studentProfileBtn = document.getElementById('hero-student-profile-btn');
+  if (studentProfileBtn) studentProfileBtn.classList.add('hidden');
+
+  const assignedSupWrap = document.getElementById('hero-assigned-sup-wrap');
+  if (assignedSupWrap) assignedSupWrap.classList.add('hidden');
 
   const prefCount = round.preferenceCount || 3;
   // Banner bỏ ghi chú 3 nguyện vọng theo yêu cầu
@@ -1604,9 +1670,10 @@ function renderRoundHeader() {
   const fmtDate = d => d ? new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '--';
   const openStr = round.openAtDate ? fmtDate(round.openAtDate) : '--';
   const closeStr = round.closeAtDate ? fmtDate(round.closeAtDate) : '--';
-  document.getElementById('round-time-range').innerHTML = `<span>📅 Thời gian: ${openStr} — ${closeStr}</span>`;
+  if (timeRangeEl) timeRangeEl.innerHTML = `<span>📅 Thời gian: ${openStr} — ${closeStr}</span>`;
 
-  document.getElementById('tray-mode-hint').textContent = `Chọn đủ ${prefCount} nguyện vọng theo thứ tự ưu tiên giảm dần`;
+  const trayHint = document.getElementById('tray-mode-hint');
+  if (trayHint) trayHint.textContent = `Chọn đủ ${prefCount} nguyện vọng theo thứ tự ưu tiên giảm dần`;
 }
 
 function startCountdown() {
@@ -20610,108 +20677,149 @@ window.updateStudentJourneyStepper = function() {
   if (!container) return;
 
   const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
+  const userMssv = mssv || state.userStudentId || (state.user?.email ? state.user.email.split('@')[0] : '');
   const round = state.activeRound;
   const reg = state.myRegistration;
-  const officialList = reg ? getOfficialSupervisors(reg) : [];
-  const hasOfficialSup = officialList.length > 0 || Boolean(reg?.assignedSupervisorId || reg?.officialSupervisor);
-  const directAssignment = isDirectSupervisorAssignment(round);
+  const effectiveAssignment = normalizeOfficialAssignment(state.myOfficialAssignment, reg);
+  const officialList = effectiveAssignment ? getOfficialSupervisors(effectiveAssignment) : [];
+  const hasOfficialSup = (state.myOfficialAssignment?.assignmentStatus === 'published' || state.impersonation || state.isAdmin)
+    ? (officialList.length > 0 || Boolean(effectiveAssignment?.assignedSupervisorId || effectiveAssignment?.officialSupervisor || effectiveAssignment?.acceptedSupervisorName))
+    : (officialList.length > 0 || Boolean(reg?.assignedSupervisorId || reg?.officialSupervisor));
 
-  // 1. Đủ điều kiện
+  const activities = Array.isArray(round?.activities) ? round.activities : [];
+
+  const findAct = (pattern) => activities.find(a => {
+    const text = `${a.title || ''} ${a.name || ''} ${a.activityType || ''} ${a.slug || ''}`.toLowerCase();
+    return pattern.test(text);
+  });
+
+  const getActStepStatus = (act, prevCompleted) => {
+    if (!act) {
+      return prevCompleted ? { status: 'upcoming', label: 'Chờ mở' } : { status: 'upcoming', label: 'Chưa tới' };
+    }
+    const actStatus = (typeof getActivityStatus === 'function') ? getActivityStatus(act) : 'upcoming';
+    let isSubmitted = false;
+    if (typeof getEffectiveSubmissionRules === 'function' && userMssv) {
+      try {
+        const rules = getEffectiveSubmissionRules(userMssv, act, round);
+        if (rules?.currentSubmission && rules.currentSubmission.status === 'submitted') {
+          isSubmitted = true;
+        }
+      } catch (e) {}
+    }
+
+    if (isSubmitted) {
+      return { status: 'completed', label: 'Hoàn tất' };
+    }
+    if (actStatus === 'ongoing') {
+      return { status: 'active', label: 'Đang mở' };
+    }
+    if (actStatus === 'past') {
+      return { status: 'completed', label: 'Đã qua' };
+    }
+    if (prevCompleted) {
+      return { status: 'active', label: 'Chuẩn bị' };
+    }
+    return { status: 'upcoming', label: 'Chưa tới' };
+  };
+
+  // 1. Phân công GVHD
+  // Yêu cầu: khi khoa đã công bố GVHD rồi thì mục này sẽ xanh lên
   let s1Status = 'upcoming';
-  let s1Label = 'Chưa xét';
-  if (state.isEligible === true) {
-    s1Status = 'completed';
-    s1Label = 'Đủ điều kiện';
-  } else if (state.isEligible === 'pending') {
+  let s1Label = 'Chờ phân công';
+  if (hasOfficialSup) {
+    s1Status = 'completed'; // Green
+    s1Label = 'Đã công bố';
+  } else if (round?.status === 'reviewing' || round?.status === 'open' || round?.status === 'finalized') {
     s1Status = 'active';
-    s1Label = 'Chờ xác nhận';
-  } else if (state.isEligible === false && mssv) {
-    s1Status = 'warning';
-    s1Label = 'Không đủ ĐK';
+    s1Label = 'Đang phân công';
   }
 
-  // 2. Đăng ký
+  // 2. Đăng ký đề tài
   let s2Status = 'upcoming';
   let s2Label = 'Chưa đăng ký';
-  if (reg) {
+  const hasTopic = Boolean(reg?.topicTitle || reg?.topic || reg?.proposalTitle || reg?.title || reg?.topicName);
+  if (hasTopic) {
     s2Status = 'completed';
-    s2Label = 'Đã nộp đơn';
-  } else if (round?.status === 'open' && state.isEligible !== false) {
+    s2Label = 'Đã đăng ký';
+  } else if (s1Status === 'completed' || round?.status === 'open') {
     s2Status = 'active';
     s2Label = 'Đang nhận ĐK';
   }
 
-  // 3. Xét nguyện vọng
-  let s3Status = 'upcoming';
-  let s3Label = 'Chưa tới';
-  const isReviewing = round?.status === 'reviewing' || (round?.reviewStatus && round.reviewStatus.startsWith('round_')) || round?.reviewStatus === 'manual_assignment';
-  const isReviewDone = round?.status === 'published' || round?.status === 'finalized' || round?.reviewStatus === 'completed' || hasOfficialSup;
-  if (isReviewDone) {
-    s3Status = 'completed';
-    s3Label = 'Đã hoàn tất';
-  } else if (isReviewing && reg) {
-    s3Status = 'active';
-    s3Label = 'Đang xét duyệt';
+  // 3. Duyệt đợt 1
+  const actDuyet1 = findAct(/(duyệt\s*(đợt)?\s*1|duyet\s*1|review\s*1)/i);
+  const s3 = getActStepStatus(actDuyet1, s2Status === 'completed');
+
+  // 4. Duyệt Đợt 2
+  const actDuyet2 = findAct(/(duyệt\s*(đợt)?\s*2|duyet\s*2|review\s*2)/i);
+  const s4 = getActStepStatus(actDuyet2, s3.status === 'completed');
+
+  // 5. Duyệt Đợt 3
+  const actDuyet3 = findAct(/(duyệt\s*(đợt)?\s*3|duyet\s*3|review\s*3)/i);
+  const s5 = getActStepStatus(actDuyet3, s4.status === 'completed');
+
+  // 6. Kiểm tra đạo văn
+  const actDaoVan = findAct(/(đạo\s*văn|dao\s*van|turnitin|plagiarism)/i);
+  const s6 = getActStepStatus(actDaoVan, s5.status === 'completed');
+
+  // 7. Nộp Thuyết minh
+  const actThuyetMinh = findAct(/(thuyết\s*minh|thuyet\s*minh)/i);
+  const s7 = getActStepStatus(actThuyetMinh, s6.status === 'completed');
+
+  // 8. Nộp Sơ Khảo
+  const actSoKhao = findAct(/(sơ\s*khảo|so\s*khao)/i);
+  const s8 = getActStepStatus(actSoKhao, s7.status === 'completed');
+
+  // 9. Bảo vệ TN
+  const actBaoVe = findAct(/(bảo\s*vệ|bao\s*ve|defense|hội\s*đồng)/i);
+  let s9Status = 'upcoming';
+  let s9Label = 'Chưa tới';
+  const hasDefenseScore = Boolean(reg?.defenseScore || reg?.finalDefenseScore || state.studentDefenseScore);
+  if (hasDefenseScore) {
+    s9Status = 'completed';
+    s9Label = 'Đã bảo vệ';
+  } else if (actBaoVe) {
+    const actBvStatus = (typeof getActivityStatus === 'function') ? getActivityStatus(actBaoVe) : 'upcoming';
+    if (actBvStatus === 'ongoing') {
+      s9Status = 'active';
+      s9Label = 'Đang diễn ra';
+    } else if (actBvStatus === 'past') {
+      s9Status = 'completed';
+      s9Label = 'Đã diễn ra';
+    } else if (s8.status === 'completed') {
+      s9Status = 'active';
+      s9Label = 'Chuẩn bị BV';
+    }
+  } else if (s8.status === 'completed') {
+    s9Status = 'active';
+    s9Label = 'Chuẩn bị BV';
   }
 
-  // 4. Phân công GVHD
-  let s4Status = 'upcoming';
-  let s4Label = 'Chưa tới';
-  if (hasOfficialSup) {
-    s4Status = 'completed';
-    s4Label = 'Đã phân công';
-  } else if ((directAssignment && reg) || isReviewing || round?.status === 'finalized') {
-    s4Status = 'active';
-    s4Label = directAssignment ? 'Chờ Khoa phân công' : 'Đang phân công';
+  // 10. Kết quả
+  let s10Status = 'upcoming';
+  let s10Label = 'Chưa tới';
+  const isResultsPublished = Boolean(round?.publishFinalScoreToStudents || round?.resultsPublished || (round?.status === 'finalized' && hasDefenseScore));
+  if (isResultsPublished) {
+    s10Status = 'completed';
+    s10Label = 'Đã công bố';
+  } else if (s9Status === 'completed' || s9Status === 'active') {
+    s10Status = 'active';
+    s10Label = 'Chờ công bố';
   }
 
-  // 5. Nộp bài
-  let s5Status = 'upcoming';
-  let s5Label = 'Chưa tới';
-  const activities = Array.isArray(round?.activities) ? round.activities : [];
-  const submissionActs = activities.filter(a => a.submissionEnabled);
-  if (hasOfficialSup && submissionActs.length > 0) {
-    s5Status = 'active';
-    s5Label = 'Đang thực hiện';
-  }
-
-  // 6. Bảo vệ
-  let s6Status = 'upcoming';
-  let s6Label = 'Chưa tới';
-  const defenseAct = activities.find(a => a.type === 'defense' || (a.title && a.title.toLowerCase().includes('bảo vệ')));
-  if (defenseAct && new Date() >= new Date(defenseAct.date || defenseAct.startDate || 0)) {
-    s6Status = 'active';
-    s6Label = 'Chuẩn bị / Đang BV';
-  }
-
-  // 7. Kết quả
-  let s7Status = 'upcoming';
-  let s7Label = 'Chưa tới';
-  if (round?.publishFinalScoreToStudents || round?.resultsPublished) {
-    s7Status = 'completed';
-    s7Label = 'Đã công bố';
-  } else if (s6Status === 'active') {
-    s7Status = 'active';
-    s7Label = 'Chờ công bố';
-  }
-
-  const preferenceSteps = [
-    { num: 1, title: '1. Đăng ký', status: s2Status, label: s2Label },
-    { num: 2, title: '2. Xét nguyện vọng', status: s3Status, label: s3Label },
-    { num: 3, title: '3. Phân công GVHD', status: s4Status, label: s4Label },
-    { num: 4, title: '4. Nộp bài', status: s5Status, label: s5Label },
-    { num: 5, title: '5. Bảo vệ', status: s6Status, label: s6Label },
-    { num: 6, title: '6. Kết quả', status: s7Status, label: s7Label }
+  const steps = [
+    { num: 1, title: 'Phân công GVHD', shortTitle: '1. Phân công GVHD', status: s1Status, label: s1Label },
+    { num: 2, title: 'Đăng ký đề tài', shortTitle: '2. Đăng ký đề tài', status: s2Status, label: s2Label },
+    { num: 3, title: 'Duyệt đợt 1', shortTitle: '3. Duyệt đợt 1', status: s3.status, label: s3.label },
+    { num: 4, title: 'Duyệt Đợt 2', shortTitle: '4. Duyệt Đợt 2', status: s4.status, label: s4.label },
+    { num: 5, title: 'Duyệt Đợt 3', shortTitle: '5. Duyệt Đợt 3', status: s5.status, label: s5.label },
+    { num: 6, title: 'Kiểm tra đạo văn', shortTitle: '6. Đạo văn', status: s6.status, label: s6.label },
+    { num: 7, title: 'Nộp Thuyết minh', shortTitle: '7. Thuyết minh', status: s7.status, label: s7.label },
+    { num: 8, title: 'Nộp Sơ Khảo', shortTitle: '8. Sơ Khảo', status: s8.status, label: s8.label },
+    { num: 9, title: 'Bảo vệ TN', shortTitle: '9. Bảo vệ TN', status: s9Status, label: s9Label },
+    { num: 10, title: 'Kết quả', shortTitle: '10. Kết quả', status: s10Status, label: s10Label }
   ];
-  const steps = directAssignment
-    ? [
-        { num: 1, title: '1. Đăng ký', status: s2Status, label: s2Label },
-        { num: 2, title: '2. Phân công GVHD', status: s4Status, label: s4Label },
-        { num: 3, title: '3. Nộp bài', status: s5Status, label: s5Label },
-        { num: 4, title: '4. Bảo vệ', status: s6Status, label: s6Label },
-        { num: 5, title: '5. Kết quả', status: s7Status, label: s7Label }
-      ]
-    : preferenceSteps;
 
   const statusStyles = {
     completed: {
@@ -20743,12 +20851,12 @@ window.updateStudentJourneyStepper = function() {
   container.innerHTML = steps.map(s => {
     const st = statusStyles[s.status] || statusStyles.upcoming;
     return `
-      <div class="p-2.5 sm:p-3 rounded-xl border ${st.border} flex flex-col items-center text-center transition-all">
-        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] mb-1.5 ${st.circle}">
+      <div class="p-2 sm:p-2.5 rounded-xl border ${st.border} flex flex-col items-center text-center transition-all min-w-0">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold mb-1 ${st.circle}">
           ${st.icon || s.num}
         </div>
-        <span class="font-bold text-[11px] text-slate-800 leading-tight mb-1 whitespace-nowrap overflow-hidden text-ellipsis w-full" title="${s.title}">${s.title}</span>
-        <span class="text-[9px] px-1.5 py-0.5 rounded-full border ${st.badge} whitespace-nowrap">${s.label}</span>
+        <span class="font-bold text-[10px] sm:text-[11px] text-slate-800 leading-tight mb-1 whitespace-nowrap overflow-hidden text-ellipsis w-full" title="${s.title}">${s.shortTitle}</span>
+        <span class="text-[9px] px-1 py-0.5 rounded-full border ${st.badge} whitespace-nowrap leading-none">${s.label}</span>
       </div>
     `;
   }).join('');

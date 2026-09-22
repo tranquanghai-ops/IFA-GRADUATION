@@ -6,6 +6,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
 
 test('round form exposes root Drive and configurable child folders', () => {
   assert.match(html, /id="round-drive-folder-url"/);
@@ -93,4 +94,29 @@ test('supervisor portal integrates round selector in banner and hides secondary 
   assert.match(app, /const studentAvatarUrl = st\.photoURL \|\| studentObj\?\.photoURL \|\| studentObj\?\.avatar \|\| defaultAvatar/);
   assert.doesNotMatch(app, /defaultAvatar = 'data:image\/svg\+xml,<svg xmlns="http:/);
 });
+
+test('student hero banner displays supervisor card, collapses header gap, and renders 10-step journey', () => {
+  assert.match(html, /id="hero-supervisor-info-card"/);
+  assert.match(html, /id="hero-sup-card-avatar"/);
+  assert.match(html, /id="hero-sup-card-name"/);
+  assert.match(html, /id="hero-sup-card-email"/);
+  assert.match(html, /id="hero-sup-card-phone"/);
+  assert.match(html, /id="round-status-badge" class="hidden badge/);
+  assert.match(html, /id="hero-student-state-badge" class="hidden badge/);
+  assert.match(html, /id="round-time-range" class="hidden text-xs/);
+  assert.match(html, /id="hero-student-profile-btn" class="hidden flex/);
+  assert.match(css, /\.ifa-portal-nav:empty/);
+  assert.match(html, /grid-cols-2 sm:grid-cols-5 lg:grid-cols-10/);
+  assert.match(app, /title: 'Phân công GVHD'/);
+  assert.match(app, /title: 'Đăng ký đề tài'/);
+  assert.match(app, /title: 'Duyệt đợt 1'/);
+  assert.match(app, /title: 'Duyệt Đợt 2'/);
+  assert.match(app, /title: 'Duyệt Đợt 3'/);
+  assert.match(app, /title: 'Kiểm tra đạo văn'/);
+  assert.match(app, /title: 'Nộp Thuyết minh'/);
+  assert.match(app, /title: 'Nộp Sơ Khảo'/);
+  assert.match(app, /title: 'Bảo vệ TN'/);
+  assert.match(app, /title: 'Kết quả'/);
+});
+
 
