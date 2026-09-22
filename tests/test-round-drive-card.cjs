@@ -63,3 +63,24 @@ test('supervisor cells expose assignment and replacement actions', () => {
   assert.match(html, /id="modal-admin-manual-assign" class="hidden fixed inset-0 z-\[80\]/);
   assert.match(html, /id="modal-add-support-supervisor" class="hidden fixed inset-0 z-\[80\]/);
 });
+
+test('milestones stay draft until individually published and empty rounds do not revive legacy data', () => {
+  assert.match(app, /export function isActivityPublished/);
+  assert.match(app, /publicationStatus: visibility \? 'published' : 'draft'/);
+  assert.match(app, /newAct\.publicationStatus = 'draft'/);
+  assert.match(app, /const willPublish = !isActivityPublished\(act\)/);
+  assert.match(app, /📢 Công bố/);
+  assert.match(app, /filter\(a => \(state\.isAdmin && !state\.impersonation\) \|\| isActivityPublished\(a\)\)/);
+  assert.match(app, /const hasEmbeddedActivities = Array\.isArray\(targetRound\.activities\)/);
+  assert.match(html, /Công bố ngay cho sinh viên/);
+  assert.doesNotMatch(html, /id="activity-form-visibility" checked/);
+});
+
+test('student portal keeps branded header and renders assignment plus resilient countdown', () => {
+  assert.match(app, /if \(targetView === 'supervisor' \|\| targetView === 'assessment'\)/);
+  assert.doesNotMatch(app, /targetView === 'student' \|\| targetView === 'supervisor'/);
+  assert.match(html, /id="round-mode-badge" class="hidden badge/);
+  assert.match(app, /normalizeOfficialAssignment\(state\.myOfficialAssignment, state\.myRegistration\)/);
+  assert.match(app, /typeof value\.toDate === 'function'/);
+  assert.match(app, /round\.closeAtDate \|\| round\.closeAt \|\| round\.endDate \|\| round\.registrationCloseAt/);
+});

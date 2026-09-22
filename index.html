@@ -50,7 +50,7 @@
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
       <div class="flex items-center gap-2.5">
         <span class="px-2 py-0.5 rounded-md bg-black/20 text-slate-950 font-black tracking-wider text-[10px] uppercase border border-black/10 flex items-center gap-1">
-          <span>🎭</span> ĐANG ĐÓNG VAI
+          <span>🎭</span> ĐANG GIẢ LẬP
         </span>
         <div class="leading-tight">
           <span class="font-bold" id="impersonate-banner-name">Nguyễn Văn A</span>
@@ -60,12 +60,12 @@
           <span class="hidden sm:inline-block mx-1.5 text-black/30">•</span>
           <span class="hidden sm:inline-block text-amber-950 font-medium text-[11px]" id="impersonate-banner-round">Đợt tốt nghiệp</span>
           <span class="hidden md:inline-block mx-1.5 text-black/30">•</span>
-          <span class="hidden md:inline-block text-[10px] text-amber-950 font-bold bg-amber-400/50 px-1.5 py-0.5 rounded border border-amber-600/30">⚡ Real Test Actions</span>
+          <span class="hidden md:inline-block text-[10px] text-amber-950 font-bold bg-amber-400/50 px-1.5 py-0.5 rounded border border-amber-600/30">⚡ Toàn quyền thao tác</span>
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <button type="button" onclick="exitImpersonation()" class="px-3 py-1 bg-slate-950 hover:bg-black text-amber-300 font-black rounded-lg shadow-sm border border-amber-400/40 transition-all flex items-center gap-1.5 text-xs cursor-pointer">
-          <span>✕</span> <span>Thoát đóng vai</span>
+          <span>✕</span> <span>Thoát giả lập</span>
         </button>
       </div>
     </div>
@@ -118,8 +118,8 @@
               <span>📝</span> <span class="hidden sm:inline">Đánh giá</span>
             </a>
             <!-- Admin Impersonate Entry Point (v2.6.0-beta.1) -->
-            <button id="btn-open-impersonate" onclick="openAdminImpersonateModal()" type="button" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-300 transition-all shadow-xs cursor-pointer" title="Đóng vai người dùng (Act-As Test Mode)">
-              <span>🎭</span> <span class="hidden sm:inline">Đóng vai</span>
+            <button id="btn-open-impersonate" onclick="openAdminImpersonateModal()" type="button" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-300 transition-all shadow-xs cursor-pointer" title="Giả lập người dùng (Simulation Mode)">
+              <span>🎭</span> <span class="hidden sm:inline">Giả lập</span>
             </button>
             <img id="user-avatar" class="ifa-user-avatar" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%2364748b'/><path fill='%2364748b' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" alt="Ảnh đại diện người dùng">
             <div class="ifa-account-identity">
@@ -207,7 +207,7 @@
             <div class="space-y-2 flex-1">
               <div class="flex flex-wrap items-center gap-2">
                 <span id="round-status-badge" class="badge badge-open font-bold">Đang mở đăng ký</span>
-                <span id="round-mode-badge" class="badge bg-white/15 text-white font-mono text-[11px] border border-white/20">3 Nguyện vọng</span>
+                <span id="round-mode-badge" class="hidden badge badge-info"></span>
                 <span id="hero-student-state-badge" class="badge bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-400/30">Đủ điều kiện</span>
               </div>
               <h1 id="round-title-display" class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white leading-snug">
@@ -4150,8 +4150,9 @@
               <span class="text-[10px] text-amber-700 ml-1 font-normal">(Hiển thị nhãn Dự kiến cho SV và Giảng viên)</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" id="activity-form-visibility" checked class="rounded text-tdtu-blue">
-              <span class="font-bold text-xs">Hiển thị cho sinh viên</span>
+              <input type="checkbox" id="activity-form-visibility" class="rounded text-tdtu-blue">
+              <span class="font-bold text-xs">Công bố ngay cho sinh viên</span>
+              <span class="text-[10px] text-slate-500">(Nếu bỏ chọn, mốc được lưu dưới dạng bản nháp)</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="activity-form-show-expired" checked class="rounded text-tdtu-blue">
@@ -5703,7 +5704,7 @@
         <div class="flex items-center gap-2.5">
           <span class="text-2xl">🎭</span>
           <div>
-            <h4 class="font-black text-sm text-slate-950 uppercase tracking-tight">Đóng vai người dùng (Exact Act-As Test Mode)</h4>
+            <h4 class="font-black text-sm text-slate-950 uppercase tracking-tight">Giả lập người dùng (Simulation Mode)</h4>
             <p class="text-[11px] text-amber-950 font-medium">Kiểm thử giao diện & phân quyền chính xác với đầy đủ quyền thao tác thực tế</p>
           </div>
         </div>
@@ -5721,7 +5722,7 @@
           </div>
           <!-- Filter: Role -->
           <div>
-            <label for="impersonate-filter-role" class="block font-bold text-slate-700 mb-1 text-[11px] uppercase tracking-wider">Vai trò cần đóng vai:</label>
+            <label for="impersonate-filter-role" class="block font-bold text-slate-700 mb-1 text-[11px] uppercase tracking-wider">Vai trò cần giả lập:</label>
             <select id="impersonate-filter-role" onchange="onImpersonateFiltersChange()" class="w-full p-2 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500">
               <option value="all">-- Tất cả vai trò --</option>
               <option value="student">🎓 Sinh viên (Student)</option>
@@ -5744,7 +5745,7 @@
 
         <div class="flex items-center justify-between text-[11px] text-slate-500">
           <span>Tìm thấy: <strong id="impersonate-candidate-count" class="text-slate-900 font-bold">0</strong> người dùng thực tế</span>
-          <span class="text-amber-800 font-bold flex items-center gap-1">⚡ Real Test Actions Enabled</span>
+          <span class="text-amber-800 font-bold flex items-center gap-1">⚡ Toàn quyền thao tác (Real Actions)</span>
         </div>
       </div>
 
@@ -5755,12 +5756,12 @@
 
       <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div class="text-[11px] text-slate-500">
-          💡 Chọn đúng 1 người dùng để đóng vai. Mọi thao tác ghi sẽ được ghi nhận cho đúng tài khoản đó kèm nhật ký kiểm toán (Audit Log).
+          💡 Chọn đúng 1 người dùng để giả lập. Mọi thao tác ghi sẽ được ghi nhận cho đúng tài khoản đó kèm nhật ký kiểm toán (Audit Log).
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <button type="button" onclick="closeAdminImpersonateModal()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer">Hủy</button>
           <button type="button" id="btn-confirm-impersonate" onclick="confirmImpersonateSelectedCandidate()" disabled class="px-5 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-slate-950 font-black rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
-            <span>🎭</span> <span id="btn-confirm-impersonate-text">Bắt đầu đóng vai</span>
+            <span>🎭</span> <span id="btn-confirm-impersonate-text">Bắt đầu giả lập</span>
           </button>
         </div>
       </div>

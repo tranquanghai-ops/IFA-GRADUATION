@@ -1098,7 +1098,7 @@ export function updateAuthUI() {
     // Toggle header: hide in student, supervisor, and assessment views (hero banners sit directly at top)
     const headerEl = document.querySelector('header');
     if (headerEl) {
-      if (state.currentView === 'student' || state.currentView === 'supervisor' || state.currentView === 'assessment') {
+      if (state.currentView === 'supervisor' || state.currentView === 'assessment') {
         headerEl.classList.add('hidden');
       } else {
         headerEl.classList.remove('hidden');
@@ -1112,7 +1112,7 @@ export function updateAuthUI() {
 
     const headerEl = document.querySelector('header');
     if (headerEl) {
-      if (state.currentView === 'student' || getCurrentPortal() === 'student') {
+      if (state.currentView === 'supervisor' || state.currentView === 'assessment' || getCurrentPortal() === 'supervisor' || getCurrentPortal() === 'assessment') {
         headerEl.classList.add('hidden');
       } else {
         headerEl.classList.remove('hidden');
@@ -1134,7 +1134,7 @@ window.switchView = async function(targetView) {
 
   const headerEl = document.querySelector('header');
   if (headerEl) {
-    if (targetView === 'student' || targetView === 'supervisor' || targetView === 'assessment') {
+    if (targetView === 'supervisor' || targetView === 'assessment') {
       headerEl.classList.add('hidden');
     } else {
       headerEl.classList.remove('hidden');
@@ -1208,23 +1208,34 @@ window.switchView = async function(targetView) {
     const regFlow = document.getElementById('registration-flow-container');
     const targetRound = state.activeRound;
 
+    // In simulation mode (or when testing with an active round), keep student workspace fully open
+    if (state.impersonation && targetRound) {
+      if (emptyCard) emptyCard.classList.add('hidden');
+      if (state.selectedRoundId) checkStudentEligibilityAndRegistration(state.selectedRoundId);
+      updateStudentJourneyStepper();
+      updateStudentPersonalSidebar();
+      return;
+    }
+
     if (!targetRound) {
-      // No active round configured
-      if (emptyCard) {
-        emptyCard.innerHTML = `
-          <div class="w-16 h-16 bg-blue-50 text-tdtu-blue rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
-            📋
-          </div>
-          <h3 class="text-lg font-black text-slate-800 mb-2 leading-snug">
-            Hiện tại chưa đến đợt đăng ký<br>Đồ án tốt nghiệp.
-          </h3>
-          <p class="text-xs text-slate-500 leading-relaxed">
-            Bạn vui lòng quay lại sau khi Khoa có thông báo chính thức.
-          </p>
-        `;
-        emptyCard.classList.remove('hidden');
+      // Only show empty state if rounds have actually loaded from Firestore
+      if (state.roundsLoaded) {
+        if (emptyCard) {
+          emptyCard.innerHTML = `
+            <div class="w-16 h-16 bg-blue-50 text-tdtu-blue rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+              📋
+            </div>
+            <h3 class="text-lg font-black text-slate-800 mb-2 leading-snug">
+              Hiện tại chưa đến đợt đăng ký<br>Đồ án tốt nghiệp.
+            </h3>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Bạn vui lòng quay lại sau khi Khoa có thông báo chính thức.
+            </p>
+          `;
+          emptyCard.classList.remove('hidden');
+        }
+        if (regFlow) regFlow.classList.add('hidden');
       }
-      if (regFlow) regFlow.classList.add('hidden');
     } else {
       const now = new Date();
       const isNotYetOpen = targetRound.openAtDate && now < targetRound.openAtDate;
@@ -1360,17 +1371,28 @@ async function loadRounds() {
 
   try {
     const snap = await getDocs(collection(db, 'graduationRounds'));
+    const parseRoundDate = val => {
+      if (!val) return null;
+      if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+      if (typeof val.toDate === 'function') {
+        try { return val.toDate(); } catch (e) {}
+      }
+      if (typeof val === 'number') return new Date(val);
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
     state.rounds = snap.docs.map(d => {
       const data = d.data();
-      const openAtVal = data.openAt || data.startDate || data.registrationOpenAt || null;
-      const closeAtVal = data.closeAt || data.endDate || data.registrationCloseAt || null;
-      const createdAtVal = data.createdAt || null;
+      const openAtVal = data.openAt || data.openAtDate || data.startDate || data.registrationOpenAt || data.registrationOpenAtDate || null;
+      const closeAtVal = data.closeAt || data.closeAtDate || data.endDate || data.registrationCloseAt || data.registrationCloseAtDate || null;
+      const createdAtVal = data.createdAt || data.createdAtDate || null;
       return {
         id: d.id,
         ...data,
-        openAtDate: openAtVal ? (openAtVal.toDate ? openAtVal.toDate() : new Date(openAtVal)) : null,
-        closeAtDate: closeAtVal ? (closeAtVal.toDate ? closeAtVal.toDate() : new Date(closeAtVal)) : null,
-        createdAtDate: createdAtVal ? (createdAtVal.toDate ? createdAtVal.toDate() : new Date(createdAtVal)) : null
+        openAtDate: parseRoundDate(openAtVal),
+        closeAtDate: parseRoundDate(closeAtVal),
+        createdAtDate: parseRoundDate(createdAtVal)
       };
     });
 
@@ -1394,7 +1416,28 @@ async function loadRounds() {
     let targetRound = null;
     if (xCode) {
       // Find round matching shortCode, roundName or id
-      targetRound = state.rounds.find(r => !r.deleted && (r.shortCode === xCode || r.roundName === xCode || r.id === xCode || r.slug === xCode));
+      targetRound = state.rounds.find(r => !r.deleted && (r.shortCode === xCode || r.roundName === xCode || r.id === xCode || r.slug === xCode || r.title === xCode));
+    }
+
+    // Restore exact simulated round after F5
+    const simulationTarget = state.impersonation?.target || null;
+    if (simulationTarget && !targetRound) {
+      const matchId = String(simulationTarget.roundId || '').trim();
+      const matchCode = String(simulationTarget.roundShortCode || simulationTarget.roundTitle || '').trim();
+
+      const simulatedRound = state.rounds.find(r => !r.deleted && (
+        (matchId && (r.id === matchId || r.shortCode === matchId || r.slug === matchId || r.roundName === matchId || r.title === matchId)) ||
+        (matchCode && (r.shortCode === matchCode || r.slug === matchCode || r.roundName === matchCode || r.title === matchCode || r.id === matchCode))
+      ));
+
+      if (simulatedRound) {
+        targetRound = simulatedRound;
+        simulationTarget.roundId = simulatedRound.id;
+        simulationTarget.roundTitle = simulatedRound.title || simulatedRound.roundName || simulatedRound.id;
+        simulationTarget.roundShortCode = simulatedRound.shortCode || simulatedRound.slug || '';
+        simulationTarget.roundAcademicYear = simulatedRound.academicYear || '';
+        try { sessionStorage.setItem('ifa_graduation_impersonation', JSON.stringify(state.impersonation)); } catch (e) {}
+      }
     }
 
     // If no direct link, ONLY use the ACTIVE round
@@ -1402,11 +1445,17 @@ async function loadRounds() {
       targetRound = state.rounds.find(r => !r.deleted && r.isActive === true);
     }
 
+    // Fallback to latest available round if active flag is not set
+    if (!targetRound && state.rounds.length > 0) {
+      targetRound = state.rounds.find(r => !r.deleted) || state.rounds[0];
+    }
+
     state.activeRound = targetRound || null;
     state.selectedRoundId = targetRound ? targetRound.id : null;
 
     if (state.selectedRoundId) {
       await selectRound(state.selectedRoundId);
+      if (state.impersonation) updateAuthUI();
     }
   } catch (e) {
     console.error('[Rounds] Error loading rounds:', e);
@@ -1466,12 +1515,19 @@ export async function selectRound(roundId) {
   state.activeRound = state.rounds.find(r => r.id === roundId) || null;
   if (!state.activeRound) return;
 
+  const emptyCard = document.getElementById('student-empty-round');
+  if (emptyCard) emptyCard.classList.add('hidden');
+
   renderRoundHeader();
   startCountdown();
   
   await loadRoundSupervisors(roundId);
   await checkStudentEligibilityAndRegistration(roundId);
   
+  if (typeof updateStudentPersonalSidebar === 'function') {
+    updateStudentPersonalSidebar();
+  }
+
   if (state.isSupervisor) {
     loadSupervisorReviewData(roundId);
   }
@@ -1490,15 +1546,22 @@ function renderRoundHeader() {
   // Hero Card Quick Metrics
   const milestonesCountEl = document.getElementById('hero-milestones-count');
   if (milestonesCountEl) {
-    const actCount = (round.activities || []).length;
+    const roundActivities = Array.isArray(round.activities) ? round.activities : [];
+    const canSeeDrafts = state.isAdmin && !state.impersonation;
+    const actCount = canSeeDrafts
+      ? roundActivities.length
+      : roundActivities.filter(activity => isActivityPublished(activity)).length;
     milestonesCountEl.textContent = `${actCount} mốc kế hoạch`;
   }
   const assignedSupEl = document.getElementById('hero-assigned-sup');
   if (assignedSupEl) {
-    const officialList = state.myRegistration ? getOfficialSupervisors(state.myRegistration) : [];
+    const effectiveAssignment = normalizeOfficialAssignment(state.myOfficialAssignment, state.myRegistration);
+    const officialList = effectiveAssignment ? getOfficialSupervisors(effectiveAssignment) : [];
     if (officialList.length > 0) {
       const p = officialList.find(s => s.role === 'primary') || officialList[0];
-      assignedSupEl.textContent = `GVHD: ${p.supervisorName}`;
+      assignedSupEl.textContent = `GVHD: ${p.supervisorName || effectiveAssignment?.acceptedSupervisorName || 'Đã phân công'}`;
+    } else if (effectiveAssignment?.acceptedSupervisorName) {
+      assignedSupEl.textContent = `GVHD: ${effectiveAssignment.acceptedSupervisorName}`;
     } else {
       assignedSupEl.textContent = 'GVHD: Chưa phân công';
     }
@@ -1535,37 +1598,57 @@ function renderRoundHeader() {
   statusBadge.textContent = st.text;
 
   const prefCount = round.preferenceCount || 3;
-  document.getElementById('round-mode-badge').textContent = `${prefCount} Nguyện vọng • ${round.selectionMode === 'wizard' ? 'Từng bước (Wizard)' : 'Thẻ (Cards)'}`;
+  // Banner bỏ ghi chú 3 nguyện vọng theo yêu cầu
+  document.getElementById('round-mode-badge')?.classList.add('hidden');
 
   const fmtDate = d => d ? new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '--';
-  document.getElementById('round-time-range').innerHTML = `<span>📅 Thời gian: ${fmtDate(round.openAtDate)} — ${fmtDate(round.closeAtDate)}</span>`;
+  const openStr = round.openAtDate ? fmtDate(round.openAtDate) : '--';
+  const closeStr = round.closeAtDate ? fmtDate(round.closeAtDate) : '--';
+  document.getElementById('round-time-range').innerHTML = `<span>📅 Thời gian: ${openStr} — ${closeStr}</span>`;
 
   document.getElementById('tray-mode-hint').textContent = `Chọn đủ ${prefCount} nguyện vọng theo thứ tự ưu tiên giảm dần`;
 }
 
 function startCountdown() {
   if (countdownInterval) clearInterval(countdownInterval);
+
+  const toMillis = value => {
+    if (!value) return 0;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value.toDate === 'function') {
+      try { return value.toDate().getTime(); } catch (e) {}
+    }
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
   
   const updateTimer = () => {
     const round = state.activeRound;
     if (!round) return;
 
     const now = new Date().getTime();
-    const openTime = round.openAtDate ? round.openAtDate.getTime() : 0;
-    const closeTime = round.closeAtDate ? round.closeAtDate.getTime() : 0;
+    const openTime = toMillis(round.openAtDate || round.openAt || round.startDate || round.registrationOpenAt || round.registrationOpenAtDate);
+    const closeTime = toMillis(round.closeAtDate || round.closeAt || round.endDate || round.registrationCloseAt || round.registrationCloseAtDate);
 
     const valEl = document.getElementById('countdown-value');
     const labelEl = document.getElementById('countdown-label');
+    if (!valEl || !labelEl) return;
 
-    if (now < openTime) {
+    if (openTime && now < openTime) {
       labelEl.textContent = 'MỞ ĐĂNG KÝ SAU';
       valEl.textContent = formatDuration(openTime - now);
-    } else if (now <= closeTime && round.status === 'open') {
+      valEl.classList.add('pulse-timer');
+    } else if (closeTime && now <= closeTime && round.status === 'open') {
       labelEl.textContent = 'THỜI GIAN CÒN LẠI';
       valEl.textContent = formatDuration(closeTime - now);
+      valEl.classList.add('pulse-timer');
+    } else if (closeTime && now > closeTime) {
+      labelEl.textContent = 'TRẠNG THÁI';
+      valEl.textContent = 'ĐÃ HẾT HẠN';
+      valEl.classList.remove('pulse-timer');
     } else {
       labelEl.textContent = 'TRẠNG THÁI';
-      valEl.textContent = round.status === 'published' ? 'ĐÃ CÔNG BỐ KẾT QUẢ' : (round.status === 'reviewing' ? 'ĐANG XÉT DUYỆT' : 'ĐÃ ĐÓNG ĐĂNG KÝ');
+      valEl.textContent = round.status === 'published' ? 'ĐÃ CÔNG BỐ KẾT QUẢ' : (round.status === 'reviewing' ? 'ĐANG XÉT DUYỆT' : (round.status === 'open' ? 'ĐANG MỞ ĐĂNG KÝ' : 'ĐÃ ĐÓNG ĐĂNG KÝ'));
       valEl.classList.remove('pulse-timer');
     }
   };
@@ -1647,12 +1730,22 @@ async function checkStudentEligibilityAndRegistration(roundId) {
     const regDoc = await getDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv));
     try {
       const assignmentDoc = await getDoc(doc(db, 'graduationRounds', roundId, 'officialAssignments', mssv));
-      const assignment = assignmentDoc.exists() ? { id: assignmentDoc.id, ...assignmentDoc.data() } : null;
-      const actor = typeof getEffectiveActor === 'function' ? getEffectiveActor() : null;
-      // Exact Act-as uses the real Admin token, so enforce effective-actor visibility in UI too.
-      if (assignment?.assignmentStatus === 'published' || (!actor?.impersonating && assignment)) {
-        state.myOfficialAssignment = assignment;
+      let assignment = assignmentDoc.exists() ? { id: assignmentDoc.id, ...assignmentDoc.data() } : null;
+
+      // If not found in officialAssignments or not yet published, check assignmentDrafts
+      if (!assignment || assignment.assignmentStatus !== 'published') {
+        try {
+          const draftDoc = await getDoc(doc(db, 'graduationRounds', roundId, 'assignmentDrafts', mssv));
+          if (draftDoc.exists()) {
+            const draftData = { id: draftDoc.id, ...draftDoc.data() };
+            if (!assignment || state.impersonation || state.isAdmin) {
+              assignment = draftData;
+            }
+          }
+        } catch (draftErr) {}
       }
+
+      state.myOfficialAssignment = assignment;
     } catch (assignmentError) {
       // Expected for draft or unrelated assignments under least-privilege Rules.
       state.myOfficialAssignment = null;
@@ -1666,9 +1759,10 @@ async function checkStudentEligibilityAndRegistration(roundId) {
       const reviewStatus = state.activeRound?.reviewStatus;
 
       const publishedSupervisors = getOfficialSupervisors(state.myRegistration);
-      const hasPublishedAssignment = state.myRegistration?.assignmentStatus === 'published' && publishedSupervisors.length > 0;
+      const isSimOrAdmin = Boolean(state.impersonation || state.isAdmin);
+      const hasPublishedAssignment = (state.myRegistration?.assignmentStatus === 'published' || isSimOrAdmin) && publishedSupervisors.length > 0;
 
-      // 1. Only an actually published assignment may be shown as the official result.
+      // 1. Only an actually published assignment (or simulation test) may be shown as the official result.
       if (hasPublishedAssignment) {
         if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
         if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
@@ -1708,7 +1802,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
     } else {
       if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
       if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
-      if (state.myOfficialAssignment?.assignmentStatus === 'published') {
+      if (state.myOfficialAssignment?.assignmentStatus === 'published' || (state.impersonation && state.myOfficialAssignment)) {
         renderStudentOfficialResult(normalizeOfficialAssignment(state.myOfficialAssignment, null));
         if (officialResultCard) officialResultCard.classList.remove('hidden');
       } else if (officialResultCard) {
@@ -9790,6 +9884,12 @@ export const DEFAULT_LETTER_GRADE_SCALE = [
   { id: 'opt_dm',  key: 'D-',  code: 'D-',  label: 'Kém',            numericValue: 4.0,  description: 'Kém' }
 ];
 
+export function isActivityPublished(activity) {
+  if (!activity) return false;
+  if (activity.publicationStatus) return activity.publicationStatus === 'published';
+  return activity.visibility !== false;
+}
+
 export function normalizeActivity(a, roundId, idx = 0) {
   const title = String(a.title || '').trim();
   const slug = String(a.slug || (title ? slugify(title) : '') || ('act-' + (idx + 1))).trim();
@@ -9851,6 +9951,7 @@ export function normalizeActivity(a, roundId, idx = 0) {
     location: a.location || '',
     order: typeof a.order === 'number' ? a.order : (idx + 1),
     visibility: a.visibility !== false,
+    publicationStatus: a.publicationStatus || (a.visibility !== false ? 'published' : 'draft'),
     showAfterExpired: a.showAfterExpired !== false,
     isTentative: Boolean(a.isTentative),
     submissionEnabled: Boolean(a.submissionEnabled),
@@ -9899,14 +10000,17 @@ window.loadAdminRoundActivities = async function(roundId) {
   }
 
   // Load from targetRound.activities or subcollection
-  let list = Array.isArray(targetRound.activities) ? targetRound.activities : [];
-  try {
-    const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'activities'));
-    if (snap && !snap.empty) {
-      list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const hasEmbeddedActivities = Array.isArray(targetRound.activities);
+  let list = hasEmbeddedActivities ? targetRound.activities : [];
+  if (!hasEmbeddedActivities) {
+    try {
+      const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'activities'));
+      if (snap && !snap.empty) {
+        list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+    } catch (e) {
+      // Fallback cleanly to round.activities
     }
-  } catch (e) {
-    // Fallback cleanly to round.activities
   }
 
   // Normalize and sort by order
@@ -9924,21 +10028,19 @@ window.loadAdminRoundActivities = async function(roundId) {
   });
 
   const selAdminRoundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
-
-  if (statsBadge) {
-    statsBadge.textContent = `${normalized.length} mốc (${ongoingCount} đang diễn ra, ${upcomingCount} sắp tới, ${pastCount} đã kết thúc)`;
-  }
+  const countDisplay = (statsBadge && selAdminRoundId === roundId)
+    ? `${normalized.length} mốc (${ongoingCount} đang diễn ra, ${upcomingCount} sắp tới)`
+    : `${normalized.length} mốc`;
+  if (statsBadge) statsBadge.textContent = countDisplay;
 
   if (normalized.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" class="p-10 text-center text-slate-400">
-          <span class="text-2xl block mb-1">📅</span>
-          Đợt "<strong>${targetRound.title}</strong>" chưa có mốc kế hoạch nào.<br>
-          <div class="mt-3 flex items-center justify-center gap-2">
-            <button type="button" onclick="openCopyFromRoundModal()" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs border border-slate-300 transition-colors">
-              📋 Sao chép từ Đợt khác
-            </button>
+        <td colspan="8" class="p-8 text-center text-slate-400">
+          <div class="flex flex-col items-center justify-center gap-2">
+            <span class="text-3xl">🗓️</span>
+            <span class="font-bold text-slate-600 text-sm">Chưa có mốc kế hoạch nào cho đợt này</span>
+            <p class="text-xs text-slate-400 max-w-sm">Hãy nhấn nút "Thêm Mốc Kế hoạch" phía trên để thiết lập lộ trình cho sinh viên và hội đồng.</p>
             <button type="button" onclick="openCreateActivityModal()" class="px-4 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl font-bold text-xs border border-blue-200 transition-colors">
               + Thêm mốc đầu tiên
             </button>
@@ -9966,9 +10068,10 @@ window.loadAdminRoundActivities = async function(roundId) {
         statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm whitespace-nowrap">Kế hoạch</span>';
       }
 
-      const visBadge = act.visibility !== false
-        ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm whitespace-nowrap">👁️ Hiện</span>'
-        : '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200 shadow-sm whitespace-nowrap">🔒 Ẩn</span>';
+      const isPub = isActivityPublished(act);
+      const visBadge = isPub
+        ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm whitespace-nowrap">👁️ Đã công bố</span>'
+        : '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200 shadow-sm whitespace-nowrap">📝 Bản nháp</span>';
 
       const subBadge = act.submissionEnabled
         ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm whitespace-nowrap" title="Chức năng nộp bài (Beta)">📥 Có</span>'
@@ -10038,7 +10141,7 @@ window.loadAdminRoundActivities = async function(roundId) {
               <div class="flex items-center gap-1 mt-0.5">
                 <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="p-1 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded border border-slate-200 shadow-sm transition-colors text-[10px]" title="Sao chép link mốc">🔗</button>
                 <button type="button" onclick="duplicateActivityWithinRound('${act.id}')" class="px-1.5 py-0.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded font-bold text-[9px] border border-amber-200 shadow-sm transition-colors flex items-center gap-1" title="Nhân bản mốc này trong cùng đợt"><span>📋</span><span>Sao chép</span></button>
-                <button type="button" onclick="toggleActivityVisibility('${act.id}')" class="px-1.5 py-0.5 bg-white hover:bg-slate-100 text-slate-600 rounded text-[9px] font-bold border border-slate-200 shadow-sm transition-colors">${act.visibility !== false ? '👁️ Ẩn' : '🔒 Hiện'}</button>
+                <button type="button" onclick="toggleActivityVisibility('${act.id}')" class="px-1.5 py-0.5 bg-white hover:bg-slate-100 text-slate-600 rounded text-[9px] font-bold border border-slate-200 shadow-sm transition-colors">${isActivityPublished(act) ? '🔒 Về bản nháp' : '📢 Công bố'}</button>
                 <div class="w-px h-3 bg-slate-200 mx-0.5"></div>
                 <button type="button" onclick="editActivityModal('${act.id}')" class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded font-bold text-[9px] transition-colors">Sửa</button>
                 <button type="button" onclick="deleteActivity('${act.id}')" class="px-1.5 py-0.5 text-rose-600 hover:bg-rose-50 rounded font-bold text-[9px] transition-colors">Xóa</button>
@@ -10077,7 +10180,7 @@ window.openCreateActivityModal = function() {
   document.getElementById('form-activity').reset();
   document.getElementById('activity-form-id').value = '';
   document.getElementById('activity-form-round-id').value = roundId;
-  document.getElementById('activity-form-visibility').checked = true;
+  document.getElementById('activity-form-visibility').checked = false;
   document.getElementById('activity-form-show-expired').checked = true;
   if (document.getElementById('activity-form-is-tentative')) document.getElementById('activity-form-is-tentative').checked = false;
   document.getElementById('activity-form-submission').checked = false;
@@ -10158,7 +10261,7 @@ window.editActivityModal = function(actId) {
     editor.innerHTML = act.descriptionHtml || escapeHtml(act.description || '');
   }
 
-  document.getElementById('activity-form-visibility').checked = act.visibility !== false;
+  document.getElementById('activity-form-visibility').checked = isActivityPublished(act);
   document.getElementById('activity-form-show-expired').checked = act.showAfterExpired !== false;
   if (document.getElementById('activity-form-is-tentative')) document.getElementById('activity-form-is-tentative').checked = Boolean(act.isTentative);
   const subEnabled = Boolean(act.submissionEnabled);
@@ -10340,6 +10443,8 @@ window.duplicateActivityWithinRound = async function(actId) {
     newAct.createdAt = nowIso;
     newAct.updatedAt = nowIso;
     newAct.isTentative = Boolean(src.isTentative);
+    newAct.publicationStatus = 'draft';
+    newAct.visibility = false;
 
     // EXCLUDE runtime state & submissions/scoring data
     delete newAct.submissions;
@@ -10561,6 +10666,8 @@ window.executeCopyFromRound = async function() {
       newAct.createdAt = nowIso;
       newAct.updatedAt = nowIso;
       newAct.isTentative = Boolean(src.isTentative);
+      newAct.publicationStatus = 'draft';
+      newAct.visibility = false;
 
       // EXCLUDE runtime state and avoid cross-round data pollution
       delete newAct.submissions;
@@ -10751,6 +10858,7 @@ window.saveActivity = async function(e) {
       description: descriptionText,
       descriptionHtml,
       visibility,
+      publicationStatus: visibility ? 'published' : 'draft',
       showAfterExpired,
       isTentative,
       submissionEnabled,
@@ -10866,7 +10974,9 @@ window.toggleActivityVisibility = async function(actId) {
   const act = activities.find(a => a.id === actId);
   if (!act) return;
 
-  act.visibility = (act.visibility === false) ? true : false;
+  const willPublish = !isActivityPublished(act);
+  act.visibility = willPublish;
+  act.publicationStatus = willPublish ? 'published' : 'draft';
 
   try {
     const roundRef = doc(db, 'graduationRounds', roundId);
@@ -10879,7 +10989,7 @@ window.toggleActivityVisibility = async function(actId) {
     if (state.selectedRoundId === roundId) {
       loadStudentRoundActivities(roundId);
     }
-    showToast(act.visibility ? `Đã hiển thị mốc "${act.title}" cho sinh viên.` : `Đã ẩn mốc "${act.title}" đối với sinh viên.`, 'info');
+    showToast(willPublish ? `Đã công bố mốc "${act.title}" cho sinh viên.` : `Đã chuyển mốc "${act.title}" về bản nháp.`, 'info');
   } catch (err) {
     showToast('Lỗi cập nhật: ' + err.message, 'error');
   }
@@ -10977,8 +11087,9 @@ window.loadStudentRoundActivities = async function(roundId) {
     return;
   }
 
-  let list = Array.isArray(targetRound.activities) ? targetRound.activities : [];
-  if (list.length === 0) {
+  const hasEmbeddedActivities = Array.isArray(targetRound.activities);
+  let list = hasEmbeddedActivities ? targetRound.activities : [];
+  if (!hasEmbeddedActivities) {
     try {
       const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'activities'));
       if (snap && !snap.empty) {
@@ -10989,7 +11100,7 @@ window.loadStudentRoundActivities = async function(roundId) {
 
   const visible = list
     .map((a, idx) => normalizeActivity(a, roundId, idx))
-    .filter(a => state.isAdmin || a.visibility !== false)
+    .filter(a => (state.isAdmin && !state.impersonation) || isActivityPublished(a))
     .sort((a, b) => (a.order || 0) - (b.order || 0));
 
   if (visible.length === 0) {
