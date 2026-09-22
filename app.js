@@ -20147,19 +20147,19 @@ window.renderAdminRoundsCards = function() {
             <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Bấm để sao chép liên kết đợt" class="block w-full text-left group mb-3">
               <h3 class="text-lg sm:text-xl xl:text-2xl font-black tracking-tight leading-tight lg:whitespace-nowrap group-hover:text-blue-200 transition-colors">${escapeHtml(r.title || '')}</h3>
             </button>
+            <div class="flex flex-wrap items-center gap-2 mb-2.5">
+              <span class="font-mono text-[11px] px-2.5 py-1 rounded-full bg-white/10 text-amber-300 font-bold border border-white/10">NH ${escapeHtml(r.academicYear || '—')}</span>
+              ${statusBadgeHtml}
+              <span class="inline-flex items-center gap-2 whitespace-nowrap">
+                ${activeBadgeHtml}
+                ${modeBadgeHtml}
+              </span>
+            </div>
             <div class="flex flex-col xl:flex-row xl:items-end justify-between gap-3">
-              <div class="min-w-0 space-y-2">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="font-mono text-[11px] px-2.5 py-1 rounded-full bg-white/10 text-amber-300 font-bold border border-white/10">NH ${escapeHtml(r.academicYear || '—')}</span>
-                  ${statusBadgeHtml}
-                  ${activeBadgeHtml}
-                  ${modeBadgeHtml}
-                </div>
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
-                  <span class="inline-flex items-center gap-1.5"><span>🗓️</span><span>${timeRangeStr}</span></span>
-                  <span class="inline-flex items-center gap-1.5"><span>📌</span><strong class="text-slate-100">${phaseInfo}</strong></span>
-                  <span class="inline-flex items-center gap-1.5"><span>📁</span><span class="${driveRootUrl ? 'text-emerald-300' : 'text-amber-300'}">${driveRootUrl ? `Drive đã kết nối · ${driveFoldersCount} thư mục con` : 'Chưa cấu hình Drive'}</span></span>
-                </div>
+              <div class="min-w-0 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
+                <span class="inline-flex items-center gap-1.5"><span>🗓️</span><span>${timeRangeStr}</span></span>
+                <span class="inline-flex items-center gap-1.5"><span>📌</span><strong class="text-slate-100">${phaseInfo}</strong></span>
+                <span class="inline-flex items-center gap-1.5"><span>📁</span><span class="${driveRootUrl ? 'text-emerald-300' : 'text-amber-300'}">${driveRootUrl ? `Drive đã kết nối · ${driveFoldersCount} thư mục con` : 'Chưa cấu hình Drive'}</span></span>
               </div>
               <div class="flex flex-wrap items-center gap-2 shrink-0">
                 ${driveRootUrl ? `<a href="${escapeHtml(driveRootUrl)}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-sm"><span>↗</span><span>Thư mục Drive</span></a>` : ''}

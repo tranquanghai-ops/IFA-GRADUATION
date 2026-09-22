@@ -33,6 +33,7 @@ test('round cards use the professional dashboard layout and retain workflow acti
   assert.match(app, /GVHD tham gia ↗/);
   assert.match(app, /copyRoundLink\('\$\{r\.id\}', '\$\{shortCode\}'\)/);
   assert.match(app, /lg:whitespace-nowrap/);
+  assert.match(app, /inline-flex items-center gap-2 whitespace-nowrap[^]*\$\{activeBadgeHtml\}[^]*\$\{modeBadgeHtml\}/);
   assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'timeline'\)/);
   assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'eligible-students'\)/);
   assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'registrations'\)/);
@@ -56,4 +57,7 @@ test('supervisor cells expose assignment and replacement actions', () => {
   const editModalSource = app.match(/window\.openAdminEditSupervisorModal = function[\s\S]+?\n};/)?.[0] || '';
   assert.match(editModalSource, /if \(!row \|\| !reg\)/);
   assert.doesNotMatch(editModalSource, /!row\.isAssigned/);
+  assert.match(html, /id="modal-admin-edit-supervisor" class="hidden fixed inset-0 z-\[80\]/);
+  assert.match(html, /id="modal-admin-manual-assign" class="hidden fixed inset-0 z-\[80\]/);
+  assert.match(html, /id="modal-add-support-supervisor" class="hidden fixed inset-0 z-\[80\]/);
 });
