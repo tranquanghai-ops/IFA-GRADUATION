@@ -303,21 +303,33 @@
         </div>
 
         <!-- 2B. 12-WEEK DATN TIMELINE PROGRESS -->
-        <div id="student-timeline-weeks-card" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <div class="flex items-center gap-2">
-              <span class="text-lg">🗓️</span>
+        <div id="student-timeline-weeks-card" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2.5">
+              <span class="text-2xl p-2 rounded-xl bg-blue-50 border border-blue-100 text-blue-700">🗓️</span>
               <div>
                 <h2 class="text-sm font-black text-slate-900 uppercase tracking-wide">Tiến độ 12 tuần thực hiện Đồ án Tốt nghiệp</h2>
                 <p id="timeline-weeks-dates-range" class="text-[11px] text-slate-500">Kế hoạch 12 tuần chính thức</p>
               </div>
             </div>
-            <span id="timeline-weeks-current-badge" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-              Đang diễn ra
-            </span>
+            <div class="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+              <span id="timeline-weeks-current-badge" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                Đang diễn ra
+              </span>
+              <!-- Navigation Controls: 4 weeks per row -->
+              <div class="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 ml-auto sm:ml-0 shadow-2xs">
+                <button type="button" id="timeline-weeks-prev-btn" onclick="prevTimelineWeeksPage()" class="p-1 rounded-lg hover:bg-white text-slate-700 hover:text-slate-900 transition disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs" title="4 tuần trước">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <span id="timeline-weeks-page-indicator" class="text-[11px] font-black px-2 text-slate-700 select-none min-w-[85px] text-center">Tuần 1 - 4</span>
+                <button type="button" id="timeline-weeks-next-btn" onclick="nextTimelineWeeksPage()" class="p-1 rounded-lg hover:bg-white text-slate-700 hover:text-slate-900 transition disabled:opacity-30 disabled:cursor-not-allowed shadow-2xs" title="4 tuần kế tiếp">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                </button>
+              </div>
+            </div>
           </div>
-          <div id="timeline-weeks-grid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-2 text-xs">
-            <!-- Populated dynamically by renderStudentTimelineWeeks() -->
+          <div id="timeline-weeks-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            <!-- Populated dynamically by renderStudentTimelineWeeks() (4 weeks per view) -->
           </div>
         </div>
 

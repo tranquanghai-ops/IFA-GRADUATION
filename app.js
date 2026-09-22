@@ -20954,6 +20954,25 @@ window.onRoundStartDateChanged = function(val) {
   }
 };
 
+window.prevTimelineWeeksPage = function() {
+  if (typeof state.timelineWeeksPage !== 'number') state.timelineWeeksPage = 0;
+  if (state.timelineWeeksPage > 0) {
+    state.timelineWeeksPage--;
+    renderStudentTimelineWeeks();
+  }
+};
+
+window.nextTimelineWeeksPage = function() {
+  const round = state.activeRound || (state.rounds || []).find(r => r.id === state.selectedRoundId) || (state.rounds || [])[0];
+  const durationWeeks = parseInt(round?.durationWeeks, 10) || 12;
+  const maxPage = Math.max(0, Math.ceil(durationWeeks / 4) - 1);
+  if (typeof state.timelineWeeksPage !== 'number') state.timelineWeeksPage = 0;
+  if (state.timelineWeeksPage < maxPage) {
+    state.timelineWeeksPage++;
+    renderStudentTimelineWeeks();
+  }
+};
+
 window.renderStudentTimelineWeeks = function() {
   const container = document.getElementById('timeline-weeks-grid');
   const rangeEl = document.getElementById('timeline-weeks-dates-range');
@@ -21041,12 +21060,53 @@ window.renderStudentTimelineWeeks = function() {
     }
   }
 
+  // 4-week pagination management
+  const pageSize = 4;
+  const maxPage = Math.max(0, Math.ceil(durationWeeks / pageSize) - 1);
+
+  if (state.timelineWeeksRoundId !== round?.id) {
+    state.timelineWeeksRoundId = round?.id;
+    state.timelineWeeksPage = null;
+  }
+
+  if (typeof state.timelineWeeksPage !== 'number') {
+    if (currentWeekNum) {
+      state.timelineWeeksPage = Math.floor((currentWeekNum - 1) / pageSize);
+    } else {
+      state.timelineWeeksPage = 0;
+    }
+  }
+  state.timelineWeeksPage = Math.max(0, Math.min(maxPage, state.timelineWeeksPage));
+
+  const pageStartIndex = state.timelineWeeksPage * pageSize;
+  const visibleWeeks = weeks.slice(pageStartIndex, pageStartIndex + pageSize);
+
+  // Update navigation controls
+  const prevBtn = document.getElementById('timeline-weeks-prev-btn');
+  const nextBtn = document.getElementById('timeline-weeks-next-btn');
+  const pageIndicator = document.getElementById('timeline-weeks-page-indicator');
+
+  if (prevBtn) prevBtn.disabled = (state.timelineWeeksPage <= 0);
+  if (nextBtn) nextBtn.disabled = (state.timelineWeeksPage >= maxPage);
+  if (pageIndicator && visibleWeeks.length > 0) {
+    const startW = visibleWeeks[0].num;
+    const endW = visibleWeeks[visibleWeeks.length - 1].num;
+    pageIndicator.textContent = `Tuần ${startW} - ${endW} / ${durationWeeks}`;
+  }
+
+  // Milestone labels for key review weeks
+  const weekMilestones = {
+    4: 'Duyệt đợt 1',
+    8: 'Duyệt đợt 2',
+    12: 'Duyệt đợt 3'
+  };
+
   // Render weekly items
   const styles = {
     completed: {
       card: 'bg-emerald-50/60 border-emerald-200 text-emerald-900',
       circle: 'bg-emerald-600 text-white font-black shadow-xs',
-      badge: 'bg-emerald-100/70 text-emerald-800 border-emerald-200',
+      badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
       icon: '✓',
       label: 'Hoàn thành'
     },
@@ -21058,7 +21118,7 @@ window.renderStudentTimelineWeeks = function() {
       label: 'Đang diễn ra'
     },
     upcoming: {
-      card: 'bg-slate-50/70 border-slate-200 text-slate-700',
+      card: 'bg-slate-50/80 border-slate-200 text-slate-700',
       circle: 'bg-slate-200 text-slate-600 font-bold',
       badge: 'bg-slate-100 text-slate-500 border-slate-200',
       icon: '',
@@ -21066,16 +21126,39 @@ window.renderStudentTimelineWeeks = function() {
     }
   };
 
-  container.innerHTML = weeks.map(w => {
+  container.innerHTML = visibleWeeks.map(w => {
     const st = styles[w.status] || styles.upcoming;
+    const milestoneTitle = weekMilestones[w.num];
+    let milestoneHtml = '';
+    if (milestoneTitle) {
+      milestoneHtml = `
+        <div class="mt-2.5 pt-2 border-t border-slate-200/80 w-full flex items-center justify-center">
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-500 text-white font-black text-[10px] tracking-wide shadow-2xs uppercase">
+            <span>🚩</span> <span>${milestoneTitle}</span>
+          </span>
+        </div>
+      `;
+    } else {
+      milestoneHtml = `
+        <div class="mt-2.5 pt-2 border-t border-transparent w-full flex items-center justify-center">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-slate-400 font-medium text-[10px] opacity-70">
+            <span>•</span> <span>Thực hiện ĐATN</span>
+          </span>
+        </div>
+      `;
+    }
+
     return `
-      <div class="p-2 sm:p-2.5 rounded-xl border ${st.card} flex flex-col items-center text-center transition-all min-w-0">
-        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold mb-1 ${st.circle}">
+      <div class="p-3.5 sm:p-4 rounded-2xl border ${st.card} flex flex-col items-center text-center transition-all min-w-0 shadow-xs relative overflow-hidden">
+        <div class="flex items-center justify-between w-full mb-1">
+          <span class="font-black text-xs sm:text-sm text-slate-900">Tuần ${w.num}</span>
+          <span class="text-[9px] px-2 py-0.5 rounded-full border ${st.badge} whitespace-nowrap font-bold leading-none">${st.label}</span>
+        </div>
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black my-1.5 ${st.circle}">
           ${st.icon || w.num}
         </div>
-        <span class="font-bold text-[11px] sm:text-xs leading-tight mb-0.5 whitespace-nowrap">Tuần ${w.num}</span>
-        <span class="text-[10px] text-slate-500 mb-1 leading-none font-mono">${w.dateText}</span>
-        <span class="text-[9px] px-1.5 py-0.5 rounded-full border ${st.badge} whitespace-nowrap font-semibold leading-none">${st.label}</span>
+        <span class="text-[11px] text-slate-500 font-mono font-medium">${w.dateText}</span>
+        ${milestoneHtml}
       </div>
     `;
   }).join('');

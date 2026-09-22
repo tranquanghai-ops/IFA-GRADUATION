@@ -143,9 +143,17 @@ test('student hero banner displays topic, supervisor card is widened, redundant 
   assert.match(html, /id="round-form-start-date"/);
   assert.match(html, /id="round-form-duration-weeks"/);
 
-  // 5. 12-week timeline JS logic
+  // 5. 12-week timeline JS logic, 4-week pagination & review milestones
+  assert.match(html, /id="timeline-weeks-prev-btn"/);
+  assert.match(html, /id="timeline-weeks-next-btn"/);
+  assert.match(html, /id="timeline-weeks-page-indicator"/);
+  assert.match(app, /window\.prevTimelineWeeksPage = function/);
+  assert.match(app, /window\.nextTimelineWeeksPage = function/);
   assert.match(app, /window\.onRoundStartDateChanged = function/);
   assert.match(app, /window\.renderStudentTimelineWeeks = function/);
   assert.match(app, /durationWeeks = parseInt\(round\?\.durationWeeks, 10\) \|\| 12/);
   assert.match(app, /timeline-weeks-grid/);
+  assert.match(app, /4:\s*'Duyệt đợt 1'/);
+  assert.match(app, /8:\s*'Duyệt đợt 2'/);
+  assert.match(app, /12:\s*'Duyệt đợt 3'/);
 });
