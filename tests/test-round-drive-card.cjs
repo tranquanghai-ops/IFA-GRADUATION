@@ -147,8 +147,8 @@ test('student hero banner displays topic, supervisor card is widened, redundant 
   assert.match(html, /id="timeline-weeks-prev-btn"/);
   assert.match(html, /id="timeline-weeks-next-btn"/);
   assert.match(html, /id="timeline-weeks-page-indicator"/);
-  assert.match(app, /window\.prevTimelineWeeksPage = function/);
-  assert.match(app, /window\.nextTimelineWeeksPage = function/);
+  assert.match(app, /window\.prevTimelineWeek = function/);
+  assert.match(app, /window\.nextTimelineWeek = function/);
   assert.match(app, /window\.onRoundStartDateChanged = function/);
   assert.match(app, /window\.renderStudentTimelineWeeks = function/);
   assert.match(app, /durationWeeks = parseInt\(round\?\.durationWeeks, 10\) \|\| 12/);

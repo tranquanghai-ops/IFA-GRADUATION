@@ -20954,24 +20954,28 @@ window.onRoundStartDateChanged = function(val) {
   }
 };
 
-window.prevTimelineWeeksPage = function() {
-  if (typeof state.timelineWeeksPage !== 'number') state.timelineWeeksPage = 0;
-  if (state.timelineWeeksPage > 0) {
-    state.timelineWeeksPage--;
+window.prevTimelineWeek = function() {
+  if (typeof state.timelineWeeksStartIndex !== 'number') state.timelineWeeksStartIndex = 0;
+  if (state.timelineWeeksStartIndex > 0) {
+    state.timelineWeeksStartIndex--;
     renderStudentTimelineWeeks();
   }
 };
 
-window.nextTimelineWeeksPage = function() {
+window.nextTimelineWeek = function() {
   const round = state.activeRound || (state.rounds || []).find(r => r.id === state.selectedRoundId) || (state.rounds || [])[0];
   const durationWeeks = parseInt(round?.durationWeeks, 10) || 12;
-  const maxPage = Math.max(0, Math.ceil(durationWeeks / 4) - 1);
-  if (typeof state.timelineWeeksPage !== 'number') state.timelineWeeksPage = 0;
-  if (state.timelineWeeksPage < maxPage) {
-    state.timelineWeeksPage++;
+  const maxStartIndex = Math.max(0, durationWeeks - 4);
+  if (typeof state.timelineWeeksStartIndex !== 'number') state.timelineWeeksStartIndex = 0;
+  if (state.timelineWeeksStartIndex < maxStartIndex) {
+    state.timelineWeeksStartIndex++;
     renderStudentTimelineWeeks();
   }
 };
+
+// Aliases for compatibility
+window.prevTimelineWeeksPage = window.prevTimelineWeek;
+window.nextTimelineWeeksPage = window.nextTimelineWeek;
 
 window.renderStudentTimelineWeeks = function() {
   const container = document.getElementById('timeline-weeks-grid');
@@ -21060,34 +21064,48 @@ window.renderStudentTimelineWeeks = function() {
     }
   }
 
-  // 4-week pagination management
+  // 4-week window sliding 1 week at a time
   const pageSize = 4;
-  const maxPage = Math.max(0, Math.ceil(durationWeeks / pageSize) - 1);
+  const maxStartIndex = Math.max(0, durationWeeks - pageSize);
 
   if (state.timelineWeeksRoundId !== round?.id) {
     state.timelineWeeksRoundId = round?.id;
-    state.timelineWeeksPage = null;
+    state.timelineWeeksStartIndex = null;
   }
 
-  if (typeof state.timelineWeeksPage !== 'number') {
+  if (typeof state.timelineWeeksStartIndex !== 'number') {
     if (currentWeekNum) {
-      state.timelineWeeksPage = Math.floor((currentWeekNum - 1) / pageSize);
+      const idealStart = currentWeekNum - 1;
+      state.timelineWeeksStartIndex = Math.max(0, Math.min(maxStartIndex, idealStart));
     } else {
-      state.timelineWeeksPage = 0;
+      state.timelineWeeksStartIndex = 0;
     }
   }
-  state.timelineWeeksPage = Math.max(0, Math.min(maxPage, state.timelineWeeksPage));
+  state.timelineWeeksStartIndex = Math.max(0, Math.min(maxStartIndex, state.timelineWeeksStartIndex));
 
-  const pageStartIndex = state.timelineWeeksPage * pageSize;
-  const visibleWeeks = weeks.slice(pageStartIndex, pageStartIndex + pageSize);
+  const visibleWeeks = weeks.slice(state.timelineWeeksStartIndex, state.timelineWeeksStartIndex + pageSize);
 
-  // Update navigation controls
+  // Update navigation controls (Side arrows: left & right)
   const prevBtn = document.getElementById('timeline-weeks-prev-btn');
   const nextBtn = document.getElementById('timeline-weeks-next-btn');
   const pageIndicator = document.getElementById('timeline-weeks-page-indicator');
 
-  if (prevBtn) prevBtn.disabled = (state.timelineWeeksPage <= 0);
-  if (nextBtn) nextBtn.disabled = (state.timelineWeeksPage >= maxPage);
+  if (prevBtn) {
+    if (state.timelineWeeksStartIndex <= 0) {
+      prevBtn.classList.add('hidden');
+    } else {
+      prevBtn.classList.remove('hidden');
+    }
+  }
+
+  if (nextBtn) {
+    if (state.timelineWeeksStartIndex >= maxStartIndex) {
+      nextBtn.classList.add('hidden');
+    } else {
+      nextBtn.classList.remove('hidden');
+    }
+  }
+
   if (pageIndicator && visibleWeeks.length > 0) {
     const startW = visibleWeeks[0].num;
     const endW = visibleWeeks[visibleWeeks.length - 1].num;
