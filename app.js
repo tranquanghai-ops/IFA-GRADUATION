@@ -1662,6 +1662,32 @@ function renderRoundHeader() {
 
   const trayHint = document.getElementById('tray-mode-hint');
   if (trayHint) trayHint.textContent = `Chọn đủ ${prefCount} nguyện vọng theo thứ tự ưu tiên giảm dần`;
+
+  // Đưa tên đề tài SV đăng ký lên hero banner khi sinh viên đã đăng ký tên đề tài
+  const topicWrap = document.getElementById('hero-registered-topic-wrap');
+  const topicNameEl = document.getElementById('hero-registered-topic-name');
+  const topicMetaEl = document.getElementById('hero-registered-topic-meta');
+  const reg = state.myRegistration;
+  const registeredTopic = reg?.topicTitle || reg?.topic || reg?.proposalTitle || reg?.title || reg?.topicName;
+
+  if (topicWrap) {
+    if (registeredTopic) {
+      topicWrap.classList.remove('hidden');
+      if (topicNameEl) topicNameEl.textContent = registeredTopic;
+      if (topicMetaEl) {
+        const typeStr = reg?.projectType ? `🏷️ Loại hình: ${reg.projectType}` : '';
+        const timeStr = reg?.submittedAt ? `🕒 Đã đăng ký: ${fmtDate(reg.submittedAt)}` : '';
+        topicMetaEl.innerHTML = [typeStr, timeStr].filter(Boolean).map(s => `<span>${s}</span>`).join('<span class="text-white/30">•</span>');
+      }
+    } else {
+      topicWrap.classList.add('hidden');
+    }
+  }
+
+  // Render thanh tiến độ 12 tuần thực hiện ĐATN
+  if (typeof renderStudentTimelineWeeks === 'function') {
+    renderStudentTimelineWeeks();
+  }
 }
 
 function startCountdown() {
@@ -1822,7 +1848,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
         if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
         if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
         renderStudentOfficialResult(state.myRegistration);
-        if (officialResultCard) officialResultCard.classList.remove('hidden');
+        if (officialResultCard) officialResultCard.classList.add('hidden');
         renderStudentFinalScoreCard(mssv, state.activeRound);
         updateStudentJourneyStepper();
         updateStudentPersonalSidebar();
@@ -1859,7 +1885,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
       if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
       if (state.myOfficialAssignment?.assignmentStatus === 'published' || (state.impersonation && state.myOfficialAssignment)) {
         renderStudentOfficialResult(normalizeOfficialAssignment(state.myOfficialAssignment, null));
-        if (officialResultCard) officialResultCard.classList.remove('hidden');
+        if (officialResultCard) officialResultCard.classList.add('hidden');
       } else if (officialResultCard) {
         officialResultCard.classList.add('hidden');
       }
@@ -3501,6 +3527,20 @@ window.openCreateRoundModal = async function() {
   if (document.getElementById('round-close-hour')) document.getElementById('round-close-hour').value = '17';
   if (document.getElementById('round-close-minute')) document.getElementById('round-close-minute').value = '30';
 
+  // 12-week timeline defaults
+  const startDateInput = document.getElementById('round-form-start-date');
+  if (startDateInput) {
+    const day = today.getDay();
+    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(new Date(today).setDate(diff));
+    startDateInput.value = `${monday.getFullYear()}-${pad(monday.getMonth()+1)}-${pad(monday.getDate())}`;
+    if (typeof window.onRoundStartDateChanged === 'function') {
+      window.onRoundStartDateChanged(startDateInput.value);
+    }
+  }
+  const durationInput = document.getElementById('round-form-duration-weeks');
+  if (durationInput) durationInput.value = '12';
+
   // Reset state collections
   state.roundModalEligibleStudents = [];
   state.roundModalSupervisors = new Map();
@@ -3660,6 +3700,35 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
     if (document.getElementById('round-close-date')) document.getElementById('round-close-date').value = `${cd.getFullYear()}-${pad(cd.getMonth()+1)}-${pad(cd.getDate())}`;
     if (document.getElementById('round-close-hour')) document.getElementById('round-close-hour').value = pad(cd.getHours());
     if (document.getElementById('round-close-minute')) document.getElementById('round-close-minute').value = pad(cd.getMinutes());
+  }
+
+  // 12-week timeline values
+  const startDateInput = document.getElementById('round-form-start-date');
+  const roundStartDate = r.startDate || r.datnStartDate || '';
+  if (startDateInput) {
+    if (roundStartDate) {
+      if (typeof roundStartDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(roundStartDate)) {
+        startDateInput.value = roundStartDate.slice(0, 10);
+      } else {
+        const d = new Date(roundStartDate?.toDate ? roundStartDate.toDate() : roundStartDate);
+        if (!isNaN(d.getTime())) {
+          startDateInput.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+        } else {
+          startDateInput.value = '';
+        }
+      }
+      if (typeof window.onRoundStartDateChanged === 'function') {
+        window.onRoundStartDateChanged(startDateInput.value);
+      }
+    } else {
+      startDateInput.value = '';
+      const feedback = document.getElementById('round-start-date-feedback');
+      if (feedback) feedback.innerHTML = '';
+    }
+  }
+  const durationInput = document.getElementById('round-form-duration-weeks');
+  if (durationInput) {
+    durationInput.value = String(r.durationWeeks || 12);
   }
 
   // Load Eligible Students for this round (strictly from round subcollection, never fallback)
@@ -4889,6 +4958,9 @@ window.saveRound = async function(e) {
   const showEmailAfterPublish = document.getElementById('round-form-show-email-after-publish')?.checked !== false;
   const showPhoneAfterPublish = document.getElementById('round-form-show-phone-after-publish')?.checked !== false;
 
+  const startDateStr = document.getElementById('round-form-start-date')?.value?.trim() || '';
+  const durationWeeks = parseInt(document.getElementById('round-form-duration-weeks')?.value, 10) || 12;
+
   if (!title || !academicYear || !roundName || (!openImmediately && !openDateStr) || !closeDateStr) {
     showToast('Vui lòng nhập đầy đủ các trường bắt buộc (*)', 'warning');
     switchRoundModalTab('info');
@@ -4975,6 +5047,9 @@ window.saveRound = async function(e) {
     openImmediately: !!openImmediately,
     openAt: openDate,
     closeAt: closeDate,
+    startDate: startDateStr || null,
+    datnStartDate: startDateStr || null,
+    durationWeeks: durationWeeks,
     preferenceCount,
     selectionMode,
     supervisorAssignmentMode,
@@ -20845,6 +20920,162 @@ window.updateStudentJourneyStepper = function() {
         </div>
         <span class="font-bold text-[10px] sm:text-[11px] text-slate-800 leading-tight mb-1 whitespace-nowrap overflow-hidden text-ellipsis w-full" title="${s.title}">${s.shortTitle}</span>
         <span class="text-[9px] px-1 py-0.5 rounded-full border ${st.badge} whitespace-nowrap leading-none">${s.label}</span>
+      </div>
+    `;
+  }).join('');
+};
+
+window.onRoundStartDateChanged = function(val) {
+  const input = document.getElementById('round-form-start-date');
+  const feedback = document.getElementById('round-start-date-feedback');
+  if (!val) {
+    if (feedback) feedback.innerHTML = '<span class="text-slate-500 italic">Chưa chọn ngày bắt đầu (mặc định sẽ dùng ngày mở đợt).</span>';
+    return;
+  }
+  const parts = val.split('-');
+  if (parts.length !== 3) return;
+  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  const day = d.getDay(); // 0: Sun, 1: Mon, ...
+  const pad = n => String(n).padStart(2, '0');
+
+  if (day !== 1) {
+    // Auto-snap to Monday of this week
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    const monStr = `${monday.getFullYear()}-${pad(monday.getMonth()+1)}-${pad(monday.getDate())}`;
+    if (input) input.value = monStr;
+    if (feedback) {
+      feedback.innerHTML = `<span class="text-blue-700 font-bold">✓ Đã tự động chuyển về Thứ Hai: <b>${monStr}</b></span>`;
+    }
+  } else {
+    if (feedback) {
+      feedback.innerHTML = `<span class="text-emerald-700 font-bold">✓ Hợp lệ: Thứ Hai (${val})</span>`;
+    }
+  }
+};
+
+window.renderStudentTimelineWeeks = function() {
+  const container = document.getElementById('timeline-weeks-grid');
+  const rangeEl = document.getElementById('timeline-weeks-dates-range');
+  const badgeEl = document.getElementById('timeline-weeks-current-badge');
+  if (!container) return;
+
+  const round = state.activeRound || (state.rounds || []).find(r => r.id === state.selectedRoundId) || (state.rounds || [])[0];
+  const durationWeeks = parseInt(round?.durationWeeks, 10) || 12;
+
+  // Determine starting Monday
+  let startMonday = null;
+  const configuredStart = round?.startDate || round?.datnStartDate;
+  if (configuredStart) {
+    let d = new Date(configuredStart?.toDate ? configuredStart.toDate() : configuredStart);
+    if (!isNaN(d.getTime())) {
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      startMonday = new Date(d.setDate(diff));
+      startMonday.setHours(0, 0, 0, 0);
+    }
+  }
+
+  // Fallback to round openAt or now if not configured
+  if (!startMonday) {
+    let d = round?.openAt ? new Date(round.openAt?.toDate ? round.openAt.toDate() : round.openAt) : new Date();
+    if (isNaN(d.getTime())) d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    startMonday = new Date(d.setDate(diff));
+    startMonday.setHours(0, 0, 0, 0);
+  }
+
+  const pad = n => String(n).padStart(2, '0');
+  const fmtShortDate = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+  const fmtFullDate = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+
+  const now = new Date();
+  let currentWeekNum = null;
+  const weeks = [];
+
+  for (let w = 0; w < durationWeeks; w++) {
+    const wStart = new Date(startMonday.getTime() + w * 7 * 24 * 3600 * 1000);
+    wStart.setHours(0, 0, 0, 0);
+    const wEnd = new Date(wStart.getTime() + 6 * 24 * 3600 * 1000);
+    wEnd.setHours(23, 59, 59, 999);
+
+    const weekNum = w + 1;
+    let status = 'upcoming';
+
+    if (now.getTime() > wEnd.getTime()) {
+      status = 'completed';
+    } else if (now.getTime() >= wStart.getTime() && now.getTime() <= wEnd.getTime()) {
+      status = 'ongoing';
+      currentWeekNum = weekNum;
+    } else {
+      status = 'upcoming';
+    }
+
+    weeks.push({
+      num: weekNum,
+      start: wStart,
+      end: wEnd,
+      dateText: `${fmtShortDate(wStart)} - ${fmtShortDate(wEnd)}`,
+      status
+    });
+  }
+
+  // Format header range and badge
+  const firstWeekStart = weeks[0]?.start;
+  const lastWeekEnd = weeks[weeks.length - 1]?.end;
+  if (rangeEl && firstWeekStart && lastWeekEnd) {
+    rangeEl.textContent = `Kế hoạch ${durationWeeks} tuần: ${fmtFullDate(firstWeekStart)} – ${fmtFullDate(lastWeekEnd)}`;
+  }
+
+  if (badgeEl) {
+    if (currentWeekNum) {
+      badgeEl.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 animate-pulse';
+      badgeEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-600 inline-block"></span> Đang diễn ra: Tuần ${currentWeekNum}/${durationWeeks}`;
+    } else if (firstWeekStart && now.getTime() < firstWeekStart.getTime()) {
+      badgeEl.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200';
+      badgeEl.innerHTML = `Sắp bắt đầu (${fmtShortDate(firstWeekStart)})`;
+    } else {
+      badgeEl.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200';
+      badgeEl.innerHTML = `✓ Đã kết thúc ${durationWeeks} tuần`;
+    }
+  }
+
+  // Render weekly items
+  const styles = {
+    completed: {
+      card: 'bg-emerald-50/60 border-emerald-200 text-emerald-900',
+      circle: 'bg-emerald-600 text-white font-black shadow-xs',
+      badge: 'bg-emerald-100/70 text-emerald-800 border-emerald-200',
+      icon: '✓',
+      label: 'Hoàn thành'
+    },
+    ongoing: {
+      card: 'bg-blue-50/90 border-blue-400 ring-2 ring-blue-300 shadow-xs text-blue-950 font-bold',
+      circle: 'bg-blue-600 text-white font-black shadow-sm animate-pulse',
+      badge: 'bg-blue-600 text-white border-blue-600 font-bold',
+      icon: '●',
+      label: 'Đang diễn ra'
+    },
+    upcoming: {
+      card: 'bg-slate-50/70 border-slate-200 text-slate-700',
+      circle: 'bg-slate-200 text-slate-600 font-bold',
+      badge: 'bg-slate-100 text-slate-500 border-slate-200',
+      icon: '',
+      label: 'Chưa tới'
+    }
+  };
+
+  container.innerHTML = weeks.map(w => {
+    const st = styles[w.status] || styles.upcoming;
+    return `
+      <div class="p-2 sm:p-2.5 rounded-xl border ${st.card} flex flex-col items-center text-center transition-all min-w-0">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold mb-1 ${st.circle}">
+          ${st.icon || w.num}
+        </div>
+        <span class="font-bold text-[11px] sm:text-xs leading-tight mb-0.5 whitespace-nowrap">Tuần ${w.num}</span>
+        <span class="text-[10px] text-slate-500 mb-1 leading-none font-mono">${w.dateText}</span>
+        <span class="text-[9px] px-1.5 py-0.5 rounded-full border ${st.badge} whitespace-nowrap font-semibold leading-none">${st.label}</span>
       </div>
     `;
   }).join('');

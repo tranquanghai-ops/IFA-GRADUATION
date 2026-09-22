@@ -119,4 +119,33 @@ test('student hero banner displays supervisor card, collapses header gap, and re
   assert.match(app, /title: 'Kết quả'/);
 });
 
+test('student hero banner displays topic, supervisor card is widened, redundant card is hidden, and 12-week timeline renders', () => {
+  // 1. Widened supervisor card on hero
+  assert.match(html, /id="hero-supervisor-info-card"[^>]*min-w-\[320px\]/);
+  assert.match(html, /id="hero-sup-card-avatar"[^>]*w-14 h-14/);
 
+  // 2. Topic on hero banner
+  assert.match(html, /id="hero-registered-topic-wrap"/);
+  assert.match(html, /id="hero-registered-topic-name"/);
+  assert.match(html, /id="hero-registered-topic-meta"/);
+  assert.match(app, /hero-registered-topic-wrap/);
+  assert.match(app, /reg\?\.topicTitle \|\| reg\?\.topic/);
+
+  // 3. Redundant supervisor card below is hidden
+  assert.match(app, /renderStudentOfficialResult\(state\.myRegistration\);\s*if \(officialResultCard\) officialResultCard\.classList\.add\('hidden'\);/);
+  assert.doesNotMatch(app, /renderStudentOfficialResult\(state\.myRegistration\);\s*if \(officialResultCard\) officialResultCard\.classList\.remove\('hidden'\);/);
+
+  // 4. 12-week timeline UI & settings
+  assert.match(html, /id="student-timeline-weeks-card"/);
+  assert.match(html, /id="timeline-weeks-dates-range"/);
+  assert.match(html, /id="timeline-weeks-current-badge"/);
+  assert.match(html, /id="timeline-weeks-grid"/);
+  assert.match(html, /id="round-form-start-date"/);
+  assert.match(html, /id="round-form-duration-weeks"/);
+
+  // 5. 12-week timeline JS logic
+  assert.match(app, /window\.onRoundStartDateChanged = function/);
+  assert.match(app, /window\.renderStudentTimelineWeeks = function/);
+  assert.match(app, /durationWeeks = parseInt\(round\?\.durationWeeks, 10\) \|\| 12/);
+  assert.match(app, /timeline-weeks-grid/);
+});

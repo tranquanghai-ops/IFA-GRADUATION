@@ -240,14 +240,23 @@
                   <span id="hero-assigned-sup">GVHD: Chưa phân công</span>
                 </div>
               </div>
+
+              <!-- Registered Topic Banner Block -->
+              <div id="hero-registered-topic-wrap" class="hidden mt-2.5 p-3 bg-white/10 border border-white/15 rounded-xl text-xs backdrop-blur-sm shadow-2xs">
+                <div class="flex items-center gap-1.5 text-amber-300 font-black text-[10px] uppercase tracking-wider">
+                  <span>📋</span> <span>Đề tài đã đăng ký:</span>
+                </div>
+                <div id="hero-registered-topic-name" class="font-bold text-white text-xs sm:text-sm mt-0.5 leading-snug break-words">--</div>
+                <div id="hero-registered-topic-meta" class="text-[11px] text-blue-200 mt-0.5 font-medium flex items-center gap-2 flex-wrap"></div>
+              </div>
             </div>
 
-            <!-- Supervisor Info Widget (Replaced Countdown / Status Widget) -->
-            <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/20 shadow-sm flex items-center gap-3.5 min-w-[260px] sm:min-w-[290px] max-w-sm shrink-0 self-start lg:self-auto">
-              <img id="hero-sup-card-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-12 h-12 rounded-xl object-cover border border-white/25 shrink-0 bg-white/10 shadow-xs" alt="GVHD Avatar">
+            <!-- Supervisor Info Widget (Enlarged and Comfortable) -->
+            <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/20 shadow-sm flex items-center gap-4 min-w-[320px] sm:min-w-[420px] lg:min-w-[460px] max-w-xl shrink-0 self-start lg:self-auto">
+              <img id="hero-sup-card-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-14 h-14 rounded-2xl object-cover border-2 border-white/30 shrink-0 bg-white/10 shadow-xs" alt="GVHD Avatar">
               <div class="min-w-0 flex-1 space-y-0.5">
                 <div class="flex items-center gap-1.5">
-                  <span id="hero-sup-card-role" class="badge bg-amber-400 text-slate-950 font-black text-[10px] px-1.5 py-0.5 uppercase tracking-wide">GVHD</span>
+                  <span id="hero-sup-card-role" class="badge bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 uppercase tracking-wide">GVHD</span>
                   <span id="hero-sup-card-status" class="text-[10px] text-blue-200 font-bold">Chưa phân công</span>
                 </div>
                 <h4 id="hero-sup-card-name" class="text-xs sm:text-sm font-black text-white truncate">Chưa phân công GVHD</h4>
@@ -290,6 +299,25 @@
           <!-- 10 Steps Stepper Container -->
           <div id="journey-steps-list" class="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2 text-xs">
             <!-- Populated dynamically by updateStudentJourneyStepper() -->
+          </div>
+        </div>
+
+        <!-- 2B. 12-WEEK DATN TIMELINE PROGRESS -->
+        <div id="student-timeline-weeks-card" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-lg">🗓️</span>
+              <div>
+                <h2 class="text-sm font-black text-slate-900 uppercase tracking-wide">Tiến độ 12 tuần thực hiện Đồ án Tốt nghiệp</h2>
+                <p id="timeline-weeks-dates-range" class="text-[11px] text-slate-500">Kế hoạch 12 tuần chính thức</p>
+              </div>
+            </div>
+            <span id="timeline-weeks-current-badge" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+              Đang diễn ra
+            </span>
+          </div>
+          <div id="timeline-weeks-grid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-2 text-xs">
+            <!-- Populated dynamically by renderStudentTimelineWeeks() -->
           </div>
         </div>
 
@@ -3172,6 +3200,25 @@
                   </div>
                 </div>
               </div>
+            </div>
+
+            <!-- 12-WEEK DATN TIMELINE CONFIGURATION -->
+            <div class="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
+              <span class="font-bold text-slate-800 text-xs block uppercase tracking-wider flex items-center gap-1.5 text-blue-900">
+                <span>🗓️</span> <span>Kế hoạch 12 tuần thực hiện Đồ án Tốt nghiệp</span>
+              </span>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="font-semibold text-slate-600 block mb-1">Ngày bắt đầu thực hiện (Thứ Hai):</label>
+                  <input type="date" id="round-form-start-date" onchange="onRoundStartDateChanged(this.value)" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold">
+                  <span id="round-start-date-feedback" class="text-[10px] text-blue-700 font-bold block mt-1"></span>
+                </div>
+                <div>
+                  <label class="font-semibold text-slate-600 block mb-1">Số tuần thực hiện:</label>
+                  <input type="number" id="round-form-duration-weeks" value="12" min="1" max="24" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-bold">
+                </div>
+              </div>
+              <p class="text-[10px] text-slate-500 italic">Hệ thống sẽ tự động tính toán và hiển thị thanh tiến độ 12 tuần trên trang sinh viên bắt đầu từ Thứ Hai của tuần bắt đầu.</p>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
