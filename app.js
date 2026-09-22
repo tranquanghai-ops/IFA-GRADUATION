@@ -3495,6 +3495,45 @@ function updateRoundModalConfigSummary() {
   }
 }
 
+// ── Weekly Content Editor (Admin) ──────────────────────────────────────────
+// Renders 12 (or durationWeeks) input cards in #round-weekly-content-grid
+function renderRoundWeeklyContentEditor(durationWeeks) {
+  const grid = document.getElementById('round-weekly-content-grid');
+  if (!grid) return;
+  durationWeeks = parseInt(durationWeeks, 10) || 12;
+  const defaultMilestones = { 4: 'Duyệt đợt 1', 8: 'Duyệt đợt 2', 12: 'Duyệt đợt 3' };
+  grid.innerHTML = Array.from({ length: durationWeeks }, (_, i) => {
+    const n = i + 1;
+    const defMilestone = defaultMilestones[n] || '';
+    return `
+      <div class="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
+        <div class="flex items-center justify-between">
+          <span class="font-black text-xs text-slate-800">Tuần ${n}</span>
+          ${defMilestone ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-bold">${defMilestone}</span>` : ''}
+        </div>
+        <input type="text" id="round-week-${n}-title" placeholder="Tiêu đề tuần ${n}"
+               class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+        <textarea id="round-week-${n}-note" rows="2" placeholder="Ghi chú nội dung tuần ${n} (tuỳ chọn)"
+                  class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none"></textarea>
+        <select id="round-week-${n}-milestone"
+                class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+          <option value="">-- Không có mốc --</option>
+          <option value="Duyệt đợt 1" ${defMilestone === 'Duyệt đợt 1' ? 'selected' : ''}>🚩 Duyệt đợt 1</option>
+          <option value="Duyệt đợt 2" ${defMilestone === 'Duyệt đợt 2' ? 'selected' : ''}>🚩 Duyệt đợt 2</option>
+          <option value="Duyệt đợt 3" ${defMilestone === 'Duyệt đợt 3' ? 'selected' : ''}>🚩 Duyệt đợt 3</option>
+          <option value="Sơ khảo">📋 Sơ khảo</option>
+          <option value="Khác">📌 Khác</option>
+        </select>
+      </div>`;
+  }).join('');
+}
+
+window.resetWeeklyContentToDefault = function() {
+  const durationInput = document.getElementById('round-form-duration-weeks');
+  const durationWeeks = parseInt(durationInput?.value, 10) || 12;
+  renderRoundWeeklyContentEditor(durationWeeks);
+};
+
 // Open Create Round Modal
 window.openCreateRoundModal = async function() {
   document.getElementById('form-round').reset();
@@ -3570,6 +3609,7 @@ window.openCreateRoundModal = async function() {
   if (createDriveFoldersInput) createDriveFoldersInput.value = '';
   updateRoundDriveFolderPreview();
 
+  if (typeof renderRoundWeeklyContentEditor === 'function') renderRoundWeeklyContentEditor(12);
   switchRoundModalTab('info');
   document.getElementById('modal-round').classList.remove('hidden');
 };
@@ -3812,6 +3852,20 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
 
   document.getElementById('modal-round-title').textContent = 'Chỉnh sửa Đợt Đồ án Tốt nghiệp';
   switchRoundModalTab(initialTab || 'info');
+
+  // Render weekly content editor and populate saved config
+  const editDurationWeeks = parseInt(r.durationWeeks, 10) || 12;
+  if (typeof renderRoundWeeklyContentEditor === 'function') renderRoundWeeklyContentEditor(editDurationWeeks);
+  (r.timelineWeeksConfig || []).forEach((wc) => {
+    const n = wc.week || 1;
+    const titleEl = document.getElementById(`round-week-${n}-title`);
+    const noteEl  = document.getElementById(`round-week-${n}-note`);
+    const mileEl  = document.getElementById(`round-week-${n}-milestone`);
+    if (titleEl) titleEl.value = wc.title || '';
+    if (noteEl)  noteEl.value  = wc.note  || '';
+    if (mileEl)  mileEl.value  = wc.milestone || '';
+  });
+
   document.getElementById('modal-round').classList.remove('hidden');
 };
 
@@ -4961,6 +5015,17 @@ window.saveRound = async function(e) {
   const startDateStr = document.getElementById('round-form-start-date')?.value?.trim() || '';
   const durationWeeks = parseInt(document.getElementById('round-form-duration-weeks')?.value, 10) || 12;
 
+  // Collect weekly content config from admin form
+  const timelineWeeksConfig = Array.from({ length: durationWeeks }, (_, i) => {
+    const n = i + 1;
+    return {
+      week: n,
+      title: document.getElementById(`round-week-${n}-title`)?.value?.trim() || `Tuần ${n}`,
+      note: document.getElementById(`round-week-${n}-note`)?.value?.trim() || '',
+      milestone: document.getElementById(`round-week-${n}-milestone`)?.value || '',
+    };
+  });
+
   if (!title || !academicYear || !roundName || (!openImmediately && !openDateStr) || !closeDateStr) {
     showToast('Vui lòng nhập đầy đủ các trường bắt buộc (*)', 'warning');
     switchRoundModalTab('info');
@@ -5050,6 +5115,7 @@ window.saveRound = async function(e) {
     startDate: startDateStr || null,
     datnStartDate: startDateStr || null,
     durationWeeks: durationWeeks,
+    timelineWeeksConfig: timelineWeeksConfig,
     preferenceCount,
     selectionMode,
     supervisorAssignmentMode,
@@ -20955,20 +21021,22 @@ window.onRoundStartDateChanged = function(val) {
 };
 
 window.prevTimelineWeek = function() {
-  if (typeof state.timelineWeeksStartIndex !== 'number') state.timelineWeeksStartIndex = 0;
-  if (state.timelineWeeksStartIndex > 0) {
-    state.timelineWeeksStartIndex--;
+  if (typeof state.timelineTrackIndex !== 'number') state.timelineTrackIndex = 0;
+  if (state.timelineTrackIndex > 0) {
+    state.timelineTrackIndex--;
     renderStudentTimelineWeeks();
   }
 };
 
 window.nextTimelineWeek = function() {
-  const round = state.activeRound || (state.rounds || []).find(r => r.id === state.selectedRoundId) || (state.rounds || [])[0];
-  const durationWeeks = parseInt(round?.durationWeeks, 10) || 12;
-  const maxStartIndex = Math.max(0, durationWeeks - 4);
-  if (typeof state.timelineWeeksStartIndex !== 'number') state.timelineWeeksStartIndex = 0;
-  if (state.timelineWeeksStartIndex < maxStartIndex) {
-    state.timelineWeeksStartIndex++;
+  if (typeof state.timelineTrackIndex !== 'number') state.timelineTrackIndex = 0;
+  const track = document.getElementById('timeline-cards-track');
+  if (!track) return;
+  const totalCards = track.children.length;
+  const visibleCount = _getTimelineVisibleCount();
+  const maxIndex = Math.max(0, totalCards - visibleCount);
+  if (state.timelineTrackIndex < maxIndex) {
+    state.timelineTrackIndex++;
     renderStudentTimelineWeeks();
   }
 };
@@ -20977,16 +21045,32 @@ window.nextTimelineWeek = function() {
 window.prevTimelineWeeksPage = window.prevTimelineWeek;
 window.nextTimelineWeeksPage = window.nextTimelineWeek;
 
+// Helper: determine how many cards are visible based on container width
+function _getTimelineVisibleCount() {
+  const wrapper = document.getElementById('timeline-cards-track')?.parentElement;
+  if (!wrapper) return 4;
+  const w = wrapper.offsetWidth;
+  if (w < 480) return 1;
+  if (w < 768) return 2;
+  return 4;
+}
+
 window.renderStudentTimelineWeeks = function() {
-  const container = document.getElementById('timeline-weeks-grid');
+  // NEW: target the card slider track (old grid is kept hidden for compat)
+  const track = document.getElementById('timeline-cards-track');
   const rangeEl = document.getElementById('timeline-weeks-dates-range');
   const badgeEl = document.getElementById('timeline-weeks-current-badge');
-  if (!container) return;
+  if (!track) return;
 
   const round = state.activeRound || (state.rounds || []).find(r => r.id === state.selectedRoundId) || (state.rounds || [])[0];
   const durationWeeks = parseInt(round?.durationWeeks, 10) || 12;
 
-  // Determine starting Monday
+  // ── Date helpers ──────────────────────────────────────────────
+  const pad = n => String(n).padStart(2, '0');
+  const fmtShortDate = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+  const fmtFullDate  = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+
+  // ── Determine starting Monday ──────────────────────────────────
   let startMonday = null;
   const configuredStart = round?.startDate || round?.datnStartDate;
   if (configuredStart) {
@@ -20998,8 +21082,6 @@ window.renderStudentTimelineWeeks = function() {
       startMonday.setHours(0, 0, 0, 0);
     }
   }
-
-  // Fallback to round openAt or now if not configured
   if (!startMonday) {
     let d = round?.openAt ? new Date(round.openAt?.toDate ? round.openAt.toDate() : round.openAt) : new Date();
     if (isNaN(d.getTime())) d = new Date();
@@ -21008,10 +21090,6 @@ window.renderStudentTimelineWeeks = function() {
     startMonday = new Date(d.setDate(diff));
     startMonday.setHours(0, 0, 0, 0);
   }
-
-  const pad = n => String(n).padStart(2, '0');
-  const fmtShortDate = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
-  const fmtFullDate = d => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 
   const now = new Date();
   let currentWeekNum = null;
@@ -21022,164 +21100,259 @@ window.renderStudentTimelineWeeks = function() {
     wStart.setHours(0, 0, 0, 0);
     const wEnd = new Date(wStart.getTime() + 6 * 24 * 3600 * 1000);
     wEnd.setHours(23, 59, 59, 999);
-
     const weekNum = w + 1;
     let status = 'upcoming';
-
-    if (now.getTime() > wEnd.getTime()) {
+    if (now > wEnd) {
       status = 'completed';
-    } else if (now.getTime() >= wStart.getTime() && now.getTime() <= wEnd.getTime()) {
+    } else if (now >= wStart && now <= wEnd) {
       status = 'ongoing';
       currentWeekNum = weekNum;
-    } else {
-      status = 'upcoming';
     }
-
-    weeks.push({
-      num: weekNum,
-      start: wStart,
-      end: wEnd,
-      dateText: `${fmtShortDate(wStart)} - ${fmtShortDate(wEnd)}`,
-      status
-    });
+    weeks.push({ num: weekNum, start: wStart, end: wEnd,
+      dateText: `${fmtShortDate(wStart)} – ${fmtShortDate(wEnd)}`, status });
   }
 
-  // Format header range and badge
+  // ── Header badge & date range ──────────────────────────────────
   const firstWeekStart = weeks[0]?.start;
-  const lastWeekEnd = weeks[weeks.length - 1]?.end;
+  const lastWeekEnd   = weeks[weeks.length - 1]?.end;
   if (rangeEl && firstWeekStart && lastWeekEnd) {
     rangeEl.textContent = `Kế hoạch ${durationWeeks} tuần: ${fmtFullDate(firstWeekStart)} – ${fmtFullDate(lastWeekEnd)}`;
   }
-
   if (badgeEl) {
     if (currentWeekNum) {
       badgeEl.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 animate-pulse';
       badgeEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-600 inline-block"></span> Đang diễn ra: Tuần ${currentWeekNum}/${durationWeeks}`;
-    } else if (firstWeekStart && now.getTime() < firstWeekStart.getTime()) {
+    } else if (firstWeekStart && now < firstWeekStart) {
       badgeEl.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200';
-      badgeEl.innerHTML = `Sắp bắt đầu (${fmtShortDate(firstWeekStart)})`;
+      badgeEl.textContent = `Sắp bắt đầu (${fmtShortDate(firstWeekStart)})`;
     } else {
       badgeEl.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200';
-      badgeEl.innerHTML = `✓ Đã kết thúc ${durationWeeks} tuần`;
+      badgeEl.textContent = `✓ Đã kết thúc ${durationWeeks} tuần`;
     }
   }
 
-  // 4-week window sliding 1 week at a time
-  const pageSize = 4;
-  const maxStartIndex = Math.max(0, durationWeeks - pageSize);
+  // ── Derive student state for intro/outro cards ────────────────
+  const reg        = state.myRegistration;
+  const hasTopic   = !!(reg?.topicTitle || reg?.topic);
+  const officialSups = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(reg) : [];
+  const hasGVHD    = officialSups.length > 0 || !!(reg?.supervisorName);
+  const directAssign = round?.supervisorAssignmentMode === 'direct_assignment';
 
-  if (state.timelineWeeksRoundId !== round?.id) {
-    state.timelineWeeksRoundId = round?.id;
-    state.timelineWeeksStartIndex = null;
+  // ── Default milestone labels per week (overrideable by admin) ──
+  const defaultMilestones = { 4: 'Duyệt đợt 1', 8: 'Duyệt đợt 2', 12: 'Duyệt đợt 3' };
+  const weeklyConfig = Array.isArray(round?.timelineWeeksConfig) ? round.timelineWeeksConfig : [];
+
+  // ── Build the full unified card array (17 cards) ──────────────
+  const allCards = [];
+
+  // Card 0 – Đăng ký đề tài
+  allCards.push({
+    type: 'milestone',
+    id: 'reg-topic',
+    icon: '📝',
+    title: 'Đăng ký đề tài',
+    subtitle: hasTopic ? (reg.topicTitle || reg.topic || 'Đề tài ĐATN') : 'Đề tài ĐATN',
+    status: hasTopic ? 'completed' : (round?.status === 'open' ? 'active' : 'upcoming'),
+    note: hasTopic ? '✓ Đã đăng ký' : (round?.status === 'open' ? 'Đang mở đăng ký' : 'Chưa mở'),
+  });
+
+  // Card 1 – Phân công GVHD
+  let gvhdStatus = 'upcoming';
+  if (hasGVHD) {
+    gvhdStatus = 'completed';
+  } else if (directAssign || round?.status === 'reviewing') {
+    gvhdStatus = 'active';
   }
+  allCards.push({
+    type: 'milestone',
+    id: 'gvhd',
+    icon: '👨‍🏫',
+    title: 'Phân công GVHD',
+    subtitle: hasGVHD
+      ? (officialSups[0]?.supervisorName || reg?.supervisorName || 'GVHD đã phân công')
+      : (directAssign ? 'Khoa đang phân công' : 'Chờ kết quả xét'),
+    status: gvhdStatus,
+    note: hasGVHD ? '✓ Đã phân công' : (gvhdStatus === 'active' ? 'Đang xử lý' : 'Chưa phân công'),
+  });
 
-  if (typeof state.timelineWeeksStartIndex !== 'number') {
-    if (currentWeekNum) {
-      const idealStart = currentWeekNum - 1;
-      state.timelineWeeksStartIndex = Math.max(0, Math.min(maxStartIndex, idealStart));
-    } else {
-      state.timelineWeeksStartIndex = 0;
-    }
-  }
-  state.timelineWeeksStartIndex = Math.max(0, Math.min(maxStartIndex, state.timelineWeeksStartIndex));
+  // Cards 2–13 – 12 weekly cards (or durationWeeks)
+  weeks.forEach((w, i) => {
+    const cfg = weeklyConfig.find(c => c.week === w.num) || {};
+    const defMilestone = defaultMilestones[w.num] || null;
+    const milestone = cfg.milestone || (defMilestone ? defMilestone : null);
+    allCards.push({
+      type: 'week',
+      num: w.num,
+      dateText: w.dateText,
+      status: w.status,
+      title: cfg.title || `Tuần ${w.num}`,
+      subtitle: cfg.note || '',
+      milestone,
+    });
+  });
 
-  const visibleWeeks = weeks.slice(state.timelineWeeksStartIndex, state.timelineWeeksStartIndex + pageSize);
+  // Card N – Sơ khảo
+  const afterWeeks = lastWeekEnd ? now > lastWeekEnd : false;
+  allCards.push({
+    type: 'milestone',
+    id: 'sokhao',
+    icon: '📄',
+    title: 'Nộp Sơ khảo',
+    subtitle: 'Nộp hồ sơ Sơ khảo',
+    status: afterWeeks ? 'completed' : 'upcoming',
+    note: afterWeeks ? '✓ Đã nộp' : 'Sau 12 tuần',
+  });
 
-  // Update navigation controls (Side arrows: left & right)
-  const prevBtn = document.getElementById('timeline-weeks-prev-btn');
-  const nextBtn = document.getElementById('timeline-weeks-next-btn');
-  const pageIndicator = document.getElementById('timeline-weeks-page-indicator');
+  // Card N+1 – Bảo vệ TN
+  allCards.push({
+    type: 'milestone',
+    id: 'baove',
+    icon: '🎓',
+    title: 'Bảo vệ Tốt nghiệp',
+    subtitle: 'Trình bày & Hội đồng chấm',
+    status: afterWeeks ? 'completed' : 'upcoming',
+    note: afterWeeks ? '✓ Đã bảo vệ' : 'Lịch do Khoa thông báo',
+  });
 
-  if (prevBtn) {
-    if (state.timelineWeeksStartIndex <= 0) {
-      prevBtn.classList.add('hidden');
-    } else {
-      prevBtn.classList.remove('hidden');
-    }
-  }
+  // Card N+2 – Kết quả
+  allCards.push({
+    type: 'milestone',
+    id: 'ketqua',
+    icon: '🏆',
+    title: 'Kết quả',
+    subtitle: 'Điểm tổng kết chính thức',
+    status: afterWeeks ? 'completed' : 'upcoming',
+    note: afterWeeks ? '✓ Đã công bố' : 'Sau bảo vệ TN',
+  });
 
-  if (nextBtn) {
-    if (state.timelineWeeksStartIndex >= maxStartIndex) {
-      nextBtn.classList.add('hidden');
-    } else {
-      nextBtn.classList.remove('hidden');
-    }
-  }
+  // ── Compute card pixel width ────────────────────────────────────
+  const visibleCount = _getTimelineVisibleCount();
+  const trackWrapper = track.parentElement;
+  const gap = 12; // gap-3 = 12px
+  const totalGaps = (visibleCount - 1) * gap;
+  const cardPxWidth = Math.floor((trackWrapper.offsetWidth - totalGaps) / visibleCount);
 
-  if (pageIndicator && visibleWeeks.length > 0) {
-    const startW = visibleWeeks[0].num;
-    const endW = visibleWeeks[visibleWeeks.length - 1].num;
-    pageIndicator.textContent = `Tuần ${startW} - ${endW} / ${durationWeeks}`;
-  }
-
-  // Milestone labels for key review weeks
-  const weekMilestones = {
-    4: 'Duyệt đợt 1',
-    8: 'Duyệt đợt 2',
-    12: 'Duyệt đợt 3'
-  };
-
-  // Render weekly items
-  const styles = {
+  // ── Render cards into track ─────────────────────────────────────
+  const stMap = {
     completed: {
-      card: 'bg-emerald-50/60 border-emerald-200 text-emerald-900',
-      circle: 'bg-emerald-600 text-white font-black shadow-xs',
+      card: 'bg-emerald-50 border-emerald-300 text-emerald-900',
+      icon_bg: 'bg-emerald-600 text-white shadow-sm',
       badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-      icon: '✓',
-      label: 'Hoàn thành'
+      label: 'Hoàn thành',
+    },
+    active: {
+      card: 'bg-blue-50 border-blue-400 ring-2 ring-blue-300 text-blue-950',
+      icon_bg: 'bg-blue-600 text-white shadow-sm animate-pulse',
+      badge: 'bg-blue-600 text-white border-blue-600',
+      label: 'Đang diễn ra',
     },
     ongoing: {
-      card: 'bg-blue-50/90 border-blue-400 ring-2 ring-blue-300 shadow-xs text-blue-950 font-bold',
-      circle: 'bg-blue-600 text-white font-black shadow-sm animate-pulse',
-      badge: 'bg-blue-600 text-white border-blue-600 font-bold',
-      icon: '●',
-      label: 'Đang diễn ra'
+      card: 'bg-blue-50 border-blue-400 ring-2 ring-blue-300 text-blue-950',
+      icon_bg: 'bg-blue-600 text-white shadow-sm animate-pulse',
+      badge: 'bg-blue-600 text-white border-blue-600',
+      label: 'Đang diễn ra',
     },
     upcoming: {
-      card: 'bg-slate-50/80 border-slate-200 text-slate-700',
-      circle: 'bg-slate-200 text-slate-600 font-bold',
+      card: 'bg-slate-50 border-slate-200 text-slate-600',
+      icon_bg: 'bg-slate-200 text-slate-500',
       badge: 'bg-slate-100 text-slate-500 border-slate-200',
-      icon: '',
-      label: 'Chưa tới'
-    }
+      label: 'Chưa tới',
+    },
   };
 
-  container.innerHTML = visibleWeeks.map(w => {
-    const st = styles[w.status] || styles.upcoming;
-    const milestoneTitle = weekMilestones[w.num];
-    let milestoneHtml = '';
-    if (milestoneTitle) {
-      milestoneHtml = `
-        <div class="mt-2.5 pt-2 border-t border-slate-200/80 w-full flex items-center justify-center">
-          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-500 text-white font-black text-[10px] tracking-wide shadow-2xs uppercase">
-            <span>🚩</span> <span>${milestoneTitle}</span>
-          </span>
-        </div>
-      `;
-    } else {
-      milestoneHtml = `
-        <div class="mt-2.5 pt-2 border-t border-transparent w-full flex items-center justify-center">
-          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-slate-400 font-medium text-[10px] opacity-70">
-            <span>•</span> <span>Thực hiện ĐATN</span>
-          </span>
-        </div>
-      `;
-    }
+  track.innerHTML = allCards.map((card, idx) => {
+    const st = stMap[card.status] || stMap.upcoming;
+    const isActive = card.status === 'ongoing' || card.status === 'active';
 
-    return `
-      <div class="p-3.5 sm:p-4 rounded-2xl border ${st.card} flex flex-col items-center text-center transition-all min-w-0 shadow-xs relative overflow-hidden">
-        <div class="flex items-center justify-between w-full mb-1">
-          <span class="font-black text-xs sm:text-sm text-slate-900">Tuần ${w.num}</span>
-          <span class="text-[9px] px-2 py-0.5 rounded-full border ${st.badge} whitespace-nowrap font-bold leading-none">${st.label}</span>
+    if (card.type === 'week') {
+      // Weekly card
+      const hasMilestone = !!card.milestone;
+      const milestoneHtml = hasMilestone
+        ? `<div class="mt-2 pt-2 border-t border-slate-200 w-full">
+             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px] uppercase tracking-wide">
+               🚩 ${card.milestone}
+             </span>
+           </div>`
+        : '';
+      const noteHtml = card.subtitle
+        ? `<p class="text-[10px] text-slate-500 mt-1 leading-tight line-clamp-2">${card.subtitle}</p>`
+        : '';
+      return `<div class="flex-shrink-0 rounded-2xl border ${st.card} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all ${isActive ? 'shadow-md' : ''}"
+                   style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
+        <div class="flex items-center justify-between w-full mb-1.5">
+          <span class="font-black text-xs text-inherit">Tuần ${card.num}</span>
+          <span class="text-[9px] px-1.5 py-0.5 rounded-full border ${st.badge} font-bold whitespace-nowrap leading-none">${st.label}</span>
         </div>
-        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black my-1.5 ${st.circle}">
-          ${st.icon || w.num}
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${st.icon_bg} my-1">
+          ${card.status === 'completed' ? '✓' : (card.status === 'ongoing' || card.status === 'active') ? '●' : card.num}
         </div>
-        <span class="text-[11px] text-slate-500 font-mono font-medium">${w.dateText}</span>
+        <span class="text-[10px] font-mono text-slate-500">${card.dateText}</span>
+        ${noteHtml}
         ${milestoneHtml}
-      </div>
-    `;
+      </div>`;
+    } else {
+      // Milestone card (intro/outro)
+      const isGvhdCompleted = card.id === 'gvhd' && card.status === 'completed';
+      const cardBg = isGvhdCompleted ? 'bg-emerald-50 border-emerald-300' : (card.status === 'completed' ? 'bg-emerald-50 border-emerald-300' : card.status === 'active' ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-300' : 'bg-slate-50 border-slate-200');
+      const iconBg = card.status === 'completed' ? 'bg-emerald-600 text-white' : card.status === 'active' ? 'bg-blue-600 text-white animate-pulse' : 'bg-slate-200 text-slate-500';
+      const noteColor = card.status === 'completed' ? 'text-emerald-700 font-bold' : card.status === 'active' ? 'text-blue-700 font-bold' : 'text-slate-400';
+      return `<div class="flex-shrink-0 rounded-2xl border ${cardBg} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all"
+                   style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
+        <div class="w-9 h-9 rounded-full flex items-center justify-center text-lg ${iconBg} mb-1.5 shadow-xs">
+          ${card.icon}
+        </div>
+        <span class="font-black text-[11px] text-slate-900 leading-tight">${card.title}</span>
+        <span class="text-[10px] text-slate-500 mt-0.5 leading-tight line-clamp-2">${card.subtitle}</span>
+        <span class="mt-1.5 text-[9px] ${noteColor}">${card.note}</span>
+      </div>`;
+    }
   }).join('');
+
+  // ── Track index management ──────────────────────────────────────
+  const totalCards = allCards.length;
+  const maxTrackIndex = Math.max(0, totalCards - visibleCount);
+
+  // Reset on round change
+  if (state.timelineWeeksRoundId !== round?.id) {
+    state.timelineWeeksRoundId = round?.id;
+    state.timelineTrackIndex = null;
+  }
+
+  // Auto-scroll to the currently active card
+  if (typeof state.timelineTrackIndex !== 'number') {
+    if (currentWeekNum) {
+      // Index of first weekly card is 2, so active week card is at 2 + (currentWeekNum - 1)
+      const activeIdx = 2 + (currentWeekNum - 1);
+      state.timelineTrackIndex = Math.max(0, Math.min(maxTrackIndex, activeIdx - 1));
+    } else if (hasTopic && !hasGVHD) {
+      state.timelineTrackIndex = 1; // scroll to show GVHD card
+    } else {
+      state.timelineTrackIndex = 0;
+    }
+  }
+  state.timelineTrackIndex = Math.max(0, Math.min(maxTrackIndex, state.timelineTrackIndex));
+
+  // Apply CSS transform to slide the track
+  const slideOffset = state.timelineTrackIndex * (cardPxWidth + gap);
+  track.style.transform = `translateX(-${slideOffset}px)`;
+
+  // ── Navigation buttons ─────────────────────────────────────────
+  const prevBtn = document.getElementById('timeline-weeks-prev-btn');
+  const nextBtn = document.getElementById('timeline-weeks-next-btn');
+  if (prevBtn) prevBtn.classList.toggle('hidden', state.timelineTrackIndex <= 0);
+  if (nextBtn) nextBtn.classList.toggle('hidden', state.timelineTrackIndex >= maxTrackIndex);
+
+  // ── Step indicator ─────────────────────────────────────────────
+  const stepIndicator = document.getElementById('timeline-track-step-indicator');
+  if (stepIndicator) {
+    stepIndicator.textContent = `${state.timelineTrackIndex + 1} / ${totalCards}`;
+  }
+  // Legacy page indicator compat
+  const pageIndicator = document.getElementById('timeline-weeks-page-indicator');
+  if (pageIndicator && weeks.length > 0) {
+    const startW = Math.max(1, state.timelineTrackIndex - 1);
+    pageIndicator.textContent = `${startW} / ${durationWeeks} tuần`;
+  }
 };
 
 window.updateStudentPersonalSidebar = function() {

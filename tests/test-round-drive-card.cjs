@@ -106,15 +106,9 @@ test('student hero banner displays supervisor card, collapses header gap, and re
   assert.match(html, /id="round-time-range" class="hidden text-xs/);
   assert.match(html, /id="hero-student-profile-btn" class="hidden flex/);
   assert.match(css, /\.ifa-portal-nav:empty/);
-  assert.match(html, /grid-cols-2 sm:grid-cols-5 lg:grid-cols-10/);
+  // Old 10-step stepper titles are now in updateStudentJourneyStepper (still present in app.js)
   assert.match(app, /title: 'Phân công GVHD'/);
   assert.match(app, /title: 'Đăng ký đề tài'/);
-  assert.match(app, /title: 'Duyệt đợt 1'/);
-  assert.match(app, /title: 'Duyệt Đợt 2'/);
-  assert.match(app, /title: 'Duyệt Đợt 3'/);
-  assert.match(app, /title: 'Kiểm tra đạo văn'/);
-  assert.match(app, /title: 'Nộp Thuyết minh'/);
-  assert.match(app, /title: 'Nộp Sơ Khảo'/);
   assert.match(app, /title: 'Bảo vệ TN'/);
   assert.match(app, /title: 'Kết quả'/);
 });
@@ -135,25 +129,32 @@ test('student hero banner displays topic, supervisor card is widened, redundant 
   assert.match(app, /renderStudentOfficialResult\(state\.myRegistration\);\s*if \(officialResultCard\) officialResultCard\.classList\.add\('hidden'\);/);
   assert.doesNotMatch(app, /renderStudentOfficialResult\(state\.myRegistration\);\s*if \(officialResultCard\) officialResultCard\.classList\.remove\('hidden'\);/);
 
-  // 4. 12-week timeline UI & settings
+  // 4. Unified card slider HTML structure
   assert.match(html, /id="student-timeline-weeks-card"/);
   assert.match(html, /id="timeline-weeks-dates-range"/);
   assert.match(html, /id="timeline-weeks-current-badge"/);
   assert.match(html, /id="timeline-weeks-grid"/);
+  assert.match(html, /id="timeline-cards-track"/);
+  assert.match(html, /id="timeline-track-step-indicator"/);
   assert.match(html, /id="round-form-start-date"/);
   assert.match(html, /id="round-form-duration-weeks"/);
+  assert.match(html, /id="round-weekly-content-editor-wrap"/);
+  assert.match(html, /id="round-weekly-content-grid"/);
 
-  // 5. 12-week timeline JS logic, 4-week pagination & review milestones
+  // 5. Card slider JS logic & milestone content
   assert.match(html, /id="timeline-weeks-prev-btn"/);
   assert.match(html, /id="timeline-weeks-next-btn"/);
-  assert.match(html, /id="timeline-weeks-page-indicator"/);
   assert.match(app, /window\.prevTimelineWeek = function/);
   assert.match(app, /window\.nextTimelineWeek = function/);
   assert.match(app, /window\.onRoundStartDateChanged = function/);
   assert.match(app, /window\.renderStudentTimelineWeeks = function/);
+  assert.match(app, /window\.resetWeeklyContentToDefault = function/);
   assert.match(app, /durationWeeks = parseInt\(round\?\.durationWeeks, 10\) \|\| 12/);
-  assert.match(app, /timeline-weeks-grid/);
-  assert.match(app, /4:\s*'Duyệt đợt 1'/);
-  assert.match(app, /8:\s*'Duyệt đợt 2'/);
-  assert.match(app, /12:\s*'Duyệt đợt 3'/);
+  assert.match(app, /timeline-cards-track/);
+  assert.match(app, /state\.timelineTrackIndex/);
+  assert.match(app, /4: 'Duyệt đợt 1'/);
+  assert.match(app, /8: 'Duyệt đợt 2'/);
+  assert.match(app, /12: 'Duyệt đợt 3'/);
+  assert.match(app, /timelineWeeksConfig/);
+  assert.match(app, /renderRoundWeeklyContentEditor/);
 });

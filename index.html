@@ -283,63 +283,52 @@
           </div>
         </div>
 
-        <!-- 2. UNIFIED STUDENT JOURNEY & 12-WEEK PROGRESS -->
-        <div id="student-journey-card" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-5">
-          <!-- Unified Header -->
+        <!-- 2. UNIFIED DATN JOURNEY & WEEKLY CARD SLIDER -->
+        <div id="student-journey-card" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <!-- Card Header -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div class="flex items-center gap-2.5">
               <span class="text-2xl p-2 rounded-xl bg-blue-50 border border-blue-100 text-blue-700">🗓️</span>
               <div>
-                <h2 class="text-sm font-black text-slate-900 uppercase tracking-wide">Lộ trình & Tiến độ 12 tuần Đồ án Tốt nghiệp</h2>
-                <p id="timeline-weeks-dates-range" class="text-[11px] text-slate-500">Kế hoạch 12 tuần chính thức • Quy trình từ phân công GVHD đến bảo vệ & kết quả</p>
+                <h2 class="text-sm font-black text-slate-900 uppercase tracking-wide">Lộ trình Đồ án Tốt nghiệp & Tiến độ thực hiện</h2>
+                <p id="timeline-weeks-dates-range" class="text-[11px] text-slate-500">Quy trình từ Đăng ký đề tài, Phân công GVHD, 12 tuần thực hiện đến Bảo vệ & Kết quả</p>
               </div>
             </div>
-            <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <div class="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
               <span id="journey-overall-badge" class="hidden text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">Đang tiến hành</span>
-              <span id="timeline-weeks-current-badge" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                Đang diễn ra
+              <span id="timeline-weeks-current-badge" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span> Đang diễn ra
+              </span>
+              <span id="timeline-track-step-indicator" class="text-[11px] font-black px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 select-none min-w-[80px] text-center">
+                1 / 17
               </span>
             </div>
           </div>
 
-          <!-- Section 1: 10 Steps Stepper Container -->
-          <div class="space-y-1.5">
-            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-0.5">
-              Quy trình 10 mốc chính
-            </div>
-            <div id="journey-steps-list" class="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2 text-xs">
-              <!-- Populated dynamically by updateStudentJourneyStepper() -->
-            </div>
-          </div>
+          <!-- Hidden anchors for backward compatibility if any legacy code queries them -->
+          <div id="journey-steps-list" class="hidden"></div>
+          <div id="student-timeline-weeks-card" class="hidden"></div>
+          <div id="timeline-weeks-grid" class="hidden"></div>
 
-          <!-- Section 2: 12-WEEK DATN TIMELINE PROGRESS -->
-          <div id="student-timeline-weeks-card" class="space-y-2 pt-3 border-t border-slate-100">
-            <div class="flex items-center justify-between text-[11px] font-bold text-slate-700 px-0.5">
-              <span class="flex items-center gap-1.5 text-slate-800">
-                <span>📅</span> <span>Tiến độ thực hiện từng tuần (Tuần 4, 8, 12: Đợt duyệt)</span>
-              </span>
-              <span id="timeline-weeks-page-indicator" class="text-[11px] font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 select-none">
-                Tuần 1 - 4 / 12
-              </span>
-            </div>
+          <!-- CARD SLIDER CONTAINER (Trượt thẻ bài mượt mà) -->
+          <div class="relative group px-1 sm:px-2 pt-1 pb-1">
+            <!-- Left Arrow Button (Floats at left margin, hidden when at index 0) -->
+            <button type="button" id="timeline-weeks-prev-btn" onclick="prevTimelineWeek()" class="hidden absolute -left-2 sm:-left-3 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/95 hover:bg-white text-slate-800 border border-slate-300 shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 hover:border-blue-500 cursor-pointer" title="Lùi 1 thẻ">
+              <svg class="w-5 h-5 text-slate-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+            </button>
 
-            <!-- Carousel with Left & Right side arrow buttons -->
-            <div class="relative px-3 sm:px-4">
-              <!-- Left Arrow Button (Hidden on week 1) -->
-              <button type="button" id="timeline-weeks-prev-btn" onclick="prevTimelineWeek()" class="hidden absolute -left-1 sm:-left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/95 hover:bg-white text-slate-800 border border-slate-300 shadow-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 hover:border-blue-400 cursor-pointer" title="Lùi 1 tuần">
-                <svg class="w-4 h-4 text-slate-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
-              </button>
-
-              <!-- 4-Card Grid Container -->
-              <div id="timeline-weeks-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                <!-- Populated dynamically by renderStudentTimelineWeeks() (4 weeks per view) -->
+            <!-- Overflow hidden wrapper -->
+            <div class="overflow-hidden rounded-2xl p-1 -m-1">
+              <!-- Cards Flex Track with smooth transform transition -->
+              <div id="timeline-cards-track" class="flex gap-3 transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)]">
+                <!-- Dynamically populated by renderStudentTimelineWeeks() -->
               </div>
-
-              <!-- Right Arrow Button (Hidden on last window) -->
-              <button type="button" id="timeline-weeks-next-btn" onclick="nextTimelineWeek()" class="hidden absolute -right-1 sm:-right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/95 hover:bg-white text-slate-800 border border-slate-300 shadow-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 hover:border-blue-400 cursor-pointer" title="Tiến 1 tuần">
-                <svg class="w-4 h-4 text-slate-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-              </button>
             </div>
+
+            <!-- Right Arrow Button (Floats at right margin, hidden when at end) -->
+            <button type="button" id="timeline-weeks-next-btn" onclick="nextTimelineWeek()" class="hidden absolute -right-2 sm:-right-3 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/95 hover:bg-white text-slate-800 border border-slate-300 shadow-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 hover:border-blue-500 cursor-pointer" title="Tiến 1 thẻ">
+              <svg class="w-5 h-5 text-slate-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </button>
           </div>
         </div>
 
@@ -3241,6 +3230,17 @@
                 </div>
               </div>
               <p class="text-[10px] text-slate-500 italic">Hệ thống sẽ tự động tính toán và hiển thị thanh tiến độ 12 tuần trên trang sinh viên bắt đầu từ Thứ Hai của tuần bắt đầu.</p>
+            </div>
+
+            <!-- Admin Weekly Content Editor -->
+            <div id="round-weekly-content-editor-wrap" class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-slate-800 text-xs uppercase tracking-wider">📝 Nội dung từng tuần</span>
+                <button type="button" onclick="resetWeeklyContentToDefault()" class="text-[10px] text-slate-500 hover:text-red-600 font-semibold transition-colors">Đặt lại mặc định</button>
+              </div>
+              <div id="round-weekly-content-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <!-- Populated by renderRoundWeeklyContentEditor() -->
+              </div>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
