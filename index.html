@@ -717,32 +717,23 @@
             </div>
           </div>
 
-          <!-- Nearest Milestone Alert Strip -->
-          <div id="sup-hero-milestone-strip" class="pt-3 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-blue-100">
-            <div class="flex items-center gap-2">
-              <span class="text-base">📌</span>
-              <span id="sup-hero-next-milestone" class="font-bold">Mốc tiếp theo: Đang cập nhật...</span>
+          <!-- Integrated Round Selector Toolbar inside Hero Banner -->
+          <div class="pt-3.5 border-t border-white/15 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+            <div class="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+              <span class="text-xs font-bold uppercase tracking-wider text-blue-200 flex items-center gap-1.5 shrink-0">
+                <span>🗓️</span> Đợt tốt nghiệp:
+              </span>
+              <select id="supervisor-round-select" onchange="onSupervisorRoundSelected(this.value)" class="bg-slate-900/80 hover:bg-slate-900 text-white border border-white/25 rounded-xl px-3 py-1.5 text-xs font-bold focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all cursor-pointer max-w-full truncate">
+                <!-- Dynamically populated -->
+              </select>
+              <span id="sup-round-locked-badge" class="hidden text-xs font-bold text-amber-950 bg-amber-400 border border-amber-300 px-2.5 py-1 rounded-lg shrink-0 shadow-2xs">🔒 Đang khóa theo phiên giả lập</span>
             </div>
-            <div id="sup-hero-milestone-deadline" class="font-mono text-amber-300 bg-black/30 px-2.5 py-1 rounded-lg border border-white/10 self-start sm:self-auto">
-              Thời gian: --
+            <div class="flex items-center gap-2 text-xs shrink-0 flex-wrap">
+              <span id="sup-active-round-badge" class="badge bg-white/15 text-white font-mono font-bold border border-white/20">Đang tải...</span>
+              <span id="sup-round-review-indicator" class="text-xs font-bold text-blue-100 bg-white/10 px-3 py-1 rounded-xl border border-white/15">
+                Trạng thái: Đang tải...
+              </span>
             </div>
-          </div>
-        </div>
-
-        <!-- 2. ROUND SELECTOR BAR (PLACED DIRECTLY UNDER HERO) -->
-        <div class="card-surface p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div class="flex flex-wrap items-center gap-2.5">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Đợt tốt nghiệp:</span>
-            <select id="supervisor-round-select" onchange="onSupervisorRoundSelected(this.value)" class="bg-slate-50 hover:bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-tdtu-blue focus:outline-none transition-all">
-              <!-- Dynamically populated -->
-            </select>
-            <span id="sup-round-locked-badge" class="hidden text-xs font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg">🔒 Đang khóa theo phiên đóng vai</span>
-          </div>
-          <div class="flex items-center gap-2 text-xs">
-            <span id="sup-active-round-badge" class="badge bg-indigo-100 text-indigo-800 font-bold">Đang tải...</span>
-            <span id="sup-round-review-indicator" class="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200">
-              Trạng thái: Đang tải...
-            </span>
           </div>
         </div>
 
@@ -777,10 +768,10 @@
             <button id="sup-tab-btn-assigned" onclick="switchSupervisorTab('assigned')" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-tdtu-blue shadow-sm transition-all cursor-pointer">
               🎯 Danh sách SV Hướng dẫn (<span id="sup-assigned-count-badge">0</span>)
             </button>
-            <button id="sup-tab-btn-review" onclick="switchSupervisorTab('review')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
+            <button id="sup-tab-btn-review" onclick="switchSupervisorTab('review')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
               🔍 Xét duyệt Nguyện vọng (<span id="sup-candidates-count-badge">0</span>)
             </button>
-            <button id="sup-tab-btn-accepted" onclick="switchSupervisorTab('accepted')" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
+            <button id="sup-tab-btn-accepted" onclick="switchSupervisorTab('accepted')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
               🏆 Danh sách Đã nhận (<span id="sup-accepted-count-badge">0</span>)
             </button>
             <button id="sup-tab-btn-preliminary" onclick="switchSupervisorTab('preliminary')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">

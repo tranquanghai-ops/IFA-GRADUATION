@@ -84,3 +84,13 @@ test('student portal keeps branded header and renders assignment plus resilient 
   assert.match(app, /typeof value\.toDate === 'function'/);
   assert.match(app, /round\.closeAtDate \|\| round\.closeAt \|\| round\.endDate \|\| round\.registrationCloseAt/);
 });
+
+test('supervisor portal integrates round selector in banner and hides secondary tabs', () => {
+  assert.match(html, /id="supervisor-hero-card"[^]*?id="supervisor-round-select"/);
+  assert.doesNotMatch(html, /id="sup-hero-milestone-strip"/);
+  assert.match(html, /id="sup-tab-btn-review" [^>]*?class="[^"]*?hidden/);
+  assert.match(html, /id="sup-tab-btn-accepted" [^>]*?class="[^"]*?hidden/);
+  assert.match(app, /const studentAvatarUrl = st\.photoURL \|\| studentObj\?\.photoURL \|\| studentObj\?\.avatar \|\| defaultAvatar/);
+  assert.doesNotMatch(app, /defaultAvatar = 'data:image\/svg\+xml,<svg xmlns="http:/);
+});
+

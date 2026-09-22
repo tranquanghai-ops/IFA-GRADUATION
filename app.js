@@ -1827,7 +1827,7 @@ function renderStudentOfficialResult(reg) {
   const officialList = getOfficialSupervisors(reg);
 
   if ((reg.reviewStatus === 'accepted' || reg.reviewStatus === 'manually_assigned' || officialList.length > 0)) {
-    const defaultAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23cbd5e1"/><path fill="%23cbd5e1" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
+    const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
 
     const supervisorsCardsHtml = officialList.map(item => {
       const sup = (state.roundSupervisors || []).find(s => s.id === item.supervisorId || s.supervisorId === item.supervisorId)
@@ -2068,7 +2068,7 @@ function renderSupervisorsGrid() {
     return;
   }
 
-  const defaultAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23cbd5e1"/><path fill="%23cbd5e1" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
+    const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
 
   grid.innerHTML = activeSupervisors.map(s => {
     const prefIndex = state.selectedPreferences.findIndex(p => p.supervisorId === s.id);
@@ -6126,7 +6126,7 @@ window.toggleSelectAllSupPicker = function() {
 window.openAddSupervisorsToRoundModal = async function() {
   await loadAdminSupervisorsMaster();
   const listEl = document.getElementById('sup-master-picker-list');
-  const defaultAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23cbd5e1"/><path fill="%23cbd5e1" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
+  const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
   
   const activeSups = state.supervisorsMaster.filter(s => s.active !== false);
   const totalBadge = document.getElementById('sup-picker-total-badge');
@@ -20779,7 +20779,7 @@ window.updateStudentPersonalSidebar = function() {
   const studentClass = studentObj?.className || studentObj?.studentClass || 'Chưa cập nhật';
   const major = studentObj?.major || 'Thiết kế nội thất';
 
-  const avatarUrl = state.user?.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%2394a3b8"/><path fill="%2394a3b8" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
+  const avatarUrl = state.user?.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%2394a3b8'/%3E%3Cpath fill='%2394a3b8' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
 
   // Update Hero Banner Pill
   if (heroName) heroName.textContent = fullName;
@@ -21053,14 +21053,14 @@ window.renderSupervisorRoundsDropdown = function() {
 
     select.innerHTML = `<option value="${lockedRoundId}" selected>${roundTitle} (Khóa)</option>`;
     select.disabled = true;
-    select.classList.add('opacity-75', 'cursor-not-allowed', 'bg-slate-100');
+    select.className = 'bg-slate-800/90 text-slate-300 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-bold opacity-80 cursor-not-allowed max-w-full truncate';
     if (lockedBadge) lockedBadge.classList.remove('hidden');
     return;
   }
 
   // Not locked - normal dropdown
   select.disabled = false;
-  select.classList.remove('opacity-75', 'cursor-not-allowed', 'bg-slate-100');
+  select.className = 'bg-slate-900/80 hover:bg-slate-900 text-white border border-white/25 rounded-xl px-3 py-1.5 text-xs font-bold focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all cursor-pointer max-w-full truncate';
   if (lockedBadge) lockedBadge.classList.add('hidden');
 
   const emailLower = (actor.email || '').toLowerCase().trim();
@@ -21262,103 +21262,25 @@ window.loadSupervisorPortalData = async function(roundId) {
   setElVal('sup-stat-support-count', supportCount);
   setElVal('sup-stat-pending-count', pendingCount);
 
-  // Hero Next Milestone & Deadline (Fix Next Milestone Bug)
-  const nextMilestoneEl = document.getElementById('sup-hero-next-milestone');
-  const deadlineEl = document.getElementById('sup-hero-milestone-deadline');
-  const now = new Date();
-  const upcomingActs = activities
-    .map(a => {
-      const dateStr = a.endAt || a.startAt || a.closeAtDate || a.endDate || a.date || a.deadline;
-      return {
-        title: a.title,
-        isTentative: Boolean(a.isTentative),
-        date: dateStr ? new Date(dateStr) : null,
-        dateStr: dateStr
-      };
-    })
-    .filter(a => a.date && !isNaN(a.date.getTime()) && a.date >= now)
-    .sort((a, b) => a.date - b.date);
-
-  if (upcomingActs.length > 0) {
-    const nextAct = upcomingActs[0];
-    const tentativeSuffix = nextAct.isTentative ? ' (Dự kiến)' : '';
-    if (nextMilestoneEl) nextMilestoneEl.textContent = `Mốc tiếp theo: ${nextAct.title}${tentativeSuffix}`;
-    const timeFormatted = typeof fmtIsoToVietnameseDateTime === 'function'
-      ? fmtIsoToVietnameseDateTime(nextAct.date.toISOString())
-      : nextAct.date.toLocaleString('vi-VN');
-    if (deadlineEl) deadlineEl.textContent = `${nextAct.isTentative ? 'Dự kiến: ' : 'Thời gian: '}${timeFormatted}`;
-  } else {
-    if (nextMilestoneEl) nextMilestoneEl.textContent = 'Mốc tiếp theo: Các mốc kế hoạch đã hoàn tất';
-    if (deadlineEl) deadlineEl.textContent = 'Đã hoàn tất timeline';
-  }
-
   // Update tabs badges
   const assignedBadge = document.getElementById('sup-assigned-count-badge');
   if (assignedBadge) assignedBadge.textContent = displayStudents.length;
 
-  // 6. Manage Supervisor Tabs Visibility & Default Selection based on Round Mode and Phase
-  const isDirect = (round.assignmentMode === 'direct_assignment') ||
-    (round.supervisorAssignmentMode === 'direct_assignment') ||
-    (typeof isDirectSupervisorAssignment === 'function' && isDirectSupervisorAssignment(round));
-
+  // 6. Manage Supervisor Tabs Visibility & Default Selection
   const tabAssignedBtn = document.getElementById('sup-tab-btn-assigned');
   const tabReviewBtn = document.getElementById('sup-tab-btn-review');
   const tabAcceptedBtn = document.getElementById('sup-tab-btn-accepted');
   const tabPrelimBtn = document.getElementById('sup-tab-btn-preliminary');
   const tabReviewerBtn = document.getElementById('sup-tab-btn-reviewer');
 
-  // Check preliminary & reviewer duties for current supervisor
-  const reviewerAssignments = round.reviewerAssignments || {};
-  const myReviewerCount = allRegistrations.filter(s => {
-    const sid = s.mssv || s.studentId || s.id;
-    return reviewerAssignments[sid] === mySupId || (currentSup?.email && reviewerAssignments[sid] === currentSup.email) || (actor.email && reviewerAssignments[sid] === actor.email);
-  }).length;
-
-  const hasPrelimDuty = actor.isAdmin || (round.supervisors || []).some(s => s.isPrelimJudge || s.role === 'prelim_judge');
-
-  if (tabPrelimBtn) {
-    if (hasPrelimDuty) tabPrelimBtn.classList.remove('hidden');
-    else tabPrelimBtn.classList.add('hidden');
-  }
-
-  if (tabReviewerBtn) {
-    if (myReviewerCount > 0 || actor.isAdmin) {
-      tabReviewerBtn.classList.remove('hidden');
-      const badge = document.getElementById('sup-reviewer-count-badge');
-      if (badge) badge.textContent = myReviewerCount;
-    } else {
-      tabReviewerBtn.classList.add('hidden');
-    }
-  }
+  // Temporarily hide review, accepted, preliminary, and reviewer tabs per user request
+  if (tabReviewBtn) tabReviewBtn.classList.add('hidden');
+  if (tabAcceptedBtn) tabAcceptedBtn.classList.add('hidden');
+  if (tabPrelimBtn) tabPrelimBtn.classList.add('hidden');
+  if (tabReviewerBtn) tabReviewerBtn.classList.add('hidden');
+  if (tabAssignedBtn) tabAssignedBtn.classList.remove('hidden');
 
   let defaultTab = 'assigned';
-
-  if (isDirect) {
-    // Direct assignment: completely hide review & accepted tabs
-    if (tabReviewBtn) tabReviewBtn.classList.add('hidden');
-    if (tabAcceptedBtn) tabAcceptedBtn.classList.add('hidden');
-    if (tabAssignedBtn) tabAssignedBtn.classList.remove('hidden');
-    defaultTab = 'assigned';
-  } else {
-    // Student preference mode
-    const isReviewPhase = round.status === 'reviewing' || (round.reviewStatus && round.reviewStatus.startsWith('round_'));
-    if (isReviewPhase) {
-      if (tabReviewBtn) tabReviewBtn.classList.remove('hidden');
-      if (tabAcceptedBtn) tabAcceptedBtn.classList.remove('hidden');
-      if (tabAssignedBtn) tabAssignedBtn.classList.remove('hidden');
-      defaultTab = 'review';
-    } else {
-      if (tabAssignedBtn) tabAssignedBtn.classList.remove('hidden');
-      if (round.status === 'finalized' || round.status === 'published' || round.status === 'closed') {
-        if (tabReviewBtn) tabReviewBtn.classList.add('hidden');
-        if (tabAcceptedBtn) tabAcceptedBtn.classList.add('hidden');
-      } else {
-        if (tabReviewBtn) tabReviewBtn.classList.remove('hidden');
-        if (tabAcceptedBtn) tabAcceptedBtn.classList.remove('hidden');
-      }
-      defaultTab = 'assigned';
-    }
-  }
 
   // Requirement 6: If GVHD is not assigned to supervise in this round, show notification and hide action menus
   const notAssignedAlert = document.getElementById('supervisor-not-assigned-alert');
@@ -21535,13 +21457,14 @@ window.renderSupervisorAssignedStudents = function() {
       }
     }
 
-    const defaultAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%23cbd5e1"/><path fill="%23cbd5e1" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
+    const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
+    const studentAvatarUrl = st.photoURL || studentObj?.photoURL || studentObj?.avatar || defaultAvatar;
 
     return `
       <div class="card-surface p-4 sm:p-5 bg-white rounded-2xl border border-slate-200 hover:border-tdtu-blue/40 shadow-xs hover:shadow-md transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <!-- Left: Student Info & Role -->
         <div class="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
-          <img src="${defaultAvatar}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0" alt="Avatar">
+          <img src="${studentAvatarUrl}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0" alt="Avatar">
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2 mb-1">
               ${roleBadge}
