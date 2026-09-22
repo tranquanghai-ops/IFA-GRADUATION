@@ -45,6 +45,8 @@ test('round cards use the professional dashboard layout and retain workflow acti
 test('round workspace opens existing management panels in a focused popup', () => {
   assert.match(html, /id="modal-round-workspace"/);
   assert.match(html, /id="modal-round-workspace-body"/);
+  assert.match(html, /id="modal-round-workspace"[^]*?max-w-6xl/);
+  assert.doesNotMatch(html, /id="modal-round-workspace"[^]*?max-w-\[96rem\]/);
   assert.match(app, /window\.openRoundWorkspaceModal = async function/);
   assert.match(app, /body\.replaceChildren\(panel\)/);
   assert.match(app, /window\.closeRoundWorkspaceModal = function/);
