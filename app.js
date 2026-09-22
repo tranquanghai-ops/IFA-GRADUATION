@@ -11548,8 +11548,8 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
         `).join('')}
       </div>
     ` : (isAssigned
-      ? `<button type="button" ${editingLocked ? 'disabled' : `onclick="openAddSupportSupervisorModal('${mssv}')"`} class="font-bold text-[11px] ${editingLocked ? 'text-slate-400 cursor-default' : 'text-indigo-700 hover:underline cursor-pointer'}">Chưa có</button>`
-      : '<span class="text-slate-400 italic text-[11px]" title="Hãy phân công GVHD 1 trước">Chưa có</span>');
+      ? `<button type="button" ${editingLocked ? 'disabled' : `onclick="openAddSupportSupervisorModal('${mssv}')"`} class="font-bold text-[11px] ${editingLocked ? 'text-slate-400 cursor-default' : 'text-indigo-700 hover:underline cursor-pointer'}" title="Bấm để chọn GVHD 2">Chưa có</button>`
+      : `<button type="button" ${editingLocked ? 'disabled' : `onclick="openAdminEditSupervisorModal('${mssv}')"`} class="font-bold text-[11px] ${editingLocked ? 'text-slate-400 cursor-default' : 'text-indigo-700 hover:underline cursor-pointer'}" title="Bấm để chọn GVHD chính và GVHD 2">Chưa có</button>`);
 
     const masterStudent = typeof window.getFacultyStudentByMssv === 'function' ? window.getFacultyStudentByMssv(mssv) : null;
     const major = masterStudent?.major || row.eligibleStudent?.major || 'Thiết kế Nội thất';
@@ -11825,8 +11825,8 @@ window.openAdminEditSupervisorModal = function(studentId) {
   if (!ensureAssignmentEditingAllowed()) return;
   const row = getAdminAssignmentRows().find(item => item.studentId === String(studentId || '').trim().toUpperCase());
   const reg = row?.effective;
-  if (!row || !reg || !row.isAssigned) {
-    showToast('Không tìm thấy phân công của sinh viên này.', 'warning');
+  if (!row || !reg) {
+    showToast('Không tìm thấy thông tin sinh viên này.', 'warning');
     return;
   }
 
@@ -20143,20 +20143,22 @@ window.renderAdminRoundsCards = function() {
 
       return `
         <article class="card-surface rounded-2xl overflow-hidden border ${isCurrentActive ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'} shadow-sm hover:shadow-lg transition-all w-full">
-          <header class="bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white p-5 sm:p-6">
-            <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+          <header class="bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white p-4 sm:p-5">
+            <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Bấm để sao chép liên kết đợt" class="block w-full text-left group mb-3">
+              <h3 class="text-lg sm:text-xl xl:text-2xl font-black tracking-tight leading-tight lg:whitespace-nowrap group-hover:text-blue-200 transition-colors">${escapeHtml(r.title || '')}</h3>
+            </button>
+            <div class="flex flex-col xl:flex-row xl:items-end justify-between gap-3">
               <div class="min-w-0 space-y-2">
-                <div class="flex flex-wrap items-center gap-2.5">
-                  <h3 class="text-xl sm:text-2xl font-black tracking-tight leading-tight">${escapeHtml(r.title || '')}</h3>
+                <div class="flex flex-wrap items-center gap-2">
                   <span class="font-mono text-[11px] px-2.5 py-1 rounded-full bg-white/10 text-amber-300 font-bold border border-white/10">NH ${escapeHtml(r.academicYear || '—')}</span>
                   ${statusBadgeHtml}
                   ${activeBadgeHtml}
+                  ${modeBadgeHtml}
                 </div>
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-300">
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
                   <span class="inline-flex items-center gap-1.5"><span>🗓️</span><span>${timeRangeStr}</span></span>
                   <span class="inline-flex items-center gap-1.5"><span>📌</span><strong class="text-slate-100">${phaseInfo}</strong></span>
                   <span class="inline-flex items-center gap-1.5"><span>📁</span><span class="${driveRootUrl ? 'text-emerald-300' : 'text-amber-300'}">${driveRootUrl ? `Drive đã kết nối · ${driveFoldersCount} thư mục con` : 'Chưa cấu hình Drive'}</span></span>
-                  ${modeBadgeHtml}
                 </div>
               </div>
               <div class="flex flex-wrap items-center gap-2 shrink-0">
@@ -20168,40 +20170,34 @@ window.renderAdminRoundsCards = function() {
             </div>
           </header>
 
-          <div class="px-5 py-3 bg-white border-b border-slate-200 flex flex-wrap items-center gap-2">
-            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Mã đợt:</span>
-            <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-xs font-mono font-bold text-slate-700 transition">🔗 ${escapeHtml(shortCode)}</button>
-            <span class="text-[11px] text-slate-400 ml-auto">Bấm các chỉ số để mở khu vực quản lý tương ứng</span>
-          </div>
-
           <div class="grid grid-cols-2 lg:grid-cols-4 bg-slate-50/80 divide-x divide-y lg:divide-y-0 divide-slate-200 border-b border-slate-200">
-            <button type="button" onclick="editRoundModal('${r.id}', 'eligible')" class="p-4 text-center hover:bg-blue-50 transition group">
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'eligible-students')" class="px-3 py-2.5 text-center hover:bg-blue-50 transition group">
               <div class="text-[10px] font-bold text-slate-400 group-hover:text-blue-700 uppercase tracking-wider">Tổng sinh viên ↗</div>
-              <div class="text-2xl font-black text-slate-950 mt-1">${eligibleCount}</div>
+              <div class="text-xl font-black text-slate-950 mt-0.5">${eligibleCount}</div>
             </button>
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review', 'assigned')" class="p-4 text-center hover:bg-emerald-50 transition group">
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review', 'assigned')" class="px-3 py-2.5 text-center hover:bg-emerald-50 transition group">
               <div class="text-[10px] font-bold text-slate-400 group-hover:text-emerald-700 uppercase tracking-wider">Đã phân GVHD ↗</div>
-              <div class="text-2xl font-black text-emerald-600 mt-1">${assignedCount === null ? '—' : assignedCount} ${unassignedCount === null ? '<span class="text-[10px] font-normal text-slate-400">chưa tổng hợp</span>' : `<span class="text-[10px] font-normal text-slate-500">(${unassignedCount} chưa)</span>`}</div>
+              <div class="text-xl font-black text-emerald-600 mt-0.5">${assignedCount === null ? '—' : assignedCount} ${unassignedCount === null ? '<span class="text-[10px] font-normal text-slate-400">chưa tổng hợp</span>' : `<span class="text-[10px] font-normal text-slate-500">(${unassignedCount} chưa)</span>`}</div>
             </button>
-            <button type="button" onclick="editRoundModal('${r.id}', 'supervisors')" class="p-4 text-center hover:bg-indigo-50 transition group">
+            <button type="button" onclick="editRoundModal('${r.id}', 'supervisors')" class="px-3 py-2.5 text-center hover:bg-indigo-50 transition group">
               <div class="text-[10px] font-bold text-slate-400 group-hover:text-indigo-700 uppercase tracking-wider">GVHD tham gia ↗</div>
-              <div class="text-2xl font-black text-indigo-700 mt-1">${supCount}</div>
+              <div class="text-xl font-black text-indigo-700 mt-0.5">${supCount}</div>
             </button>
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="p-4 text-center hover:bg-purple-50 transition group">
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'timeline')" class="px-3 py-2.5 text-center hover:bg-purple-50 transition group">
               <div class="text-[10px] font-bold text-slate-400 group-hover:text-purple-700 uppercase tracking-wider">Mốc kế hoạch ↗</div>
-              <div class="text-2xl font-black text-purple-700 mt-1">${actCount}</div>
+              <div class="text-xl font-black text-purple-700 mt-0.5">${actCount}</div>
             </button>
           </div>
 
-          <div class="px-5 py-4 bg-white flex flex-wrap items-center justify-center gap-2">
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'timeline')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-sm">📅 Kế hoạch (${actCount})</button>
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'eligible-students')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-sm">🎓 Sinh viên (${eligibleCount})</button>
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'registrations')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 transition shadow-sm">📝 Đăng ký (${regCount})</button>
-            ${directAssignment ? '' : `<button type="button" onclick="navigateToRoundAction('${r.id}', 'review')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 text-slate-800 transition shadow-sm">🎯 Xét nguyện vọng</button>`}
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'review', 'assigned')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-purple-50 hover:border-purple-300 text-slate-800 transition shadow-sm">👥 ${directAssignment ? 'Phân công GVHD' : 'Kết quả phân công'}</button>
-            <button type="button" onclick="navigateToRoundAction('${r.id}', 'scoring-dashboard')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 text-slate-800 transition shadow-sm">📊 Quản lý điểm</button>
-            <div class="w-full border-t border-slate-100 mt-1 pt-3 flex justify-center gap-2 text-xs">
-              <button type="button" onclick="duplicateRoundModal('${r.id}')" class="px-2.5 py-1.5 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg font-semibold transition">📋 Sao chép</button>
+          <div class="px-4 py-3 bg-white flex flex-wrap items-center justify-center gap-2">
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'timeline')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-sm">📅 Kế hoạch (${actCount})</button>
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'eligible-students')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-sm">🎓 Sinh viên (${eligibleCount})</button>
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'registrations')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 transition shadow-sm">📝 Đăng ký (${regCount})</button>
+            ${directAssignment ? '' : `<button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 text-slate-800 transition shadow-sm">🎯 Xét nguyện vọng</button>`}
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review', 'assigned')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-purple-50 hover:border-purple-300 text-slate-800 transition shadow-sm">👥 ${directAssignment ? 'Phân công GVHD' : 'Kết quả phân công'}</button>
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'scoring-dashboard')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 text-slate-800 transition shadow-sm">📊 Quản lý điểm</button>
+            <span class="hidden sm:block w-px h-6 bg-slate-200 mx-1" aria-hidden="true"></span>
+            <div class="flex items-center justify-center gap-1 text-xs">
               ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-2.5 py-1.5 text-blue-700 hover:bg-blue-50 rounded-lg font-bold transition">⭐ Đặt hiện hành</button>` : ''}
               <button type="button" onclick="softDeleteRound('${r.id}')" class="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg font-semibold transition">🗑️ Thùng rác</button>
             </div>
@@ -20258,6 +20254,64 @@ window.navigateToRoundAction = async function(roundId, actionKey, subSection = n
       }
     }, 250);
   }
+};
+
+window.openRoundWorkspaceModal = async function(roundId, actionKey, subSection = null) {
+  if (!roundId || !actionKey) return;
+  if (state.roundWorkspaceModal?.panel) window.closeRoundWorkspaceModal();
+
+  await window.navigateToRoundAction(roundId, actionKey, subSection);
+
+  const panel = document.getElementById(`atab-panel-${actionKey}`);
+  const modal = document.getElementById('modal-round-workspace');
+  const body = document.getElementById('modal-round-workspace-body');
+  const title = document.getElementById('modal-round-workspace-title');
+  const subtitle = document.getElementById('modal-round-workspace-subtitle');
+  if (!panel || !modal || !body) return;
+
+  const round = (state.rounds || []).find(item => item.id === roundId);
+  const labels = {
+    timeline: 'Kế hoạch đợt',
+    'eligible-students': 'Danh sách sinh viên',
+    registrations: 'Danh sách đăng ký',
+    review: isDirectSupervisorAssignment(round) ? 'Phân công GVHD' : 'Xét nguyện vọng & Phân công',
+    'scoring-dashboard': 'Quản lý điểm'
+  };
+
+  const placeholder = document.createComment(`round-workspace-${actionKey}`);
+  panel.parentNode?.insertBefore(placeholder, panel);
+  body.replaceChildren(panel);
+  panel.classList.remove('hidden');
+
+  state.roundWorkspaceModal = {
+    panel,
+    placeholder,
+    previousBodyOverflow: document.body.style.overflow
+  };
+  if (title) title.textContent = labels[actionKey] || 'Quản lý đợt tốt nghiệp';
+  if (subtitle) subtitle.textContent = round?.title || 'Đợt tốt nghiệp';
+  document.body.style.overflow = 'hidden';
+  modal.classList.remove('hidden');
+
+  if (actionKey === 'review' && subSection === 'assigned') {
+    setTimeout(() => {
+      document.getElementById('admin-official-supervisors-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 350);
+  }
+};
+
+window.closeRoundWorkspaceModal = function() {
+  const modalState = state.roundWorkspaceModal;
+  const modal = document.getElementById('modal-round-workspace');
+  if (modalState?.panel && modalState?.placeholder?.parentNode) {
+    modalState.placeholder.parentNode.insertBefore(modalState.panel, modalState.placeholder);
+    modalState.placeholder.remove();
+    modalState.panel.classList.add('hidden');
+  }
+  document.body.style.overflow = modalState?.previousBodyOverflow || '';
+  state.roundWorkspaceModal = null;
+  modal?.classList.add('hidden');
+  window.switchAdminTab('rounds');
 };
 
 window.updateRoundBreadcrumb = function(tabKey) {

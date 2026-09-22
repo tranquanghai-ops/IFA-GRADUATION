@@ -323,3 +323,12 @@ body {
   color: #64748b;
   margin: 0.5rem 0;
 }
+
+/* Round management panels are moved into this popup for focused, table-like work. */
+#modal-round-workspace-body .round-breadcrumb-container {
+  display: none !important;
+}
+
+#modal-round-workspace-body > [id^="atab-panel-"] {
+  width: 100%;
+}

@@ -31,7 +31,29 @@ test('round cards use the professional dashboard layout and retain workflow acti
   assert.match(app, /from-slate-950 via-slate-900 to-blue-950/);
   assert.match(app, /Tổng sinh viên ↗/);
   assert.match(app, /GVHD tham gia ↗/);
-  assert.match(app, /navigateToRoundAction\('\$\{r\.id\}', 'timeline'\)/);
+  assert.match(app, /copyRoundLink\('\$\{r\.id\}', '\$\{shortCode\}'\)/);
+  assert.match(app, /lg:whitespace-nowrap/);
+  assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'timeline'\)/);
+  assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'eligible-students'\)/);
+  assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'registrations'\)/);
+  assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'review', 'assigned'\)/);
+  assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'scoring-dashboard'\)/);
   assert.match(app, /directAssignment \? '' : `<button[^`]+Xét nguyện vọng/s);
 });
 
+test('round workspace opens existing management panels in a focused popup', () => {
+  assert.match(html, /id="modal-round-workspace"/);
+  assert.match(html, /id="modal-round-workspace-body"/);
+  assert.match(app, /window\.openRoundWorkspaceModal = async function/);
+  assert.match(app, /body\.replaceChildren\(panel\)/);
+  assert.match(app, /window\.closeRoundWorkspaceModal = function/);
+});
+
+test('supervisor cells expose assignment and replacement actions', () => {
+  assert.match(app, /onclick="openAdminManualAssignModal\('\$\{mssv\}'\)"/);
+  assert.match(app, /onclick="openAdminEditSupervisorModal\('\$\{mssv\}'\)"/);
+  assert.match(app, /onclick="openAddSupportSupervisorModal\('\$\{mssv\}'\)"/);
+  const editModalSource = app.match(/window\.openAdminEditSupervisorModal = function[\s\S]+?\n};/)?.[0] || '';
+  assert.match(editModalSource, /if \(!row \|\| !reg\)/);
+  assert.doesNotMatch(editModalSource, /!row\.isAssigned/);
+});
