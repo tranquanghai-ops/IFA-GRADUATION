@@ -452,11 +452,20 @@ service cloud.firestore {
         allow update: if (admin())
           || (staff()
             && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(email()))
+            && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId))
+            && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.assignmentStatus == 'published'
+            && email() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.supervisorEmails
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'topicApprovalStatus', 'topicApprovalNote', 'topicReviewedAt',
               'topicReviewedBy', 'topicTitleHistory', 'updatedAt'
             ])
             && request.resource.data.topicApprovalStatus in ['approved', 'rejected']
+            && request.resource.data.topicApprovalNote is string
+            && request.resource.data.topicApprovalNote.size() <= 1000
+            && request.resource.data.topicReviewedAt is timestamp
+            && request.resource.data.topicReviewedBy == email()
+            && request.resource.data.topicTitleHistory is list
+            && request.resource.data.topicTitleHistory.size() <= 50
             && request.resource.data.topicTitle == resource.data.topicTitle
             && request.resource.data.studentId == resource.data.studentId)
           || (student()
