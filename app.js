@@ -1454,9 +1454,11 @@ async function loadRounds() {
     if (state.isAdmin && !state.impersonation) {
       await Promise.all(state.rounds.filter(r => !r.deleted).map(async round => {
         try {
-          const [officialSnap, draftSnap] = await Promise.all([
+          const [officialSnap, draftSnap, eligibleSnap, supervisorsSnap] = await Promise.all([
             getDocs(collection(db, 'graduationRounds', round.id, 'officialAssignments')),
-            getDocs(collection(db, 'graduationRounds', round.id, 'assignmentDrafts'))
+            getDocs(collection(db, 'graduationRounds', round.id, 'assignmentDrafts')),
+            getDocs(collection(db, 'graduationRounds', round.id, 'eligibleStudents')),
+            getDocs(collection(db, 'graduationRounds', round.id, 'supervisors'))
           ]);
           const assignedStudentIds = new Set();
           [...officialSnap.docs, ...draftSnap.docs].forEach(assignmentDoc => {
@@ -1470,6 +1472,12 @@ async function loadRounds() {
           });
           round.assignedCount = assignedStudentIds.size;
           round.officialAssignmentsCount = officialSnap.size;
+          // These values must come from the subcollections, not stale counters
+          // stored on the round document after manual add/remove operations.
+          round.eligibleCount = eligibleSnap.size;
+          round.eligibleStudentsCount = eligibleSnap.size;
+          round.supervisorCount = supervisorsSnap.size;
+          round.supervisorsCount = supervisorsSnap.size;
         } catch (error) {
           console.warn(`[Rounds] Could not hydrate assignment count for ${round.id}:`, error);
         }
@@ -6961,6 +6969,33 @@ window.addEligibleStudentByMssv = async function() {
     if (existing.exists()) {
       showToast(`Sinh viên ${rawMssv} đã có trong đợt này.`, 'warning');
       return;
+    }
+
+    // A student removed from the round configuration may still have records
+    // created before that removal.  Never silently reuse those records when
+    // the student is added again: the operator explicitly chooses whether to
+    // clear the old topic and supervisor assignment for this round.
+    const [oldRegistration, oldOfficialAssignment, oldDraftAssignment] = await Promise.all([
+      getDoc(doc(db, 'graduationRounds', roundId, 'registrations', rawMssv)),
+      getDoc(doc(db, 'graduationRounds', roundId, 'officialAssignments', rawMssv)),
+      getDoc(doc(db, 'graduationRounds', roundId, 'assignmentDrafts', rawMssv))
+    ]);
+    if (oldRegistration.exists() || oldOfficialAssignment.exists() || oldDraftAssignment.exists()) {
+      const shouldReset = await showConfirm(
+        'Dữ liệu cũ của sinh viên',
+        `MSSV ${rawMssv} vẫn còn thông tin đăng ký hoặc phân công từ lần trước. Xóa dữ liệu cũ để thêm lại sinh viên với trạng thái mới?`,
+        { confirmText: 'Xóa dữ liệu cũ & thêm lại', danger: true }
+      );
+      if (!shouldReset) return;
+      const cleanupResults = await Promise.allSettled([
+        deleteDoc(doc(db, 'graduationRounds', roundId, 'registrations', rawMssv)),
+        deleteDoc(doc(db, 'graduationRounds', roundId, 'officialAssignments', rawMssv)),
+        deleteDoc(doc(db, 'graduationRounds', roundId, 'assignmentDrafts', rawMssv)),
+        deleteDoc(doc(db, 'graduationRounds', roundId, 'reviewDecisions', rawMssv))
+      ]);
+      if (cleanupResults.some(result => result.status === 'rejected')) {
+        throw new Error('Không thể xóa đầy đủ dữ liệu cũ của sinh viên.');
+      }
     }
 
     const fullName = master.fullName || master.name;

@@ -341,12 +341,13 @@
         <div class="space-y-6">
 
             <!-- NON-ELIGIBLE BANNER -->
-            <div id="non-eligible-alert" class="hidden card-surface bg-amber-50/90 border border-amber-200 p-5 text-amber-900 rounded-2xl shadow-sm">
-              <div class="flex items-start gap-3.5">
-                <span class="text-2xl mt-0.5">ℹ️</span>
+            <div id="non-eligible-alert" class="hidden card-surface max-w-6xl mx-auto bg-gradient-to-r from-amber-50 via-amber-50 to-orange-50 border border-amber-200 p-5 sm:p-6 text-amber-900 rounded-2xl shadow-sm">
+              <div class="flex items-start gap-4">
+                <span class="shrink-0 w-11 h-11 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center text-xl">ℹ️</span>
                 <div class="flex-1">
-                  <h3 class="font-bold text-sm sm:text-base text-amber-950">Bạn chưa có trong danh sách sinh viên đủ điều kiện đăng ký Đồ án tốt nghiệp đợt này.</h3>
-                  <p class="text-xs sm:text-sm text-amber-800 mt-1 leading-relaxed">
+                  <p class="text-[11px] font-black tracking-wide uppercase text-amber-700 mb-1">Thông tin đợt tốt nghiệp</p>
+                  <h3 class="font-black text-sm sm:text-base text-amber-950">Bạn chưa có trong danh sách sinh viên đủ điều kiện đăng ký Đồ án tốt nghiệp đợt này.</h3>
+                  <p class="text-xs sm:text-sm text-amber-800 mt-1.5 leading-relaxed max-w-4xl">
                     Tài khoản của bạn hiện chưa được ghi nhận trong danh sách sinh viên chính thức của đợt tốt nghiệp này. Nếu bạn thuộc đối tượng làm ĐATN hoặc cần hỗ trợ kiểm tra điều kiện, vui lòng liên hệ Văn phòng Khoa để được giải quyết.
                   </p>
                 </div>
@@ -826,28 +827,23 @@
               🏆 Danh sách Đã nhận (<span id="sup-accepted-count-badge">0</span>)
             </button>
           </div>
+          <div class="relative w-full sm:w-72">
+            <input type="text" id="supervisor-student-search" oninput="renderSupervisorAssignedStudents()" placeholder="Tìm MSSV, họ tên, đề tài..." class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <span class="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+          </div>
         </div>
 
         <!-- 4. SUB-PANEL A: MAIN AREA — ASSIGNED STUDENTS WORKSPACE -->
         <div id="sup-panel-assigned" class="space-y-4">
 
-          <!-- Filter & Search Toolbar -->
-          <div class="card-surface p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <!-- Filter Pills (Temporarily hidden per user request) -->
-            <div id="sup-student-filter-pills" class="hidden flex-wrap items-center gap-1.5 text-xs">
+          <!-- Filter Pills (Temporarily hidden per user request) -->
+          <div id="sup-student-filter-pills" class="hidden flex-wrap items-center gap-1.5 text-xs">
               <button onclick="setSupervisorStudentFilter('all')" id="sup-flt-all" class="px-3 py-1.5 rounded-xl font-bold bg-tdtu-blue text-white shadow-xs cursor-pointer">Tất cả (<span id="sup-cnt-all">0</span>)</button>
               <button onclick="setSupervisorStudentFilter('pending')" id="sup-flt-pending" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">Chưa xử lý (<span id="sup-cnt-pending">0</span>)</button>
               <button onclick="setSupervisorStudentFilter('in_progress')" id="sup-flt-in_progress" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">Đang thực hiện (<span id="sup-cnt-in_progress">0</span>)</button>
               <button onclick="setSupervisorStudentFilter('completed')" id="sup-flt-completed" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">Đã hoàn tất (<span id="sup-cnt-completed">0</span>)</button>
               <button onclick="setSupervisorStudentFilter('primary')" id="sup-flt-primary" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">GVHD chính (<span id="sup-cnt-primary">0</span>)</button>
               <button onclick="setSupervisorStudentFilter('support')" id="sup-flt-support" class="px-3 py-1.5 rounded-xl font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">GVHD 2 (<span id="sup-cnt-support">0</span>)</button>
-            </div>
-
-            <!-- Search Input -->
-            <div class="relative w-full md:w-64">
-              <input type="text" id="supervisor-student-search" oninput="renderSupervisorAssignedStudents()" placeholder="Tìm MSSV, họ tên, đề tài..." class="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none">
-              <span class="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
-            </div>
           </div>
 
           <!-- Students Horizontal Cards Container -->
@@ -856,14 +852,14 @@
           </div>
 
           <!-- Empty State -->
-          <div id="supervisor-students-empty" class="hidden card-surface p-12 text-center max-w-md mx-auto my-6 border border-dashed border-slate-300 rounded-2xl bg-slate-50">
-            <div class="w-14 h-14 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl font-bold">
+          <div id="supervisor-students-empty" class="hidden card-surface w-full min-h-[250px] p-8 sm:p-10 text-center flex flex-col items-center justify-center my-4 border border-dashed border-slate-300 rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/60">
+            <div class="w-16 h-16 bg-white border border-blue-100 text-tdtu-blue rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl shadow-sm">
               👨‍🎓
             </div>
-            <h3 class="text-base font-black text-slate-800 mb-1">
+            <h3 class="text-base sm:text-lg font-black text-slate-800 mb-1.5">
               Chưa có sinh viên được phân công trong đợt này.
             </h3>
-            <p class="text-xs text-slate-500 leading-relaxed">
+            <p class="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-xl">
               Hiện chưa có sinh viên nào được phân công cho Thầy/Cô trong đợt tốt nghiệp này.
             </p>
           </div>
