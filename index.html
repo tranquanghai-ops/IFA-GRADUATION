@@ -910,15 +910,13 @@
             </div>
 
             <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs min-w-[700px]">
+              <table class="w-full text-left text-xs min-w-[600px]">
                 <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
                   <tr>
                     <th class="p-3.5">MSSV</th>
                     <th class="p-3.5">Họ và tên</th>
                     <th class="p-3.5">Đề tài tốt nghiệp</th>
-                    <th class="p-3.5">Loại hình</th>
                     <th class="p-3.5">Hình thức trúng tuyển</th>
-                    <th class="p-3.5 text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody id="sup-accepted-tbody" class="divide-y divide-slate-100">
@@ -1050,24 +1048,10 @@
               </div>
             </div>
 
-            <!-- Section E: Đánh giá & Nhận xét của GVHD -->
-            <div class="p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-amber-950 uppercase tracking-wide text-[11px]">Đánh giá & Nhận xét của GVHD</span>
-                <span id="dtl-score-status" class="badge bg-amber-200 text-amber-900 font-bold">Chưa chấm</span>
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <span class="text-[11px] text-slate-500 block">Điểm GVHD:</span>
-                  <span id="dtl-score-val" class="text-2xl font-black font-mono text-amber-700">--</span>
-                </div>
-                <div>
-                  <span class="text-[11px] text-slate-500 block">Thời gian lưu:</span>
-                  <span id="dtl-score-time" class="text-xs font-mono text-slate-600">--</span>
-                </div>
-              </div>
+            <!-- Section E: Nhận xét hướng dẫn (điểm được nhập tại Cổng Chấm điểm) -->
+            <div class="p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
+              <span class="font-bold text-amber-950 uppercase tracking-wide text-[11px]">Nhận xét của GVHD</span>
               <div>
-                <span class="text-[11px] text-slate-500 block mb-1">Nhận xét của GVHD:</span>
                 <div id="dtl-comment-text" class="p-3 bg-white rounded-lg border border-amber-200/80 text-xs italic text-slate-700 min-h-[50px]">
                   (Chưa có nhận xét)
                 </div>
@@ -1080,9 +1064,6 @@
           <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
             <button type="button" onclick="closeSupervisorStudentDetailModal()" class="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs rounded-xl transition-all cursor-pointer">
               Đóng
-            </button>
-            <button id="btn-dtl-score" type="button" class="px-5 py-2.5 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer">
-              <span>✍️ Nhập Điểm / Cập nhật Nhận xét</span>
             </button>
           </div>
         </div>

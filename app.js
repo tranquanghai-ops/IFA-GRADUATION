@@ -3333,7 +3333,7 @@ function renderSupervisorAcceptedTable() {
   if (!tbody) return;
 
   if (state.supervisorAcceptedStudents.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400">Chưa có sinh viên nào trúng tuyển chính thức.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-slate-400">Chưa có sinh viên nào trúng tuyển chính thức.</td></tr>';
     return;
   }
 
@@ -3346,12 +3346,6 @@ function renderSupervisorAcceptedTable() {
         <span class="badge bg-emerald-100 text-emerald-800 font-bold text-[10px]">
           ${s.acceptedRank === 'manual' ? 'Phân công Khoa' : 'Nguyện vọng ' + s.acceptedRank}
         </span>
-      </td>
-      <td class="p-3.5 text-center">
-        ${renderSupervisorScoreCell(s.studentId)}
-      </td>
-      <td class="p-3.5 text-center">
-        ${renderThesisHdScoreCell(s.studentId)}
       </td>
     </tr>
   `).join('');
@@ -3896,6 +3890,37 @@ function normalizeRoundWeekEventColor(value) {
   return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#dc2626';
 }
 
+const ROUND_WEEK_EVENT_COLORS = [
+  ['#dc2626', 'Đỏ'], ['#ea580c', 'Cam'], ['#d97706', 'Hổ phách'], ['#ca8a04', 'Vàng'],
+  ['#65a30d', 'Xanh lá nhạt'], ['#16a34a', 'Xanh lá'], ['#0f766e', 'Xanh ngọc'], ['#0891b2', 'Xanh cyan'],
+  ['#2563eb', 'Xanh dương'], ['#4f46e5', 'Chàm'], ['#7e22ce', 'Tím'], ['#db2777', 'Hồng']
+];
+
+function getRoundWeekEditingEventId(weekNumber) {
+  return state.roundWeekEditingEvents?.[weekNumber] || '';
+}
+
+function setRoundWeekEventFormMode(weekNumber, eventId = '') {
+  if (!state.roundWeekEditingEvents) state.roundWeekEditingEvents = {};
+  if (eventId) state.roundWeekEditingEvents[weekNumber] = eventId;
+  else delete state.roundWeekEditingEvents[weekNumber];
+  const submitBtn = document.getElementById(`round-week-${weekNumber}-event-submit`);
+  const cancelBtn = document.getElementById(`round-week-${weekNumber}-event-cancel`);
+  if (submitBtn) submitBtn.textContent = eventId ? 'Lưu chỉnh sửa sự kiện' : 'Thêm khoảng sự kiện';
+  if (cancelBtn) cancelBtn.classList.toggle('hidden', !eventId);
+}
+
+function updateRoundWeekEventColorPresets(weekNumber, value) {
+  const color = normalizeRoundWeekEventColor(value);
+  document.querySelectorAll(`[data-round-week-event-color="${weekNumber}"]`).forEach(button => {
+    const active = button.dataset.color === color;
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.classList.toggle('ring-2', active);
+    button.classList.toggle('ring-slate-700', active);
+    button.classList.toggle('ring-offset-1', active);
+  });
+}
+
 function getRoundWeekEventRange(event = {}) {
   const fallback = Math.max(0, Math.min(6, Number(event.dayIndex) || 0));
   let startDayIndex = Number.isInteger(Number(event.startDayIndex))
@@ -3945,9 +3970,10 @@ function renderRoundWeekDayPicker(weekNumber) {
       const startDate = event.startDate || event.date || days[startDayIndex]?.date || '';
       const endDate = event.endDate || event.date || days[endDayIndex]?.date || startDate;
       const dateText = startDate === endDate ? startDate : `${startDate} → ${endDate}`;
-      return `<div class="flex items-center justify-between gap-1 rounded-md border px-2 py-1 text-[10px]" style="background-color:${color}18;border-color:${color}55;color:${color}"><span class="truncate">📌 ${escapeHtml(dateText)} · ${escapeHtml(event.title || '')}</span><button type="button" onclick="removeRoundWeekEvent(${weekNumber}, '${escapeHtml(event.id)}')" class="shrink-0 font-black opacity-70 hover:opacity-100">×</button></div>`;
+      return `<div class="flex items-center justify-between gap-1 rounded-md border px-2 py-1 text-[10px]" style="background-color:${color}18;border-color:${color}55;color:${color}"><span class="truncate">📌 ${escapeHtml(dateText)} · ${escapeHtml(event.title || '')}</span><span class="flex shrink-0 items-center gap-1"><button type="button" onclick="editRoundWeekEvent(${weekNumber}, '${escapeHtml(event.id)}')" class="font-black opacity-70 hover:opacity-100" title="Sửa sự kiện">✎</button><button type="button" onclick="removeRoundWeekEvent(${weekNumber}, '${escapeHtml(event.id)}')" class="font-black opacity-70 hover:opacity-100" title="Xóa sự kiện">×</button></span></div>`;
     }).join('')
     : '<span class="text-[10px] text-slate-400 italic">Chưa có sự kiện theo ngày.</span>';
+  updateRoundWeekEventColorPresets(weekNumber, document.getElementById(`round-week-${weekNumber}-event-color`)?.value);
 }
 
 window.selectRoundWeekEventDay = function(weekNumber, dayIndex) {
@@ -3970,6 +3996,36 @@ window.syncRoundWeekEventRange = function(weekNumber, changedField) {
     if (changedField === 'start') endSelect.value = String(start);
     else startSelect.value = String(end);
   }
+};
+
+window.selectRoundWeekEventColor = function(weekNumber, color) {
+  const input = document.getElementById(`round-week-${weekNumber}-event-color`);
+  if (input) input.value = normalizeRoundWeekEventColor(color);
+  updateRoundWeekEventColorPresets(weekNumber, color);
+};
+
+window.editRoundWeekEvent = function(weekNumber, eventId) {
+  const event = getRoundWeekDraftEvents(weekNumber).find(item => item.id === eventId);
+  if (!event) return;
+  const { startDayIndex, endDayIndex } = getRoundWeekEventRange(event);
+  const form = document.getElementById(`round-week-${weekNumber}-event-form`);
+  const startSelect = document.getElementById(`round-week-${weekNumber}-event-start-day`);
+  const endSelect = document.getElementById(`round-week-${weekNumber}-event-end-day`);
+  const titleInput = document.getElementById(`round-week-${weekNumber}-event-title`);
+  if (startSelect) startSelect.value = String(startDayIndex);
+  if (endSelect) endSelect.value = String(endDayIndex);
+  if (titleInput) titleInput.value = event.title || '';
+  window.selectRoundWeekEventColor(weekNumber, event.color);
+  setRoundWeekEventFormMode(weekNumber, eventId);
+  form?.classList.remove('hidden');
+  titleInput?.focus();
+};
+
+window.cancelRoundWeekEventEdit = function(weekNumber) {
+  const titleInput = document.getElementById(`round-week-${weekNumber}-event-title`);
+  if (titleInput) titleInput.value = '';
+  window.selectRoundWeekEventColor(weekNumber, '#dc2626');
+  setRoundWeekEventFormMode(weekNumber);
 };
 
 window.toggleRoundWeekEventForm = function(weekNumber) {
@@ -3999,8 +4055,8 @@ window.addRoundWeekEvent = function(weekNumber) {
     return;
   }
   const events = getRoundWeekDraftEvents(weekNumber);
-  events.push({
-    id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  const editedEventId = getRoundWeekEditingEventId(weekNumber);
+  const payload = {
     title,
     dayIndex: startDayIndex,
     date: startDay.date,
@@ -4009,14 +4065,20 @@ window.addRoundWeekEvent = function(weekNumber) {
     startDate: startDay.date,
     endDate: endDay.date,
     color: normalizeRoundWeekEventColor(colorInput?.value)
-  });
+  };
+  const existingIndex = events.findIndex(event => event.id === editedEventId);
+  if (existingIndex >= 0) events[existingIndex] = { ...events[existingIndex], ...payload };
+  else events.push({ id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, ...payload });
   state.roundWeekEventsDraft[weekNumber] = events;
   if (titleInput) titleInput.value = '';
+  window.selectRoundWeekEventColor(weekNumber, '#dc2626');
+  setRoundWeekEventFormMode(weekNumber);
   renderRoundWeekDayPicker(weekNumber);
 };
 
 window.removeRoundWeekEvent = function(weekNumber, eventId) {
   state.roundWeekEventsDraft[weekNumber] = getRoundWeekDraftEvents(weekNumber).filter(event => event.id !== eventId);
+  if (getRoundWeekEditingEventId(weekNumber) === eventId) window.cancelRoundWeekEventEdit(weekNumber);
   renderRoundWeekDayPicker(weekNumber);
 };
 
@@ -4070,8 +4132,10 @@ function renderRoundWeeklyContentEditor(durationWeeks) {
               <label class="min-w-0 text-[9px] font-bold text-slate-500">Bắt đầu<select id="round-week-${n}-event-start-day" onchange="syncRoundWeekEventRange(${n}, 'start')" class="mt-0.5 w-full min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"></select></label>
               <label class="min-w-0 text-[9px] font-bold text-slate-500">Kết thúc<select id="round-week-${n}-event-end-day" onchange="syncRoundWeekEventRange(${n}, 'end')" class="mt-0.5 w-full min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"></select></label>
             </div>
-            <div class="grid grid-cols-[1fr_72px] gap-1.5 items-end"><input id="round-week-${n}-event-title" type="text" maxlength="120" placeholder="VD: Sơ khảo" class="min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"><label class="text-[9px] font-bold text-slate-500">Màu<input id="round-week-${n}-event-color" type="color" value="#dc2626" title="Chọn màu sự kiện" class="mt-0.5 h-7 w-full cursor-pointer rounded-md border border-slate-200 bg-white p-0.5"></label></div>
-            <button type="button" onclick="addRoundWeekEvent(${n})" class="w-full rounded-md bg-blue-600 py-1 text-[10px] font-bold text-white hover:bg-blue-700">Thêm khoảng sự kiện</button>
+            <input id="round-week-${n}-event-title" type="text" maxlength="120" placeholder="VD: Sơ khảo" class="min-w-0 w-full rounded-md border border-slate-200 bg-white p-1 text-[10px]">
+            <input id="round-week-${n}-event-color" type="hidden" value="#dc2626">
+            <div><span class="text-[9px] font-bold text-slate-500">Màu sự kiện</span><div class="mt-1 grid grid-cols-6 gap-1">${ROUND_WEEK_EVENT_COLORS.map(([color, label]) => `<button type="button" data-round-week-event-color="${n}" data-color="${color}" onclick="selectRoundWeekEventColor(${n}, '${color}')" title="${label}" aria-label="Màu ${label}" class="h-5 rounded-md border border-white/80 shadow-sm transition hover:scale-110" style="background-color:${color}"></button>`).join('')}</div></div>
+            <div class="grid grid-cols-[1fr_auto] gap-1.5"><button type="button" id="round-week-${n}-event-submit" onclick="addRoundWeekEvent(${n})" class="w-full rounded-md bg-blue-600 py-1 text-[10px] font-bold text-white hover:bg-blue-700">Thêm khoảng sự kiện</button><button type="button" id="round-week-${n}-event-cancel" onclick="cancelRoundWeekEventEdit(${n})" class="hidden rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-100">Hủy</button></div>
           </div>
         </div>
       </div>`;
@@ -4095,6 +4159,7 @@ function readRoundWeeklyContentDraft(durationWeeks) {
 
 function restoreRoundWeeklyContentDraft(drafts = []) {
   state.roundWeekEventsDraft = {};
+  state.roundWeekEditingEvents = {};
   drafts.forEach((draft, index) => {
     const week = index + 1;
     const titleEl = document.getElementById(`round-week-${week}-title`);
@@ -4164,6 +4229,7 @@ window.resetWeeklyContentToDefault = function() {
   const durationInput = document.getElementById('round-form-duration-weeks');
   const durationWeeks = parseInt(durationInput?.value, 10) || 12;
   state.roundWeekEventsDraft = {};
+  state.roundWeekEditingEvents = {};
   renderRoundWeeklyContentEditor(durationWeeks);
 };
 
@@ -4489,6 +4555,7 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
   // Render weekly content editor and populate saved config
   const editDurationWeeks = parseInt(r.durationWeeks, 10) || 12;
   state.roundWeekEventsDraft = {};
+  state.roundWeekEditingEvents = {};
   if (typeof renderRoundWeeklyContentEditor === 'function') renderRoundWeeklyContentEditor(editDurationWeeks);
   (r.timelineWeeksConfig || []).forEach((wc) => {
     const n = wc.week || 1;
@@ -22385,8 +22452,15 @@ window.renderStudentTimelineWeeks = function() {
       const iconBg = card.status === 'completed' ? 'bg-emerald-600 text-white' : card.status === 'active' ? 'bg-blue-600 text-white animate-pulse' : 'bg-slate-200 text-slate-500';
       const noteColor = card.status === 'completed' ? 'text-emerald-700 font-bold' : card.status === 'active' ? 'text-blue-700 font-bold' : 'text-slate-400';
       const supervisorInfo = card.id === 'gvhd' && card.supervisor
-        ? `<div class="mt-1.5 flex items-center gap-2 rounded-lg bg-white/70 border border-emerald-200 px-2 py-1.5 w-full text-left"><img src="${card.supervisor.photoUrl || getSupervisorAvatarSvgDataUri(card.supervisor.name)}" onerror="this.onerror=null;this.src=getSupervisorAvatarSvgDataUri('${escapeHtml(card.supervisor.name)}');" class="w-7 h-7 rounded-lg object-cover border border-emerald-300"><span class="min-w-0"><b class="block truncate text-[10px] text-emerald-900">${escapeHtml(card.supervisor.name)}</b>${card.supervisor.email ? `<small class="block truncate text-[8px] text-emerald-700">${escapeHtml(card.supervisor.email)}</small>` : ''}</span></div>`
+        ? `<div class="flex flex-col items-center text-center w-full"><img src="${card.supervisor.photoUrl || getSupervisorAvatarSvgDataUri(card.supervisor.name)}" onerror="this.onerror=null;this.src=getSupervisorAvatarSvgDataUri('${escapeHtml(card.supervisor.name)}');" class="w-16 h-16 rounded-2xl object-cover border-2 border-emerald-300 shadow-sm"><b class="mt-2 block max-w-full truncate text-[11px] text-emerald-950">${escapeHtml(card.supervisor.name)}</b>${card.supervisor.email ? `<small class="mt-0.5 block max-w-full truncate text-[9px] text-emerald-700">${escapeHtml(card.supervisor.email)}</small>` : ''}</div>`
         : '';
+      if (card.id === 'gvhd' && card.supervisor) {
+        return `<div class="flex-shrink-0 rounded-2xl border ${cardBg} flex flex-col items-center justify-center text-center p-4 shadow-xs relative overflow-hidden transition-all"
+                     style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
+          ${supervisorInfo}
+          <span class="mt-2 text-[9px] ${noteColor}">${card.note}</span>
+        </div>`;
+      }
       return `<div class="flex-shrink-0 rounded-2xl border ${cardBg} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all"
                    style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
         <div class="w-9 h-9 rounded-full flex items-center justify-center text-lg ${iconBg} mb-1.5 shadow-xs">
@@ -23520,17 +23594,6 @@ window.renderSupervisorAssignedStudents = function() {
       ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">GVHD chính</span>'
       : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800 border border-indigo-300">GVHD 2</span>';
 
-    // Score status
-    const sc = round?.supervisorScores?.[studentId];
-    let scoreBadge = '';
-    if (sc?.status === 'completed') {
-      scoreBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-mono font-black bg-emerald-100 text-emerald-800 border border-emerald-300">Điểm GVHD: ${Number(sc.score).toFixed(1)}</span>`;
-    } else if (sc?.status === 'draft') {
-      scoreBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-300">● Lưu tạm: ${sc.score ?? '--'}</span>`;
-    } else {
-      scoreBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-500">Chưa chấm</span>';
-    }
-
     // Next milestone & submission check
     const activities = Array.isArray(round?.activities) ? round.activities : [];
     const subActs = activities.filter(a => a.submissionEnabled);
@@ -23583,11 +23646,8 @@ window.renderSupervisorAssignedStudents = function() {
           </div>
         </div>
 
-        <!-- Right: Status Badges & Action Buttons -->
+        <!-- Right: Guidance actions only; scoring belongs to the Assessment portal. -->
         <div class="flex flex-wrap items-center justify-between lg:justify-end gap-2.5 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 shrink-0">
-          <div class="mr-2">
-            ${scoreBadge}
-          </div>
           <div class="flex items-center gap-1.5 flex-wrap">
             <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}')" class="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer" title="Xem thông tin chi tiết">
               📋 Xem hồ sơ
@@ -23597,9 +23657,6 @@ window.renderSupervisorAssignedStudents = function() {
             </button>
             <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}', 'comment')" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-xl text-xs font-bold transition-all cursor-pointer" title="Nhận xét của GVHD">
               💬 Nhận xét
-            </button>
-            <button type="button" onclick="openScoreEntryModal('supervisor', '${studentId}')" class="px-3.5 py-1.5 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl text-xs font-black shadow-xs transition-all cursor-pointer" title="Nhập hoặc chỉnh sửa điểm GVHD">
-              ✍️ Chấm điểm
             </button>
           </div>
         </div>
