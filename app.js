@@ -3685,13 +3685,17 @@ function renderRoundWeeklyContentEditor(durationWeeks) {
       <div class="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
         <div class="flex items-center justify-between">
           <span class="font-black text-xs text-slate-800">Tuần ${n}</span>
-          ${defMilestone ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-bold">${defMilestone}</span>` : ''}
+          <label class="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 cursor-pointer">
+            <input type="checkbox" id="round-week-${n}-visible" checked class="rounded text-emerald-600">
+            Hiển thị cho SV
+          </label>
         </div>
         <input type="text" id="round-week-${n}-title" placeholder="Tiêu đề tuần ${n}"
                class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
         <textarea id="round-week-${n}-note" rows="2" placeholder="Ghi chú nội dung tuần ${n} (tuỳ chọn)"
                   class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none"></textarea>
         <select id="round-week-${n}-milestone"
+                onchange="toggleRoundWeekCustomMilestone(${n})"
                 class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
           <option value="">-- Không có mốc --</option>
           <option value="Duyệt đợt 1" ${defMilestone === 'Duyệt đợt 1' ? 'selected' : ''}>🚩 Duyệt đợt 1</option>
@@ -3700,9 +3704,17 @@ function renderRoundWeeklyContentEditor(durationWeeks) {
           <option value="Sơ khảo">📋 Sơ khảo</option>
           <option value="Khác">📌 Khác</option>
         </select>
+        <input type="text" id="round-week-${n}-milestone-custom" placeholder="Tên mốc tùy chỉnh"
+               class="hidden w-full p-1.5 border border-amber-200 rounded-lg text-xs bg-amber-50 focus:ring-2 focus:ring-amber-400 focus:outline-none">
       </div>`;
   }).join('');
 }
+
+window.toggleRoundWeekCustomMilestone = function(weekNumber) {
+  const select = document.getElementById(`round-week-${weekNumber}-milestone`);
+  const custom = document.getElementById(`round-week-${weekNumber}-milestone-custom`);
+  if (custom) custom.classList.toggle('hidden', select?.value !== 'Khác');
+};
 
 window.resetWeeklyContentToDefault = function() {
   const durationInput = document.getElementById('round-form-duration-weeks');
@@ -4037,9 +4049,18 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
     const titleEl = document.getElementById(`round-week-${n}-title`);
     const noteEl  = document.getElementById(`round-week-${n}-note`);
     const mileEl  = document.getElementById(`round-week-${n}-milestone`);
+    const visibleEl = document.getElementById(`round-week-${n}-visible`);
+    const customMilestoneEl = document.getElementById(`round-week-${n}-milestone-custom`);
     if (titleEl) titleEl.value = wc.title || '';
     if (noteEl)  noteEl.value  = wc.note  || '';
-    if (mileEl)  mileEl.value  = wc.milestone || '';
+    if (visibleEl) visibleEl.checked = wc.visible !== false;
+    if (mileEl) {
+      const standardMilestones = ['', 'Duyệt đợt 1', 'Duyệt đợt 2', 'Duyệt đợt 3', 'Sơ khảo', 'Khác'];
+      const savedMilestone = wc.milestone || '';
+      mileEl.value = standardMilestones.includes(savedMilestone) ? savedMilestone : 'Khác';
+      if (customMilestoneEl && mileEl.value === 'Khác') customMilestoneEl.value = savedMilestone === 'Khác' ? '' : savedMilestone;
+      window.toggleRoundWeekCustomMilestone(n);
+    }
   });
 
   document.getElementById('modal-round').classList.remove('hidden');
@@ -5194,11 +5215,14 @@ window.saveRound = async function(e) {
   // Collect weekly content config from admin form
   const timelineWeeksConfig = Array.from({ length: durationWeeks }, (_, i) => {
     const n = i + 1;
+    const milestoneSelect = document.getElementById(`round-week-${n}-milestone`)?.value || '';
+    const customMilestone = document.getElementById(`round-week-${n}-milestone-custom`)?.value?.trim() || '';
     return {
       week: n,
       title: document.getElementById(`round-week-${n}-title`)?.value?.trim() || `Tuần ${n}`,
       note: document.getElementById(`round-week-${n}-note`)?.value?.trim() || '',
-      milestone: document.getElementById(`round-week-${n}-milestone`)?.value || '',
+      milestone: milestoneSelect === 'Khác' ? (customMilestone || 'Mốc khác') : milestoneSelect,
+      visible: document.getElementById(`round-week-${n}-visible`)?.checked !== false,
     };
   });
 
@@ -20490,83 +20514,131 @@ function getRoundStatusCategory(r) {
   return 'running';
 }
 
-function formatAdminRoundTimelineDate(value) {
-  if (!value) return 'Chưa đặt thời gian';
-  const parsed = value?.toDate ? value.toDate() : new Date(value);
-  if (isNaN(parsed.getTime())) return 'Chưa đặt thời gian';
-  const pad = number => String(number).padStart(2, '0');
-  return `${pad(parsed.getDate())}/${pad(parsed.getMonth() + 1)}/${parsed.getFullYear()}`;
+function getRoundWeekSchedule(round) {
+  const durationWeeks = parseInt(round?.durationWeeks, 10) || 12;
+  const pad = value => String(value).padStart(2, '0');
+  const formatDate = date => `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+  let startMonday = null;
+  const configuredStart = round?.startDate || round?.datnStartDate || round?.openAt || round?.openAtDate;
+  if (configuredStart) {
+    const parsed = new Date(configuredStart?.toDate ? configuredStart.toDate() : configuredStart);
+    if (!isNaN(parsed.getTime())) {
+      const day = parsed.getDay();
+      parsed.setDate(parsed.getDate() - day + (day === 0 ? -6 : 1));
+      parsed.setHours(0, 0, 0, 0);
+      startMonday = parsed;
+    }
+  }
+  if (!startMonday) startMonday = new Date();
+
+  const now = new Date();
+  const defaultMilestones = { 4: 'Duyệt đợt 1', 8: 'Duyệt đợt 2', 12: 'Duyệt đợt 3' };
+  const weeklyConfig = Array.isArray(round?.timelineWeeksConfig) ? round.timelineWeeksConfig : [];
+  return Array.from({ length: durationWeeks }, (_, index) => {
+    const week = index + 1;
+    const start = new Date(startMonday.getTime() + index * 7 * 24 * 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000);
+    end.setHours(23, 59, 59, 999);
+    const config = weeklyConfig.find(item => Number(item.week) === week) || {};
+    const status = now > end ? 'completed' : (now >= start ? 'ongoing' : 'upcoming');
+    return {
+      week,
+      title: config.title || `Tuần ${week}`,
+      note: config.note || '',
+      milestone: config.milestone || defaultMilestones[week] || '',
+      visible: config.visible !== false,
+      status,
+      dateText: `${formatDate(start)} – ${formatDate(end)}`
+    };
+  });
 }
 
 function renderAdminRoundTimelinePreview(round) {
-  const activities = (Array.isArray(round.activities) ? round.activities : [])
-    .map((activity, index) => normalizeActivity(activity, round.id, index))
-    .sort((a, b) => (a.order || 0) - (b.order || 0));
-  const publishedCount = activities.filter(isActivityPublished).length;
-  const draftCount = activities.length - publishedCount;
+  const weeks = getRoundWeekSchedule(round);
+  const visibleWeeks = weeks.filter(week => week.visible).length;
+  const hiddenWeeks = weeks.length - visibleWeeks;
+  const statusStyles = {
+    completed: { card: 'bg-emerald-50 border-emerald-300', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300', label: 'Đã qua', icon: '✓' },
+    ongoing: { card: 'bg-blue-50 border-blue-400 ring-2 ring-blue-200', badge: 'bg-blue-600 text-white border-blue-600', label: 'Đang diễn ra', icon: '●' },
+    upcoming: { card: 'bg-slate-50 border-slate-200', badge: 'bg-white text-slate-500 border-slate-200', label: 'Chưa tới', icon: null }
+  };
 
-  const cards = activities.slice(0, 4).map((activity, index) => {
-    const typeMeta = ACTIVITY_TYPES[activity.activityType] || ACTIVITY_TYPES.other;
-    const status = getActivityStatus(activity);
-    const statusMeta = status === 'ongoing'
-      ? { label: 'Đang diễn ra', cls: 'bg-blue-600 text-white border-blue-600' }
-      : status === 'upcoming'
-        ? { label: 'Sắp tới', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
-        : status === 'past'
-          ? { label: 'Đã kết thúc', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
-          : { label: 'Kế hoạch', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
-    const publication = isActivityPublished(activity)
-      ? '<span class="text-[9px] font-bold text-emerald-700">● Đã công bố</span>'
-      : '<span class="text-[9px] font-bold text-amber-700">● Bản nháp</span>';
-    const dateText = activity.startAt
-      ? `${formatAdminRoundTimelineDate(activity.startAt)}${activity.endAt ? ` – ${formatAdminRoundTimelineDate(activity.endAt)}` : ''}`
-      : 'Chưa đặt thời gian';
+  const introCards = [
+    { icon: '📝', title: 'Đăng ký đề tài', subtitle: 'Đề tài ĐATN' },
+    { icon: '👨‍🏫', title: 'Phân công GVHD', subtitle: isDirectSupervisorAssignment(round) ? 'Khoa phân công' : 'Xét nguyện vọng' }
+  ].map(card => `
+    <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}')" class="min-w-[215px] h-[142px] rounded-2xl border border-slate-200 bg-white p-3 flex flex-col items-center justify-center text-center hover:border-blue-400 hover:shadow-md cursor-pointer transition">
+      <span class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-lg mb-2">${card.icon}</span>
+      <span class="font-black text-xs text-slate-900">${card.title}</span>
+      <span class="text-[10px] text-slate-500 mt-1">${card.subtitle}</span>
+    </div>`).join('');
 
+  const weekCards = weeks.map(week => {
+    const style = statusStyles[week.status] || statusStyles.upcoming;
     return `
-      <button type="button" onclick="openAdminRoundTimelineActivity('${round.id}', '${activity.id}')" class="min-w-[220px] flex-1 text-left p-3 rounded-2xl border ${status === 'ongoing' ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200' : 'border-slate-200 bg-white'} hover:border-blue-400 hover:shadow-md transition group">
-        <div class="flex items-start justify-between gap-2 mb-2">
-          <span class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-base">${typeMeta.icon || '📅'}</span>
-          <span class="px-2 py-0.5 rounded-full border text-[9px] font-bold whitespace-nowrap ${statusMeta.cls}">${statusMeta.label}</span>
+      <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}', ${week.week})" class="relative min-w-[215px] h-[142px] rounded-2xl border p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}">
+        <div class="flex items-center justify-between w-full mb-1">
+          <span class="font-black text-xs text-slate-900">Tuần ${week.week}</span>
+          <span class="px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${week.visible ? style.badge : 'bg-slate-200 text-slate-600 border-slate-300'}">${week.visible ? style.label : 'Đang ẩn'}</span>
         </div>
-        <div class="font-black text-xs text-slate-900 line-clamp-2 group-hover:text-blue-700">${escapeHtml(activity.title || `Mốc ${index + 1}`)}</div>
-        <div class="text-[10px] text-slate-500 mt-1">${dateText}</div>
-        <div class="mt-2 flex items-center justify-between gap-2">
-          ${publication}
-          <span class="text-[9px] font-bold text-blue-600">Sửa ↗</span>
-        </div>
-      </button>`;
+        <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black my-1 ${week.status === 'ongoing' ? 'bg-blue-600 text-white' : week.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">${style.icon || week.week}</span>
+        <span class="font-mono font-bold text-[11px] text-slate-700">${week.dateText}</span>
+        ${week.note ? `<span class="text-[9px] text-slate-500 mt-1 line-clamp-1">${escapeHtml(week.note)}</span>` : ''}
+        ${week.milestone ? `<span class="mt-1 px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px]">🚩 ${escapeHtml(week.milestone)}</span>` : ''}
+        <button type="button" onclick="toggleRoundTimelineWeekVisibility('${round.id}', ${week.week}, event)" class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-white/90 border border-slate-200 text-[9px] font-bold ${week.visible ? 'text-slate-600' : 'text-blue-700'}">${week.visible ? 'Ẩn' : 'Hiện'}</button>
+      </div>`;
   }).join('');
 
-  const emptyCard = `
-    <button type="button" onclick="openAdminRoundTimelineActivity('${round.id}', '', true)" class="min-h-[116px] w-full border-2 border-dashed border-blue-200 bg-blue-50/40 hover:bg-blue-50 hover:border-blue-400 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition">
-      <span class="w-9 h-9 rounded-xl bg-white border border-blue-200 text-blue-700 flex items-center justify-center text-lg">＋</span>
-      <span class="font-black text-xs text-blue-800">Tạo mốc kế hoạch đầu tiên</span>
-      <span class="text-[10px] text-slate-500">Mốc chỉ hiển thị cho sinh viên sau khi được công bố</span>
-    </button>`;
-
   return `
-    <section class="px-4 py-3.5 bg-slate-50/60 border-b border-slate-200">
+    <section class="px-4 py-3.5 bg-white border-b border-slate-200">
       <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div class="flex items-center gap-2.5">
           <span class="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-lg">🗓️</span>
           <div>
-            <div class="font-black text-sm text-slate-900">Lộ trình đồ án & tiến độ thực hiện</div>
-            <div class="text-[10px] text-slate-500">${activities.length} mốc · ${publishedCount} đã công bố${draftCount ? ` · ${draftCount} bản nháp` : ''}</div>
+            <div class="font-black text-sm text-slate-900">Lộ trình đồ án tốt nghiệp & tiến độ thực hiện</div>
+            <div class="text-[10px] text-slate-500">Kế hoạch ${weeks.length} tuần · ${visibleWeeks} tuần hiển thị${hiddenWeeks ? ` · ${hiddenWeeks} tuần đang ẩn` : ''}</div>
           </div>
         </div>
-        <button type="button" onclick="openRoundWorkspaceModal('${round.id}', 'timeline')" class="px-3 py-1.5 rounded-xl border border-blue-200 bg-white hover:bg-blue-50 text-blue-700 font-bold text-[10px] transition">Quản lý kế hoạch ↗</button>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="openRoundWeekEditor('${round.id}')" class="px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] transition">＋ Thêm / sửa mốc</button>
+        </div>
       </div>
-      <div class="flex gap-2.5 overflow-x-auto pb-1">${activities.length ? cards : emptyCard}</div>
-      ${activities.length > 4 ? `<button type="button" onclick="openRoundWorkspaceModal('${round.id}', 'timeline')" class="mt-2 text-[10px] font-bold text-blue-700 hover:underline">Xem và chỉnh sửa tất cả ${activities.length} mốc →</button>` : ''}
+      <div class="flex gap-3 overflow-x-auto pb-2 snap-x">${introCards}${weekCards}</div>
     </section>`;
 }
 
-window.openAdminRoundTimelineActivity = async function(roundId, activityId = '', createNew = false) {
-  await window.openRoundWorkspaceModal(roundId, 'timeline');
+window.openRoundWeekEditor = async function(roundId, weekNumber = null) {
+  await window.editRoundModal(roundId, 'info');
   window.setTimeout(() => {
-    if (createNew && typeof window.openCreateActivityModal === 'function') window.openCreateActivityModal();
-    else if (activityId && typeof window.editActivityModal === 'function') window.editActivityModal(activityId);
+    const target = weekNumber
+      ? document.getElementById(`round-week-${weekNumber}-title`)
+      : document.getElementById('round-weekly-content-editor-wrap');
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (weekNumber) target?.focus();
   }, 180);
+};
+
+window.toggleRoundTimelineWeekVisibility = async function(roundId, weekNumber, event) {
+  event?.stopPropagation();
+  const round = (state.rounds || []).find(item => item.id === roundId);
+  if (!round) return;
+  const durationWeeks = parseInt(round.durationWeeks, 10) || 12;
+  const existing = Array.isArray(round.timelineWeeksConfig) ? round.timelineWeeksConfig : [];
+  const nextConfig = Array.from({ length: durationWeeks }, (_, index) => {
+    const week = index + 1;
+    const current = existing.find(item => Number(item.week) === week) || { week, title: `Tuần ${week}`, note: '', milestone: '' };
+    return week === Number(weekNumber) ? { ...current, visible: current.visible === false } : { ...current, visible: current.visible !== false };
+  });
+  try {
+    await updateDoc(doc(db, 'graduationRounds', roundId), { timelineWeeksConfig: nextConfig, updatedAt: serverTimestamp() });
+    round.timelineWeeksConfig = nextConfig;
+    renderAdminRoundsCards();
+    if (state.selectedRoundId === roundId && typeof renderStudentTimelineWeeks === 'function') renderStudentTimelineWeeks();
+    const changed = nextConfig.find(item => Number(item.week) === Number(weekNumber));
+    showToast(changed?.visible === false ? `Đã ẩn Tuần ${weekNumber} khỏi trang sinh viên.` : `Đã hiện Tuần ${weekNumber} trên trang sinh viên.`, 'success');
+  } catch (error) {
+    showToast('Không thể cập nhật hiển thị tuần: ' + error.message, 'error');
+  }
 };
 
 window.renderAdminRoundsCards = function() {
@@ -21439,6 +21511,7 @@ window.renderStudentTimelineWeeks = function() {
   // Cards 2–13 – 12 weekly cards (or durationWeeks)
   weeks.forEach((w, i) => {
     const cfg = weeklyConfig.find(c => c.week === w.num) || {};
+    if (cfg.visible === false) return;
     const defMilestone = defaultMilestones[w.num] || null;
     const milestone = cfg.milestone || (defMilestone ? defMilestone : null);
     allCards.push({
@@ -21582,9 +21655,10 @@ window.renderStudentTimelineWeeks = function() {
   // Auto-scroll to the currently active card
   if (typeof state.timelineTrackIndex !== 'number') {
     if (currentWeekNum) {
-      // Index of first weekly card is 2, so active week card is at 2 + (currentWeekNum - 1)
-      const activeIdx = 2 + (currentWeekNum - 1);
-      state.timelineTrackIndex = Math.max(0, Math.min(maxTrackIndex, activeIdx - 1));
+      const activeIdx = allCards.findIndex(card => card.type === 'week' && card.num === currentWeekNum);
+      state.timelineTrackIndex = activeIdx >= 0
+        ? Math.max(0, Math.min(maxTrackIndex, activeIdx - 1))
+        : 0;
     } else if (hasTopic && !hasGVHD) {
       state.timelineTrackIndex = 1; // scroll to show GVHD card
     } else {

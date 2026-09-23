@@ -41,9 +41,12 @@ test('round cards use the professional dashboard layout and retain workflow acti
   assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'review', 'assigned'\)/);
   assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'scoring-dashboard'\)/);
   assert.match(app, /renderAdminRoundTimelinePreview\(r\)/);
-  assert.match(app, /window\.openAdminRoundTimelineActivity = async function/);
-  assert.match(app, /Tạo mốc kế hoạch đầu tiên/);
-  assert.match(app, /Mốc chỉ hiển thị cho sinh viên sau khi được công bố/);
+  assert.match(app, /window\.openRoundWeekEditor = async function/);
+  assert.match(app, /window\.toggleRoundTimelineWeekVisibility = async function/);
+  assert.match(app, /Thêm \/ sửa mốc/);
+  assert.match(app, /Kế hoạch \$\{weeks\.length\} tuần/);
+  assert.match(app, /if \(cfg\.visible === false\) return/);
+  assert.match(app, /visible: document\.getElementById\(`round-week-\$\{n\}-visible`\)\?\.checked !== false/);
   assert.match(app, /directAssignment \? '' : `<button[^`]+Xét nguyện vọng/s);
 });
 
