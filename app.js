@@ -641,6 +641,7 @@ export const state = {
   eligibleStudents: [],
   myRegistration: null,
   myOfficialAssignment: null,
+  studentSelfProfile: null,
   
   // Registration Flow State
   currentStep: 1,
@@ -1063,14 +1064,14 @@ export function updateAuthUI() {
       }
     } else if (state.currentView === 'supervisor') {
       if (btnGotoSupervisor) btnGotoSupervisor.classList.add('hidden');
-      if (btnGotoStudent) { btnGotoStudent.classList.remove('hidden'); btnGotoStudent.classList.add('flex'); }
+      if (btnGotoStudent) { btnGotoStudent.classList.add('hidden'); btnGotoStudent.classList.remove('flex'); }
       if (btnGotoAdmin) {
         if (state.isAdmin) { btnGotoAdmin.classList.remove('hidden'); btnGotoAdmin.classList.add('flex'); }
         else { btnGotoAdmin.classList.add('hidden'); }
       }
       if (btnGotoAssessment) {
-        btnGotoAssessment.classList.remove('hidden');
-        btnGotoAssessment.classList.add('flex');
+        btnGotoAssessment.classList.add('hidden');
+        btnGotoAssessment.classList.remove('flex');
       }
     } else if (state.currentView === 'assessment') {
       if (btnGotoAssessment) btnGotoAssessment.classList.add('hidden');
@@ -1338,17 +1339,65 @@ async function bootstrapProjectTypesIfNeeded() {
 }
 
 function renderProjectTypesDropdown() {
-  const select = document.getElementById('select-project-type');
-  if (!select) return;
+  const container = document.getElementById('project-types-checkbox-list');
+  if (!container) return;
   const activeTypes = (state.projectTypes && state.projectTypes.length > 0)
     ? state.projectTypes.filter(p => p.active !== false).sort((a, b) => (a.order || 0) - (b.order || 0))
     : DEFAULT_PROJECT_TYPES.map((name, i) => ({ name, order: i + 1 }));
 
-  select.innerHTML = '<option value="">-- Chọn loại hình đồ án --</option>' +
-    activeTypes
-      .map(p => '<option value="' + p.name + '">' + p.name + '</option>')
-      .join('');
+  container.innerHTML = activeTypes.map(p => `
+    <label class="flex items-start gap-2.5 p-2.5 bg-white border border-slate-200 rounded-xl hover:border-blue-300 cursor-pointer transition-colors">
+      <input type="checkbox" class="project-type-checkbox mt-0.5 h-4 w-4 accent-blue-600" value="${escapeHtml(p.name)}" onchange="handleProjectTypeSelection(this)">
+      <span class="text-xs font-semibold text-slate-700 leading-snug">${escapeHtml(p.name)}</span>
+    </label>
+  `).join('');
+  setSelectedProjectTypes(parseStoredProjectTypes(document.getElementById('select-project-type')?.value || ''));
 }
+
+function parseStoredProjectTypes(value) {
+  if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean).slice(0, 3);
+  return String(value || '').split(/\s*[;|]\s*/).map(v => v.trim()).filter(Boolean).slice(0, 3);
+}
+
+function getSelectedProjectTypes() {
+  return Array.from(document.querySelectorAll('.project-type-checkbox:checked')).map(el => el.value).slice(0, 3);
+}
+
+function syncProjectTypesHiddenInput() {
+  const hidden = document.getElementById('select-project-type');
+  if (hidden) hidden.value = getSelectedProjectTypes().join('; ');
+  const hasOther = getSelectedProjectTypes().includes('Khác');
+  document.getElementById('project-type-other-wrap')?.classList.toggle('hidden', !hasOther);
+  if (!hasOther) {
+    const other = document.getElementById('input-project-type-other');
+    if (other) other.value = '';
+  }
+}
+
+function setSelectedProjectTypes(values, otherValue = '') {
+  const selected = new Set(parseStoredProjectTypes(values));
+  document.querySelectorAll('.project-type-checkbox').forEach(el => { el.checked = selected.has(el.value); });
+  const other = document.getElementById('input-project-type-other');
+  if (other) other.value = otherValue || '';
+  syncProjectTypesHiddenInput();
+}
+
+window.handleProjectTypeSelection = function(changed) {
+  const allChecked = Array.from(document.querySelectorAll('.project-type-checkbox:checked'));
+  if (allChecked.length > 3) {
+    changed.checked = false;
+    showToast('Mỗi đề tài được chọn tối đa 3 loại hình.', 'warning');
+  }
+  const checked = getSelectedProjectTypes();
+  if (checked.length >= 3) {
+    document.querySelectorAll('.project-type-checkbox:not(:checked)').forEach(el => { el.disabled = true; });
+  } else {
+    document.querySelectorAll('.project-type-checkbox').forEach(el => { el.disabled = false; });
+  }
+  syncProjectTypesHiddenInput();
+  const error = document.getElementById('project-types-error');
+  if (error) error.classList.add('hidden');
+};
 
 window.renderProjectTypesDropdown = renderProjectTypesDropdown;
 // Initial populate of dropdown
@@ -1399,6 +1448,33 @@ async function loadRounds() {
       const timeB = b.createdAtDate ? b.createdAtDate.getTime() : 0;
       return timeB - timeA;
     });
+
+    // Round documents do not always contain denormalized assignment counters.
+    // Hydrate admin cards from the same sources used by the assignment workspace.
+    if (state.isAdmin && !state.impersonation) {
+      await Promise.all(state.rounds.filter(r => !r.deleted).map(async round => {
+        try {
+          const [officialSnap, draftSnap] = await Promise.all([
+            getDocs(collection(db, 'graduationRounds', round.id, 'officialAssignments')),
+            getDocs(collection(db, 'graduationRounds', round.id, 'assignmentDrafts'))
+          ]);
+          const assignedStudentIds = new Set();
+          [...officialSnap.docs, ...draftSnap.docs].forEach(assignmentDoc => {
+            const assignment = { id: assignmentDoc.id, ...assignmentDoc.data() };
+            const supervisors = getOfficialSupervisors(assignment);
+            const hasAssignment = supervisors.length > 0 || Boolean(
+              assignment.acceptedSupervisorId || assignment.assignedSupervisorId || assignment.officialSupervisor
+            );
+            const studentId = String(assignment.studentId || assignment.id || '').trim().toUpperCase();
+            if (hasAssignment && studentId) assignedStudentIds.add(studentId);
+          });
+          round.assignedCount = assignedStudentIds.size;
+          round.officialAssignmentsCount = officialSnap.size;
+        } catch (error) {
+          console.warn(`[Rounds] Could not hydrate assignment count for ${round.id}:`, error);
+        }
+      }));
+    }
 
     renderRoundsDropdowns();
     renderAdminRoundsTable();
@@ -1536,6 +1612,14 @@ function renderRoundHeader() {
   const round = state.activeRound;
   if (!round) return;
 
+  const heroCard = document.getElementById('student-hero-card');
+  const journeyCard = document.getElementById('student-journey-card');
+  if (state.eligibilityState === 'not_eligible' && (!state.isAdmin || state.impersonation)) {
+    if (heroCard) heroCard.classList.add('hidden');
+    if (journeyCard) journeyCard.classList.add('hidden');
+    return;
+  }
+
   const titleDisplay = document.getElementById('round-title-display');
   if (titleDisplay) titleDisplay.textContent = round.title;
   const yearDisplay = document.getElementById('round-academic-year');
@@ -1667,6 +1751,7 @@ function renderRoundHeader() {
   const topicWrap = document.getElementById('hero-registered-topic-wrap');
   const topicNameEl = document.getElementById('hero-registered-topic-name');
   const topicMetaEl = document.getElementById('hero-registered-topic-meta');
+  const topicDownloadBtn = document.getElementById('hero-download-topic-form-btn');
   const reg = state.myRegistration;
   const registeredTopic = reg?.topicTitle || reg?.topic || reg?.proposalTitle || reg?.title || reg?.topicName;
 
@@ -1677,10 +1762,14 @@ function renderRoundHeader() {
       if (topicMetaEl) {
         const typeStr = reg?.projectType ? `🏷️ Loại hình: ${reg.projectType}` : '';
         const timeStr = reg?.submittedAt ? `🕒 Đã đăng ký: ${fmtDate(reg.submittedAt)}` : '';
-        topicMetaEl.innerHTML = [typeStr, timeStr].filter(Boolean).map(s => `<span>${s}</span>`).join('<span class="text-white/30">•</span>');
+        const versionStr = reg?.topicTitleVersion ? `📝 Lần ${reg.topicTitleVersion}` : '';
+        const approvalText = reg?.topicApprovalStatus === 'approved' ? '✓ GVHD đã duyệt' : reg?.topicApprovalStatus === 'rejected' ? '✕ GVHD yêu cầu chỉnh sửa' : '⌛ Chờ GVHD duyệt';
+        topicMetaEl.innerHTML = [typeStr, versionStr, approvalText, timeStr].filter(Boolean).map(s => `<span>${escapeHtml(s)}</span>`).join('<span class="text-white/30">•</span>');
       }
+      if (topicDownloadBtn) topicDownloadBtn.classList.toggle('hidden', reg?.topicApprovalStatus !== 'approved');
     } else {
       topicWrap.classList.add('hidden');
+      if (topicDownloadBtn) topicDownloadBtn.classList.add('hidden');
     }
   }
 
@@ -1760,14 +1849,21 @@ async function checkStudentEligibilityAndRegistration(roundId) {
   state.myOfficialAssignment = null;
 
   const nonEligibleAlert = document.getElementById('non-eligible-alert');
+  const heroCard = document.getElementById('student-hero-card');
+  const journeyCard = document.getElementById('student-journey-card');
+  const timelineSection = document.getElementById('student-timeline-section');
   const alreadyRegCard = document.getElementById('already-registered-card');
   const ctaCard = document.getElementById('registration-cta-card');
   const reviewInProgressCard = document.getElementById('review-in-progress-card');
   const officialResultCard = document.getElementById('official-result-card');
   const flowContainer = document.getElementById('registration-flow-container');
+  const finalScoreCard = document.getElementById('student-final-score-card');
+  applySupervisorAssignmentModeToRegistrationUI();
 
   if (!mssv) {
     if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
+    if (heroCard) heroCard.classList.remove('hidden');
+    if (journeyCard) journeyCard.classList.remove('hidden');
     if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
     if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
     if (officialResultCard) officialResultCard.classList.add('hidden');
@@ -1780,6 +1876,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
   }
 
   try {
+    await loadStudentSelfProfile(mssv);
     const roundData = state.activeRound || state.rounds?.find(r => r.id === roundId);
     const allowPre = Boolean(roundData?.allowRegistrationBeforeEligibility && !roundData?.eligibilityFinalized);
 
@@ -1789,20 +1886,28 @@ async function checkStudentEligibilityAndRegistration(roundId) {
     if (isOfficiallyEligible) {
       state.isEligible = true;
       state.eligibilityState = 'eligible';
-      nonEligibleAlert.classList.add('hidden');
+      if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
+      if (heroCard) heroCard.classList.remove('hidden');
+      if (journeyCard) journeyCard.classList.remove('hidden');
     } else if (allowPre) {
       state.isEligible = 'pending';
       state.eligibilityState = 'pending';
-      nonEligibleAlert.classList.add('hidden');
+      if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
+      if (heroCard) heroCard.classList.remove('hidden');
+      if (journeyCard) journeyCard.classList.remove('hidden');
     } else {
       state.isEligible = false;
       state.eligibilityState = 'not_eligible';
       if (nonEligibleAlert) nonEligibleAlert.classList.remove('hidden');
+      if (heroCard) heroCard.classList.add('hidden');
+      if (journeyCard) journeyCard.classList.add('hidden');
+      if (timelineSection) timelineSection.classList.add('hidden');
       if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
       if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
       if (officialResultCard) officialResultCard.classList.add('hidden');
       if (ctaCard) ctaCard.classList.add('hidden');
       if (flowContainer) flowContainer.classList.add('hidden');
+      if (finalScoreCard) finalScoreCard.classList.add('hidden');
       updateStudentJourneyStepper();
       updateStudentPersonalSidebar();
       return;
@@ -1978,6 +2083,15 @@ function renderStudentExistingRegistration(reg) {
 
   const bannerEl = document.getElementById('reg-card-eligibility-banner');
   const statusEl = document.getElementById('reg-card-status');
+  const topicStatus = reg.topicApprovalStatus || 'pending';
+  const downloadBtn = document.getElementById('btn-download-official-topic-form');
+  if (downloadBtn) downloadBtn.classList.toggle('hidden', topicStatus !== 'approved');
+  const reviewNoteEl = document.getElementById('reg-card-topic-review-note');
+  if (reviewNoteEl) {
+    const showReviewNote = topicStatus === 'rejected' && String(reg.topicApprovalNote || '').trim();
+    reviewNoteEl.textContent = showReviewNote ? `GVHD phản hồi: ${reg.topicApprovalNote}` : '';
+    reviewNoteEl.classList.toggle('hidden', !showReviewNote);
+  }
   const directAssignment = shouldSkipStudentSupervisorPreference();
   if (bannerEl) {
     if (reg.eligibilityStatus === 'pending') {
@@ -1987,7 +2101,9 @@ function renderStudentExistingRegistration(reg) {
         <div>
           <span class="font-bold block">Trạng thái điều kiện: Chờ kết quả xét từ Nhà trường / Khoa</span>
           <p class="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-            Đăng ký nguyện vọng của bạn đã được ghi nhận vào hệ thống. Trạng thái điều kiện đang là <b>Chờ xét</b>. Sau khi Nhà trường/Khoa ban hành danh sách chính thức, hệ thống sẽ đối chiếu và chuyển hồ sơ sang GVHD xét duyệt.
+            ${directAssignment
+              ? 'Đăng ký đề tài của bạn đã được ghi nhận. Trạng thái điều kiện đang là <b>Chờ xét</b>. Sau khi Nhà trường/Khoa ban hành danh sách chính thức, hồ sơ sẽ tiếp tục quy trình phân công GVHD.'
+              : 'Đăng ký nguyện vọng của bạn đã được ghi nhận vào hệ thống. Trạng thái điều kiện đang là <b>Chờ xét</b>. Sau khi Nhà trường/Khoa ban hành danh sách chính thức, hệ thống sẽ đối chiếu và chuyển hồ sơ sang GVHD xét duyệt.'}
           </p>
         </div>
       `;
@@ -2003,7 +2119,9 @@ function renderStudentExistingRegistration(reg) {
         <div>
           <span class="font-bold block">Kết quả xét duyệt: Không đủ điều kiện làm ĐATN đợt này</span>
           <p class="text-[11px] text-rose-800 mt-0.5 leading-relaxed">
-            Theo danh sách chính thức từ Nhà trường/Khoa, bạn chưa đủ điều kiện làm ĐATN trong đợt này. Nguyện vọng đăng ký không được chuyển sang GVHD xét duyệt.
+            ${directAssignment
+              ? 'Theo danh sách chính thức từ Nhà trường/Khoa, bạn chưa đủ điều kiện làm ĐATN trong đợt này. Đăng ký đề tài sẽ không được tiếp tục xử lý.'
+              : 'Theo danh sách chính thức từ Nhà trường/Khoa, bạn chưa đủ điều kiện làm ĐATN trong đợt này. Nguyện vọng đăng ký không được chuyển sang GVHD xét duyệt.'}
           </p>
         </div>
       `;
@@ -2011,6 +2129,22 @@ function renderStudentExistingRegistration(reg) {
       if (statusEl) {
         statusEl.textContent = 'Không đủ điều kiện';
         statusEl.className = 'font-bold text-rose-700 text-sm';
+      }
+    } else if (directAssignment && getOfficialSupervisors(reg).length > 0) {
+      const assignment = getOfficialSupervisors(reg).find(item => item.role === 'primary') || getOfficialSupervisors(reg)[0];
+      const assignedName = assignment?.supervisorName || reg.acceptedSupervisorName || 'Giảng viên hướng dẫn';
+      bannerEl.className = 'mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs flex items-start gap-2.5';
+      bannerEl.innerHTML = `
+        <span class="text-base">✓</span>
+        <div>
+          <span class="font-bold block">GVHD đã được Khoa phân công: ${escapeHtml(assignedName)}</span>
+          <p class="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">Bạn có thể tiếp tục đăng ký và nộp đề tài theo kế hoạch của đợt.</p>
+        </div>
+      `;
+      bannerEl.classList.remove('hidden');
+      if (statusEl) {
+        statusEl.textContent = `Đã phân công GVHD: ${assignedName}`;
+        statusEl.className = 'font-bold text-emerald-700 text-sm';
       }
     } else if (directAssignment) {
       bannerEl.className = 'mb-4 p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-start gap-2.5';
@@ -2084,15 +2218,28 @@ function renderStudentExistingRegistration(reg) {
   const canEdit = state.activeRound?.status === 'open' && state.activeRound?.allowStudentEdit !== false;
   if (canEdit) {
     btnEdit.classList.remove('hidden');
+    btnEdit.innerHTML = topicStatus === 'approved' ? '✏️ Đổi tên đề tài' : '✏️ Chỉnh sửa & đăng ký lại';
   } else {
     btnEdit.classList.add('hidden');
+  }
+
+  if (statusEl && reg.eligibilityStatus !== 'not_eligible') {
+    const topicStatusUi = {
+      approved: ['Tên đề tài đã được GVHD duyệt', 'font-bold text-emerald-700 text-sm'],
+      rejected: ['Tên đề tài chưa được duyệt – cần chỉnh sửa', 'font-bold text-rose-700 text-sm'],
+      pending: ['Tên đề tài đang chờ GVHD duyệt', 'font-bold text-amber-700 text-sm']
+    }[topicStatus] || ['Tên đề tài đang chờ GVHD duyệt', 'font-bold text-amber-700 text-sm'];
+    statusEl.textContent = topicStatusUi[0];
+    statusEl.className = topicStatusUi[1];
   }
 }
 
 window.enableEditRegistration = function() {
   if (!state.myRegistration) return;
   document.getElementById('input-topic-title').value = state.myRegistration.topicTitle || '';
-  document.getElementById('select-project-type').value = state.myRegistration.projectType || '';
+  const storedTypes = state.myRegistration.projectTypes || parseStoredProjectTypes(state.myRegistration.projectType || '');
+  setSelectedProjectTypes(storedTypes, state.myRegistration.projectTypeOther || '');
+  populateRegistrationStudentForm();
   state.selectedPreferences = [...(state.myRegistration.preferences || [])];
 
   const alreadyCard = document.getElementById('already-registered-card');
@@ -2107,9 +2254,25 @@ window.enableEditRegistration = function() {
 // --- ROUND SUPERVISORS ---
 async function loadRoundSupervisors(roundId) {
   try {
-    const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'supervisors'));
-    state.roundSupervisors = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const [snap] = await Promise.all([
+      getDocs(collection(db, 'graduationRounds', roundId, 'supervisors')),
+      ensureSupervisorsMasterLoaded().catch(() => [])
+    ]);
+    state.roundSupervisors = snap.docs.map(d => {
+      const roundSupervisor = { id: d.id, ...d.data() };
+      const master = (state.supervisorsMaster || []).find(item => item.id === roundSupervisor.supervisorId || item.id === roundSupervisor.id);
+      // Old round records can predate a phone/email change in the master list.
+      // Prefer the per-round snapshot, then seamlessly fall back to Master.
+      return {
+        ...master,
+        ...roundSupervisor,
+        email: roundSupervisor.email || master?.email || '',
+        phone: roundSupervisor.phone || master?.phone || '',
+        photoUrl: roundSupervisor.photoUrl || master?.photoUrl || ''
+      };
+    });
     renderSupervisorsGrid();
+    if (state.activeRound?.id === roundId) renderRoundHeader();
   } catch (e) {
     console.error('Error loading round supervisors:', e);
   }
@@ -2349,12 +2512,31 @@ function renderPreferencesTray() {
 // --- STEPPER NAVIGATION ---
 function applySupervisorAssignmentModeToRegistrationUI() {
   const directAssignment = shouldSkipStudentSupervisorPreference();
+  const ctaTitle = document.getElementById('registration-cta-title');
+  const ctaDescription = document.getElementById('registration-cta-description');
   const selectionStep = document.getElementById('step-indicator-2');
   const confirmStep = document.getElementById('step-indicator-3');
   const nextButton = document.getElementById('btn-registration-step-1-next');
   const confirmBackButton = document.getElementById('btn-registration-confirm-back');
   const topicDescription = document.getElementById('registration-topic-step-description');
   const confirmTitle = document.getElementById('confirm-step-title');
+  const confirmNote = document.getElementById('registration-confirm-note');
+
+  if (ctaTitle) {
+    ctaTitle.textContent = directAssignment
+      ? 'Đăng ký Đề tài'
+      : 'Đăng ký Đề tài & Chọn Giảng viên hướng dẫn';
+  }
+  if (ctaDescription) {
+    ctaDescription.textContent = directAssignment
+      ? 'Vui lòng nhập tên đề tài dự kiến và chọn từ 1 đến 3 loại hình đồ án trước khi xác nhận đăng ký.'
+      : 'Vui lòng hoàn thành điền tên đề tài dự kiến, chọn loại hình đồ án và đăng ký các nguyện vọng GVHD theo quy định của Khoa.';
+  }
+  if (confirmNote) {
+    confirmNote.innerHTML = directAssignment
+      ? '⚠️ <strong>LƯU Ý:</strong> Sau khi bấm <em>Xác nhận Đăng ký</em>, hệ thống sẽ lưu tên đề tài và loại hình đồ án của bạn. Bạn có thể chỉnh sửa trong thời gian đợt đăng ký còn mở (nếu đợt cho phép).'
+      : '⚠️ <strong>LƯU Ý:</strong> Sau khi bấm <em>Xác nhận Đăng ký</em>, hệ thống sẽ lưu thông tin của bạn vào cơ sở dữ liệu đợt. Bạn có thể thay đổi nguyện vọng trong thời gian đợt đăng ký còn mở (nếu đợt cho phép).';
+  }
 
   if (selectionStep) {
     if (directAssignment) {
@@ -2432,7 +2614,8 @@ window.validateAndGoToStep2 = function() {
   const topicInput = document.getElementById('input-topic-title');
   const errorEl = document.getElementById('topic-title-error');
   const topic = (topicInput?.value || '').trim();
-  const projectType = document.getElementById('select-project-type')?.value || '';
+  const projectTypes = getSelectedProjectTypes();
+  const officialFormFields = collectOfficialFormFields();
 
   if (errorEl) {
     errorEl.classList.add('hidden');
@@ -2463,9 +2646,16 @@ window.validateAndGoToStep2 = function() {
     return;
   }
 
-  if (!projectType) {
-    showToast('Vui lòng chọn loại hình đồ án.', 'warning');
-    document.getElementById('select-project-type')?.focus();
+  if (projectTypes.length < 1 || projectTypes.length > 3) {
+    showToast('Vui lòng chọn từ 1 đến 3 loại hình đồ án.', 'warning');
+    document.getElementById('project-types-checkbox-list')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  if (!validateOfficialFormFields(officialFormFields)) return;
+  if (projectTypes.includes('Khác') && !(document.getElementById('input-project-type-other')?.value || '').trim()) {
+    showToast('Vui lòng nhập nội dung cho loại hình “Khác”.', 'warning');
+    document.getElementById('input-project-type-other')?.focus();
     return;
   }
 
@@ -2503,7 +2693,8 @@ window.validateAndGoToStep3 = async function() {
 
 function renderConfirmationPanel() {
   document.getElementById('confirm-topic-title').textContent = (document.getElementById('input-topic-title')?.value || '').trim();
-  document.getElementById('confirm-project-type').textContent = document.getElementById('select-project-type')?.value || '';
+  const other = (document.getElementById('input-project-type-other')?.value || '').trim();
+  document.getElementById('confirm-project-type').textContent = getSelectedProjectTypes().map(t => t === 'Khác' && other ? `Khác: ${other}` : t).join(' • ');
 
   const directAssignment = shouldSkipStudentSupervisorPreference();
   const preferencesSection = document.getElementById('confirmation-preferences-section');
@@ -2538,10 +2729,18 @@ window.submitRegistration = async function() {
   const roundId = state.selectedRoundId;
   const mssv = state.isPreviewMode ? state.previewMssv : (actor?.studentMssv || state.studentMssv);
   const topicTitle = (document.getElementById('input-topic-title')?.value || '').trim();
-  const projectType = document.getElementById('select-project-type')?.value || '';
+  const projectTypes = getSelectedProjectTypes();
+  const projectTypeOther = (document.getElementById('input-project-type-other')?.value || '').trim();
+  const projectType = projectTypes.map(t => t === 'Khác' && projectTypeOther ? `Khác: ${projectTypeOther}` : t).join('; ');
+  const officialFormFields = collectOfficialFormFields();
 
   if (!roundId || !mssv) {
     showToast('Không xác định được phiên làm việc hoặc MSSV.', 'warning');
+    return;
+  }
+
+  if (!validateOfficialFormFields(officialFormFields)) {
+    goToStep(1);
     return;
   }
 
@@ -2559,6 +2758,11 @@ window.submitRegistration = async function() {
     const isPending = (state.isEligible === 'pending' || state.eligibilityState === 'pending');
     const eligibilityStatus = isPending ? 'pending' : 'eligible';
     const directAssignment = shouldSkipStudentSupervisorPreference();
+    const publishedAssignment = state.myOfficialAssignment?.assignmentStatus === 'published'
+      ? normalizeOfficialAssignment(state.myOfficialAssignment, null)
+      : null;
+    const publishedSupervisors = publishedAssignment ? getOfficialSupervisors(publishedAssignment) : [];
+    const primaryPublishedSupervisor = publishedSupervisors.find(item => item.role === 'primary') || publishedSupervisors[0] || null;
 
     const resolvedName = (typeof window.resolveStudentName === 'function')
       ? window.resolveStudentName(mssv, actor?.displayName || state.user?.displayName || '')
@@ -2566,12 +2770,31 @@ window.submitRegistration = async function() {
     const studentName = resolvedName || mssv;
     const studentEmail = actor?.email || state.user?.email || `${mssv}@student.tdtu.edu.vn`;
 
+    const previous = state.myRegistration || null;
+    const titleChanged = !previous || String(previous.topicTitle || '').trim() !== topicTitle;
+    const previousHistory = Array.isArray(previous?.topicTitleHistory) ? previous.topicTitleHistory : [];
+    const nextVersion = titleChanged ? Math.max(Number(previous?.topicTitleVersion || 0) + 1, previousHistory.length + 1) : Number(previous?.topicTitleVersion || 1);
+    const topicTitleHistory = titleChanged ? previousHistory.concat([{
+      version: nextVersion,
+      title: topicTitle,
+      submittedAt: new Date().toISOString(),
+      status: 'pending'
+    }]) : previousHistory;
+
     const payload = {
       studentId: mssv,
       studentName: studentName,
       email: studentEmail,
       topicTitle,
       projectType,
+      projectTypes,
+      projectTypeOther,
+      ...officialFormFields,
+      major: getRegistrationStudentIdentity().major,
+      topicTitleVersion: nextVersion,
+      topicTitleHistory,
+      topicApprovalStatus: titleChanged ? 'pending' : (previous?.topicApprovalStatus || 'pending'),
+      topicApprovalNote: titleChanged ? '' : (previous?.topicApprovalNote || ''),
       preferences: directAssignment ? [] : state.selectedPreferences.map(p => ({
         rank: p.rank,
         supervisorId: p.supervisorId,
@@ -2581,13 +2804,37 @@ window.submitRegistration = async function() {
       submittedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       status: 'submitted',
-      reviewStatus: directAssignment ? 'direct_assignment_pending' : 'waiting',
+      // A faculty assignment can be published before the student submits the
+      // topic. Preserve that published relationship rather than sending the
+      // student back to the waiting state on first registration.
+      reviewStatus: directAssignment && primaryPublishedSupervisor ? 'manually_assigned' : (directAssignment ? 'direct_assignment_pending' : 'waiting'),
       eligibilityStatus: eligibilityStatus
     };
+    if (primaryPublishedSupervisor) {
+      payload.assignmentStatus = 'published';
+      payload.officialSupervisors = publishedSupervisors;
+      payload.acceptedSupervisorId = primaryPublishedSupervisor.supervisorId || '';
+      payload.acceptedSupervisorName = primaryPublishedSupervisor.supervisorName || '';
+      payload.acceptedRank = 'manual';
+    }
 
-    await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload);
+    await setDoc(doc(db, 'graduationStudentProfiles', mssv), {
+      studentId: mssv,
+      email: studentEmail,
+      currentClass: officialFormFields.currentClass,
+      personalEmail: officialFormFields.personalEmail,
+      phone: officialFormFields.studentPhone,
+      permanentAddress: officialFormFields.studentPermanentAddress,
+      temporaryAddress: officialFormFields.studentTemporaryAddress,
+      address: officialFormFields.studentTemporaryAddress,
+      updatedAt: serverTimestamp(),
+      updatedBy: state.user?.email || studentEmail
+    }, { merge: true });
+    await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload, { merge: true });
     
-    showToast(directAssignment ? '🎉 ĐĂNG KÝ THÀNH CÔNG! Vui lòng chờ Khoa phân công GVHD.' : '🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
+    showToast(directAssignment
+      ? (primaryPublishedSupervisor ? '🎉 ĐĂNG KÝ THÀNH CÔNG! GVHD đã phân công được giữ nguyên.' : '🎉 ĐĂNG KÝ THÀNH CÔNG! Vui lòng chờ Khoa phân công GVHD.')
+      : '🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
     await checkStudentEligibilityAndRegistration(roundId);
   } catch (err) {
     console.error('Lỗi khi nộp đăng ký:', err);
@@ -3497,6 +3744,99 @@ function updateRoundModalConfigSummary() {
 
 // ── Weekly Content Editor (Admin) ──────────────────────────────────────────
 // Renders 12 (or durationWeeks) input cards in #round-weekly-content-grid
+function getRoundWeekDaysFromForm(weekNumber) {
+  const rawStart = document.getElementById('round-form-start-date')?.value || '';
+  let monday;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawStart)) {
+    const [year, month, day] = rawStart.split('-').map(Number);
+    monday = new Date(year, month - 1, day);
+  } else {
+    monday = new Date();
+    const day = monday.getDay();
+    monday.setDate(monday.getDate() - day + (day === 0 ? -6 : 1));
+  }
+  monday.setHours(0, 0, 0, 0);
+  const pad = value => String(value).padStart(2, '0');
+  const weekStart = new Date(monday.getTime() + (Number(weekNumber) - 1) * 7 * 86400000);
+  return Array.from({ length: 7 }, (_, dayIndex) => {
+    const date = new Date(weekStart.getTime() + dayIndex * 86400000);
+    return {
+      dayIndex,
+      shortName: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][dayIndex],
+      label: `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`,
+      date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    };
+  });
+}
+
+function getRoundWeekDraftEvents(weekNumber) {
+  if (!state.roundWeekEventsDraft) state.roundWeekEventsDraft = {};
+  return Array.isArray(state.roundWeekEventsDraft[weekNumber]) ? state.roundWeekEventsDraft[weekNumber] : [];
+}
+
+function renderRoundWeekDayPicker(weekNumber) {
+  const daysEl = document.getElementById(`round-week-${weekNumber}-days`);
+  const eventsEl = document.getElementById(`round-week-${weekNumber}-events`);
+  const selectEl = document.getElementById(`round-week-${weekNumber}-event-day`);
+  if (!daysEl || !eventsEl || !selectEl) return;
+  const days = getRoundWeekDaysFromForm(weekNumber);
+  const events = getRoundWeekDraftEvents(weekNumber);
+
+  selectEl.innerHTML = days.map(day => `<option value="${day.dayIndex}">${day.shortName} · ${day.label}</option>`).join('');
+  daysEl.innerHTML = days.map(day => {
+    const dayEvents = events.filter(event => Number(event.dayIndex) === day.dayIndex || event.date === day.date);
+    const titles = dayEvents.map(event => escapeHtml(event.title)).join('\n');
+    return `<button type="button" onclick="selectRoundWeekEventDay(${weekNumber}, ${day.dayIndex})" title="${titles || `${day.shortName} ${day.label}: chưa có sự kiện`}" class="min-w-0 rounded-lg border px-1 py-1 text-center transition ${dayEvents.length ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-blue-300'}">
+      <span class="block text-[8px] font-black">${day.shortName}</span><span class="block text-[9px] font-bold">${day.label}</span>${dayEvents.length ? '<span class="block text-[8px] leading-none mt-0.5">●</span>' : ''}
+    </button>`;
+  }).join('');
+  eventsEl.innerHTML = events.length
+    ? events.map(event => `<div class="flex items-center justify-between gap-1 rounded-md bg-rose-50 border border-rose-100 px-2 py-1 text-[10px] text-rose-800"><span class="truncate">📌 ${escapeHtml(event.date || '')} · ${escapeHtml(event.title || '')}</span><button type="button" onclick="removeRoundWeekEvent(${weekNumber}, '${escapeHtml(event.id)}')" class="shrink-0 font-black text-rose-500 hover:text-rose-700">×</button></div>`).join('')
+    : '<span class="text-[10px] text-slate-400 italic">Chưa có sự kiện theo ngày.</span>';
+}
+
+window.selectRoundWeekEventDay = function(weekNumber, dayIndex) {
+  const select = document.getElementById(`round-week-${weekNumber}-event-day`);
+  const form = document.getElementById(`round-week-${weekNumber}-event-form`);
+  if (select) select.value = String(dayIndex);
+  if (form) form.classList.remove('hidden');
+  document.getElementById(`round-week-${weekNumber}-event-title`)?.focus();
+};
+
+window.toggleRoundWeekEventForm = function(weekNumber) {
+  const form = document.getElementById(`round-week-${weekNumber}-event-form`);
+  form?.classList.toggle('hidden');
+  if (form && !form.classList.contains('hidden')) document.getElementById(`round-week-${weekNumber}-event-title`)?.focus();
+};
+
+window.addRoundWeekEvent = function(weekNumber) {
+  const titleInput = document.getElementById(`round-week-${weekNumber}-event-title`);
+  const daySelect = document.getElementById(`round-week-${weekNumber}-event-day`);
+  const title = String(titleInput?.value || '').trim();
+  if (!title) {
+    showToast('Nhập tên sự kiện hoặc cột mốc.', 'warning');
+    titleInput?.focus();
+    return;
+  }
+  const dayIndex = Number(daySelect?.value || 0);
+  const day = getRoundWeekDaysFromForm(weekNumber)[dayIndex];
+  const events = getRoundWeekDraftEvents(weekNumber);
+  events.push({ id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, dayIndex, date: day.date, title });
+  state.roundWeekEventsDraft[weekNumber] = events;
+  if (titleInput) titleInput.value = '';
+  renderRoundWeekDayPicker(weekNumber);
+};
+
+window.removeRoundWeekEvent = function(weekNumber, eventId) {
+  state.roundWeekEventsDraft[weekNumber] = getRoundWeekDraftEvents(weekNumber).filter(event => event.id !== eventId);
+  renderRoundWeekDayPicker(weekNumber);
+};
+
+window.refreshRoundWeekDayPickers = function() {
+  const duration = parseInt(document.getElementById('round-form-duration-weeks')?.value, 10) || 12;
+  for (let week = 1; week <= duration; week++) renderRoundWeekDayPicker(week);
+};
+
 function renderRoundWeeklyContentEditor(durationWeeks) {
   const grid = document.getElementById('round-weekly-content-grid');
   if (!grid) return;
@@ -3509,13 +3849,17 @@ function renderRoundWeeklyContentEditor(durationWeeks) {
       <div class="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
         <div class="flex items-center justify-between">
           <span class="font-black text-xs text-slate-800">Tuần ${n}</span>
-          ${defMilestone ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-bold">${defMilestone}</span>` : ''}
+          <label class="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 cursor-pointer">
+            <input type="checkbox" id="round-week-${n}-visible" checked class="rounded text-emerald-600">
+            Hiển thị cho SV
+          </label>
         </div>
         <input type="text" id="round-week-${n}-title" placeholder="Tiêu đề tuần ${n}"
                class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
         <textarea id="round-week-${n}-note" rows="2" placeholder="Ghi chú nội dung tuần ${n} (tuỳ chọn)"
                   class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none"></textarea>
         <select id="round-week-${n}-milestone"
+                onchange="toggleRoundWeekCustomMilestone(${n})"
                 class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
           <option value="">-- Không có mốc --</option>
           <option value="Duyệt đợt 1" ${defMilestone === 'Duyệt đợt 1' ? 'selected' : ''}>🚩 Duyệt đợt 1</option>
@@ -3524,13 +3868,32 @@ function renderRoundWeeklyContentEditor(durationWeeks) {
           <option value="Sơ khảo">📋 Sơ khảo</option>
           <option value="Khác">📌 Khác</option>
         </select>
+        <input type="text" id="round-week-${n}-milestone-custom" placeholder="Tên mốc tùy chỉnh"
+               class="hidden w-full p-1.5 border border-amber-200 rounded-lg text-xs bg-amber-50 focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <div class="border-t border-slate-100 pt-2 space-y-1.5">
+          <div class="flex items-center justify-between"><span class="text-[10px] font-black text-slate-600">LỊCH THỨ 2 – CHỦ NHẬT</span><button type="button" onclick="toggleRoundWeekEventForm(${n})" class="rounded-md bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-black text-blue-700 hover:bg-blue-100">＋ Sự kiện</button></div>
+          <div id="round-week-${n}-days" class="grid grid-cols-7 gap-1"></div>
+          <div id="round-week-${n}-events" class="space-y-1"></div>
+          <div id="round-week-${n}-event-form" class="hidden rounded-lg bg-blue-50 border border-blue-100 p-2 space-y-1.5">
+            <div class="grid grid-cols-[90px_1fr] gap-1.5"><select id="round-week-${n}-event-day" class="min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"></select><input id="round-week-${n}-event-title" type="text" maxlength="120" placeholder="VD: Sơ khảo" class="min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"></div>
+            <button type="button" onclick="addRoundWeekEvent(${n})" class="w-full rounded-md bg-blue-600 py-1 text-[10px] font-bold text-white hover:bg-blue-700">Thêm vào ngày đã chọn</button>
+          </div>
+        </div>
       </div>`;
   }).join('');
+  window.refreshRoundWeekDayPickers();
 }
+
+window.toggleRoundWeekCustomMilestone = function(weekNumber) {
+  const select = document.getElementById(`round-week-${weekNumber}-milestone`);
+  const custom = document.getElementById(`round-week-${weekNumber}-milestone-custom`);
+  if (custom) custom.classList.toggle('hidden', select?.value !== 'Khác');
+};
 
 window.resetWeeklyContentToDefault = function() {
   const durationInput = document.getElementById('round-form-duration-weeks');
   const durationWeeks = parseInt(durationInput?.value, 10) || 12;
+  state.roundWeekEventsDraft = {};
   renderRoundWeeklyContentEditor(durationWeeks);
 };
 
@@ -3855,15 +4218,32 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
 
   // Render weekly content editor and populate saved config
   const editDurationWeeks = parseInt(r.durationWeeks, 10) || 12;
+  state.roundWeekEventsDraft = {};
   if (typeof renderRoundWeeklyContentEditor === 'function') renderRoundWeeklyContentEditor(editDurationWeeks);
   (r.timelineWeeksConfig || []).forEach((wc) => {
     const n = wc.week || 1;
     const titleEl = document.getElementById(`round-week-${n}-title`);
     const noteEl  = document.getElementById(`round-week-${n}-note`);
     const mileEl  = document.getElementById(`round-week-${n}-milestone`);
+    const visibleEl = document.getElementById(`round-week-${n}-visible`);
+    const customMilestoneEl = document.getElementById(`round-week-${n}-milestone-custom`);
     if (titleEl) titleEl.value = wc.title || '';
     if (noteEl)  noteEl.value  = wc.note  || '';
-    if (mileEl)  mileEl.value  = wc.milestone || '';
+    state.roundWeekEventsDraft[n] = Array.isArray(wc.events) ? wc.events.map((event, index) => ({
+      id: event.id || `legacy-${n}-${index}`,
+      title: String(event.title || event.name || '').trim(),
+      dayIndex: Number.isInteger(event.dayIndex) ? event.dayIndex : 0,
+      date: event.date || ''
+    })).filter(event => event.title) : [];
+    if (visibleEl) visibleEl.checked = wc.visible !== false;
+    if (mileEl) {
+      const standardMilestones = ['', 'Duyệt đợt 1', 'Duyệt đợt 2', 'Duyệt đợt 3', 'Sơ khảo', 'Khác'];
+      const savedMilestone = wc.milestone || '';
+      mileEl.value = standardMilestones.includes(savedMilestone) ? savedMilestone : 'Khác';
+      if (customMilestoneEl && mileEl.value === 'Khác') customMilestoneEl.value = savedMilestone === 'Khác' ? '' : savedMilestone;
+      window.toggleRoundWeekCustomMilestone(n);
+    }
+    renderRoundWeekDayPicker(n);
   });
 
   document.getElementById('modal-round').classList.remove('hidden');
@@ -5018,11 +5398,20 @@ window.saveRound = async function(e) {
   // Collect weekly content config from admin form
   const timelineWeeksConfig = Array.from({ length: durationWeeks }, (_, i) => {
     const n = i + 1;
+    const milestoneSelect = document.getElementById(`round-week-${n}-milestone`)?.value || '';
+    const customMilestone = document.getElementById(`round-week-${n}-milestone-custom`)?.value?.trim() || '';
     return {
       week: n,
       title: document.getElementById(`round-week-${n}-title`)?.value?.trim() || `Tuần ${n}`,
       note: document.getElementById(`round-week-${n}-note`)?.value?.trim() || '',
-      milestone: document.getElementById(`round-week-${n}-milestone`)?.value || '',
+      milestone: milestoneSelect === 'Khác' ? (customMilestone || 'Mốc khác') : milestoneSelect,
+      visible: document.getElementById(`round-week-${n}-visible`)?.checked !== false,
+      events: getRoundWeekDraftEvents(n).map(event => ({
+        id: event.id,
+        title: String(event.title || '').trim(),
+        dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
+        date: event.date || ''
+      })).filter(event => event.title),
     };
   });
 
@@ -6496,13 +6885,106 @@ window.filterEligibleTable = function() {
 };
 
 window.deleteEligibleStudent = async function(studentId) {
-  const roundId = document.getElementById('admin-round-student-select').value;
-  if (!(await showConfirm('Xóa sinh viên', `Xóa sinh viên ${studentId} khỏi danh sách đủ điều kiện của đợt?`, { confirmText: 'Xóa', danger: true }))) return;
+  const roundId = document.getElementById('admin-round-student-select')?.value || state.selectedRoundId;
+  if (!roundId) return;
+  const normalizedId = String(studentId || '').trim().toUpperCase();
+  if (!(await showConfirm('Xóa sinh viên', `Xóa sinh viên ${normalizedId} và toàn bộ thông tin đăng ký, đề tài, phân công khỏi đợt này?`, { confirmText: 'Xóa toàn bộ', danger: true }))) return;
   try {
-    await deleteDoc(doc(db, 'graduationRounds', roundId, 'eligibleStudents', studentId));
+    const deleteTasks = [
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'eligibleStudents', normalizedId)),
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'registrations', normalizedId)),
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'officialAssignments', normalizedId)),
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'assignmentDrafts', normalizedId)),
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'reviewDecisions', normalizedId)),
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'councilScores', normalizedId)),
+      deleteDoc(doc(db, 'graduationStudentProfiles', normalizedId))
+    ];
+
+    try {
+      const subSnap = await getDocs(query(collection(db, 'graduationRounds', roundId, 'submissions'), where('studentId', '==', normalizedId)));
+      subSnap.forEach(d => {
+        deleteTasks.push(deleteDoc(d.ref));
+      });
+    } catch (subErr) {}
+
+    await Promise.allSettled(deleteTasks);
+
+    showToast(`✓ Đã xóa sinh viên ${normalizedId} và toàn bộ dữ liệu đã nhập khỏi đợt.`, 'success');
     loadAdminEligibleStudents(roundId);
+    if (typeof loadSupervisorPortalData === 'function' && (state.selectedRoundId === roundId || state.activeRound?.id === roundId)) {
+      loadSupervisorPortalData(roundId);
+    }
   } catch (e) {
     showToast('Lỗi xóa: ' + e.message, 'error');
+  }
+};
+
+// Add one supplementary student without requiring an Excel import.  The
+// authoritative profile is always resolved from the Faculty Student Master,
+// so a manually-added row has the same data shape as an imported student.
+window.addEligibleStudentByMssv = async function() {
+  const input = document.getElementById('quick-add-eligible-mssv');
+  const rawMssv = String(input?.value || '').trim().replace(/\s+/g, '').toUpperCase();
+  const roundId = document.getElementById('admin-round-student-select')?.value;
+
+  if (!roundId) {
+    showToast('Vui lòng chọn đợt tốt nghiệp trước khi thêm sinh viên.', 'warning');
+    return;
+  }
+  if (!rawMssv) {
+    showToast('Nhập MSSV sinh viên cần bổ sung.', 'warning');
+    input?.focus();
+    return;
+  }
+  if (!/^[A-Z0-9_-]+$/.test(rawMssv)) {
+    showToast('MSSV chỉ gồm chữ cái, chữ số, dấu gạch nối hoặc gạch dưới.', 'warning');
+    return;
+  }
+
+  try {
+    if (typeof ensureFacultyDatasetLoaded === 'function') {
+      await ensureFacultyDatasetLoaded();
+    } else if (typeof loadFacultyDatasetFromIFAA === 'function' && !state.facultyStudentsLoaded) {
+      await loadFacultyDatasetFromIFAA();
+    }
+
+    const master = typeof window.getFacultyStudentByMssv === 'function'
+      ? window.getFacultyStudentByMssv(rawMssv)
+      : (state.facultyStudents || []).find(s => String(s.mssv || s.studentId || '').trim().toUpperCase() === rawMssv);
+    if (!master || master.notFoundInMaster || !(master.fullName || master.name)) {
+      showToast(`Không tìm thấy MSSV ${rawMssv} trong dữ liệu sinh viên Khoa.`, 'error');
+      return;
+    }
+
+    const studentRef = doc(db, 'graduationRounds', roundId, 'eligibleStudents', rawMssv);
+    const existing = await getDoc(studentRef);
+    if (existing.exists()) {
+      showToast(`Sinh viên ${rawMssv} đã có trong đợt này.`, 'warning');
+      return;
+    }
+
+    const fullName = master.fullName || master.name;
+    const className = master.className || master.studentClass || '';
+    await setDoc(studentRef, {
+      studentId: rawMssv,
+      mssv: rawMssv,
+      name: fullName,
+      fullName,
+      email: master.email || `${rawMssv.toLowerCase()}@student.tdtu.edu.vn`,
+      className,
+      studentClass: className,
+      major: master.major || 'Thiết kế Nội thất',
+      eligible: true,
+      source: 'manual_supplement',
+      createdAt: serverTimestamp()
+    });
+
+    if (input) input.value = '';
+    showToast(`Đã thêm ${fullName} (${rawMssv}) vào đợt.`, 'success');
+    await loadAdminEligibleStudents(roundId);
+  } catch (e) {
+    console.error('Quick add eligible student failed:', e);
+    showToast('Không thể thêm sinh viên: ' + e.message, 'error');
   }
 };
 
@@ -11262,6 +11744,11 @@ window.loadStudentRoundActivities = async function(roundId) {
   const actionWrap = document.getElementById('student-timeline-header-actions');
   const timelineSection = document.getElementById('student-timeline-section');
   if (!container) return;
+
+  if (state.eligibilityState === 'not_eligible' && (!state.isAdmin || state.impersonation)) {
+    if (timelineSection) timelineSection.classList.add('hidden');
+    return;
+  }
 
   // Requirement 5: During registration, preference review, and assignment stages, student does NOT see detailed plan.
   // Student only sees detailed plan once they have an official supervisor assigned.
@@ -20314,6 +20801,158 @@ function getRoundStatusCategory(r) {
   return 'running';
 }
 
+function getRoundWeekSchedule(round) {
+  const durationWeeks = parseInt(round?.durationWeeks, 10) || 12;
+  const pad = value => String(value).padStart(2, '0');
+  const formatDate = date => `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+  let startMonday = null;
+  const configuredStart = round?.startDate || round?.datnStartDate || round?.openAt || round?.openAtDate;
+  if (configuredStart) {
+    const parsed = new Date(configuredStart?.toDate ? configuredStart.toDate() : configuredStart);
+    if (!isNaN(parsed.getTime())) {
+      const day = parsed.getDay();
+      parsed.setDate(parsed.getDate() - day + (day === 0 ? -6 : 1));
+      parsed.setHours(0, 0, 0, 0);
+      startMonday = parsed;
+    }
+  }
+  if (!startMonday) startMonday = new Date();
+
+  const now = new Date();
+  const defaultMilestones = { 4: 'Duyệt đợt 1', 8: 'Duyệt đợt 2', 12: 'Duyệt đợt 3' };
+  const weeklyConfig = Array.isArray(round?.timelineWeeksConfig) ? round.timelineWeeksConfig : [];
+  return Array.from({ length: durationWeeks }, (_, index) => {
+    const week = index + 1;
+    const start = new Date(startMonday.getTime() + index * 7 * 24 * 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 6 * 24 * 60 * 60 * 1000);
+    end.setHours(23, 59, 59, 999);
+    const config = weeklyConfig.find(item => Number(item.week) === week) || {};
+    const status = now > end ? 'completed' : (now >= start ? 'ongoing' : 'upcoming');
+    const days = Array.from({ length: 7 }, (_, dayIndex) => {
+      const date = new Date(start.getTime() + dayIndex * 86400000);
+      return { dayIndex, shortName: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][dayIndex], date, label: `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`, key: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` };
+    });
+    const events = (Array.isArray(config.events) ? config.events : []).map((event, index) => ({
+      id: event.id || `legacy-${week}-${index}`,
+      title: String(event.title || event.name || '').trim(),
+      dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
+      date: event.date || ''
+    })).filter(event => event.title);
+    return {
+      week,
+      title: config.title || `Tuần ${week}`,
+      note: config.note || '',
+      milestone: config.milestone || defaultMilestones[week] || '',
+      visible: config.visible !== false,
+      status,
+      dateText: `${formatDate(start)} – ${formatDate(end)}`,
+      days,
+      events
+    };
+  });
+}
+
+function renderTimelineWeekDays(days = [], events = []) {
+  return `<div class="grid grid-cols-7 gap-1 w-full mt-2 pt-2 border-t border-slate-200/80">${days.map(day => {
+    const dayEvents = events.filter(event => Number(event.dayIndex) === day.dayIndex || event.date === day.key);
+    const titles = dayEvents.map(event => escapeHtml(event.title)).join(' · ');
+    const isToday = day.date instanceof Date && day.date.toDateString() === new Date().toDateString();
+    const dayClass = dayEvents.length
+      ? 'bg-rose-50 border-rose-300 text-rose-700'
+      : (isToday ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' : 'bg-white/70 border-slate-200 text-slate-500');
+    return `<span title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border px-0.5 py-0.5 text-center ${dayClass}"><b class="block text-[8px] leading-none">${day.shortName}</b><b class="block text-[8px] leading-none mt-0.5">${day.label}</b>${dayEvents.length ? '<i class="block text-[8px] leading-none not-italic">●</i>' : ''}</span>`;
+  }).join('')}</div>`;
+}
+
+function renderAdminRoundTimelinePreview(round) {
+  const weeks = getRoundWeekSchedule(round);
+  const visibleWeeks = weeks.filter(week => week.visible).length;
+  const hiddenWeeks = weeks.length - visibleWeeks;
+  const statusStyles = {
+    completed: { card: 'bg-emerald-50 border-emerald-300', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300', label: 'Đã qua', icon: '✓' },
+    ongoing: { card: 'bg-blue-50 border-blue-400 ring-2 ring-blue-200', badge: 'bg-blue-600 text-white border-blue-600', label: 'Đang diễn ra', icon: '●' },
+    upcoming: { card: 'bg-slate-50 border-slate-200', badge: 'bg-white text-slate-500 border-slate-200', label: 'Chưa tới', icon: null }
+  };
+
+  const introCards = [
+    { icon: '📝', title: 'Đăng ký đề tài', subtitle: 'Đề tài ĐATN' },
+    { icon: '👨‍🏫', title: 'Phân công GVHD', subtitle: isDirectSupervisorAssignment(round) ? 'Khoa phân công' : 'Xét nguyện vọng' }
+  ].map(card => `
+    <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}')" class="min-w-[215px] h-[142px] rounded-2xl border border-slate-200 bg-white p-3 flex flex-col items-center justify-center text-center hover:border-blue-400 hover:shadow-md cursor-pointer transition">
+      <span class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-lg mb-2">${card.icon}</span>
+      <span class="font-black text-xs text-slate-900">${card.title}</span>
+      <span class="text-[10px] text-slate-500 mt-1">${card.subtitle}</span>
+    </div>`).join('');
+
+  const weekCards = weeks.map(week => {
+    const style = statusStyles[week.status] || statusStyles.upcoming;
+    return `
+      <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}', ${week.week})" class="relative min-w-[215px] h-[184px] rounded-2xl border p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}">
+        <div class="flex items-center justify-between w-full mb-1">
+          <span class="font-black text-xs text-slate-900">Tuần ${week.week}</span>
+          <span class="px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${week.visible ? style.badge : 'bg-slate-200 text-slate-600 border-slate-300'}">${week.visible ? style.label : 'Đang ẩn'}</span>
+        </div>
+        <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black my-1 ${week.status === 'ongoing' ? 'bg-blue-600 text-white' : week.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">${style.icon || week.week}</span>
+        <span class="font-mono font-bold text-[11px] text-slate-700">${week.dateText}</span>
+        ${renderTimelineWeekDays(week.days, week.events)}
+        ${week.milestone ? `<span class="mt-1 px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px]">🚩 ${escapeHtml(week.milestone)}</span>` : ''}
+        ${week.note ? `<span class="text-[9px] text-slate-500 mt-1 line-clamp-1">${escapeHtml(week.note)}</span>` : ''}
+        <button type="button" onclick="toggleRoundTimelineWeekVisibility('${round.id}', ${week.week}, event)" class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-white/90 border border-slate-200 text-[9px] font-bold ${week.visible ? 'text-slate-600' : 'text-blue-700'}">${week.visible ? 'Ẩn' : 'Hiện'}</button>
+      </div>`;
+  }).join('');
+
+  return `
+    <section class="px-4 py-3.5 bg-white border-b border-slate-200">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-lg">🗓️</span>
+          <div>
+            <div class="font-black text-sm text-slate-900">Lộ trình đồ án tốt nghiệp & tiến độ thực hiện</div>
+            <div class="text-[10px] text-slate-500">Kế hoạch ${weeks.length} tuần · ${visibleWeeks} tuần hiển thị${hiddenWeeks ? ` · ${hiddenWeeks} tuần đang ẩn` : ''}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="openRoundWeekEditor('${round.id}')" class="px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] transition">＋ Thêm / sửa mốc</button>
+        </div>
+      </div>
+      <div class="flex gap-3 overflow-x-auto pb-2 snap-x">${introCards}${weekCards}</div>
+    </section>`;
+}
+
+window.openRoundWeekEditor = async function(roundId, weekNumber = null) {
+  await window.editRoundModal(roundId, 'info');
+  window.setTimeout(() => {
+    const target = weekNumber
+      ? document.getElementById(`round-week-${weekNumber}-title`)
+      : document.getElementById('round-weekly-content-editor-wrap');
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (weekNumber) target?.focus();
+  }, 180);
+};
+
+window.toggleRoundTimelineWeekVisibility = async function(roundId, weekNumber, event) {
+  event?.stopPropagation();
+  const round = (state.rounds || []).find(item => item.id === roundId);
+  if (!round) return;
+  const durationWeeks = parseInt(round.durationWeeks, 10) || 12;
+  const existing = Array.isArray(round.timelineWeeksConfig) ? round.timelineWeeksConfig : [];
+  const nextConfig = Array.from({ length: durationWeeks }, (_, index) => {
+    const week = index + 1;
+    const current = existing.find(item => Number(item.week) === week) || { week, title: `Tuần ${week}`, note: '', milestone: '' };
+    return week === Number(weekNumber) ? { ...current, visible: current.visible === false } : { ...current, visible: current.visible !== false };
+  });
+  try {
+    await updateDoc(doc(db, 'graduationRounds', roundId), { timelineWeeksConfig: nextConfig, updatedAt: serverTimestamp() });
+    round.timelineWeeksConfig = nextConfig;
+    renderAdminRoundsCards();
+    if (state.selectedRoundId === roundId && typeof renderStudentTimelineWeeks === 'function') renderStudentTimelineWeeks();
+    const changed = nextConfig.find(item => Number(item.week) === Number(weekNumber));
+    showToast(changed?.visible === false ? `Đã ẩn Tuần ${weekNumber} khỏi trang sinh viên.` : `Đã hiện Tuần ${weekNumber} trên trang sinh viên.`, 'success');
+  } catch (error) {
+    showToast('Không thể cập nhật hiển thị tuần: ' + error.message, 'error');
+  }
+};
+
 window.renderAdminRoundsCards = function() {
   const container = document.getElementById('admin-rounds-cards');
   if (!container) return;
@@ -20419,7 +21058,7 @@ window.renderAdminRoundsCards = function() {
       const eligibleCount = typeof r.eligibleCount === 'number' ? r.eligibleCount : (r.eligibleStudentsCount || 0);
       const supCount = typeof r.supervisorCount === 'number' ? r.supervisorCount : (r.supervisorsCount || 0);
       const regCount = typeof r.registrationsCount === 'number' ? r.registrationsCount : 0;
-      const actCount = typeof r.activitiesCount === 'number' ? r.activitiesCount : (r.activities ? r.activities.length : 0);
+      const actCount = Array.isArray(r.activities) ? r.activities.length : (typeof r.activitiesCount === 'number' ? r.activitiesCount : 0);
       const assignedCount = typeof r.assignedCount === 'number'
         ? r.assignedCount
         : (typeof r.officialAssignmentsCount === 'number' ? r.officialAssignmentsCount : null);
@@ -20495,6 +21134,8 @@ window.renderAdminRoundsCards = function() {
               <div class="text-xl font-black text-purple-700 mt-0.5">${actCount}</div>
             </button>
           </div>
+
+          ${renderAdminRoundTimelinePreview(r)}
 
           <div class="px-4 py-3 bg-white flex flex-wrap items-center justify-center gap-2">
             <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'timeline')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-sm">📅 Kế hoạch (${actCount})</button>
@@ -20786,6 +21427,10 @@ window.startStudentRegistration = function() {
     flowContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   state.selectedPreferences = [];
+  const topicInput = document.getElementById('input-topic-title');
+  if (topicInput) topicInput.value = '';
+  setSelectedProjectTypes([]);
+  populateRegistrationStudentForm();
   goToStep(1);
 };
 
@@ -20996,6 +21641,7 @@ window.onRoundStartDateChanged = function(val) {
   const feedback = document.getElementById('round-start-date-feedback');
   if (!val) {
     if (feedback) feedback.innerHTML = '<span class="text-slate-500 italic">Chưa chọn ngày bắt đầu (mặc định sẽ dùng ngày mở đợt).</span>';
+    window.refreshRoundWeekDayPickers?.();
     return;
   }
   const parts = val.split('-');
@@ -21018,6 +21664,7 @@ window.onRoundStartDateChanged = function(val) {
       feedback.innerHTML = `<span class="text-emerald-700 font-bold">✓ Hợp lệ: Thứ Hai (${val})</span>`;
     }
   }
+  window.refreshRoundWeekDayPickers?.();
 };
 
 window.prevTimelineWeek = function() {
@@ -21108,8 +21755,12 @@ window.renderStudentTimelineWeeks = function() {
       status = 'ongoing';
       currentWeekNum = weekNum;
     }
+    const days = Array.from({ length: 7 }, (_, dayIndex) => {
+      const date = new Date(wStart.getTime() + dayIndex * 86400000);
+      return { dayIndex, shortName: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][dayIndex], date, label: fmtShortDate(date), key: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` };
+    });
     weeks.push({ num: weekNum, start: wStart, end: wEnd,
-      dateText: `${fmtShortDate(wStart)} – ${fmtShortDate(wEnd)}`, status });
+      dateText: `${fmtFullDate(wStart)} – ${fmtFullDate(wEnd)}`, status, days });
   }
 
   // ── Header badge & date range ──────────────────────────────────
@@ -21134,8 +21785,9 @@ window.renderStudentTimelineWeeks = function() {
   // ── Derive student state for intro/outro cards ────────────────
   const reg        = state.myRegistration;
   const hasTopic   = !!(reg?.topicTitle || reg?.topic);
-  const officialSups = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(reg) : [];
-  const hasGVHD    = officialSups.length > 0 || !!(reg?.supervisorName);
+  const effectiveAssignment = normalizeOfficialAssignment(state.myOfficialAssignment, reg);
+  const officialSups = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(effectiveAssignment) : [];
+  const hasGVHD = officialSups.length > 0 || Boolean(effectiveAssignment?.acceptedSupervisorId || effectiveAssignment?.assignedSupervisorId || reg?.supervisorName);
   const directAssign = round?.supervisorAssignmentMode === 'direct_assignment';
 
   // ── Default milestone labels per week (overrideable by admin) ──
@@ -21163,23 +21815,41 @@ window.renderStudentTimelineWeeks = function() {
   } else if (directAssign || round?.status === 'reviewing') {
     gvhdStatus = 'active';
   }
+  const primarySupervisor = officialSups.find(item => item.role === 'primary') || officialSups[0] || {};
+  const primarySupervisorId = primarySupervisor.supervisorId || effectiveAssignment?.acceptedSupervisorId || effectiveAssignment?.assignedSupervisorId;
+  const primarySupervisorProfile = (state.roundSupervisors || []).find(s => s.id === primarySupervisorId || s.supervisorId === primarySupervisorId)
+    || (state.supervisorsMaster || []).find(s => s.id === primarySupervisorId)
+    || {};
+  const primarySupervisorName = primarySupervisor.supervisorName || primarySupervisorProfile.name || effectiveAssignment?.acceptedSupervisorName || 'GVHD đã phân công';
   allCards.push({
     type: 'milestone',
     id: 'gvhd',
     icon: '👨‍🏫',
     title: 'Phân công GVHD',
     subtitle: hasGVHD
-      ? (officialSups[0]?.supervisorName || reg?.supervisorName || 'GVHD đã phân công')
+      ? primarySupervisorName
       : (directAssign ? 'Khoa đang phân công' : 'Chờ kết quả xét'),
     status: gvhdStatus,
     note: hasGVHD ? '✓ Đã phân công' : (gvhdStatus === 'active' ? 'Đang xử lý' : 'Chưa phân công'),
+    supervisor: hasGVHD ? {
+      name: primarySupervisorName,
+      photoUrl: primarySupervisorProfile.photoUrl || primarySupervisor.photoUrl || '',
+      email: primarySupervisorProfile.email || primarySupervisor.email || effectiveAssignment?.supervisorEmail || ''
+    } : null,
   });
 
   // Cards 2–13 – 12 weekly cards (or durationWeeks)
   weeks.forEach((w, i) => {
     const cfg = weeklyConfig.find(c => c.week === w.num) || {};
+    if (cfg.visible === false) return;
     const defMilestone = defaultMilestones[w.num] || null;
     const milestone = cfg.milestone || (defMilestone ? defMilestone : null);
+    const events = (Array.isArray(cfg.events) ? cfg.events : []).map((event, index) => ({
+      id: event.id || `legacy-${w.num}-${index}`,
+      title: String(event.title || event.name || '').trim(),
+      dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
+      date: event.date || ''
+    })).filter(event => event.title);
     allCards.push({
       type: 'week',
       num: w.num,
@@ -21188,6 +21858,8 @@ window.renderStudentTimelineWeeks = function() {
       title: cfg.title || `Tuần ${w.num}`,
       subtitle: cfg.note || '',
       milestone,
+      days: w.days,
+      events,
     });
   });
 
@@ -21286,9 +21958,10 @@ window.renderStudentTimelineWeeks = function() {
         <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${st.icon_bg} my-1">
           ${card.status === 'completed' ? '✓' : (card.status === 'ongoing' || card.status === 'active') ? '●' : card.num}
         </div>
-        <span class="text-[10px] font-mono text-slate-500">${card.dateText}</span>
-        ${noteHtml}
+        <span class="text-[13px] font-mono font-bold text-slate-700 tracking-tight">${card.dateText}</span>
+        ${renderTimelineWeekDays(card.days, card.events)}
         ${milestoneHtml}
+        ${noteHtml}
       </div>`;
     } else {
       // Milestone card (intro/outro)
@@ -21296,6 +21969,9 @@ window.renderStudentTimelineWeeks = function() {
       const cardBg = isGvhdCompleted ? 'bg-emerald-50 border-emerald-300' : (card.status === 'completed' ? 'bg-emerald-50 border-emerald-300' : card.status === 'active' ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-300' : 'bg-slate-50 border-slate-200');
       const iconBg = card.status === 'completed' ? 'bg-emerald-600 text-white' : card.status === 'active' ? 'bg-blue-600 text-white animate-pulse' : 'bg-slate-200 text-slate-500';
       const noteColor = card.status === 'completed' ? 'text-emerald-700 font-bold' : card.status === 'active' ? 'text-blue-700 font-bold' : 'text-slate-400';
+      const supervisorInfo = card.id === 'gvhd' && card.supervisor
+        ? `<div class="mt-1.5 flex items-center gap-2 rounded-lg bg-white/70 border border-emerald-200 px-2 py-1.5 w-full text-left"><img src="${card.supervisor.photoUrl || getSupervisorAvatarSvgDataUri(card.supervisor.name)}" onerror="this.onerror=null;this.src=getSupervisorAvatarSvgDataUri('${escapeHtml(card.supervisor.name)}');" class="w-7 h-7 rounded-lg object-cover border border-emerald-300"><span class="min-w-0"><b class="block truncate text-[10px] text-emerald-900">${escapeHtml(card.supervisor.name)}</b>${card.supervisor.email ? `<small class="block truncate text-[8px] text-emerald-700">${escapeHtml(card.supervisor.email)}</small>` : ''}</span></div>`
+        : '';
       return `<div class="flex-shrink-0 rounded-2xl border ${cardBg} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all"
                    style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
         <div class="w-9 h-9 rounded-full flex items-center justify-center text-lg ${iconBg} mb-1.5 shadow-xs">
@@ -21304,6 +21980,7 @@ window.renderStudentTimelineWeeks = function() {
         <span class="font-black text-[11px] text-slate-900 leading-tight">${card.title}</span>
         <span class="text-[10px] text-slate-500 mt-0.5 leading-tight line-clamp-2">${card.subtitle}</span>
         <span class="mt-1.5 text-[9px] ${noteColor}">${card.note}</span>
+        ${supervisorInfo}
       </div>`;
     }
   }).join('');
@@ -21321,9 +21998,10 @@ window.renderStudentTimelineWeeks = function() {
   // Auto-scroll to the currently active card
   if (typeof state.timelineTrackIndex !== 'number') {
     if (currentWeekNum) {
-      // Index of first weekly card is 2, so active week card is at 2 + (currentWeekNum - 1)
-      const activeIdx = 2 + (currentWeekNum - 1);
-      state.timelineTrackIndex = Math.max(0, Math.min(maxTrackIndex, activeIdx - 1));
+      const activeIdx = allCards.findIndex(card => card.type === 'week' && card.num === currentWeekNum);
+      state.timelineTrackIndex = activeIdx >= 0
+        ? Math.max(0, Math.min(maxTrackIndex, activeIdx - 1))
+        : 0;
     } else if (hasTopic && !hasGVHD) {
       state.timelineTrackIndex = 1; // scroll to show GVHD card
     } else {
@@ -21355,6 +22033,267 @@ window.renderStudentTimelineWeeks = function() {
   }
 };
 
+async function loadStudentSelfProfile(mssv) {
+  if (!mssv) return null;
+  try {
+    const snap = await getDoc(doc(db, 'graduationStudentProfiles', mssv));
+    state.studentSelfProfile = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (err) {
+    console.warn('[StudentProfile] Unable to load self profile:', err.message);
+    state.studentSelfProfile = null;
+  }
+  return state.studentSelfProfile;
+}
+
+function getRegistrationStudentIdentity() {
+  const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
+  const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(mssv) : null;
+  return {
+    mssv,
+    fullName: studentObj?.fullName || studentObj?.name || state.myRegistration?.studentName || state.user?.displayName || `Sinh viên ${mssv}`,
+    major: studentObj?.major || state.myRegistration?.major || 'Thiết kế nội thất',
+    email: state.myRegistration?.email || (state.impersonation?.target?.email) || state.user?.email || `${mssv}@student.tdtu.edu.vn`
+  };
+}
+
+function populateRegistrationStudentForm() {
+  const identity = getRegistrationStudentIdentity();
+  const reg = state.myRegistration || {};
+  const profile = state.studentSelfProfile || {};
+  const values = {
+    'registration-student-name': identity.fullName,
+    'registration-student-id': identity.mssv,
+    'registration-student-major': identity.major,
+    'registration-personal-email': reg.personalEmail || profile.personalEmail || '',
+    'registration-current-class': reg.currentClass || profile.currentClass || '',
+    'registration-student-phone': reg.studentPhone || profile.phone || '',
+    'registration-student-permanent-address': reg.studentPermanentAddress || profile.permanentAddress || '',
+    'registration-student-temporary-address': reg.studentTemporaryAddress || reg.studentAddress || profile.temporaryAddress || profile.address || '',
+    'registration-course-name': reg.courseName || 'Đồ án tốt nghiệp',
+    'registration-course-code': reg.courseCode || '',
+    'registration-course-group': reg.courseGroup || '',
+    'input-topic-description': reg.topicDescription || ''
+  };
+  Object.entries(values).forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value;
+  });
+  const counter = document.getElementById('topic-description-char-count');
+  if (counter) counter.textContent = String(values['input-topic-description'].length);
+}
+
+function collectOfficialFormFields() {
+  const val = id => (document.getElementById(id)?.value || '').trim();
+  return {
+    currentClass: val('registration-current-class'),
+    personalEmail: val('registration-personal-email'),
+    studentPhone: val('registration-student-phone'),
+    studentPermanentAddress: val('registration-student-permanent-address'),
+    studentTemporaryAddress: val('registration-student-temporary-address'),
+    studentAddress: val('registration-student-temporary-address'),
+    courseName: val('registration-course-name'),
+    courseCode: val('registration-course-code'),
+    courseGroup: val('registration-course-group'),
+    topicDescription: val('input-topic-description')
+  };
+}
+
+function validateOfficialFormFields(fields) {
+  const labels = {
+    currentClass: 'lớp', personalEmail: 'email cá nhân', studentPhone: 'số điện thoại',
+    studentPermanentAddress: 'địa chỉ thường trú', studentTemporaryAddress: 'địa chỉ tạm trú',
+    courseName: 'môn học', courseCode: 'mã môn học', courseGroup: 'nhóm', topicDescription: 'mô tả định hướng thiết kế'
+  };
+  const missing = Object.entries(labels).find(([key]) => !String(fields[key] || '').trim());
+  if (missing) {
+    showToast(`Vui lòng nhập ${missing[1]} để hoàn thiện phiếu đăng ký chính thức.`, 'warning');
+    return false;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.personalEmail)) {
+    showToast('Email cá nhân chưa đúng định dạng.', 'warning');
+    return false;
+  }
+  return true;
+}
+
+window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
+  let reg = null;
+  let identity = null;
+
+  if (targetStudentId && typeof targetStudentId === 'string') {
+    reg = (state.supervisorAssignedStudents || []).find(st => (st.studentId || st.id) === targetStudentId) ||
+      (typeof findStudentInRound === 'function' ? findStudentInRound(targetStudentId) : null);
+    const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(targetStudentId) : null;
+    identity = {
+      mssv: targetStudentId,
+      fullName: reg?.studentName || studentObj?.fullName || studentObj?.name || targetStudentId,
+      major: reg?.major || studentObj?.major || 'Thiết kế nội thất',
+      email: reg?.personalEmail || reg?.email || studentObj?.email || `${targetStudentId}@student.tdtu.edu.vn`
+    };
+  } else {
+    reg = state.myRegistration;
+    identity = getRegistrationStudentIdentity();
+  }
+
+  if (!reg) {
+    showToast('Không tìm thấy thông tin đăng ký.', 'warning');
+    return;
+  }
+  if (!targetStudentId && reg.topicApprovalStatus !== 'approved') {
+    showToast('Phiếu PDF chỉ được tải sau khi GVHD xác nhận tên đề tài.', 'warning');
+    return;
+  }
+  if (!window.pdfMake) {
+    showToast('Bộ tạo PDF chưa tải xong. Vui lòng thử lại sau vài giây.', 'warning');
+    return;
+  }
+
+  const identity = getRegistrationStudentIdentity();
+  const round = state.activeRound || {};
+  const approvedDate = reg.topicReviewedAt?.toDate ? reg.topicReviewedAt.toDate() : new Date();
+  const dd = String(approvedDate.getDate()).padStart(2, '0');
+  const mm = String(approvedDate.getMonth() + 1).padStart(2, '0');
+  const yyyy = approvedDate.getFullYear();
+  const roundLabel = round.title || round.roundName || 'ĐỒ ÁN TỐT NGHIỆP';
+  const version = Number(reg.topicTitleVersion || 1);
+  const value = text => String(text || '').trim() || '........................................';
+  const normalizedRoundLabel = roundLabel.toUpperCase().replace(/\s+/g, ' ').trim();
+  const roundHeadingMatch = normalizedRoundLabel.match(/^(.*?)(?:\s*-\s*)?(ĐỢT\s+.+)$/);
+  const programHeading = roundHeadingMatch?.[1] || normalizedRoundLabel;
+  const roundHeading = roundHeadingMatch?.[2] || '';
+  const dottedText = '........................................................................................................................';
+  const descriptionText = String(reg.topicDescription || '').trim();
+  const estimatedDescriptionLines = Math.max(1, Math.ceil(descriptionText.length / 88));
+  const descriptionDotLines = Array.from({ length: Math.max(0, 8 - estimatedDescriptionLines) }, () => ({
+    text: dottedText, fontSize: 12, lineHeight: 1, margin: [0, 0, 0, 6]
+  }));
+  const estimatedTopicLines = Math.max(1, Math.ceil(String(reg.topicTitle || '').trim().length / 70));
+  const topicDotLines = Array.from({ length: Math.max(0, 3 - estimatedTopicLines) }, () => ({
+    text: dottedText, bold: true, fontSize: 12, lineHeight: 1, margin: [28, 0, 0, 5]
+  }));
+  const fieldRow = (leftLabel, leftValue, rightLabel, rightValue) => ({
+    table: {
+      widths: [80, '*', 46, 105],
+      body: [[
+        { text: leftLabel, fontSize: 12, border: [false, false, false, false] },
+        { text: value(leftValue), fontSize: 12, border: [false, false, false, false] },
+        { text: rightLabel, fontSize: 12, border: [false, false, false, false] },
+        { text: value(rightValue), fontSize: 12, border: [false, false, false, false] }
+      ]]
+    },
+    layout: {
+      paddingLeft: () => 0, paddingRight: () => 0,
+      paddingTop: () => 0, paddingBottom: () => 0
+    },
+    margin: [0, 0, 0, 12]
+  });
+  const fullFieldRow = (label, fieldValue) => ({
+    table: {
+      widths: [118, '*'],
+      body: [[
+        { text: label, fontSize: 12, border: [false, false, false, false] },
+        { text: value(fieldValue), fontSize: 12, border: [false, false, false, false] }
+      ]]
+    },
+    layout: {
+      paddingLeft: () => 0, paddingRight: () => 0,
+      paddingTop: () => 0, paddingBottom: () => 0
+    },
+    margin: [0, 0, 0, 12]
+  });
+  const courseRow = {
+    table: {
+      widths: [62, '*', 82, 55, 42, 28],
+      body: [[
+        { text: 'MÔN HỌC:', fontSize: 12, border: [false, false, false, false] },
+        { text: value(reg.courseName), fontSize: 12, border: [false, false, false, false] },
+        { text: 'MÃ MÔN HỌC:', fontSize: 12, border: [false, false, false, false] },
+        { text: value(reg.courseCode), fontSize: 12, border: [false, false, false, false] },
+        { text: 'NHÓM:', fontSize: 12, border: [false, false, false, false] },
+        { text: value(reg.courseGroup), fontSize: 12, border: [false, false, false, false] }
+      ]]
+    },
+    layout: {
+      paddingLeft: () => 0, paddingRight: () => 0,
+      paddingTop: () => 0, paddingBottom: () => 0
+    },
+    margin: [0, 0, 0, 12]
+  };
+
+  const docDefinition = {
+    pageSize: 'A4',
+    pageMargins: [56, 23, 56, 40],
+    defaultStyle: { font: 'Roboto', fontSize: 12, lineHeight: 1 },
+    content: [
+      {
+        columns: [
+          {
+            width: '48%', stack: [
+              { text: 'TRƯỜNG ĐẠI HỌC TÔN ĐỨC THẮNG', fontSize: 10, alignment: 'center' },
+              { text: 'KHOA MỸ THUẬT CÔNG NGHIỆP', fontSize: 10, bold: true, alignment: 'center', margin: [0, 1, 0, 7] },
+              { canvas: [{ type: 'line', x1: 26, y1: 0, x2: 190, y2: 0, lineWidth: 0.8 }] }
+            ]
+          },
+          {
+            width: '52%', stack: [
+              { text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', fontSize: 10, alignment: 'center' },
+              { text: 'Độc lập - Tự do - Hạnh phúc', fontSize: 10, alignment: 'center', margin: [0, 1, 0, 7] },
+              { canvas: [{ type: 'line', x1: 42, y1: 0, x2: 175, y2: 0, lineWidth: 0.8 }] }
+            ]
+          }
+        ], margin: [0, 0, 0, 20]
+      },
+      { text: 'PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC', bold: true, fontSize: 18, alignment: 'center' },
+      { text: programHeading, bold: true, fontSize: 16, alignment: 'center', margin: [0, 3, 0, 0] },
+      ...(roundHeading ? [{ text: roundHeading, bold: true, fontSize: 16, alignment: 'center', margin: [0, 1, 0, 22] }] : [{ text: '', margin: [0, 0, 0, 22] }]),
+      fieldRow('HỌ VÀ TÊN:', identity.fullName, 'MSSV:', identity.mssv),
+      fieldRow('LỚP:', reg.currentClass, 'NGÀNH:', reg.major || identity.major),
+      fullFieldRow('EMAIL:', reg.personalEmail),
+      fullFieldRow('ĐIỆN THOẠI:', reg.studentPhone),
+      fullFieldRow('ĐỊA CHỈ TẠM TRÚ:', reg.studentTemporaryAddress || reg.studentAddress),
+      courseRow,
+      { text: `Đăng ký đề tài chính thức lần thứ : ${version}`, italics: true, fontSize: 12, alignment: 'center', margin: [0, 0, 0, 22] },
+      {
+        table: {
+          widths: [92, '*'],
+          body: [[
+            { text: 'TÊN ĐỀ TÀI :', bold: true, fontSize: 12, border: [false, false, false, false] },
+            { text: value(reg.topicTitle), bold: true, fontSize: 12, border: [false, false, false, false] }
+          ]]
+        },
+        layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
+        margin: [0, 0, 0, 5]
+      },
+      ...topicDotLines,
+      { text: 'MÔ TẢ CHI TIẾT ĐỊNH HƯỚNG THIẾT KẾ CỦA ĐỀ TÀI :', bold: true, alignment: 'center', fontSize: 12, margin: [0, 13, 0, 11] },
+      { text: value(descriptionText), alignment: 'justify', fontSize: 12, lineHeight: 1.3, margin: [0, 0, 0, 5] },
+      ...descriptionDotLines,
+      { text: 'Tôi xin cam đoan thực hiện đúng đề tài đã đăng ký.', bold: true, fontSize: 12, alignment: 'center', margin: [0, 12, 0, 22] },
+      {
+        columns: [
+          {
+            width: '58%', stack: [
+              { text: 'Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN', bold: true, fontSize: 12, alignment: 'center', margin: [0, 19, 0, 0] }
+            ]
+          },
+          {
+            width: '42%', stack: [
+              { text: `Tp.HCM, ngày ${dd} tháng ${mm} năm ${yyyy}`, italics: true, fontSize: 12, alignment: 'center' },
+              { text: 'NGƯỜI ĐĂNG KÝ', fontSize: 12, alignment: 'center', margin: [0, 4, 0, 0] },
+              { text: '(ký và ghi rõ họ tên)', fontSize: 12, alignment: 'center' },
+              { text: identity.fullName, bold: true, fontSize: 12, alignment: 'center', margin: [0, 46, 0, 0] }
+            ]
+          }
+        ]
+      }
+    ],
+    styles: {}
+  };
+
+  const safeId = String(identity.mssv || 'sinh-vien').replace(/[^0-9A-Za-z_-]/g, '');
+  window.pdfMake.createPdf(docDefinition).download(`Phieu-dang-ky-de-tai-${safeId}-lan-${version}.pdf`);
+};
+
 window.updateStudentPersonalSidebar = function() {
   const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
   const heroName = document.getElementById('hero-student-name');
@@ -21377,7 +22316,7 @@ window.updateStudentPersonalSidebar = function() {
 
   const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(mssv) : null;
   const fullName = studentObj?.fullName || studentObj?.name || state.user?.displayName || `Sinh viên ${mssv}`;
-  const studentClass = studentObj?.className || studentObj?.studentClass || 'Chưa cập nhật';
+  const studentClass = state.studentSelfProfile?.currentClass || state.myRegistration?.currentClass || 'Chưa cập nhật';
   const major = studentObj?.major || 'Thiết kế nội thất';
 
   const avatarUrl = state.user?.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%2394a3b8'/%3E%3Cpath fill='%2394a3b8' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
@@ -21455,6 +22394,20 @@ window.updateStudentPersonalSidebar = function() {
           <h3 class="font-bold text-sm text-slate-900 truncate leading-snug">${fullName}</h3>
           <p class="text-xs text-slate-500 font-mono">MSSV: <span class="font-bold text-tdtu-blue">${mssv}</span></p>
         </div>
+      </div>
+
+      <div class="p-3.5 bg-blue-50 border border-blue-200 rounded-xl space-y-2.5">
+        <div>
+          <span class="font-black text-xs text-blue-900 block">Thông tin sinh viên tự cập nhật</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <label class="text-[11px] font-bold text-slate-600">Lớp<input id="profile-current-class" maxlength="50" value="${escapeHtml(state.studentSelfProfile?.currentClass || state.myRegistration?.currentClass || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
+          <label class="text-[11px] font-bold text-slate-600">Điện thoại<input id="profile-student-phone" maxlength="20" value="${escapeHtml(state.studentSelfProfile?.phone || state.myRegistration?.studentPhone || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
+        </div>
+        <label class="text-[11px] font-bold text-slate-600 block">Email cá nhân<input id="profile-personal-email" type="email" maxlength="120" value="${escapeHtml(state.studentSelfProfile?.personalEmail || state.myRegistration?.personalEmail || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
+        <label class="text-[11px] font-bold text-slate-600 block">Địa chỉ thường trú<input id="profile-student-permanent-address" maxlength="250" value="${escapeHtml(state.studentSelfProfile?.permanentAddress || state.myRegistration?.studentPermanentAddress || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
+        <label class="text-[11px] font-bold text-slate-600 block">Địa chỉ tạm trú<input id="profile-student-temporary-address" maxlength="250" value="${escapeHtml(state.studentSelfProfile?.temporaryAddress || state.myRegistration?.studentTemporaryAddress || state.studentSelfProfile?.address || state.myRegistration?.studentAddress || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
+        <button type="button" onclick="saveStudentSelfProfile()" class="w-full px-3 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-lg text-xs font-black">Lưu thông tin sinh viên</button>
       </div>
 
       <!-- Student Details -->
@@ -21639,6 +22592,7 @@ window.renderSupervisorRoundsDropdown = function() {
   if (!select) return;
 
   const actor = getEffectiveActor();
+  const toolbar = document.getElementById('supervisor-round-selector-toolbar');
   const lockedBadge = document.getElementById('sup-round-locked-badge');
   const validRounds = (state.rounds || []).filter(r => !r.deleted);
 
@@ -21652,10 +22606,11 @@ window.renderSupervisorRoundsDropdown = function() {
 
     const roundTitle = lockedRound ? `${lockedRound.title} (${lockedRound.academicYear || ''})` : `Đợt: ${lockedRoundId}`;
 
-    select.innerHTML = `<option value="${lockedRoundId}" selected>${roundTitle} (Khóa)</option>`;
+    select.innerHTML = `<option value="${lockedRoundId}" selected>${roundTitle}</option>`;
     select.disabled = true;
-    select.className = 'bg-slate-800/90 text-slate-300 border border-white/20 rounded-xl px-3 py-1.5 text-xs font-bold opacity-80 cursor-not-allowed max-w-full truncate';
+    select.className = 'bg-slate-900/80 text-white border border-white/25 rounded-xl px-3 py-1.5 text-xs font-bold max-w-full truncate';
     if (lockedBadge) lockedBadge.classList.remove('hidden');
+    if (toolbar) toolbar.classList.add('hidden');
     return;
   }
 
@@ -21691,6 +22646,7 @@ window.renderSupervisorRoundsDropdown = function() {
   if (filteredRounds.length === 0) {
     select.innerHTML = '<option value="">-- Chưa có đợt tốt nghiệp --</option>';
   }
+  if (toolbar) toolbar.classList.toggle('hidden', filteredRounds.length <= 1);
 };
 
 window.onSupervisorRoundSelected = async function(roundId) {
@@ -21712,6 +22668,7 @@ window.loadSupervisorPortalData = async function(roundId) {
   const emailLower = (actor.email || '').toLowerCase().trim();
   const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
   if (!round) return;
+  const isDirect = isDirectSupervisorAssignment(round);
 
   // 1. Locate current supervisor profile
   let currentSup = (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower);
@@ -21792,36 +22749,88 @@ window.loadSupervisorPortalData = async function(roundId) {
   }
 
   // 4. Identify Assigned Students for this supervisor
-  const mySupId = currentSup?.id || currentSup?.supervisorId;
-  const registrationsById = new Map(allRegistrations.map(r => [String(r.studentId || r.id).trim().toUpperCase(), r]));
-  const assignedFromOfficial = publishedAssignments.map(assignment => {
-    const studentId = String(assignment.studentId || assignment.id).trim().toUpperCase();
-    return normalizeOfficialAssignment(assignment, registrationsById.get(studentId) || null);
-  });
-  const legacyAssigned = (round.status === 'published' || round.reviewStatus === 'completed') ? allRegistrations.filter(r => {
-    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
-    if (officials.length === 0) {
-      if (r.reviewStatus !== 'accepted' && r.reviewStatus !== 'manually_assigned') return false;
+  // Fetch eligible students map for the round to exclude students deleted or ineligible
+  let eligibleMap = new Map();
+  let hasEligibleStudentsList = false;
+  try {
+    const elSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents'));
+    if (!elSnap.empty) {
+      hasEligibleStudentsList = true;
+      elSnap.docs.forEach(d => {
+        const dData = d.data() || {};
+        const key = String(d.id || dData.studentId || dData.mssv || '').trim().toUpperCase();
+        if (key && dData.eligible !== false) {
+          eligibleMap.set(key, true);
+        }
+      });
     }
-    return officials.some(s => {
-      if (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) return true;
-      if (s.email && s.email.toLowerCase().trim() === emailLower) return true;
-      if (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower) return true;
-      return false;
+  } catch (elErr) {
+    console.warn('[SupervisorPortal] Could not query eligible students:', elErr);
+  }
+
+  const isStudentEligible = (stId) => {
+    if (!hasEligibleStudentsList) return true;
+    return eligibleMap.has(String(stId || '').trim().toUpperCase());
+  };
+
+  const mySupId = currentSup?.id || currentSup?.supervisorId;
+  const currentSupName = (currentSup?.name || '').toLowerCase().trim();
+  const registrationsById = new Map(allRegistrations.map(r => [String(r.studentId || r.id).trim().toUpperCase(), r]));
+
+  const isAssignedToThisSupervisor = (item) => {
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(item) : [];
+    if (officials.length > 0) {
+      return officials.some(s => {
+        if (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) return true;
+        if (emailLower && ((s.email && s.email.toLowerCase().trim() === emailLower) || (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower))) return true;
+        if (currentSupName && s.supervisorName && s.supervisorName.toLowerCase().trim() === currentSupName) return true;
+        return false;
+      });
+    }
+    if (mySupId && (item.acceptedSupervisorId === mySupId || item.finalSupervisorId === mySupId || item.supervisorId === mySupId)) return true;
+    if (emailLower && ((item.supervisorEmail && item.supervisorEmail.toLowerCase().trim() === emailLower) || (Array.isArray(item.supervisorEmails) && item.supervisorEmails.map(e => (e||'').toLowerCase().trim()).includes(emailLower)))) return true;
+    if (currentSupName && ((item.acceptedSupervisorName && item.acceptedSupervisorName.toLowerCase().trim() === currentSupName) || (item.supervisorName && item.supervisorName.toLowerCase().trim() === currentSupName))) return true;
+    return false;
+  };
+
+  const assignedFromOfficial = publishedAssignments
+    .map(assignment => {
+      const studentId = String(assignment.studentId || assignment.id).trim().toUpperCase();
+      return normalizeOfficialAssignment(assignment, registrationsById.get(studentId) || null);
+    })
+    .filter(item => {
+      const studentId = String(item.studentId || item.id).trim().toUpperCase();
+      if (!isStudentEligible(studentId)) return false;
+      if (currentSup || mySupId) {
+        return isAssignedToThisSupervisor(item);
+      }
+      return true;
     });
+
+  const legacyAssigned = (round.status === 'published' || round.reviewStatus === 'completed') ? allRegistrations.filter(r => {
+    const studentId = String(r.studentId || r.id).trim().toUpperCase();
+    if (!isStudentEligible(studentId)) return false;
+    if (currentSup || mySupId) {
+      return isAssignedToThisSupervisor(r);
+    }
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
+    return officials.length > 0 || r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned';
   }) : [];
+
   const assignedMap = new Map();
   [...assignedFromOfficial, ...legacyAssigned].forEach(item => {
     const key = String(item.studentId || item.id).trim().toUpperCase();
-    if (key && !assignedMap.has(key)) assignedMap.set(key, item);
+    if (key && !assignedMap.has(key) && isStudentEligible(key)) assignedMap.set(key, item);
   });
   const assigned = [...assignedMap.values()];
 
-  // Admin fallback: If admin without personal assignment, can see all assigned students in round
+  // Admin fallback: ONLY if pure admin who is NOT in the supervisor roster at all and has zero personal assignments
   let displayStudents = assigned;
-  if (actor.isAdmin && assigned.length === 0) {
+  if (actor.isAdmin && !currentSup && assigned.length === 0) {
     displayStudents = [...assignedMap.values()];
     if (displayStudents.length === 0 && (round.status === 'published' || round.reviewStatus === 'completed')) displayStudents = allRegistrations.filter(r => {
+      const studentId = String(r.studentId || r.id).trim().toUpperCase();
+      if (!isStudentEligible(studentId)) return false;
       const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
       return officials.length > 0 || r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned';
     });
@@ -21874,9 +22883,10 @@ window.loadSupervisorPortalData = async function(roundId) {
   const tabPrelimBtn = document.getElementById('sup-tab-btn-preliminary');
   const tabReviewerBtn = document.getElementById('sup-tab-btn-reviewer');
 
-  // Temporarily hide review, accepted, preliminary, and reviewer tabs per user request
-  if (tabReviewBtn) tabReviewBtn.classList.add('hidden');
-  if (tabAcceptedBtn) tabAcceptedBtn.classList.add('hidden');
+  // Direct-assignment rounds do not use preference review or accepted-preference lists.
+  if (tabReviewBtn) tabReviewBtn.classList.toggle('hidden', isDirect);
+  if (tabAcceptedBtn) tabAcceptedBtn.classList.toggle('hidden', isDirect);
+  // Preliminary and reviewer scoring live exclusively in the Assessment portal.
   if (tabPrelimBtn) tabPrelimBtn.classList.add('hidden');
   if (tabReviewerBtn) tabReviewerBtn.classList.add('hidden');
   if (tabAssignedBtn) tabAssignedBtn.classList.remove('hidden');
@@ -22020,6 +23030,13 @@ window.renderSupervisorAssignedStudents = function() {
     const hasRegistration = Boolean(st.topicTitle);
     const topicTitle = st.topicTitle || 'Chưa đăng ký đề tài';
     const projectType = st.projectType || '--';
+    const topicApprovalStatus = st.topicApprovalStatus || 'pending';
+    const topicVersion = Number(st.topicTitleVersion || 1);
+    const topicApprovalBadge = topicApprovalStatus === 'approved'
+      ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">✓ Tên đề tài đã duyệt</span>'
+      : topicApprovalStatus === 'rejected'
+        ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-200">✕ Yêu cầu chỉnh sửa</span>'
+        : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">⌛ Chờ duyệt tên đề tài</span>';
 
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
     const isPrimary = officials.some(s => {
@@ -22075,10 +23092,20 @@ window.renderSupervisorAssignedStudents = function() {
               <span class="text-xs text-slate-500 font-medium truncate">Lớp: ${className}</span>
             </div>
             <h3 class="text-sm sm:text-base font-black text-slate-900 leading-snug truncate">${name}</h3>
-            <p class="text-xs text-slate-600 mt-1 line-clamp-1">
-              <strong class="text-slate-700">Đề tài:</strong> ${topicTitle}
+            <p class="text-xs text-slate-600 mt-1 flex items-center gap-2 flex-wrap">
+              <strong class="text-slate-700">Đề tài:</strong>
+              <span class="font-semibold text-slate-900">${topicTitle}</span>
+              ${hasRegistration ? `
+                <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')"
+                        class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer shrink-0"
+                        title="Xem phiếu đăng ký đề tài chính thức (mô phỏng file PDF trình nộp)">
+                  <span>👁️</span> <span>Xem</span>
+                </button>
+              ` : ''}
             </p>
             <div class="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] text-slate-500">
+              ${hasRegistration ? topicApprovalBadge : ''}
+              ${hasRegistration ? `<span>Phiên bản ${topicVersion}</span><span>•</span>` : ''}
               <span>Loại hình: <b class="text-slate-700">${projectType}</b></span>
               <span>•</span>
               <span>${submissionStatusStr}</span>
@@ -22111,6 +23138,285 @@ window.renderSupervisorAssignedStudents = function() {
   }).join('');
 };
 
+window.saveStudentSelfProfile = async function() {
+  if (!checkImpersonationWriteGuard('Cập nhật thông tin sinh viên')) return;
+  const identity = getRegistrationStudentIdentity();
+  const currentClass = (document.getElementById('profile-current-class')?.value || '').trim();
+  const personalEmail = (document.getElementById('profile-personal-email')?.value || '').trim();
+  const phone = (document.getElementById('profile-student-phone')?.value || '').trim();
+  const permanentAddress = (document.getElementById('profile-student-permanent-address')?.value || '').trim();
+  const temporaryAddress = (document.getElementById('profile-student-temporary-address')?.value || '').trim();
+  if (!currentClass || !personalEmail || !phone || !permanentAddress || !temporaryAddress) {
+    showToast('Vui lòng nhập đầy đủ lớp, email cá nhân, điện thoại, địa chỉ thường trú và địa chỉ tạm trú.', 'warning');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalEmail)) {
+    showToast('Email cá nhân chưa đúng định dạng.', 'warning');
+    return;
+  }
+  try {
+    const payload = {
+      studentId: identity.mssv,
+      email: identity.email,
+      currentClass,
+      personalEmail,
+      phone,
+      permanentAddress,
+      temporaryAddress,
+      address: temporaryAddress,
+      updatedAt: serverTimestamp(),
+      updatedBy: state.user?.email || identity.email
+    };
+    await setDoc(doc(db, 'graduationStudentProfiles', identity.mssv), payload, { merge: true });
+    if (state.myRegistration && state.selectedRoundId) {
+      await updateDoc(doc(db, 'graduationRounds', state.selectedRoundId, 'registrations', identity.mssv), {
+        currentClass,
+        personalEmail,
+        studentPhone: phone,
+        studentPermanentAddress: permanentAddress,
+        studentTemporaryAddress: temporaryAddress,
+        studentAddress: temporaryAddress,
+        updatedAt: serverTimestamp()
+      });
+      Object.assign(state.myRegistration, {
+        currentClass, personalEmail, studentPhone: phone,
+        studentPermanentAddress: permanentAddress,
+        studentTemporaryAddress: temporaryAddress,
+        studentAddress: temporaryAddress
+      });
+    }
+    state.studentSelfProfile = { ...(state.studentSelfProfile || {}), ...payload };
+    updateStudentPersonalSidebar();
+    populateRegistrationStudentForm();
+    showToast('Đã cập nhật thông tin sinh viên.', 'success');
+  } catch (err) {
+    console.error('Save student self profile failed:', err);
+    showToast('Không thể lưu thông tin sinh viên: ' + err.message, 'error');
+  }
+};
+
+window.reviewStudentTopicTitle = async function(studentId, decision) {
+  if (!checkImpersonationWriteGuard('Duyệt tên đề tài')) return;
+  const registration = (state.supervisorAssignedStudents || []).find(st => (st.studentId || st.id) === studentId);
+  const roundId = state.selectedRoundId || state.activeRound?.id;
+  if (!registration?.topicTitle || !roundId) return;
+
+  if (decision === 'approved') {
+    const requiredOfficialFields = ['currentClass', 'personalEmail', 'studentPhone', 'studentPermanentAddress', 'studentTemporaryAddress', 'courseName', 'courseCode', 'courseGroup', 'topicDescription'];
+    const missingOfficialFields = requiredOfficialFields.filter(key => !String(registration[key] || '').trim());
+    if (missingOfficialFields.length > 0) {
+      showToast('Sinh viên chưa hoàn thiện đủ thông tin Phiếu đăng ký chính thức. Chưa thể xác nhận.', 'warning');
+      return;
+    }
+  }
+
+  let note = '';
+  if (decision === 'rejected') {
+    note = window.prompt('Nhập lý do hoặc nội dung cần sinh viên chỉnh sửa:', registration.topicApprovalNote || '') || '';
+    if (!note.trim()) {
+      showToast('Vui lòng nhập lý do khi không duyệt tên đề tài.', 'warning');
+      return;
+    }
+  } else if (!window.confirm(`Duyệt tên đề tài “${registration.topicTitle}”?`)) {
+    return;
+  }
+
+  const actor = getEffectiveActor();
+  const version = Number(registration.topicTitleVersion || 1);
+  const history = Array.isArray(registration.topicTitleHistory) ? [...registration.topicTitleHistory] : [];
+  const idx = history.findIndex(item => Number(item.version) === version);
+  const reviewedEntry = {
+    ...(idx >= 0 ? history[idx] : { version, title: registration.topicTitle, submittedAt: new Date().toISOString() }),
+    status: decision,
+    reviewedAt: new Date().toISOString(),
+    reviewedBy: actor?.email || state.user?.email || '',
+    note: note.trim()
+  };
+  if (idx >= 0) history[idx] = reviewedEntry; else history.push(reviewedEntry);
+
+  try {
+    await updateDoc(doc(db, 'graduationRounds', roundId, 'registrations', studentId), {
+      topicApprovalStatus: decision,
+      topicApprovalNote: note.trim(),
+      topicReviewedAt: serverTimestamp(),
+      topicReviewedBy: actor?.email || state.user?.email || '',
+      topicTitleHistory: history,
+      updatedAt: serverTimestamp()
+    });
+    registration.topicApprovalStatus = decision;
+    registration.topicApprovalNote = note.trim();
+    registration.topicTitleHistory = history;
+    renderSupervisorAssignedStudents();
+    showToast(decision === 'approved' ? 'Đã duyệt tên đề tài.' : 'Đã gửi yêu cầu sinh viên chỉnh sửa tên đề tài.', 'success');
+  } catch (err) {
+    console.error('Topic title review failed:', err);
+    showToast('Không thể lưu quyết định duyệt: ' + err.message, 'error');
+  }
+};
+
+
+window.openTopicRegistrationPreviewModal = function(studentId) {
+  const modal = document.getElementById('modal-supervisor-topic-preview');
+  if (!modal) return;
+
+  const round = state.activeRound || {};
+  const st = (state.supervisorAssignedStudents || []).find(s => (s.studentId || s.id) === studentId) ||
+    findStudentInRound(studentId);
+  if (!st) {
+    showToast('Không tìm thấy thông tin đăng ký của sinh viên.', 'warning');
+    return;
+  }
+
+  const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(studentId) : null;
+  const fullName = st?.studentName || studentObj?.fullName || studentObj?.name || studentId;
+  const className = st?.currentClass || studentObj?.className || studentObj?.studentClass || st?.className || '--';
+  const major = st?.major || studentObj?.major || 'Thiết kế nội thất';
+  const personalEmail = st?.personalEmail || st?.email || studentObj?.email || '--';
+  const phone = st?.studentPhone || studentObj?.phone || '--';
+  const address = st?.studentTemporaryAddress || st?.studentAddress || studentObj?.address || '--';
+  const courseName = st?.courseName || 'Đồ án tốt nghiệp';
+  const courseCode = st?.courseCode || '--';
+  const courseGroup = st?.courseGroup || '--';
+  const version = Number(st?.topicTitleVersion || 1);
+  const topicTitle = st?.topicTitle || 'Chưa đăng ký đề tài';
+  const topicDescription = st?.topicDescription || '(Chưa có mô tả định hướng thiết kế)';
+  const status = st?.topicApprovalStatus || 'pending';
+
+  const roundLabel = round.title || round.roundName || 'ĐỒ ÁN TỐT NGHIỆP';
+  const normalizedRoundLabel = roundLabel.toUpperCase().replace(/\s+/g, ' ').trim();
+  const roundHeadingMatch = normalizedRoundLabel.match(/^(.*?)(?:\s*-\s*)?(ĐỢT\s+.+)$/);
+  const programHeading = roundHeadingMatch?.[1] || normalizedRoundLabel;
+  const roundHeading = roundHeadingMatch?.[2] || '';
+
+  const approvedDate = st?.topicReviewedAt?.toDate ? st.topicReviewedAt.toDate() : (st?.topicReviewedAt ? new Date(st.topicReviewedAt) : new Date());
+  const dd = String(approvedDate.getDate()).padStart(2, '0');
+  const mm = String(approvedDate.getMonth() + 1).padStart(2, '0');
+  const yyyy = approvedDate.getFullYear();
+
+  // Header info
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '--'; };
+  setEl('topic-preview-student-name', fullName);
+  setEl('topic-preview-mssv', studentId);
+  setEl('topic-preview-round-name', roundLabel);
+
+  // Doc info
+  setEl('topic-preview-doc-program', programHeading);
+  setEl('topic-preview-doc-round', roundHeading);
+  setEl('topic-preview-doc-name', fullName);
+  setEl('topic-preview-doc-mssv', studentId);
+  setEl('topic-preview-doc-class', className);
+  setEl('topic-preview-doc-major', major);
+  setEl('topic-preview-doc-email', personalEmail);
+  setEl('topic-preview-doc-phone', phone);
+  setEl('topic-preview-doc-address', address);
+  setEl('topic-preview-doc-course', courseName);
+  setEl('topic-preview-doc-code', courseCode);
+  setEl('topic-preview-doc-group', courseGroup);
+  setEl('topic-preview-doc-version', `Đăng ký đề tài chính thức lần thứ : ${version}`);
+  setEl('topic-preview-doc-title', topicTitle);
+  setEl('topic-preview-doc-description', topicDescription);
+  setEl('topic-preview-doc-sign-student', fullName);
+  setEl('topic-preview-doc-date', `Tp.HCM, ngày ${dd} tháng ${mm} năm ${yyyy}`);
+
+  // Supervisor info
+  const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
+  const primary = officials.find(s => s.role === 'primary') || officials[0];
+  const supName = primary?.supervisorName || st.acceptedSupervisorName || 'Giảng viên Hướng dẫn';
+  setEl('topic-preview-doc-sup-name', supName);
+
+  // Status badge & sup status in document
+  const badgeEl = document.getElementById('topic-preview-status-badge');
+  const docSupStatusEl = document.getElementById('topic-preview-doc-sup-status');
+  const footerNoteEl = document.getElementById('topic-preview-footer-note');
+  const btnApprove = document.getElementById('btn-topic-preview-approve');
+  const btnReject = document.getElementById('btn-topic-preview-reject');
+
+  if (status === 'approved') {
+    if (badgeEl) {
+      badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300';
+      badgeEl.textContent = '✓ Đã duyệt đề tài';
+    }
+    if (docSupStatusEl) {
+      docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-emerald-700 italic';
+      docSupStatusEl.textContent = '✓ Đã duyệt đề tài';
+    }
+    if (footerNoteEl) {
+      footerNoteEl.textContent = `Tên đề tài đã được GVHD phê duyệt${st.topicReviewedAt ? ' lúc ' + fmtIsoToVietnameseDateTime(st.topicReviewedAt) : ''}.`;
+    }
+    if (btnApprove) btnApprove.classList.add('hidden');
+    if (btnReject) {
+      btnReject.classList.remove('hidden');
+      btnReject.innerHTML = '<span>🔄</span> <span>Yêu cầu sửa lại</span>';
+    }
+  } else if (status === 'rejected') {
+    if (badgeEl) {
+      badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300';
+      badgeEl.textContent = '✕ Yêu cầu chỉnh sửa';
+    }
+    if (docSupStatusEl) {
+      docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-rose-700 italic';
+      docSupStatusEl.textContent = `✕ Yêu cầu chỉnh sửa: ${st.topicApprovalNote || ''}`;
+    }
+    if (footerNoteEl) {
+      footerNoteEl.textContent = `Đã yêu cầu sinh viên chỉnh sửa: "${st.topicApprovalNote || ''}".`;
+    }
+    if (btnApprove) {
+      btnApprove.classList.remove('hidden');
+      btnApprove.innerHTML = '<span>✓</span> <span>Duyệt tên đề tài</span>';
+    }
+    if (btnReject) btnReject.classList.add('hidden');
+  } else {
+    if (badgeEl) {
+      badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300';
+      badgeEl.textContent = '⌛ Chờ duyệt tên đề tài';
+    }
+    if (docSupStatusEl) {
+      docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-amber-700 italic';
+      docSupStatusEl.textContent = '(Chờ GVHD xem xét & ký duyệt)';
+    }
+    if (footerNoteEl) {
+      footerNoteEl.textContent = 'GVHD xem xét nội dung phiếu đăng ký và xác nhận duyệt hoặc yêu cầu chỉnh sửa.';
+    }
+    if (btnApprove) {
+      btnApprove.classList.remove('hidden');
+      btnApprove.innerHTML = '<span>✓</span> <span>Duyệt tên đề tài</span>';
+    }
+    if (btnReject) {
+      btnReject.classList.remove('hidden');
+      btnReject.innerHTML = '<span>✕</span> <span>Không duyệt (Yêu cầu sửa)</span>';
+    }
+  }
+
+  // Bind actions
+  if (btnApprove) {
+    btnApprove.onclick = async () => {
+      await window.reviewStudentTopicTitle(studentId, 'approved');
+      window.openTopicRegistrationPreviewModal(studentId);
+    };
+  }
+  if (btnReject) {
+    btnReject.onclick = async () => {
+      await window.reviewStudentTopicTitle(studentId, 'rejected');
+      window.openTopicRegistrationPreviewModal(studentId);
+    };
+  }
+
+  const btnPdf = document.getElementById('btn-topic-preview-download-pdf');
+  if (btnPdf) {
+    btnPdf.onclick = () => {
+      window.downloadOfficialTopicRegistrationPdf(studentId);
+    };
+  }
+
+  modal.classList.remove('hidden');
+};
+
+window.closeTopicRegistrationPreviewModal = function() {
+  const modal = document.getElementById('modal-supervisor-topic-preview');
+  if (modal) modal.classList.add('hidden');
+};
+
+
 window.setSupervisorStudentFilter = function(filterKey) {
   state.supervisorStudentFilter = filterKey;
 
@@ -22130,6 +23436,7 @@ window.setSupervisorStudentFilter = function(filterKey) {
 
 window.switchSupervisorTab = function(tabName) {
   state.currentSupervisorTab = tabName;
+  const isDirect = isDirectSupervisorAssignment(state.activeRound);
   const tabs = {
     assigned: ['sup-tab-btn-assigned', 'sup-panel-assigned'],
     review: ['sup-tab-btn-review', 'sup-panel-review'],
@@ -22144,6 +23451,11 @@ window.switchSupervisorTab = function(tabName) {
     const isTarget = (k === tabName);
 
     if (btn) {
+      if (isDirect && (k === 'review' || k === 'accepted')) {
+        btn.classList.add('hidden');
+        if (panel) panel.classList.add('hidden');
+        return;
+      }
       if (isTarget) {
         btn.className = 'px-4 py-2 rounded-xl text-xs font-bold text-white bg-tdtu-blue shadow-sm transition-all cursor-pointer';
       } else {
@@ -22182,6 +23494,21 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
   document.getElementById('dtl-class-major').textContent = `Lớp: ${className} • Ngành: ${major}`;
   document.getElementById('dtl-topic-title').textContent = st?.topicTitle || 'Chưa cập nhật tên đề tài';
   document.getElementById('dtl-project-type').textContent = `Loại hình: ${st?.projectType || '--'}`;
+  const officialFormInfo = document.getElementById('dtl-official-form-info');
+  if (officialFormInfo) {
+    const rows = [
+      ['Lớp', st?.currentClass], ['Ngành', st?.major], ['Email cá nhân', st?.personalEmail], ['Điện thoại', st?.studentPhone],
+      ['Địa chỉ thường trú', st?.studentPermanentAddress], ['Địa chỉ tạm trú', st?.studentTemporaryAddress || st?.studentAddress],
+      ['Môn học', st?.courseName], ['Mã môn / Nhóm', [st?.courseCode, st?.courseGroup].filter(Boolean).join(' / ')],
+      ['Đăng ký lần', st?.topicTitleVersion || 1], ['Mô tả định hướng', st?.topicDescription]
+    ];
+    officialFormInfo.innerHTML = rows.map(([label, value]) => `
+      <div class="${label === 'Mô tả định hướng' || label.startsWith('Địa chỉ') ? 'sm:col-span-2' : ''}">
+        <span class="text-slate-400 block">${label}</span>
+        <span class="font-semibold text-slate-800 whitespace-pre-wrap">${escapeHtml(value || '--')}</span>
+      </div>
+    `).join('');
+  }
 
   const dateStr = st?.submittedAt ? (st.submittedAt.toDate ? st.submittedAt.toDate() : new Date(st.submittedAt)).toLocaleString('vi-VN') : '--';
   document.getElementById('dtl-registered-time').textContent = `Đăng ký ngày: ${dateStr}`;

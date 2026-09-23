@@ -32,6 +32,9 @@
   </script>
   <!-- SheetJS for local Excel parsing -->
   <script src="xlsx.full.min.js"></script>
+  <!-- pdfmake for the official student topic-registration form -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-blue-100 selection:text-blue-900">
@@ -64,6 +67,9 @@
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
+        <button type="button" onclick="openAdminImpersonateModal()" class="px-3 py-1 bg-white/35 hover:bg-white/55 text-slate-950 font-black rounded-lg shadow-sm border border-black/15 transition-all flex items-center gap-1.5 text-xs cursor-pointer">
+          <span>🔄</span> <span>Đổi nhân vật</span>
+        </button>
         <button type="button" onclick="exitImpersonation()" class="px-3 py-1 bg-slate-950 hover:bg-black text-amber-300 font-black rounded-lg shadow-sm border border-amber-400/40 transition-all flex items-center gap-1.5 text-xs cursor-pointer">
           <span>✕</span> <span>Thoát giả lập</span>
         </button>
@@ -202,24 +208,32 @@
       <div id="student-workspace-container" class="space-y-4">
 
         <!-- 1. CURRENT ROUND HERO CARD -->
-        <div id="student-hero-card" class="card-surface p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl relative overflow-hidden rounded-2xl border border-white/10">
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-            <div class="space-y-2 flex-1">
+        <div id="student-hero-card" class="card-surface px-5 py-4 sm:px-6 sm:py-5 bg-gradient-to-r from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl relative overflow-hidden rounded-2xl border border-white/10">
+          <div class="relative z-10 min-h-[132px]">
+            <div class="space-y-2 lg:pr-[350px]">
               <div class="flex flex-wrap items-center gap-2">
                 <span id="round-status-badge" class="hidden badge badge-open font-bold">Đang mở đăng ký</span>
                 <span id="round-mode-badge" class="hidden badge badge-info"></span>
                 <span id="hero-student-state-badge" class="hidden badge bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-400/30">Đủ điều kiện</span>
               </div>
-              <h1 id="round-title-display" class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white leading-snug">
+              <h1 id="round-title-display" class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white leading-tight lg:whitespace-nowrap">
                 Đồ án Tốt nghiệp
               </h1>
-              <p id="round-academic-year" class="text-xs sm:text-sm text-blue-200 font-medium">Năm học 2026-2027</p>
-              <p id="round-time-range" class="hidden text-xs text-slate-300 flex items-center gap-1.5 pt-0.5">
+              <div id="hero-registered-topic-wrap" class="hidden mt-1.5 p-2.5 bg-white/10 border border-white/15 rounded-xl text-xs backdrop-blur-sm shadow-2xs max-w-3xl lg:mr-[430px]">
+                <div class="flex items-center gap-1.5 text-amber-300 font-black text-[10px] uppercase tracking-wider">
+                  <span>📋</span> <span>Đề tài đã đăng ký:</span>
+                </div>
+                <div id="hero-registered-topic-name" class="font-bold text-white text-xs sm:text-sm mt-0.5 leading-snug break-words">--</div>
+                <div id="hero-registered-topic-meta" class="text-[11px] text-blue-200 mt-0.5 font-medium flex items-center gap-2 flex-wrap"></div>
+                <button id="hero-download-topic-form-btn" type="button" onclick="downloadOfficialTopicRegistrationPdf()" class="hidden mt-2 px-3 py-1.5 bg-white text-tdtu-blue rounded-lg text-[11px] font-black shadow-sm hover:bg-blue-50">⬇ Tải phiếu đăng ký PDF</button>
+              </div>
+              <p id="round-academic-year" class="text-xs sm:text-sm text-blue-200 font-medium lg:mr-[430px]">Năm học 2026-2027</p>
+              <p id="round-time-range" class="hidden text-xs text-slate-300 flex items-center gap-1.5 pt-0.5 lg:mr-[430px]">
                 <span>📅 Thời gian: --</span>
               </p>
 
               <!-- Quick Metrics Bar inside Hero -->
-              <div class="flex flex-wrap items-center gap-3 pt-2 text-xs text-blue-100">
+              <div class="flex flex-wrap items-center gap-3 pt-1 text-xs text-blue-100">
                 <!-- Student Info Pill hidden as requested (already in header) -->
                 <button type="button" onclick="openStudentProfileModal()" id="hero-student-profile-btn" class="hidden flex items-center gap-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 px-3 py-1.5 rounded-xl border border-white/20 transition-all cursor-pointer shadow-2xs text-left" title="Xem thông tin chi tiết sinh viên">
                   <img id="hero-student-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23fff'/%3E%3Cpath fill='%23fff' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-6 h-6 rounded-md object-cover border border-white/30 shrink-0" alt="Avatar">
@@ -240,20 +254,11 @@
                   <span id="hero-assigned-sup">GVHD: Chưa phân công</span>
                 </div>
               </div>
-
-              <!-- Registered Topic Banner Block -->
-              <div id="hero-registered-topic-wrap" class="hidden mt-2.5 p-3 bg-white/10 border border-white/15 rounded-xl text-xs backdrop-blur-sm shadow-2xs">
-                <div class="flex items-center gap-1.5 text-amber-300 font-black text-[10px] uppercase tracking-wider">
-                  <span>📋</span> <span>Đề tài đã đăng ký:</span>
-                </div>
-                <div id="hero-registered-topic-name" class="font-bold text-white text-xs sm:text-sm mt-0.5 leading-snug break-words">--</div>
-                <div id="hero-registered-topic-meta" class="text-[11px] text-blue-200 mt-0.5 font-medium flex items-center gap-2 flex-wrap"></div>
-              </div>
             </div>
 
             <!-- Supervisor Info Widget (Enlarged and Comfortable) -->
-            <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/20 shadow-sm flex items-center gap-4 min-w-[320px] sm:min-w-[420px] lg:min-w-[460px] max-w-xl shrink-0 self-start lg:self-auto">
-              <img id="hero-sup-card-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-14 h-14 rounded-2xl object-cover border-2 border-white/30 shrink-0 bg-white/10 shadow-xs" alt="GVHD Avatar">
+            <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/20 shadow-sm flex items-center gap-3 min-w-[280px] sm:min-w-[300px] lg:w-[320px] max-w-[340px] lg:absolute lg:right-0 lg:top-0 mt-3 lg:mt-0">
+              <img id="hero-sup-card-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-12 h-12 rounded-xl object-cover border-2 border-white/30 shrink-0 bg-white/10 shadow-xs" alt="GVHD Avatar">
               <div class="min-w-0 flex-1 space-y-0.5">
                 <div class="flex items-center gap-1.5">
                   <span id="hero-sup-card-role" class="badge bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 uppercase tracking-wide">GVHD</span>
@@ -342,7 +347,7 @@
                 <div class="flex-1">
                   <h3 class="font-bold text-sm sm:text-base text-amber-950">Bạn chưa có trong danh sách sinh viên đủ điều kiện đăng ký Đồ án tốt nghiệp đợt này.</h3>
                   <p class="text-xs sm:text-sm text-amber-800 mt-1 leading-relaxed">
-                    Bạn vẫn có thể xem thông tin đợt, danh sách Giảng viên hướng dẫn, chuyên môn và kế hoạch bên dưới. Chức năng nộp đơn đăng ký hiện đang bị khóa. Nếu cần hỗ trợ, vui lòng liên hệ Văn phòng Khoa.
+                    Tài khoản của bạn hiện chưa được ghi nhận trong danh sách sinh viên chính thức của đợt tốt nghiệp này. Nếu bạn thuộc đối tượng làm ĐATN hoặc cần hỗ trợ kiểm tra điều kiện, vui lòng liên hệ Văn phòng Khoa để được giải quyết.
                   </p>
                 </div>
               </div>
@@ -433,8 +438,8 @@
               </div>
               <div>
                 <span class="badge bg-blue-100 text-blue-800 font-bold text-xs mb-1">ĐỢT ĐANG MỞ ĐĂNG KÝ</span>
-                <h2 class="text-lg sm:text-xl font-black text-slate-900 mt-1">Đăng ký Đề tài & Chọn Giảng viên hướng dẫn</h2>
-                <p class="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                <h2 id="registration-cta-title" class="text-lg sm:text-xl font-black text-slate-900 mt-1">Đăng ký Đề tài & Chọn Giảng viên hướng dẫn</h2>
+                <p id="registration-cta-description" class="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
                   Vui lòng hoàn thành điền tên đề tài dự kiến, chọn loại hình đồ án và đăng ký các nguyện vọng GVHD theo quy định của Khoa.
                 </p>
               </div>
@@ -463,6 +468,9 @@
                 <button id="btn-edit-existing-reg" onclick="enableEditRegistration()" class="hidden px-4 py-2 bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto cursor-pointer">
                   ✏️ Chỉnh sửa đăng ký
                 </button>
+                <button id="btn-download-official-topic-form" onclick="downloadOfficialTopicRegistrationPdf()" class="hidden px-4 py-2 bg-tdtu-blue text-white hover:bg-tdtu-dark font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto cursor-pointer">
+                  ⬇ Tải phiếu PDF
+                </button>
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -473,6 +481,7 @@
                 <div>
                   <span class="font-semibold text-slate-500 block">Trạng thái hồ sơ:</span>
                   <span id="reg-card-status" class="font-bold text-emerald-700 text-sm">Đã ghi nhận (Chờ xét duyệt)</span>
+                  <p id="reg-card-topic-review-note" class="hidden mt-1 text-xs text-rose-700 font-medium"></p>
                 </div>
               </div>
 
@@ -510,13 +519,35 @@
               </div>
 
               <!-- STEP 1: TOPIC & PROJECT TYPE -->
-              <div id="step-panel-1" class="card-surface p-6 sm:p-8 space-y-6 max-w-2xl mx-auto">
+              <div id="step-panel-1" class="card-surface p-6 sm:p-8 space-y-6 w-full">
                 <div class="border-b pb-4 text-center">
                   <h2 class="text-xl font-bold text-tdtu-blue">1. Thông tin Đồ án Dự kiến</h2>
                   <p id="registration-topic-step-description" class="text-xs text-slate-500 mt-1">Vui lòng điền tên đề tài dự kiến và phân loại đồ án trước khi chọn GVHD.</p>
                 </div>
 
-                <div class="space-y-5 max-w-xl mx-auto text-left">
+                <div class="space-y-5 w-full text-left">
+                  <div class="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-3">
+                    <div>
+                      <h3 class="text-xs font-black uppercase text-blue-900">Thông tin sinh viên trên phiếu chính thức</h3>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Họ và tên</label><input id="registration-student-name" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">MSSV</label><input id="registration-student-id" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-700"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Lớp <span class="text-rose-500">*</span></label><input id="registration-current-class" maxlength="50" placeholder="Lớp" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Ngành</label><input id="registration-student-major" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Email cá nhân <span class="text-rose-500">*</span></label><input id="registration-personal-email" type="email" maxlength="120" placeholder="Email cá nhân của sinh viên" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-700"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Điện thoại <span class="text-rose-500">*</span></label><input id="registration-student-phone" maxlength="20" placeholder="Số điện thoại liên hệ" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Địa chỉ thường trú <span class="text-rose-500">*</span></label><input id="registration-student-permanent-address" maxlength="250" placeholder="Địa chỉ thường trú" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Địa chỉ tạm trú <span class="text-rose-500">*</span></label><input id="registration-student-temporary-address" maxlength="250" placeholder="Địa chỉ tạm trú dùng trên biểu mẫu" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Môn học <span class="text-rose-500">*</span></label><select id="registration-course-name" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"><option value="Đồ án tốt nghiệp">Đồ án tốt nghiệp</option><option value="Đồ án tổng hợp">Đồ án tổng hợp</option></select></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Mã môn học <span class="text-rose-500">*</span></label><input id="registration-course-code" maxlength="30" placeholder="Mã môn" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Nhóm <span class="text-rose-500">*</span></label><input id="registration-course-group" maxlength="20" placeholder="Nhóm" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                    </div>
+                  </div>
                   <div>
                     <label for="input-topic-title" class="block text-xs font-bold uppercase text-slate-600 mb-1.5">
                       Tên đề tài tốt nghiệp dự kiến <span class="text-rose-500">*</span>
@@ -530,23 +561,22 @@
                   </div>
 
                   <div>
-                    <label for="select-project-type" class="block text-xs font-bold uppercase text-slate-600 mb-1.5">
-                      Loại hình đồ án <span class="text-rose-500">*</span>
+                    <label for="input-topic-description" class="block text-xs font-bold uppercase text-slate-600 mb-1.5">Mô tả chi tiết định hướng thiết kế <span class="text-rose-500">*</span></label>
+                    <textarea id="input-topic-description" rows="5" maxlength="2000" oninput="document.getElementById('topic-description-char-count').textContent=this.value.length" placeholder="Trình bày mục tiêu, đối tượng, không gian và định hướng thiết kế chính..." class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 text-justify focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                    <div class="text-right text-[11px] text-slate-400"><span id="topic-description-char-count">0</span>/2000</div>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1.5">
+                      Loại hình đồ án <span class="text-rose-500">*</span> <span class="normal-case font-medium text-slate-400">(chọn từ 1 đến 3)</span>
                     </label>
-                    <select id="select-project-type" class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none shadow-sm">
-                      <option value="">-- Chọn loại hình đồ án --</option>
-                      <option value="Nhà ở dân dụng">Nhà ở dân dụng</option>
-                      <option value="Thương mại dịch vụ">Thương mại dịch vụ</option>
-                      <option value="Cảnh quan">Cảnh quan</option>
-                      <option value="Giáo dục / nghiên cứu">Giáo dục / nghiên cứu</option>
-                      <option value="Văn phòng">Văn phòng</option>
-                      <option value="Văn hóa / triển lãm / bảo tàng">Văn hóa / triển lãm / bảo tàng</option>
-                      <option value="Resort / khách sạn">Resort / khách sạn</option>
-                      <option value="F&B – Nhà hàng / Cafe / Bar / Pub">F&B – Nhà hàng / Cafe / Bar / Pub</option>
-                      <option value="Dịch vụ sức khỏe">Dịch vụ sức khỏe</option>
-                      <option value="Bến tàu / bến xe">Bến tàu / bến xe</option>
-                      <option value="Khác">Khác</option>
-                    </select>
+                    <input type="hidden" id="select-project-type" value="">
+                    <div id="project-types-checkbox-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl"></div>
+                    <div id="project-type-other-wrap" class="hidden mt-2">
+                      <label for="input-project-type-other" class="block text-[11px] font-bold text-slate-600 mb-1">Nội dung loại hình khác</label>
+                      <input type="text" id="input-project-type-other" maxlength="120" placeholder="Nhập loại hình đồ án của bạn..." class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+                    <p id="project-types-error" class="hidden text-rose-600 text-xs font-semibold mt-1"></p>
                   </div>
                 </div>
 
@@ -621,13 +651,13 @@
               </div>
 
               <!-- STEP 3: CONFIRMATION -->
-              <div id="step-panel-3" class="hidden card-surface p-6 sm:p-8 space-y-6 max-w-2xl mx-auto">
+              <div id="step-panel-3" class="hidden card-surface p-6 sm:p-8 space-y-6 w-full">
                 <div class="border-b pb-4 text-center">
                   <h2 id="confirm-step-title" class="text-xl font-bold text-tdtu-blue">3. Kiểm tra & Xác nhận Đăng ký</h2>
                   <p class="text-xs text-slate-500 mt-1">Vui lòng rà soát kỹ các thông tin trước khi xác nhận gửi chính thức.</p>
                 </div>
 
-                <div class="space-y-4 max-w-xl mx-auto text-xs">
+                <div class="space-y-4 w-full text-xs">
                   <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
                     <div class="flex items-start justify-between">
                       <span class="font-bold text-slate-500 uppercase">Tên đề tài dự kiến:</span>
@@ -651,11 +681,11 @@
                   </div>
                 </div>
 
-                <div class="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed max-w-xl mx-auto">
+                <div id="registration-confirm-note" class="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed w-full">
                   ⚠️ <strong>LƯU Ý:</strong> Sau khi bấm <em>Xác nhận Đăng ký</em>, hệ thống sẽ lưu thông tin của bạn vào cơ sở dữ liệu đợt. Bạn có thể thay đổi nguyện vọng trong thời gian đợt đăng ký còn mở (nếu đợt cho phép).
                 </div>
 
-                <div class="pt-4 flex justify-center items-center gap-3 max-w-xl mx-auto">
+                <div class="pt-4 flex justify-center items-center gap-3 w-full">
                   <button id="btn-registration-confirm-back" type="button" onclick="goToStep(2)" class="px-5 py-2.5 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-sm rounded-xl transition-all cursor-pointer">
                     ← Quay lại Bước 2
                   </button>
@@ -720,40 +750,10 @@
         <div id="supervisor-hero-card" class="card-surface p-6 bg-gradient-to-br from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl rounded-2xl border border-white/10 space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="space-y-2 flex-1">
-              <div class="flex items-center gap-2">
-                <span class="badge bg-amber-400 text-slate-950 font-black text-xs">CỔNG GIẢNG VIÊN HƯỚNG DẪN</span>
-                <span id="sup-hero-role-badge" class="badge bg-white/20 text-white font-mono text-[11px] border border-white/20">GVHD</span>
-              </div>
               <h1 id="supervisor-greeting-name" class="text-xl sm:text-2xl font-black text-white leading-snug">
                 Kính chào Thầy/Cô
               </h1>
               <p class="text-xs text-blue-200" id="supervisor-round-info">Đợt tốt nghiệp: Đang tải...</p>
-
-              <!-- Clickable Supervisor Info Pill & Actions -->
-              <div class="flex flex-wrap items-center gap-2.5 pt-1 text-xs text-blue-100">
-                <button type="button" onclick="openTeacherProfileModal()" id="hero-supervisor-profile-btn" class="flex items-center gap-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 px-3 py-1.5 rounded-xl border border-white/20 transition-all cursor-pointer shadow-2xs text-left" title="Xem thông tin Giảng viên">
-                  <img id="hero-supervisor-avatar" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23fff'/><path fill='%23fff' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" class="w-6 h-6 rounded-md object-cover border border-white/30 shrink-0" alt="Avatar">
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-1">
-                      <span id="hero-supervisor-name" class="font-bold text-white text-xs truncate">--</span>
-                      <span class="text-[9px] text-blue-200">ℹ️</span>
-                    </div>
-                    <span id="hero-supervisor-email" class="text-[10px] text-blue-200 font-mono block truncate max-w-[180px]">--</span>
-                  </div>
-                </button>
-                <a href="/graduation/assessment/" id="hero-sup-goto-assessment" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl border border-white/15 text-purple-200 font-semibold transition-all" title="Chuyển sang Cổng Đánh giá & Chấm thi">
-                  <span>⚖️</span>
-                  <span>Cổng Đánh giá</span>
-                </a>
-                <a href="/graduation/" id="hero-sup-goto-student" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl border border-white/15 text-blue-200 font-semibold transition-all" title="Xem Cổng Sinh viên">
-                  <span>🎓</span>
-                  <span>Cổng SV</span>
-                </a>
-                <button type="button" onclick="handleTeacherLogout()" class="flex items-center gap-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 px-2.5 py-1.5 rounded-xl transition-all font-semibold cursor-pointer" title="Đăng xuất">
-                  <span>🚪</span>
-                  <span>Đăng xuất</span>
-                </button>
-              </div>
             </div>
 
             <!-- Simplified Hero Stat: Số SV hướng dẫn -->
@@ -762,6 +762,9 @@
               <span id="sup-stat-assigned-total" class="text-2xl sm:text-3xl font-black text-white">0</span>
               <!-- Hidden compatibility counters -->
               <span id="sup-stat-total-cap" class="hidden">0</span>
+              <span id="sup-stat-accepted-prev" class="hidden">0</span>
+              <span id="sup-stat-selected-curr" class="hidden">0</span>
+              <span id="sup-stat-remaining-cap" class="hidden">0</span>
               <span id="sup-stat-primary-count" class="hidden">0</span>
               <span id="sup-stat-support-count" class="hidden">0</span>
               <span id="sup-stat-pending-count" class="hidden">0</span>
@@ -769,7 +772,7 @@
           </div>
 
           <!-- Integrated Round Selector Toolbar inside Hero Banner -->
-          <div class="pt-3.5 border-t border-white/15 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+          <div id="supervisor-round-selector-toolbar" class="pt-3.5 border-t border-white/15 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
             <div class="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
               <span class="text-xs font-bold uppercase tracking-wider text-blue-200 flex items-center gap-1.5 shrink-0">
                 <span>🗓️</span> Đợt tốt nghiệp:
@@ -777,13 +780,10 @@
               <select id="supervisor-round-select" onchange="onSupervisorRoundSelected(this.value)" class="bg-slate-900/80 hover:bg-slate-900 text-white border border-white/25 rounded-xl px-3 py-1.5 text-xs font-bold focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all cursor-pointer max-w-full truncate">
                 <!-- Dynamically populated -->
               </select>
-              <span id="sup-round-locked-badge" class="hidden text-xs font-bold text-amber-950 bg-amber-400 border border-amber-300 px-2.5 py-1 rounded-lg shrink-0 shadow-2xs">🔒 Đang khóa theo phiên giả lập</span>
             </div>
             <div class="flex items-center gap-2 text-xs shrink-0 flex-wrap">
               <span id="sup-active-round-badge" class="badge bg-white/15 text-white font-mono font-bold border border-white/20">Đang tải...</span>
-              <span id="sup-round-review-indicator" class="text-xs font-bold text-blue-100 bg-white/10 px-3 py-1 rounded-xl border border-white/15">
-                Trạng thái: Đang tải...
-              </span>
+              <span id="sup-round-review-indicator" class="hidden"></span>
             </div>
           </div>
         </div>
@@ -824,12 +824,6 @@
             </button>
             <button id="sup-tab-btn-accepted" onclick="switchSupervisorTab('accepted')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
               🏆 Danh sách Đã nhận (<span id="sup-accepted-count-badge">0</span>)
-            </button>
-            <button id="sup-tab-btn-preliminary" onclick="switchSupervisorTab('preliminary')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
-              🎯 Chấm Sơ khảo
-            </button>
-            <button id="sup-tab-btn-reviewer" onclick="switchSupervisorTab('reviewer')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
-              📖 Phản biện Thuyết minh (<span id="sup-reviewer-count-badge">0</span>)
             </button>
           </div>
         </div>
@@ -1044,6 +1038,7 @@
               </div>
               <p id="dtl-topic-title" class="text-sm font-black text-slate-900 leading-snug">Tên đề tài...</p>
               <p id="dtl-registered-time" class="text-[11px] text-slate-400">Đăng ký ngày: --</p>
+              <div id="dtl-official-form-info" class="mt-3 pt-3 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]"></div>
             </div>
 
             <!-- Section B: Phân công GVHD -->
@@ -1108,7 +1103,196 @@
         </div>
       </div>
 
-    </section>    <!-- ======================================================= -->
+      <!-- MODAL: XEM VÀ DUYỆT PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC (MÔ PHỎNG A4 PDF) -->
+      <div id="modal-supervisor-topic-preview" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-2 sm:p-4">
+        <div class="bg-slate-100 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
+          <!-- Sticky Header -->
+          <div class="px-5 py-3.5 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-blue-50 text-tdtu-blue flex items-center justify-center text-lg font-black shrink-0 border border-blue-100">
+                📄
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="font-black text-sm sm:text-base text-slate-900 truncate">
+                    Phiếu Đăng Ký Đề Tài Chính Thức (Trình nộp)
+                  </h3>
+                  <span id="topic-preview-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">⌛ Chờ duyệt</span>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5 truncate">
+                  Sinh viên: <strong id="topic-preview-student-name" class="text-slate-700">--</strong> (<span id="topic-preview-mssv" class="font-mono font-bold text-tdtu-blue">--</span>) • <span id="topic-preview-round-name">--</span>
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button type="button" id="btn-topic-preview-download-pdf" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Tải file PDF chính thức">
+                <span>🖨️</span> <span>Tải PDF / In</span>
+              </button>
+              <button type="button" onclick="closeTopicRegistrationPreviewModal()" class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer text-lg leading-none" title="Đóng">
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <!-- A4 Paper Body Scroll Area -->
+          <div class="overflow-y-auto flex-1 p-3 sm:p-6" style="background:#e2e8f0;">
+            <div class="bg-white rounded-xl shadow-lg border border-slate-300 mx-auto p-6 sm:p-10 text-slate-900" style="max-width:760px;font-family:'Times New Roman',Times,serif;font-size:13pt;line-height:1.4;">
+              
+              <!-- Header Section: TDTU & Quốc hiệu -->
+              <table style="width:100%;border-collapse:collapse;margin-bottom:20px;table-layout:fixed;">
+                <tr>
+                  <td style="width:48%;text-align:center;vertical-align:top;padding-right:8px;">
+                    <div style="font-size:10pt;">TRƯỜNG ĐẠI HỌC TÔN ĐỨC THẮNG</div>
+                    <div style="font-size:10pt;font-weight:bold;margin-top:2px;margin-bottom:6px;">KHOA MỸ THUẬT CÔNG NGHIỆP</div>
+                    <div style="width:140px;height:1px;background:#000;margin:0 auto;"></div>
+                  </td>
+                  <td style="width:52%;text-align:center;vertical-align:top;padding-left:8px;">
+                    <div style="font-size:10pt;font-weight:bold;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                    <div style="font-size:10pt;font-weight:bold;margin-top:2px;margin-bottom:6px;">Độc lập - Tự do - Hạnh phúc</div>
+                    <div style="width:140px;height:1px;background:#000;margin:0 auto;"></div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Main Title -->
+              <div style="text-align:center;margin-bottom:18px;">
+                <div style="font-size:15pt;font-weight:bold;letter-spacing:0.5px;">PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC</div>
+                <div id="topic-preview-doc-program" style="font-size:13pt;font-weight:bold;margin-top:4px;">ĐỒ ÁN TỐT NGHIỆP</div>
+                <div id="topic-preview-doc-round" style="font-size:13pt;font-weight:bold;margin-top:2px;"></div>
+              </div>
+
+              <!-- Student Profile Form Lines -->
+              <div style="margin-bottom:16px;line-height:1.8;">
+                <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
+                  <tr>
+                    <td style="width:15%;white-space:nowrap;">HỌ VÀ TÊN:</td>
+                    <td style="width:45%;font-weight:bold;border-bottom:1px dotted #64748b;" id="topic-preview-doc-name">--</td>
+                    <td style="width:10%;padding-left:12px;white-space:nowrap;">MSSV:</td>
+                    <td style="width:30%;font-weight:bold;border-bottom:1px dotted #64748b;" id="topic-preview-doc-mssv">--</td>
+                  </tr>
+                </table>
+
+                <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
+                  <tr>
+                    <td style="width:10%;white-space:nowrap;">LỚP:</td>
+                    <td style="width:50%;font-weight:bold;border-bottom:1px dotted #64748b;" id="topic-preview-doc-class">--</td>
+                    <td style="width:12%;padding-left:12px;white-space:nowrap;">NGÀNH:</td>
+                    <td style="width:28%;font-weight:bold;border-bottom:1px dotted #64748b;" id="topic-preview-doc-major">--</td>
+                  </tr>
+                </table>
+
+                <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
+                  <tr>
+                    <td style="width:12%;white-space:nowrap;">EMAIL:</td>
+                    <td style="width:88%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-email">--</td>
+                  </tr>
+                </table>
+
+                <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
+                  <tr>
+                    <td style="width:18%;white-space:nowrap;">ĐIỆN THOẠI:</td>
+                    <td style="width:82%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-phone">--</td>
+                  </tr>
+                </table>
+
+                <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
+                  <tr>
+                    <td style="width:24%;white-space:nowrap;">ĐỊA CHỈ TẠM TRÚ:</td>
+                    <td style="width:76%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-address">--</td>
+                  </tr>
+                </table>
+
+                <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+                  <tr>
+                    <td style="width:14%;white-space:nowrap;">MÔN HỌC:</td>
+                    <td style="width:36%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-course">--</td>
+                    <td style="width:18%;padding-left:8px;white-space:nowrap;">MÃ MÔN HỌC:</td>
+                    <td style="width:16%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-code">--</td>
+                    <td style="width:10%;padding-left:8px;white-space:nowrap;">NHÓM:</td>
+                    <td style="width:6%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-group">--</td>
+                  </tr>
+                </table>
+
+                <div style="text-align:center;font-style:italic;margin:12px 0 16px 0;" id="topic-preview-doc-version">
+                  Đăng ký đề tài chính thức lần thứ : 1
+                </div>
+
+                <!-- TÊN ĐỀ TÀI -->
+                <div style="margin-bottom:14px;">
+                  <div style="font-weight:bold;margin-bottom:4px;">TÊN ĐỀ TÀI :</div>
+                  <div id="topic-preview-doc-title" style="font-weight:bold;font-size:13pt;text-transform:uppercase;padding:8px 12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;line-height:1.4;">
+                    --
+                  </div>
+                </div>
+
+                <!-- MÔ TẢ CHI TIẾT -->
+                <div style="margin-bottom:18px;">
+                  <div style="font-weight:bold;text-align:center;margin-bottom:8px;">
+                    MÔ TẢ CHI TIẾT ĐỊNH HƯỚNG THIẾT KẾ CỦA ĐỀ TÀI :
+                  </div>
+                  <div id="topic-preview-doc-description" style="text-align:justify;padding:10px 14px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;min-height:90px;white-space:pre-wrap;line-height:1.5;">
+                    --
+                  </div>
+                </div>
+
+                <!-- Cam đoan -->
+                <div style="text-align:center;font-weight:bold;margin:16px 0 24px 0;">
+                  Tôi xin cam đoan thực hiện đúng đề tài đã đăng ký.
+                </div>
+
+                <!-- Khối chữ ký -->
+                <table style="width:100%;border-collapse:collapse;table-layout:fixed;text-align:center;margin-top:10px;">
+                  <tr>
+                    <td style="width:55%;vertical-align:top;">
+                      <div style="font-weight:bold;font-size:11.5pt;">Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN</div>
+                      <div id="topic-preview-doc-sup-status" style="margin-top:6px;font-size:11pt;font-style:italic;color:#047857;">
+                        (Đã duyệt đề tài)
+                      </div>
+                      <div style="height:55px;"></div>
+                      <div id="topic-preview-doc-sup-name" style="font-weight:bold;font-size:12pt;">
+                        --
+                      </div>
+                    </td>
+                    <td style="width:45%;vertical-align:top;">
+                      <div id="topic-preview-doc-date" style="font-style:italic;font-size:11pt;">
+                        Tp.HCM, ngày ... tháng ... năm ...
+                      </div>
+                      <div style="font-weight:bold;font-size:11.5pt;margin-top:3px;">NGƯỜI ĐĂNG KÝ</div>
+                      <div style="font-style:italic;font-size:10pt;">(ký và ghi rõ họ tên)</div>
+                      <div style="height:45px;"></div>
+                      <div id="topic-preview-doc-sign-student" style="font-weight:bold;font-size:12pt;">
+                        --
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Modal Footer: Action Bar -->
+          <div class="px-5 py-3.5 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+            <div id="topic-preview-note-container" class="text-xs text-slate-500 flex items-center gap-2">
+              <span>📌</span> <span id="topic-preview-footer-note">GVHD xem xét nội dung phiếu đăng ký và xác nhận duyệt hoặc yêu cầu chỉnh sửa.</span>
+            </div>
+            <div class="flex items-center gap-2 shrink-0 flex-wrap">
+              <button type="button" onclick="closeTopicRegistrationPreviewModal()" class="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs rounded-xl transition cursor-pointer">
+                Đóng
+              </button>
+              <button type="button" id="btn-topic-preview-reject" class="px-4 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer">
+                <span>✕</span> <span>Không duyệt (Yêu cầu sửa)</span>
+              </button>
+              <button type="button" id="btn-topic-preview-approve" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-1.5 cursor-pointer">
+                <span>✓</span> <span>Duyệt tên đề tài</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+    <!-- ======================================================= -->
     <!-- PORTAL 4: ASSESSMENT / EVALUATION PORTAL (/graduation/assessment/) -->
     <!-- ======================================================= -->
     <section id="view-assessment" class="hidden space-y-6">
@@ -2065,7 +2249,11 @@
             </select>
           </div>
 
-          <div class="flex items-center gap-2">
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <div class="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-2 py-1 shadow-sm">
+              <input type="text" id="quick-add-eligible-mssv" onkeydown="if(event.key === 'Enter') addEligibleStudentByMssv()" placeholder="Nhập MSSV cần bổ sung" class="w-44 sm:w-52 px-2 py-1.5 text-xs font-mono text-slate-800 focus:outline-none" autocomplete="off" inputmode="numeric">
+              <button type="button" onclick="addEligibleStudentByMssv()" class="shrink-0 px-3 py-1.5 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-lg transition-all">＋ Thêm SV</button>
+            </div>
             <label class="cursor-pointer px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all inline-flex items-center gap-1.5">
               <span>📥 Tải lên danh sách SV (.xlsx)</span>
               <input type="file" id="excel-file-input" accept=".xlsx,.xls" onchange="handleExcelFileUpload(event)" class="hidden">
@@ -4028,7 +4216,7 @@
   <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
   <!-- CREATE / EDIT ACTIVITY MODAL (v1.9.0-beta.1) -->
-  <div id="modal-activity" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+  <div id="modal-activity" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
         <div>
@@ -4554,7 +4742,7 @@
   </div>
 
   <!-- COPY ACTIVITIES FROM ANOTHER ROUND MODAL -->
-  <div id="modal-copy-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+  <div id="modal-copy-round" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
         <div>
