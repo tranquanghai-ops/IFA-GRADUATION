@@ -6885,11 +6885,35 @@ window.filterEligibleTable = function() {
 };
 
 window.deleteEligibleStudent = async function(studentId) {
-  const roundId = document.getElementById('admin-round-student-select').value;
-  if (!(await showConfirm('Xóa sinh viên', `Xóa sinh viên ${studentId} khỏi danh sách đủ điều kiện của đợt?`, { confirmText: 'Xóa', danger: true }))) return;
+  const roundId = document.getElementById('admin-round-student-select')?.value || state.selectedRoundId;
+  if (!roundId) return;
+  const normalizedId = String(studentId || '').trim().toUpperCase();
+  if (!(await showConfirm('Xóa sinh viên', `Xóa sinh viên ${normalizedId} và toàn bộ thông tin đăng ký, đề tài, phân công khỏi đợt này?`, { confirmText: 'Xóa toàn bộ', danger: true }))) return;
   try {
-    await deleteDoc(doc(db, 'graduationRounds', roundId, 'eligibleStudents', studentId));
+    const deleteTasks = [
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'eligibleStudents', normalizedId)),
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'registrations', normalizedId)),
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'officialAssignments', normalizedId)),
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'assignmentDrafts', normalizedId)),
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'reviewDecisions', normalizedId)),
+      deleteDoc(doc(db, 'graduationRounds', roundId, 'councilScores', normalizedId)),
+      deleteDoc(doc(db, 'graduationStudentProfiles', normalizedId))
+    ];
+
+    try {
+      const subSnap = await getDocs(query(collection(db, 'graduationRounds', roundId, 'submissions'), where('studentId', '==', normalizedId)));
+      subSnap.forEach(d => {
+        deleteTasks.push(deleteDoc(d.ref));
+      });
+    } catch (subErr) {}
+
+    await Promise.allSettled(deleteTasks);
+
+    showToast(`✓ Đã xóa sinh viên ${normalizedId} và toàn bộ dữ liệu đã nhập khỏi đợt.`, 'success');
     loadAdminEligibleStudents(roundId);
+    if (typeof loadSupervisorPortalData === 'function' && (state.selectedRoundId === roundId || state.activeRound?.id === roundId)) {
+      loadSupervisorPortalData(roundId);
+    }
   } catch (e) {
     showToast('Lỗi xóa: ' + e.message, 'error');
   }
@@ -22725,6 +22749,30 @@ window.loadSupervisorPortalData = async function(roundId) {
   }
 
   // 4. Identify Assigned Students for this supervisor
+  // Fetch eligible students map for the round to exclude students deleted or ineligible
+  let eligibleMap = new Map();
+  let hasEligibleStudentsList = false;
+  try {
+    const elSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents'));
+    if (!elSnap.empty) {
+      hasEligibleStudentsList = true;
+      elSnap.docs.forEach(d => {
+        const dData = d.data() || {};
+        const key = String(d.id || dData.studentId || dData.mssv || '').trim().toUpperCase();
+        if (key && dData.eligible !== false) {
+          eligibleMap.set(key, true);
+        }
+      });
+    }
+  } catch (elErr) {
+    console.warn('[SupervisorPortal] Could not query eligible students:', elErr);
+  }
+
+  const isStudentEligible = (stId) => {
+    if (!hasEligibleStudentsList) return true;
+    return eligibleMap.has(String(stId || '').trim().toUpperCase());
+  };
+
   const mySupId = currentSup?.id || currentSup?.supervisorId;
   const currentSupName = (currentSup?.name || '').toLowerCase().trim();
   const registrationsById = new Map(allRegistrations.map(r => [String(r.studentId || r.id).trim().toUpperCase(), r]));
@@ -22751,6 +22799,8 @@ window.loadSupervisorPortalData = async function(roundId) {
       return normalizeOfficialAssignment(assignment, registrationsById.get(studentId) || null);
     })
     .filter(item => {
+      const studentId = String(item.studentId || item.id).trim().toUpperCase();
+      if (!isStudentEligible(studentId)) return false;
       if (currentSup || mySupId) {
         return isAssignedToThisSupervisor(item);
       }
@@ -22758,6 +22808,8 @@ window.loadSupervisorPortalData = async function(roundId) {
     });
 
   const legacyAssigned = (round.status === 'published' || round.reviewStatus === 'completed') ? allRegistrations.filter(r => {
+    const studentId = String(r.studentId || r.id).trim().toUpperCase();
+    if (!isStudentEligible(studentId)) return false;
     if (currentSup || mySupId) {
       return isAssignedToThisSupervisor(r);
     }
@@ -22768,7 +22820,7 @@ window.loadSupervisorPortalData = async function(roundId) {
   const assignedMap = new Map();
   [...assignedFromOfficial, ...legacyAssigned].forEach(item => {
     const key = String(item.studentId || item.id).trim().toUpperCase();
-    if (key && !assignedMap.has(key)) assignedMap.set(key, item);
+    if (key && !assignedMap.has(key) && isStudentEligible(key)) assignedMap.set(key, item);
   });
   const assigned = [...assignedMap.values()];
 
@@ -22777,6 +22829,8 @@ window.loadSupervisorPortalData = async function(roundId) {
   if (actor.isAdmin && !currentSup && assigned.length === 0) {
     displayStudents = [...assignedMap.values()];
     if (displayStudents.length === 0 && (round.status === 'published' || round.reviewStatus === 'completed')) displayStudents = allRegistrations.filter(r => {
+      const studentId = String(r.studentId || r.id).trim().toUpperCase();
+      if (!isStudentEligible(studentId)) return false;
       const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
       return officials.length > 0 || r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned';
     });

@@ -260,4 +260,13 @@ test('non-eligible student view hides hero card and journey cards, only showing 
   assert.match(app, /if \(state\.eligibilityState === 'not_eligible'/);
 });
 
+test('deleting student cascades all registration and assignment data and isolates supervisor list', () => {
+  assert.match(app, /deleteDoc\(doc\(db, 'graduationRounds', roundId, 'registrations', normalizedId\)\)/);
+  assert.match(app, /deleteDoc\(doc\(db, 'graduationRounds', roundId, 'officialAssignments', normalizedId\)\)/);
+  assert.match(app, /deleteDoc\(doc\(db, 'graduationRounds', roundId, 'assignmentDrafts', normalizedId\)\)/);
+  assert.match(app, /deleteDoc\(doc\(db, 'graduationStudentProfiles', normalizedId\)\)/);
+  assert.match(app, /const isStudentEligible = \(stId\) =>/);
+});
+
+
 
