@@ -208,9 +208,9 @@
       <div id="student-workspace-container" class="space-y-4">
 
         <!-- 1. CURRENT ROUND HERO CARD -->
-        <div id="student-hero-card" class="card-surface px-5 pb-5 pt-3 sm:px-6 sm:pb-6 sm:pt-4 bg-gradient-to-r from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl relative overflow-hidden rounded-2xl border border-white/10">
-          <div class="relative z-10 min-h-[205px]">
-            <div class="space-y-2">
+        <div id="student-hero-card" class="card-surface px-5 py-4 sm:px-6 sm:py-5 bg-gradient-to-r from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl relative overflow-hidden rounded-2xl border border-white/10">
+          <div class="relative z-10 min-h-[132px]">
+            <div class="space-y-2 lg:pr-[350px]">
               <div class="flex flex-wrap items-center gap-2">
                 <span id="round-status-badge" class="hidden badge badge-open font-bold">Đang mở đăng ký</span>
                 <span id="round-mode-badge" class="hidden badge badge-info"></span>
@@ -233,7 +233,7 @@
               </p>
 
               <!-- Quick Metrics Bar inside Hero -->
-              <div class="flex flex-wrap items-center gap-3 pt-2 text-xs text-blue-100 lg:mr-[430px]">
+              <div class="flex flex-wrap items-center gap-3 pt-1 text-xs text-blue-100">
                 <!-- Student Info Pill hidden as requested (already in header) -->
                 <button type="button" onclick="openStudentProfileModal()" id="hero-student-profile-btn" class="hidden flex items-center gap-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 px-3 py-1.5 rounded-xl border border-white/20 transition-all cursor-pointer shadow-2xs text-left" title="Xem thông tin chi tiết sinh viên">
                   <img id="hero-student-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23fff'/%3E%3Cpath fill='%23fff' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-6 h-6 rounded-md object-cover border border-white/30 shrink-0" alt="Avatar">
@@ -257,8 +257,8 @@
             </div>
 
             <!-- Supervisor Info Widget (Enlarged and Comfortable) -->
-            <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-sm flex items-center gap-3 min-w-[290px] sm:min-w-[310px] lg:w-[340px] max-w-[360px] lg:absolute lg:right-0 lg:top-16 mt-4 lg:mt-0">
-              <img id="hero-sup-card-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-14 h-14 rounded-2xl object-cover border-2 border-white/30 shrink-0 bg-white/10 shadow-xs" alt="GVHD Avatar">
+            <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/20 shadow-sm flex items-center gap-3 min-w-[280px] sm:min-w-[300px] lg:w-[320px] max-w-[340px] lg:absolute lg:right-0 lg:top-0 mt-3 lg:mt-0">
+              <img id="hero-sup-card-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-12 h-12 rounded-xl object-cover border-2 border-white/30 shrink-0 bg-white/10 shadow-xs" alt="GVHD Avatar">
               <div class="min-w-0 flex-1 space-y-0.5">
                 <div class="flex items-center gap-1.5">
                   <span id="hero-sup-card-role" class="badge bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 uppercase tracking-wide">GVHD</span>
@@ -651,13 +651,13 @@
               </div>
 
               <!-- STEP 3: CONFIRMATION -->
-              <div id="step-panel-3" class="hidden card-surface p-6 sm:p-8 space-y-6 max-w-2xl mx-auto">
+              <div id="step-panel-3" class="hidden card-surface p-6 sm:p-8 space-y-6 w-full">
                 <div class="border-b pb-4 text-center">
                   <h2 id="confirm-step-title" class="text-xl font-bold text-tdtu-blue">3. Kiểm tra & Xác nhận Đăng ký</h2>
                   <p class="text-xs text-slate-500 mt-1">Vui lòng rà soát kỹ các thông tin trước khi xác nhận gửi chính thức.</p>
                 </div>
 
-                <div class="space-y-4 max-w-xl mx-auto text-xs">
+                <div class="space-y-4 w-full text-xs">
                   <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
                     <div class="flex items-start justify-between">
                       <span class="font-bold text-slate-500 uppercase">Tên đề tài dự kiến:</span>
@@ -681,11 +681,11 @@
                   </div>
                 </div>
 
-                <div id="registration-confirm-note" class="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed max-w-xl mx-auto">
+                <div id="registration-confirm-note" class="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed w-full">
                   ⚠️ <strong>LƯU Ý:</strong> Sau khi bấm <em>Xác nhận Đăng ký</em>, hệ thống sẽ lưu thông tin của bạn vào cơ sở dữ liệu đợt. Bạn có thể thay đổi nguyện vọng trong thời gian đợt đăng ký còn mở (nếu đợt cho phép).
                 </div>
 
-                <div class="pt-4 flex justify-center items-center gap-3 max-w-xl mx-auto">
+                <div class="pt-4 flex justify-center items-center gap-3 w-full">
                   <button id="btn-registration-confirm-back" type="button" onclick="goToStep(2)" class="px-5 py-2.5 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-sm rounded-xl transition-all cursor-pointer">
                     ← Quay lại Bước 2
                   </button>

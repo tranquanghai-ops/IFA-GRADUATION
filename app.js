@@ -2108,6 +2108,22 @@ function renderStudentExistingRegistration(reg) {
         statusEl.textContent = 'Không đủ điều kiện';
         statusEl.className = 'font-bold text-rose-700 text-sm';
       }
+    } else if (directAssignment && getOfficialSupervisors(reg).length > 0) {
+      const assignment = getOfficialSupervisors(reg).find(item => item.role === 'primary') || getOfficialSupervisors(reg)[0];
+      const assignedName = assignment?.supervisorName || reg.acceptedSupervisorName || 'Giảng viên hướng dẫn';
+      bannerEl.className = 'mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs flex items-start gap-2.5';
+      bannerEl.innerHTML = `
+        <span class="text-base">✓</span>
+        <div>
+          <span class="font-bold block">GVHD đã được Khoa phân công: ${escapeHtml(assignedName)}</span>
+          <p class="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">Bạn có thể tiếp tục đăng ký và nộp đề tài theo kế hoạch của đợt.</p>
+        </div>
+      `;
+      bannerEl.classList.remove('hidden');
+      if (statusEl) {
+        statusEl.textContent = `Đã phân công GVHD: ${assignedName}`;
+        statusEl.className = 'font-bold text-emerald-700 text-sm';
+      }
     } else if (directAssignment) {
       bannerEl.className = 'mb-4 p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-start gap-2.5';
       bannerEl.innerHTML = `
@@ -2720,6 +2736,11 @@ window.submitRegistration = async function() {
     const isPending = (state.isEligible === 'pending' || state.eligibilityState === 'pending');
     const eligibilityStatus = isPending ? 'pending' : 'eligible';
     const directAssignment = shouldSkipStudentSupervisorPreference();
+    const publishedAssignment = state.myOfficialAssignment?.assignmentStatus === 'published'
+      ? normalizeOfficialAssignment(state.myOfficialAssignment, null)
+      : null;
+    const publishedSupervisors = publishedAssignment ? getOfficialSupervisors(publishedAssignment) : [];
+    const primaryPublishedSupervisor = publishedSupervisors.find(item => item.role === 'primary') || publishedSupervisors[0] || null;
 
     const resolvedName = (typeof window.resolveStudentName === 'function')
       ? window.resolveStudentName(mssv, actor?.displayName || state.user?.displayName || '')
@@ -2761,9 +2782,19 @@ window.submitRegistration = async function() {
       submittedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       status: 'submitted',
-      reviewStatus: directAssignment ? 'direct_assignment_pending' : 'waiting',
+      // A faculty assignment can be published before the student submits the
+      // topic. Preserve that published relationship rather than sending the
+      // student back to the waiting state on first registration.
+      reviewStatus: directAssignment && primaryPublishedSupervisor ? 'manually_assigned' : (directAssignment ? 'direct_assignment_pending' : 'waiting'),
       eligibilityStatus: eligibilityStatus
     };
+    if (primaryPublishedSupervisor) {
+      payload.assignmentStatus = 'published';
+      payload.officialSupervisors = publishedSupervisors;
+      payload.acceptedSupervisorId = primaryPublishedSupervisor.supervisorId || '';
+      payload.acceptedSupervisorName = primaryPublishedSupervisor.supervisorName || '';
+      payload.acceptedRank = 'manual';
+    }
 
     await setDoc(doc(db, 'graduationStudentProfiles', mssv), {
       studentId: mssv,
@@ -2779,7 +2810,9 @@ window.submitRegistration = async function() {
     }, { merge: true });
     await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload, { merge: true });
     
-    showToast(directAssignment ? '🎉 ĐĂNG KÝ THÀNH CÔNG! Vui lòng chờ Khoa phân công GVHD.' : '🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
+    showToast(directAssignment
+      ? (primaryPublishedSupervisor ? '🎉 ĐĂNG KÝ THÀNH CÔNG! GVHD đã phân công được giữ nguyên.' : '🎉 ĐĂNG KÝ THÀNH CÔNG! Vui lòng chờ Khoa phân công GVHD.')
+      : '🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
     await checkStudentEligibilityAndRegistration(roundId);
   } catch (err) {
     console.error('Lỗi khi nộp đăng ký:', err);
@@ -20772,7 +20805,11 @@ function renderTimelineWeekDays(days = [], events = []) {
   return `<div class="grid grid-cols-7 gap-1 w-full mt-2 pt-2 border-t border-slate-200/80">${days.map(day => {
     const dayEvents = events.filter(event => Number(event.dayIndex) === day.dayIndex || event.date === day.key);
     const titles = dayEvents.map(event => escapeHtml(event.title)).join(' · ');
-    return `<span title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border px-0.5 py-0.5 text-center ${dayEvents.length ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-white/70 border-slate-200 text-slate-500'}"><b class="block text-[8px] leading-none">${day.shortName}</b><b class="block text-[8px] leading-none mt-0.5">${day.label}</b>${dayEvents.length ? '<i class="block text-[8px] leading-none not-italic">●</i>' : ''}</span>`;
+    const isToday = day.date instanceof Date && day.date.toDateString() === new Date().toDateString();
+    const dayClass = dayEvents.length
+      ? 'bg-rose-50 border-rose-300 text-rose-700'
+      : (isToday ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' : 'bg-white/70 border-slate-200 text-slate-500');
+    return `<span title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border px-0.5 py-0.5 text-center ${dayClass}"><b class="block text-[8px] leading-none">${day.shortName}</b><b class="block text-[8px] leading-none mt-0.5">${day.label}</b>${dayEvents.length ? '<i class="block text-[8px] leading-none not-italic">●</i>' : ''}</span>`;
   }).join('')}</div>`;
 }
 
@@ -20806,9 +20843,9 @@ function renderAdminRoundTimelinePreview(round) {
         </div>
         <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black my-1 ${week.status === 'ongoing' ? 'bg-blue-600 text-white' : week.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">${style.icon || week.week}</span>
         <span class="font-mono font-bold text-[11px] text-slate-700">${week.dateText}</span>
-        ${week.note ? `<span class="text-[9px] text-slate-500 mt-1 line-clamp-1">${escapeHtml(week.note)}</span>` : ''}
-        ${week.milestone ? `<span class="mt-1 px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px]">🚩 ${escapeHtml(week.milestone)}</span>` : ''}
         ${renderTimelineWeekDays(week.days, week.events)}
+        ${week.milestone ? `<span class="mt-1 px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px]">🚩 ${escapeHtml(week.milestone)}</span>` : ''}
+        ${week.note ? `<span class="text-[9px] text-slate-500 mt-1 line-clamp-1">${escapeHtml(week.note)}</span>` : ''}
         <button type="button" onclick="toggleRoundTimelineWeekVisibility('${round.id}', ${week.week}, event)" class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-white/90 border border-slate-200 text-[9px] font-bold ${week.visible ? 'text-slate-600' : 'text-blue-700'}">${week.visible ? 'Ẩn' : 'Hiện'}</button>
       </div>`;
   }).join('');
@@ -21697,8 +21734,9 @@ window.renderStudentTimelineWeeks = function() {
   // ── Derive student state for intro/outro cards ────────────────
   const reg        = state.myRegistration;
   const hasTopic   = !!(reg?.topicTitle || reg?.topic);
-  const officialSups = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(reg) : [];
-  const hasGVHD    = officialSups.length > 0 || !!(reg?.supervisorName);
+  const effectiveAssignment = normalizeOfficialAssignment(state.myOfficialAssignment, reg);
+  const officialSups = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(effectiveAssignment) : [];
+  const hasGVHD = officialSups.length > 0 || Boolean(effectiveAssignment?.acceptedSupervisorId || effectiveAssignment?.assignedSupervisorId || reg?.supervisorName);
   const directAssign = round?.supervisorAssignmentMode === 'direct_assignment';
 
   // ── Default milestone labels per week (overrideable by admin) ──
@@ -21726,16 +21764,27 @@ window.renderStudentTimelineWeeks = function() {
   } else if (directAssign || round?.status === 'reviewing') {
     gvhdStatus = 'active';
   }
+  const primarySupervisor = officialSups.find(item => item.role === 'primary') || officialSups[0] || {};
+  const primarySupervisorId = primarySupervisor.supervisorId || effectiveAssignment?.acceptedSupervisorId || effectiveAssignment?.assignedSupervisorId;
+  const primarySupervisorProfile = (state.roundSupervisors || []).find(s => s.id === primarySupervisorId || s.supervisorId === primarySupervisorId)
+    || (state.supervisorsMaster || []).find(s => s.id === primarySupervisorId)
+    || {};
+  const primarySupervisorName = primarySupervisor.supervisorName || primarySupervisorProfile.name || effectiveAssignment?.acceptedSupervisorName || 'GVHD đã phân công';
   allCards.push({
     type: 'milestone',
     id: 'gvhd',
     icon: '👨‍🏫',
     title: 'Phân công GVHD',
     subtitle: hasGVHD
-      ? (officialSups[0]?.supervisorName || reg?.supervisorName || 'GVHD đã phân công')
+      ? primarySupervisorName
       : (directAssign ? 'Khoa đang phân công' : 'Chờ kết quả xét'),
     status: gvhdStatus,
     note: hasGVHD ? '✓ Đã phân công' : (gvhdStatus === 'active' ? 'Đang xử lý' : 'Chưa phân công'),
+    supervisor: hasGVHD ? {
+      name: primarySupervisorName,
+      photoUrl: primarySupervisorProfile.photoUrl || primarySupervisor.photoUrl || '',
+      email: primarySupervisorProfile.email || primarySupervisor.email || effectiveAssignment?.supervisorEmail || ''
+    } : null,
   });
 
   // Cards 2–13 – 12 weekly cards (or durationWeeks)
@@ -21859,9 +21908,9 @@ window.renderStudentTimelineWeeks = function() {
           ${card.status === 'completed' ? '✓' : (card.status === 'ongoing' || card.status === 'active') ? '●' : card.num}
         </div>
         <span class="text-[13px] font-mono font-bold text-slate-700 tracking-tight">${card.dateText}</span>
-        ${noteHtml}
-        ${milestoneHtml}
         ${renderTimelineWeekDays(card.days, card.events)}
+        ${milestoneHtml}
+        ${noteHtml}
       </div>`;
     } else {
       // Milestone card (intro/outro)
@@ -21869,6 +21918,9 @@ window.renderStudentTimelineWeeks = function() {
       const cardBg = isGvhdCompleted ? 'bg-emerald-50 border-emerald-300' : (card.status === 'completed' ? 'bg-emerald-50 border-emerald-300' : card.status === 'active' ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-300' : 'bg-slate-50 border-slate-200');
       const iconBg = card.status === 'completed' ? 'bg-emerald-600 text-white' : card.status === 'active' ? 'bg-blue-600 text-white animate-pulse' : 'bg-slate-200 text-slate-500';
       const noteColor = card.status === 'completed' ? 'text-emerald-700 font-bold' : card.status === 'active' ? 'text-blue-700 font-bold' : 'text-slate-400';
+      const supervisorInfo = card.id === 'gvhd' && card.supervisor
+        ? `<div class="mt-1.5 flex items-center gap-2 rounded-lg bg-white/70 border border-emerald-200 px-2 py-1.5 w-full text-left"><img src="${card.supervisor.photoUrl || getSupervisorAvatarSvgDataUri(card.supervisor.name)}" onerror="this.onerror=null;this.src=getSupervisorAvatarSvgDataUri('${escapeHtml(card.supervisor.name)}');" class="w-7 h-7 rounded-lg object-cover border border-emerald-300"><span class="min-w-0"><b class="block truncate text-[10px] text-emerald-900">${escapeHtml(card.supervisor.name)}</b>${card.supervisor.email ? `<small class="block truncate text-[8px] text-emerald-700">${escapeHtml(card.supervisor.email)}</small>` : ''}</span></div>`
+        : '';
       return `<div class="flex-shrink-0 rounded-2xl border ${cardBg} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all"
                    style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
         <div class="w-9 h-9 rounded-full flex items-center justify-center text-lg ${iconBg} mb-1.5 shadow-xs">
@@ -21877,6 +21929,7 @@ window.renderStudentTimelineWeeks = function() {
         <span class="font-black text-[11px] text-slate-900 leading-tight">${card.title}</span>
         <span class="text-[10px] text-slate-500 mt-0.5 leading-tight line-clamp-2">${card.subtitle}</span>
         <span class="mt-1.5 text-[9px] ${noteColor}">${card.note}</span>
+        ${supervisorInfo}
       </div>`;
     }
   }).join('');
