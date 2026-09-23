@@ -178,9 +178,10 @@ function buildAssignmentDraftPayload(row, supervisors, source = 'manually_assign
 }
 
 function isAssignmentEditingLocked() {
-  const round = state.activeRound || {};
-  const published = round.status === 'published' || round.reviewStatus === 'completed';
-  return published && round.assignmentEditingUnlocked !== true;
+  // Admin may keep correcting or completing supervisor assignments after the
+  // first publication. Changes are stored as drafts and become visible to
+  // students after the existing "Công bố lại" action.
+  return false;
 }
 
 function ensureAssignmentEditingAllowed() {
@@ -1460,8 +1461,11 @@ async function loadRounds() {
             getDocs(collection(db, 'graduationRounds', round.id, 'eligibleStudents')),
             getDocs(collection(db, 'graduationRounds', round.id, 'supervisors'))
           ]);
+          const effectiveAssignments = new Map();
+          officialSnap.docs.forEach(assignmentDoc => effectiveAssignments.set(assignmentDoc.id, assignmentDoc));
+          draftSnap.docs.forEach(assignmentDoc => effectiveAssignments.set(assignmentDoc.id, assignmentDoc));
           const assignedStudentIds = new Set();
-          [...officialSnap.docs, ...draftSnap.docs].forEach(assignmentDoc => {
+          effectiveAssignments.forEach(assignmentDoc => {
             const assignment = { id: assignmentDoc.id, ...assignmentDoc.data() };
             const supervisors = getOfficialSupervisors(assignment);
             const hasAssignment = supervisors.length > 0 || Boolean(
@@ -1551,6 +1555,44 @@ async function loadRounds() {
   }
 }
 window.loadRounds = loadRounds;
+
+async function refreshRoundCardMetrics(roundId) {
+  if (!roundId) return;
+  const round = (state.rounds || []).find(item => item.id === roundId);
+  if (!round) return;
+
+  try {
+    const [eligibleSnap, supervisorsSnap, officialSnap, draftSnap] = await Promise.all([
+      getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents')),
+      getDocs(collection(db, 'graduationRounds', roundId, 'supervisors')),
+      getDocs(collection(db, 'graduationRounds', roundId, 'officialAssignments')),
+      getDocs(collection(db, 'graduationRounds', roundId, 'assignmentDrafts'))
+    ]);
+    const effectiveAssignments = new Map();
+    officialSnap.docs.forEach(assignmentDoc => effectiveAssignments.set(assignmentDoc.id, assignmentDoc));
+    draftSnap.docs.forEach(assignmentDoc => effectiveAssignments.set(assignmentDoc.id, assignmentDoc));
+    const assignedStudentIds = new Set();
+    effectiveAssignments.forEach(assignmentDoc => {
+      const assignment = { id: assignmentDoc.id, ...assignmentDoc.data() };
+      const hasAssignment = getOfficialSupervisors(assignment).length > 0 || Boolean(
+        assignment.acceptedSupervisorId || assignment.assignedSupervisorId || assignment.officialSupervisor
+      );
+      const studentId = String(assignment.studentId || assignmentDoc.id || '').trim().toUpperCase();
+      if (hasAssignment && studentId) assignedStudentIds.add(studentId);
+    });
+
+    round.eligibleCount = eligibleSnap.size;
+    round.eligibleStudentsCount = eligibleSnap.size;
+    round.supervisorCount = supervisorsSnap.size;
+    round.supervisorsCount = supervisorsSnap.size;
+    round.assignedCount = assignedStudentIds.size;
+    round.officialAssignmentsCount = officialSnap.size;
+    if (state.activeRound?.id === roundId) Object.assign(state.activeRound, round);
+    renderAdminRoundsCards();
+  } catch (error) {
+    console.warn(`[Rounds] Could not refresh live metrics for ${roundId}:`, error);
+  }
+}
 
 
 // Safe helper to populate round selectors across views
@@ -2710,7 +2752,15 @@ function renderConfirmationPanel() {
   const listEl = document.getElementById('confirm-preferences-list');
   if (!listEl) return;
 
-  listEl.innerHTML = state.selectedPreferences.map(p => {
+  const medalOrder = [2, 1, 3];
+  const orderedPreferences = [...state.selectedPreferences].sort((a, b) => {
+    const aIndex = medalOrder.indexOf(Number(a.rank));
+    const bIndex = medalOrder.indexOf(Number(b.rank));
+    return (aIndex < 0 ? 99 : aIndex) - (bIndex < 0 ? 99 : bIndex);
+  });
+
+  listEl.className = 'flex flex-wrap sm:flex-nowrap items-end justify-center gap-3 sm:gap-5 pt-5 pb-2';
+  listEl.innerHTML = orderedPreferences.map(p => {
     const sup = (state.roundSupervisors || []).find(s => s.id === p.supervisorId) ||
                 (state.supervisorsMaster || []).find(s => s.id === p.supervisorId);
     const avatarSrc = (sup?.showPhoto !== false && sup?.photoUrl && sup.photoUrl.trim()) 
@@ -2718,13 +2768,18 @@ function renderConfirmationPanel() {
       : getSupervisorAvatarSvgDataUri(p.supervisorName);
     const escapedName = escapeHtml(p.supervisorName || '');
 
+    const rank = Number(p.rank);
+    const isFirst = rank === 1;
+    const medal = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : '🥉');
+    const rankLabel = rank === 1 ? 'Nguyện vọng 1' : `Nguyện vọng ${rank}`;
     return `
-      <div class="flex items-center gap-3.5 p-3 bg-white rounded-xl border border-slate-200 shadow-2xs mx-auto max-w-lg">
-        <span class="w-28 sm:w-32 text-xs sm:text-sm font-bold text-tdtu-blue shrink-0 text-left">
-          Nguyện Vọng ${p.rank}
-        </span>
-        <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-9 h-9 rounded-lg object-cover object-top border border-slate-200 shadow-2xs shrink-0" alt="${escapedName}">
-        <span class="font-bold text-slate-900 text-xs sm:text-sm truncate text-left flex-1 min-w-0">${escapedName}</span>
+      <div class="relative flex flex-col items-center text-center w-[135px] sm:w-[175px] ${isFirst ? 'order-2 -translate-y-5' : (rank === 2 ? 'order-1' : 'order-3')}" title="${rankLabel}: ${escapedName}">
+        <div class="absolute -top-3 -right-1 sm:right-3 z-10 w-9 h-9 rounded-full bg-white border border-slate-200 shadow-md flex items-center justify-center text-xl">${medal}</div>
+        <div class="${isFirst ? 'w-28 h-28 sm:w-32 sm:h-32 ring-4 ring-amber-300' : 'w-24 h-24 sm:w-28 sm:h-28 ring-4 ring-slate-200'} rounded-full bg-white p-1 shadow-lg">
+          <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-full h-full rounded-full object-cover object-top" alt="${escapedName}">
+        </div>
+        <span class="mt-3 inline-flex px-3 py-1 rounded-full ${isFirst ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-white text-tdtu-blue border-slate-200'} border text-[10px] sm:text-xs font-black uppercase tracking-wide shadow-sm">${rankLabel}</span>
+        <span class="mt-2 font-black text-slate-900 text-xs sm:text-sm leading-snug min-h-[36px] flex items-start justify-center">${escapedName}</span>
       </div>
     `;
   }).join('');
@@ -6688,6 +6743,7 @@ window.saveRoundSupervisorRow = async function(roundId, supId) {
     const capInput = document.getElementById('cap-input-' + supId);
     if (capInput) capInput.value = capacity;
     showToast(`Đã cập nhật chỉ tiêu: ${capacity} SV (Tối đa Trường: ${maxCap})!`, 'success');
+    await refreshRoundCardMetrics(roundId);
   } catch (e) {
     showToast('Lỗi cập nhật: ' + e.message, 'error');
   }
@@ -6697,7 +6753,8 @@ window.removeRoundSupervisor = async function(roundId, supId) {
   if (!(await showConfirm('Bỏ GVHD khỏi đợt', 'Bạn có chắc chắn muốn gỡ GVHD này khỏi đợt tốt nghiệp?', { confirmText: 'Gỡ khỏi đợt', danger: true }))) return;
   try {
     await deleteDoc(doc(db, 'graduationRounds', roundId, 'supervisors', supId));
-    loadAdminRoundSupervisors(roundId);
+    await loadAdminRoundSupervisors(roundId);
+    await refreshRoundCardMetrics(roundId);
   } catch (e) {
     showToast('Lỗi xóa: ' + e.message, 'error');
   }
@@ -6783,7 +6840,8 @@ window.saveSelectedSupervisorsToRound = async function() {
   try {
     await batch.commit();
     closeAddSupToRoundModal();
-    loadAdminRoundSupervisors(roundId);
+    await loadAdminRoundSupervisors(roundId);
+    await refreshRoundCardMetrics(roundId);
   } catch (e) {
     showToast('Lỗi thêm GVHD: ' + e.message, 'error');
   }
@@ -6918,7 +6976,8 @@ window.deleteEligibleStudent = async function(studentId) {
     await Promise.allSettled(deleteTasks);
 
     showToast(`✓ Đã xóa sinh viên ${normalizedId} và toàn bộ dữ liệu đã nhập khỏi đợt.`, 'success');
-    loadAdminEligibleStudents(roundId);
+    await loadAdminEligibleStudents(roundId);
+    await refreshRoundCardMetrics(roundId);
     if (typeof loadSupervisorPortalData === 'function' && (state.selectedRoundId === roundId || state.activeRound?.id === roundId)) {
       loadSupervisorPortalData(roundId);
     }
@@ -7017,6 +7076,7 @@ window.addEligibleStudentByMssv = async function() {
     if (input) input.value = '';
     showToast(`Đã thêm ${fullName} (${rawMssv}) vào đợt.`, 'success');
     await loadAdminEligibleStudents(roundId);
+    await refreshRoundCardMetrics(roundId);
   } catch (e) {
     console.error('Quick add eligible student failed:', e);
     showToast('Không thể thêm sinh viên: ' + e.message, 'error');
@@ -7188,7 +7248,8 @@ window.confirmExcelImport = async function() {
 
     showToast(`Đã import thành công ${itemsToImport.length} sinh viên đủ điều kiện!`, 'info');
     cancelExcelImport();
-    loadAdminEligibleStudents(roundId);
+    await loadAdminEligibleStudents(roundId);
+    await refreshRoundCardMetrics(roundId);
   } catch (err) {
     showToast('Lỗi import Firestore: ' + err.message, 'error');
   } finally {
@@ -7616,6 +7677,7 @@ window.loadAdminReviewData = async function(roundId) {
       assignmentDrafts
     };
 
+    await refreshRoundCardMetrics(roundId);
     renderAdminReviewDashboard();
     renderAdminReviewSupervisorsTable();
     renderAdminManualAssignmentTable();
@@ -7672,21 +7734,18 @@ function renderAdminReviewDashboard() {
     : 'Dành cho sinh viên chưa trúng tuyển sau các vòng nguyện vọng, hoặc điều phối bổ sung.';
 
   if (isPublished) {
-    statusPill.className = editingUnlocked
+    const hasDraftChanges = (state.adminReviewData?.assignmentDrafts || []).length > 0;
+    statusPill.className = hasDraftChanges
       ? 'badge bg-amber-200 text-amber-900 font-black'
       : 'badge bg-emerald-500 text-white font-black';
-    statusPill.textContent = editingUnlocked ? 'Đang chỉnh sửa bản nháp' : 'Đã hoàn tất & Công bố';
-    titleEl.textContent = editingUnlocked ? 'Đang chỉnh sửa phân công sau công bố' : 'Đã Hoàn tất & Công bố Kết quả ĐATN';
-    descEl.textContent = editingUnlocked
-      ? 'Sinh viên và giảng viên vẫn xem bản đã công bố. Các thay đổi mới chỉ hiển thị sau khi công bố lại.'
-      : 'Kết quả phân công GVHD đã được công bố chính thức cho sinh viên và giảng viên.';
-    actionsWrap.innerHTML = editingUnlocked ? `
+    statusPill.textContent = hasDraftChanges ? 'Có thay đổi chưa công bố' : 'Đã hoàn tất & Công bố';
+    titleEl.textContent = hasDraftChanges ? 'Đang cập nhật phân công sau công bố' : 'Đã Hoàn tất & Công bố Kết quả ĐATN';
+    descEl.textContent = hasDraftChanges
+      ? 'Bạn vẫn có thể đổi hoặc bổ sung GVHD. Sinh viên sẽ thấy thay đổi sau khi bấm Công bố lại.'
+      : 'Kết quả đã công bố; bạn vẫn có thể đổi GVHD hoặc bổ sung GVHD cho sinh viên chưa được phân công.';
+    actionsWrap.innerHTML = `
       <button onclick="publishAdminResults()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
-        <span>📢 Lưu & Công bố lại kết quả</span>
-      </button>
-    ` : `
-      <button onclick="unlockSupervisorAssignmentEditing()" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
-        <span>🔓 Đã công bố — Mở khóa chỉnh sửa</span>
+        <span>📢 ${hasDraftChanges ? 'Lưu & Công bố lại kết quả' : 'Công bố lại khi có thay đổi'}</span>
       </button>
     `;
     return;
