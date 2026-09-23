@@ -2941,7 +2941,7 @@ export async function loadSupervisorReviewData(roundId) {
     document.getElementById('sup-stat-selected-curr').textContent = '0';
     document.getElementById('sup-stat-remaining-cap').textContent = '0';
     document.getElementById('sup-round-review-indicator').textContent = 'Thầy/Cô chưa tham gia đợt này';
-    document.getElementById('sup-candidates-tbody').innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Thầy/Cô chưa được cấu hình vào danh sách GVHD đợt này.</td></tr>';
+    document.getElementById('sup-candidates-tbody').innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400">Thầy/Cô chưa được cấu hình vào danh sách GVHD đợt này.</td></tr>';
     return;
   }
 
@@ -3025,7 +3025,7 @@ function renderSupervisorReviewUI(currentSup, currentRound, reviewStatus, isLock
     indicator.textContent = 'Khoa/Admin phân công GVHD trực tiếp; danh sách sinh viên đã được phân công hiển thị bên dưới.';
     actionBtns.innerHTML = '<span class="text-xs text-slate-400 italic">Không có bước xét nguyện vọng trong đợt này.</span>';
     const tbody = document.getElementById('sup-candidates-tbody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400">Đợt này sử dụng phân công trực tiếp. Vui lòng xem danh sách sinh viên đã được phân công.</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400">Đợt này sử dụng phân công trực tiếp. Vui lòng xem danh sách sinh viên đã được phân công.</td></tr>';
     return;
   }
 
@@ -3075,12 +3075,14 @@ function renderSupervisorCandidatesTable(readOnly) {
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400">Không có ứng viên nào đăng ký Thầy/Cô ở Nguyện vọng này (hoặc đã được nhận ở vòng trước).</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400">Không có ứng viên nào đăng ký Thầy/Cô ở Nguyện vọng này (hoặc đã được nhận ở vòng trước).</td></tr>';
     return;
   }
 
   tbody.innerHTML = filtered.map(c => {
     const isSelected = state.supervisorDecisions[c.studentId] === 'selected';
+    const topicTitle = String(c.topicTitle || 'Chưa cập nhật tên đề tài');
+    const topicDescription = String(c.topicDescription || 'Sinh viên chưa bổ sung mô tả định hướng thiết kế.');
 
     let actionBtn = '';
     if (readOnly) {
@@ -3096,9 +3098,17 @@ function renderSupervisorCandidatesTable(readOnly) {
     return `
       <tr class="hover:bg-slate-50 transition-colors ${isSelected ? 'bg-blue-50/40' : ''}">
         <td class="p-3.5 font-mono font-bold text-slate-900">${c.studentId}</td>
-        <td class="p-3.5 font-semibold text-slate-800">${c.studentName || '--'}</td>
-        <td class="p-3.5 text-slate-500">${c.className || '--'}</td>
-        <td class="p-3.5 max-w-xs font-medium text-slate-900" title="${c.topicTitle}">${c.topicTitle}</td>
+        <td class="p-3.5">
+          <span class="font-semibold text-slate-800 block">${escapeHtml(c.studentName || '--')}</span>
+          <span class="text-[11px] text-slate-500">Lớp: ${escapeHtml(c.className || '--')}</span>
+        </td>
+        <td class="p-3.5 max-w-lg">
+          <p class="font-bold text-slate-900 leading-snug">${escapeHtml(topicTitle)}</p>
+          <div class="mt-1.5 pt-1.5 border-t border-slate-100">
+            <span class="text-[10px] font-black uppercase tracking-wide text-blue-700">Mô tả định hướng</span>
+            <p class="mt-0.5 text-[11px] leading-relaxed text-slate-600 whitespace-pre-line text-justify">${escapeHtml(topicDescription)}</p>
+          </div>
+        </td>
         <td class="p-3.5 text-slate-600">${c.projectType || '--'}</td>
         <td class="p-3.5 text-center">${actionBtn}</td>
       </tr>
