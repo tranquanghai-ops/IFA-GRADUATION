@@ -4259,14 +4259,12 @@
               <div class="grid grid-cols-5 gap-1.5">
                 <div class="col-span-3">
                   <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Ngày (DD/MM/YYYY):</span>
-                  <div class="flex items-center">
+                  <div class="relative flex items-center">
                     <input type="text" id="activity-form-start-date" placeholder="25/09/2026" maxlength="10"
                       class="w-full p-2 border border-slate-300 rounded-l-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
                       oninput="formatDateInput(this)" onblur="validateDateInput(this)">
-                    <label class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch">
-                      📅
-                      <input type="date" id="activity-form-start-date-picker" class="sr-only" onchange="syncPickerToDateInput('start', this.value)">
-                    </label>
+                    <button type="button" onclick="openActivityDatePicker('start')" class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch" aria-label="Chọn ngày bắt đầu từ lịch">📅</button>
+                    <input type="date" id="activity-form-start-date-picker" tabindex="-1" class="absolute h-px w-px opacity-0 pointer-events-none" onchange="syncPickerToDateInput('start', this.value)">
                   </div>
                 </div>
                 <div class="col-span-2">
@@ -4289,14 +4287,12 @@
               <div class="grid grid-cols-5 gap-1.5">
                 <div class="col-span-3">
                   <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Ngày (DD/MM/YYYY):</span>
-                  <div class="flex items-center">
+                  <div class="relative flex items-center">
                     <input type="text" id="activity-form-end-date" placeholder="26/09/2026" maxlength="10"
                       class="w-full p-2 border border-slate-300 rounded-l-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
                       oninput="formatDateInput(this)" onblur="validateDateInput(this)">
-                    <label class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch">
-                      📅
-                      <input type="date" id="activity-form-end-date-picker" class="sr-only" onchange="syncPickerToDateInput('end', this.value)">
-                    </label>
+                    <button type="button" onclick="openActivityDatePicker('end')" class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch" aria-label="Chọn ngày kết thúc từ lịch">📅</button>
+                    <input type="date" id="activity-form-end-date-picker" tabindex="-1" class="absolute h-px w-px opacity-0 pointer-events-none" onchange="syncPickerToDateInput('end', this.value)">
                   </div>
                 </div>
                 <div class="col-span-2">

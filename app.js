@@ -10740,6 +10740,28 @@ window.syncPickerToDateInput = function(target, isoDate) {
   }
 };
 
+window.openActivityDatePicker = function(target) {
+  const picker = document.getElementById(`activity-form-${target}-date-picker`);
+  const textInput = document.getElementById(`activity-form-${target}-date`);
+  if (!picker) return;
+
+  // Keep the native picker aligned with a date manually typed in Vietnamese format.
+  const typed = String(textInput?.value || '').trim();
+  const match = typed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (match) picker.value = `${match[3]}-${match[2]}-${match[1]}`;
+
+  try {
+    if (typeof picker.showPicker === 'function') {
+      picker.showPicker();
+      return;
+    }
+  } catch (error) {
+    // Older browsers can still open the native picker through focus/click.
+  }
+  picker.focus({ preventScroll: true });
+  picker.click();
+};
+
 window.clearActivityDateTime = function(target) {
   const dateInput = document.getElementById(`activity-form-${target}-date`);
   const timeInput = document.getElementById(`activity-form-${target}-time`);
@@ -21219,6 +21241,38 @@ function renderTimelineWeekDays(days = [], events = []) {
   }).join('')}</div>`;
 }
 
+function renderTimelineWeekEvents(events = []) {
+  if (!events.length) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const parseEventDate = value => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return null;
+    const [year, month, day] = String(value).split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    date.setHours(0, 0, 0, 0);
+    return isNaN(date.getTime()) ? null : date;
+  };
+  const shortDate = value => {
+    const date = parseEventDate(value);
+    return date ? `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}` : '';
+  };
+  return `<div class="mt-2 w-full space-y-1 text-left">${events.map(event => {
+    const color = normalizeRoundWeekEventColor(event.color);
+    const startValue = event.startDate || event.date || '';
+    const endValue = event.endDate || startValue;
+    const startDate = parseEventDate(startValue);
+    const endDate = parseEventDate(endValue) || startDate;
+    const dayCount = startDate ? Math.ceil((startDate - today) / 86400000) : null;
+    const countdown = !startDate
+      ? ''
+      : (dayCount > 0 ? `Còn ${dayCount} ngày` : (endDate >= today ? (dayCount === 0 ? 'Hôm nay' : 'Đang diễn ra') : 'Đã diễn ra'));
+    const dateLabel = startValue === endValue ? shortDate(startValue) : `${shortDate(startValue)}–${shortDate(endValue)}`;
+    return `<div class="flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-[9px] leading-tight" style="background-color:${color}18;border-color:${color}66;color:${color}">
+      <span class="shrink-0">📌 ${escapeHtml(dateLabel)}</span><span class="min-w-0 flex-1 truncate font-black">${escapeHtml(event.title)}</span>${countdown ? `<span class="shrink-0 font-bold opacity-80">${countdown}</span>` : ''}
+    </div>`;
+  }).join('')}</div>`;
+}
+
 function renderAdminRoundTimelinePreview(round) {
   const weeks = getRoundWeekSchedule(round);
   const visibleWeeks = weeks.filter(week => week.visible).length;
@@ -22182,7 +22236,7 @@ window.renderStudentTimelineWeeks = function() {
     icon: '👨‍🏫',
     title: 'Phân công GVHD',
     subtitle: hasGVHD
-      ? primarySupervisorName
+      ? ''
       : (directAssign ? 'Khoa đang phân công' : 'Chờ kết quả xét'),
     status: gvhdStatus,
     note: hasGVHD ? '✓ Đã phân công' : (gvhdStatus === 'active' ? 'Đang xử lý' : 'Chưa phân công'),
@@ -22320,6 +22374,7 @@ window.renderStudentTimelineWeeks = function() {
         </div>
         <span class="text-[13px] font-mono font-bold text-slate-700 tracking-tight">${card.dateText}</span>
         ${renderTimelineWeekDays(card.days, card.events)}
+        ${renderTimelineWeekEvents(card.events)}
         ${milestoneHtml}
         ${noteHtml}
       </div>`;
@@ -22338,7 +22393,7 @@ window.renderStudentTimelineWeeks = function() {
           ${card.icon}
         </div>
         <span class="font-black text-[11px] text-slate-900 leading-tight">${card.title}</span>
-        <span class="text-[10px] text-slate-500 mt-0.5 leading-tight line-clamp-2">${card.subtitle}</span>
+        ${card.subtitle ? `<span class="text-[10px] text-slate-500 mt-0.5 leading-tight line-clamp-2">${card.subtitle}</span>` : ''}
         <span class="mt-1.5 text-[9px] ${noteColor}">${card.note}</span>
         ${supervisorInfo}
       </div>`;
