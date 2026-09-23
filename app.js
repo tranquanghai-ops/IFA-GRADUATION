@@ -1338,17 +1338,65 @@ async function bootstrapProjectTypesIfNeeded() {
 }
 
 function renderProjectTypesDropdown() {
-  const select = document.getElementById('select-project-type');
-  if (!select) return;
+  const container = document.getElementById('project-types-checkbox-list');
+  if (!container) return;
   const activeTypes = (state.projectTypes && state.projectTypes.length > 0)
     ? state.projectTypes.filter(p => p.active !== false).sort((a, b) => (a.order || 0) - (b.order || 0))
     : DEFAULT_PROJECT_TYPES.map((name, i) => ({ name, order: i + 1 }));
 
-  select.innerHTML = '<option value="">-- Chọn loại hình đồ án --</option>' +
-    activeTypes
-      .map(p => '<option value="' + p.name + '">' + p.name + '</option>')
-      .join('');
+  container.innerHTML = activeTypes.map(p => `
+    <label class="flex items-start gap-2.5 p-2.5 bg-white border border-slate-200 rounded-xl hover:border-blue-300 cursor-pointer transition-colors">
+      <input type="checkbox" class="project-type-checkbox mt-0.5 h-4 w-4 accent-blue-600" value="${escapeHtml(p.name)}" onchange="handleProjectTypeSelection(this)">
+      <span class="text-xs font-semibold text-slate-700 leading-snug">${escapeHtml(p.name)}</span>
+    </label>
+  `).join('');
+  setSelectedProjectTypes(parseStoredProjectTypes(document.getElementById('select-project-type')?.value || ''));
 }
+
+function parseStoredProjectTypes(value) {
+  if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean).slice(0, 3);
+  return String(value || '').split(/\s*[;|]\s*/).map(v => v.trim()).filter(Boolean).slice(0, 3);
+}
+
+function getSelectedProjectTypes() {
+  return Array.from(document.querySelectorAll('.project-type-checkbox:checked')).map(el => el.value).slice(0, 3);
+}
+
+function syncProjectTypesHiddenInput() {
+  const hidden = document.getElementById('select-project-type');
+  if (hidden) hidden.value = getSelectedProjectTypes().join('; ');
+  const hasOther = getSelectedProjectTypes().includes('Khác');
+  document.getElementById('project-type-other-wrap')?.classList.toggle('hidden', !hasOther);
+  if (!hasOther) {
+    const other = document.getElementById('input-project-type-other');
+    if (other) other.value = '';
+  }
+}
+
+function setSelectedProjectTypes(values, otherValue = '') {
+  const selected = new Set(parseStoredProjectTypes(values));
+  document.querySelectorAll('.project-type-checkbox').forEach(el => { el.checked = selected.has(el.value); });
+  const other = document.getElementById('input-project-type-other');
+  if (other) other.value = otherValue || '';
+  syncProjectTypesHiddenInput();
+}
+
+window.handleProjectTypeSelection = function(changed) {
+  const allChecked = Array.from(document.querySelectorAll('.project-type-checkbox:checked'));
+  if (allChecked.length > 3) {
+    changed.checked = false;
+    showToast('Mỗi đề tài được chọn tối đa 3 loại hình.', 'warning');
+  }
+  const checked = getSelectedProjectTypes();
+  if (checked.length >= 3) {
+    document.querySelectorAll('.project-type-checkbox:not(:checked)').forEach(el => { el.disabled = true; });
+  } else {
+    document.querySelectorAll('.project-type-checkbox').forEach(el => { el.disabled = false; });
+  }
+  syncProjectTypesHiddenInput();
+  const error = document.getElementById('project-types-error');
+  if (error) error.classList.add('hidden');
+};
 
 window.renderProjectTypesDropdown = renderProjectTypesDropdown;
 // Initial populate of dropdown
@@ -1677,7 +1725,9 @@ function renderRoundHeader() {
       if (topicMetaEl) {
         const typeStr = reg?.projectType ? `🏷️ Loại hình: ${reg.projectType}` : '';
         const timeStr = reg?.submittedAt ? `🕒 Đã đăng ký: ${fmtDate(reg.submittedAt)}` : '';
-        topicMetaEl.innerHTML = [typeStr, timeStr].filter(Boolean).map(s => `<span>${s}</span>`).join('<span class="text-white/30">•</span>');
+        const versionStr = reg?.topicTitleVersion ? `📝 Lần ${reg.topicTitleVersion}` : '';
+        const approvalText = reg?.topicApprovalStatus === 'approved' ? '✓ GVHD đã duyệt' : reg?.topicApprovalStatus === 'rejected' ? '✕ GVHD yêu cầu chỉnh sửa' : '⌛ Chờ GVHD duyệt';
+        topicMetaEl.innerHTML = [typeStr, versionStr, approvalText, timeStr].filter(Boolean).map(s => `<span>${escapeHtml(s)}</span>`).join('<span class="text-white/30">•</span>');
       }
     } else {
       topicWrap.classList.add('hidden');
@@ -1978,6 +2028,13 @@ function renderStudentExistingRegistration(reg) {
 
   const bannerEl = document.getElementById('reg-card-eligibility-banner');
   const statusEl = document.getElementById('reg-card-status');
+  const topicStatus = reg.topicApprovalStatus || 'pending';
+  const reviewNoteEl = document.getElementById('reg-card-topic-review-note');
+  if (reviewNoteEl) {
+    const showReviewNote = topicStatus === 'rejected' && String(reg.topicApprovalNote || '').trim();
+    reviewNoteEl.textContent = showReviewNote ? `GVHD phản hồi: ${reg.topicApprovalNote}` : '';
+    reviewNoteEl.classList.toggle('hidden', !showReviewNote);
+  }
   const directAssignment = shouldSkipStudentSupervisorPreference();
   if (bannerEl) {
     if (reg.eligibilityStatus === 'pending') {
@@ -2084,15 +2141,27 @@ function renderStudentExistingRegistration(reg) {
   const canEdit = state.activeRound?.status === 'open' && state.activeRound?.allowStudentEdit !== false;
   if (canEdit) {
     btnEdit.classList.remove('hidden');
+    btnEdit.innerHTML = topicStatus === 'approved' ? '✏️ Đổi tên đề tài' : '✏️ Chỉnh sửa & đăng ký lại';
   } else {
     btnEdit.classList.add('hidden');
+  }
+
+  if (statusEl && reg.eligibilityStatus !== 'not_eligible') {
+    const topicStatusUi = {
+      approved: ['Tên đề tài đã được GVHD duyệt', 'font-bold text-emerald-700 text-sm'],
+      rejected: ['Tên đề tài chưa được duyệt – cần chỉnh sửa', 'font-bold text-rose-700 text-sm'],
+      pending: ['Tên đề tài đang chờ GVHD duyệt', 'font-bold text-amber-700 text-sm']
+    }[topicStatus] || ['Tên đề tài đang chờ GVHD duyệt', 'font-bold text-amber-700 text-sm'];
+    statusEl.textContent = topicStatusUi[0];
+    statusEl.className = topicStatusUi[1];
   }
 }
 
 window.enableEditRegistration = function() {
   if (!state.myRegistration) return;
   document.getElementById('input-topic-title').value = state.myRegistration.topicTitle || '';
-  document.getElementById('select-project-type').value = state.myRegistration.projectType || '';
+  const storedTypes = state.myRegistration.projectTypes || parseStoredProjectTypes(state.myRegistration.projectType || '');
+  setSelectedProjectTypes(storedTypes, state.myRegistration.projectTypeOther || '');
   state.selectedPreferences = [...(state.myRegistration.preferences || [])];
 
   const alreadyCard = document.getElementById('already-registered-card');
@@ -2432,7 +2501,7 @@ window.validateAndGoToStep2 = function() {
   const topicInput = document.getElementById('input-topic-title');
   const errorEl = document.getElementById('topic-title-error');
   const topic = (topicInput?.value || '').trim();
-  const projectType = document.getElementById('select-project-type')?.value || '';
+  const projectTypes = getSelectedProjectTypes();
 
   if (errorEl) {
     errorEl.classList.add('hidden');
@@ -2463,9 +2532,14 @@ window.validateAndGoToStep2 = function() {
     return;
   }
 
-  if (!projectType) {
-    showToast('Vui lòng chọn loại hình đồ án.', 'warning');
-    document.getElementById('select-project-type')?.focus();
+  if (projectTypes.length < 1 || projectTypes.length > 3) {
+    showToast('Vui lòng chọn từ 1 đến 3 loại hình đồ án.', 'warning');
+    document.getElementById('project-types-checkbox-list')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  if (projectTypes.includes('Khác') && !(document.getElementById('input-project-type-other')?.value || '').trim()) {
+    showToast('Vui lòng nhập nội dung cho loại hình “Khác”.', 'warning');
+    document.getElementById('input-project-type-other')?.focus();
     return;
   }
 
@@ -2503,7 +2577,8 @@ window.validateAndGoToStep3 = async function() {
 
 function renderConfirmationPanel() {
   document.getElementById('confirm-topic-title').textContent = (document.getElementById('input-topic-title')?.value || '').trim();
-  document.getElementById('confirm-project-type').textContent = document.getElementById('select-project-type')?.value || '';
+  const other = (document.getElementById('input-project-type-other')?.value || '').trim();
+  document.getElementById('confirm-project-type').textContent = getSelectedProjectTypes().map(t => t === 'Khác' && other ? `Khác: ${other}` : t).join(' • ');
 
   const directAssignment = shouldSkipStudentSupervisorPreference();
   const preferencesSection = document.getElementById('confirmation-preferences-section');
@@ -2538,7 +2613,9 @@ window.submitRegistration = async function() {
   const roundId = state.selectedRoundId;
   const mssv = state.isPreviewMode ? state.previewMssv : (actor?.studentMssv || state.studentMssv);
   const topicTitle = (document.getElementById('input-topic-title')?.value || '').trim();
-  const projectType = document.getElementById('select-project-type')?.value || '';
+  const projectTypes = getSelectedProjectTypes();
+  const projectTypeOther = (document.getElementById('input-project-type-other')?.value || '').trim();
+  const projectType = projectTypes.map(t => t === 'Khác' && projectTypeOther ? `Khác: ${projectTypeOther}` : t).join('; ');
 
   if (!roundId || !mssv) {
     showToast('Không xác định được phiên làm việc hoặc MSSV.', 'warning');
@@ -2566,12 +2643,29 @@ window.submitRegistration = async function() {
     const studentName = resolvedName || mssv;
     const studentEmail = actor?.email || state.user?.email || `${mssv}@student.tdtu.edu.vn`;
 
+    const previous = state.myRegistration || null;
+    const titleChanged = !previous || String(previous.topicTitle || '').trim() !== topicTitle;
+    const previousHistory = Array.isArray(previous?.topicTitleHistory) ? previous.topicTitleHistory : [];
+    const nextVersion = titleChanged ? Math.max(Number(previous?.topicTitleVersion || 0) + 1, previousHistory.length + 1) : Number(previous?.topicTitleVersion || 1);
+    const topicTitleHistory = titleChanged ? previousHistory.concat([{
+      version: nextVersion,
+      title: topicTitle,
+      submittedAt: new Date().toISOString(),
+      status: 'pending'
+    }]) : previousHistory;
+
     const payload = {
       studentId: mssv,
       studentName: studentName,
       email: studentEmail,
       topicTitle,
       projectType,
+      projectTypes,
+      projectTypeOther,
+      topicTitleVersion: nextVersion,
+      topicTitleHistory,
+      topicApprovalStatus: titleChanged ? 'pending' : (previous?.topicApprovalStatus || 'pending'),
+      topicApprovalNote: titleChanged ? '' : (previous?.topicApprovalNote || ''),
       preferences: directAssignment ? [] : state.selectedPreferences.map(p => ({
         rank: p.rank,
         supervisorId: p.supervisorId,
@@ -2585,7 +2679,7 @@ window.submitRegistration = async function() {
       eligibilityStatus: eligibilityStatus
     };
 
-    await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload);
+    await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload, { merge: true });
     
     showToast(directAssignment ? '🎉 ĐĂNG KÝ THÀNH CÔNG! Vui lòng chờ Khoa phân công GVHD.' : '🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
     await checkStudentEligibilityAndRegistration(roundId);
@@ -20786,6 +20880,9 @@ window.startStudentRegistration = function() {
     flowContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   state.selectedPreferences = [];
+  const topicInput = document.getElementById('input-topic-title');
+  if (topicInput) topicInput.value = '';
+  setSelectedProjectTypes([]);
   goToStep(1);
 };
 
@@ -22020,6 +22117,13 @@ window.renderSupervisorAssignedStudents = function() {
     const hasRegistration = Boolean(st.topicTitle);
     const topicTitle = st.topicTitle || 'Chưa đăng ký đề tài';
     const projectType = st.projectType || '--';
+    const topicApprovalStatus = st.topicApprovalStatus || 'pending';
+    const topicVersion = Number(st.topicTitleVersion || 1);
+    const topicApprovalBadge = topicApprovalStatus === 'approved'
+      ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">✓ Tên đề tài đã duyệt</span>'
+      : topicApprovalStatus === 'rejected'
+        ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-200">✕ Yêu cầu chỉnh sửa</span>'
+        : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">⌛ Chờ duyệt tên đề tài</span>';
 
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
     const isPrimary = officials.some(s => {
@@ -22079,6 +22183,8 @@ window.renderSupervisorAssignedStudents = function() {
               <strong class="text-slate-700">Đề tài:</strong> ${topicTitle}
             </p>
             <div class="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] text-slate-500">
+              ${hasRegistration ? topicApprovalBadge : ''}
+              ${hasRegistration ? `<span>Phiên bản ${topicVersion}</span><span>•</span>` : ''}
               <span>Loại hình: <b class="text-slate-700">${projectType}</b></span>
               <span>•</span>
               <span>${submissionStatusStr}</span>
@@ -22092,6 +22198,8 @@ window.renderSupervisorAssignedStudents = function() {
             ${scoreBadge}
           </div>
           <div class="flex items-center gap-1.5 flex-wrap">
+            ${hasRegistration && topicApprovalStatus !== 'approved' ? `<button type="button" onclick="reviewStudentTopicTitle('${studentId}', 'approved')" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-black cursor-pointer">✓ Duyệt tên</button>` : ''}
+            ${hasRegistration && topicApprovalStatus !== 'rejected' ? `<button type="button" onclick="reviewStudentTopicTitle('${studentId}', 'rejected')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-800 rounded-xl text-xs font-black cursor-pointer">✕ Không duyệt</button>` : ''}
             <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}')" class="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer" title="Xem thông tin chi tiết">
               📋 Xem hồ sơ
             </button>
@@ -22109,6 +22217,56 @@ window.renderSupervisorAssignedStudents = function() {
       </div>
     `;
   }).join('');
+};
+
+window.reviewStudentTopicTitle = async function(studentId, decision) {
+  if (!checkImpersonationWriteGuard('Duyệt tên đề tài')) return;
+  const registration = (state.supervisorAssignedStudents || []).find(st => (st.studentId || st.id) === studentId);
+  const roundId = state.selectedRoundId || state.activeRound?.id;
+  if (!registration?.topicTitle || !roundId) return;
+
+  let note = '';
+  if (decision === 'rejected') {
+    note = window.prompt('Nhập lý do hoặc nội dung cần sinh viên chỉnh sửa:', registration.topicApprovalNote || '') || '';
+    if (!note.trim()) {
+      showToast('Vui lòng nhập lý do khi không duyệt tên đề tài.', 'warning');
+      return;
+    }
+  } else if (!window.confirm(`Duyệt tên đề tài “${registration.topicTitle}”?`)) {
+    return;
+  }
+
+  const actor = getEffectiveActor();
+  const version = Number(registration.topicTitleVersion || 1);
+  const history = Array.isArray(registration.topicTitleHistory) ? [...registration.topicTitleHistory] : [];
+  const idx = history.findIndex(item => Number(item.version) === version);
+  const reviewedEntry = {
+    ...(idx >= 0 ? history[idx] : { version, title: registration.topicTitle, submittedAt: new Date().toISOString() }),
+    status: decision,
+    reviewedAt: new Date().toISOString(),
+    reviewedBy: actor?.email || state.user?.email || '',
+    note: note.trim()
+  };
+  if (idx >= 0) history[idx] = reviewedEntry; else history.push(reviewedEntry);
+
+  try {
+    await updateDoc(doc(db, 'graduationRounds', roundId, 'registrations', studentId), {
+      topicApprovalStatus: decision,
+      topicApprovalNote: note.trim(),
+      topicReviewedAt: serverTimestamp(),
+      topicReviewedBy: actor?.email || state.user?.email || '',
+      topicTitleHistory: history,
+      updatedAt: serverTimestamp()
+    });
+    registration.topicApprovalStatus = decision;
+    registration.topicApprovalNote = note.trim();
+    registration.topicTitleHistory = history;
+    renderSupervisorAssignedStudents();
+    showToast(decision === 'approved' ? 'Đã duyệt tên đề tài.' : 'Đã gửi yêu cầu sinh viên chỉnh sửa tên đề tài.', 'success');
+  } catch (err) {
+    console.error('Topic title review failed:', err);
+    showToast('Không thể lưu quyết định duyệt: ' + err.message, 'error');
+  }
 };
 
 window.setSupervisorStudentFilter = function(filterKey) {

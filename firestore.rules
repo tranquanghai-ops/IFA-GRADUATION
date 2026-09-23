@@ -448,8 +448,17 @@ service cloud.firestore {
           && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt']) 
               || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt));
 
-        // Cập nhật: Admin (duyệt/chốt/phân công) HOẶC Sinh viên chính chủ khi đợt mở và cho phép sửa
+        // Cập nhật: Admin; GVHD chỉ được duyệt tên đề tài; hoặc Sinh viên chính chủ khi đợt mở.
         allow update: if (admin())
+          || (staff()
+            && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(email()))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'topicApprovalStatus', 'topicApprovalNote', 'topicReviewedAt',
+              'topicReviewedBy', 'topicTitleHistory', 'updatedAt'
+            ])
+            && request.resource.data.topicApprovalStatus in ['approved', 'rejected']
+            && request.resource.data.topicTitle == resource.data.topicTitle
+            && request.resource.data.studentId == resource.data.studentId)
           || (student()
             && email().matches('^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
             && resource.data.email == email()
@@ -462,7 +471,9 @@ service cloud.firestore {
             && request.resource.data.topicTitle.size() <= 250
             && request.resource.data.projectType is string
             && request.resource.data.preferences is list
-            && request.resource.data.preferences.size() > 0
+            && (request.resource.data.preferences.size() > 0
+              || (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['supervisorAssignmentMode'])
+                && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.supervisorAssignmentMode == 'direct_assignment'))
             && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status == 'open'
             && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.allowStudentEdit == true
             && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt']) 

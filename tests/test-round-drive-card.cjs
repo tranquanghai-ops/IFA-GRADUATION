@@ -158,3 +158,15 @@ test('student hero banner displays topic, supervisor card is widened, redundant 
   assert.match(app, /timelineWeeksConfig/);
   assert.match(app, /renderRoundWeeklyContentEditor/);
 });
+
+test('topic registration supports multi-type selection and supervisor title approval history', () => {
+  assert.match(html, /id="project-types-checkbox-list"/);
+  assert.match(html, /id="input-project-type-other"/);
+  assert.match(app, /Mỗi đề tài được chọn tối đa 3 loại hình/);
+  assert.match(app, /projectTypes\.map\(t => t === 'Khác'/);
+  assert.match(app, /topicTitleVersion/);
+  assert.match(app, /topicTitleHistory/);
+  assert.match(app, /window\.reviewStudentTopicTitle = async function/);
+  assert.match(app, /topicApprovalStatus: decision/);
+  assert.match(app, /Đổi tên đề tài/);
+});
