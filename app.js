@@ -2959,16 +2959,43 @@ export async function loadSupervisorReviewData(roundId) {
     const decSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'reviewDecisions'));
     const allDecisions = decSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    const currentReviewRound = state.activeRound?.currentReviewRound || 1;
-    const reviewStatus = state.activeRound?.reviewStatus || 'not_started';
+    const currentReviewRound = 1;
+    const reviewStatus = state.activeRound?.reviewStatus || 'round_1';
     const isLocked = Boolean(state.activeRound?.reviewLocks && state.activeRound?.reviewLocks['round_' + currentReviewRound]);
     const isCompleted = state.supervisorRoundProgress['round_' + currentReviewRound]?.status === 'completed';
 
-    // Filter Candidates who picked this supervisor at rank == currentReviewRound AND not accepted yet AND not ineligible
-    const candidates = allRegistrations.filter(r => {
-      if (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned' || r.eligibilityStatus === 'not_eligible') return false;
-      const pref = (r.preferences || []).find(p => p.rank === currentReviewRound);
-      return pref && (pref.supervisorId === currentSup.id || pref.supervisorId === currentSup.supervisorId);
+    const decisionByStudentRank = new Map();
+    allDecisions.forEach(decision => {
+      if (!decision.studentId || !decision.round || !decision.decision) return;
+      decisionByStudentRank.set(`${String(decision.studentId).trim().toUpperCase()}:${Number(decision.round)}`, decision);
+    });
+
+    // Rolling preference review: a student starts at NV1. A "Không chọn"
+    // decision immediately advances the application to the next preference,
+    // so one supervisor can see NV1, NV2 and NV3 candidates together.
+    const candidates = [];
+    allRegistrations.forEach(registration => {
+      if (registration.reviewStatus === 'accepted' || registration.reviewStatus === 'manually_assigned' || registration.eligibilityStatus === 'not_eligible') return;
+      const studentId = String(registration.studentId || registration.id || '').trim().toUpperCase();
+      const preferences = [...(registration.preferences || [])].sort((a, b) => Number(a.rank) - Number(b.rank));
+      for (const preference of preferences) {
+        const rank = Number(preference.rank || 1);
+        const decision = decisionByStudentRank.get(`${studentId}:${rank}`);
+        if (decision?.decision === 'not_selected') continue;
+
+        const belongsToCurrentSupervisor = preference.supervisorId === currentSup.id || preference.supervisorId === currentSup.supervisorId;
+        if (belongsToCurrentSupervisor) {
+          candidates.push({
+            ...registration,
+            studentId,
+            candidateRank: rank,
+            currentDecision: decision?.decision || ''
+          });
+        }
+        // Stop at the first preference that has not rejected the student. A
+        // selected or pending application must not leak to later choices.
+        break;
+      }
     });
 
     state.supervisorCandidates = candidates;
@@ -2982,18 +3009,16 @@ export async function loadSupervisorReviewData(roundId) {
     });
     state.supervisorAcceptedStudents = acceptedStudents;
 
-    // Build decisions map for current review round
+    // Build decisions map for each candidate's effective preference rank.
     const decisionsMap = {};
-    allDecisions.forEach(d => {
-      if (d.round === currentReviewRound && (d.supervisorId === currentSup.id || d.supervisorId === currentSup.supervisorId)) {
-        decisionsMap[d.studentId] = d.decision;
-      }
+    candidates.forEach(candidate => {
+      if (candidate.currentDecision) decisionsMap[candidate.studentId] = candidate.currentDecision;
     });
     state.supervisorDecisions = decisionsMap;
 
     // Calculate quota
     const totalCapacity = supData.capacity || 10;
-    const acceptedPrev = acceptedStudents.filter(r => r.acceptedRank < currentReviewRound).length || (supData.acceptedCount || 0);
+    const acceptedPrev = acceptedStudents.length || (supData.acceptedCount || 0);
     const selectedCurr = candidates.filter(c => decisionsMap[c.studentId] === 'selected').length;
     const remainingCap = Math.max(0, totalCapacity - acceptedPrev - selectedCurr);
 
@@ -3006,7 +3031,7 @@ export async function loadSupervisorReviewData(roundId) {
     document.getElementById('sup-total-accepted-text').textContent = `Tổng: ${acceptedStudents.length} SV`;
 
     // Render review UI
-    renderSupervisorReviewUI(currentSup, currentReviewRound, reviewStatus, isLocked, isCompleted, remainingCap);
+    renderSupervisorReviewUI(currentSup, currentReviewRound, reviewStatus, isLocked, false, remainingCap);
     renderSupervisorAcceptedTable();
   } catch (e) {
     console.error('Error loading supervisor review data:', e);
@@ -3029,12 +3054,12 @@ function renderSupervisorReviewUI(currentSup, currentRound, reviewStatus, isLock
     return;
   }
 
-  rankBadge.textContent = `NGUYỆN VỌNG ${currentRound}`;
+  rankBadge.textContent = 'XÉT NGUYỆN VỌNG 1 → 3';
 
   if (reviewStatus === 'not_started' || reviewStatus === 'draft') {
-    stateTag.textContent = 'Chưa bắt đầu xét';
-    indicator.textContent = 'Trạng thái: Đang trong thời gian nộp đơn. Chưa mở xét duyệt.';
-    actionBtns.innerHTML = '<span class="text-xs text-slate-400 italic">Chờ Quản trị viên mở vòng xét</span>';
+    stateTag.textContent = 'Đang xét Nguyện vọng 1';
+    indicator.textContent = 'Trạng thái: Vòng 1 bắt đầu ngay khi sinh viên đăng ký chọn GVHD.';
+    actionBtns.innerHTML = '<span class="text-xs text-blue-200 font-semibold">Quyết định được lưu ngay và tự động chuyển nguyện vọng</span>';
   } else if (reviewStatus === 'completed' || state.activeRound?.status === 'published') {
     stateTag.textContent = 'Đã hoàn tất & Công bố';
     indicator.textContent = 'Trạng thái: Đã kết thúc toàn bộ quy trình xét duyệt.';
@@ -3052,17 +3077,13 @@ function renderSupervisorReviewUI(currentSup, currentRound, reviewStatus, isLock
       </button>
     `;
   } else {
-    stateTag.textContent = 'Đang trong thời gian xét';
-    indicator.textContent = `Trạng thái: Đang xét Nguyện vọng ${currentRound}.`;
-    actionBtns.innerHTML = `
-      <button onclick="openSupervisorConfirmModal()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5">
-        <span>🚀 XÁC NHẬN & KẾT THÚC LỰA CHỌN</span>
-      </button>
-    `;
+    stateTag.textContent = 'Đang xét cuốn chiếu';
+    indicator.textContent = 'Trạng thái: Hiển thị chung ứng viên NV1, NV2 và NV3 đang đến lượt Thầy/Cô xét.';
+    actionBtns.innerHTML = '<span class="text-xs text-blue-200 font-semibold">Quyết định được lưu ngay và tự động chuyển nguyện vọng</span>';
   }
 
   // Render candidates table
-  renderSupervisorCandidatesTable(isLocked || isCompleted);
+  renderSupervisorCandidatesTable(isLocked);
 }
 
 function renderSupervisorCandidatesTable(readOnly) {
@@ -3090,9 +3111,12 @@ function renderSupervisorCandidatesTable(readOnly) {
         ? '<span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Đã chọn</span>'
         : '<span class="text-slate-400 font-semibold text-xs">Không chọn</span>';
     } else {
-      actionBtn = isSelected
-        ? `<button onclick="toggleSupervisorDecision('${c.studentId}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm transition-all text-xs">✓ Đã chọn</button>`
-        : `<button onclick="toggleSupervisorDecision('${c.studentId}')" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all text-xs">+ Chọn SV này</button>`;
+      actionBtn = `
+        <div class="flex flex-col gap-1.5 min-w-[112px]">
+          <button onclick="setSupervisorDecision('${c.studentId}', 'selected')" class="px-3 py-1.5 ${isSelected ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'} font-bold rounded-xl shadow-sm transition-all text-xs">✓ Chọn SV</button>
+          <button onclick="setSupervisorDecision('${c.studentId}', 'not_selected')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl transition-all text-xs">✕ Không chọn</button>
+        </div>
+      `;
     }
 
     return `
@@ -3101,6 +3125,7 @@ function renderSupervisorCandidatesTable(readOnly) {
         <td class="p-3.5">
           <span class="font-semibold text-slate-800 block">${escapeHtml(c.studentName || '--')}</span>
           <span class="text-[11px] text-slate-500">Lớp: ${escapeHtml(c.className || '--')}</span>
+          <span class="mt-1.5 inline-flex px-2 py-0.5 rounded-full ${Number(c.candidateRank) === 1 ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-100 text-blue-800 border-blue-200'} border text-[10px] font-black">NV${Number(c.candidateRank || 1)}</span>
         </td>
         <td class="p-3.5 max-w-lg">
           <p class="font-bold text-slate-900 leading-snug">${escapeHtml(topicTitle)}</p>
@@ -3118,28 +3143,28 @@ function renderSupervisorCandidatesTable(readOnly) {
 
 window.filterSupervisorCandidates = function() {
   const isLocked = Boolean(state.activeRound?.reviewLocks && state.activeRound?.reviewLocks['round_' + (state.activeRound?.currentReviewRound || 1)]);
-  const isCompleted = state.supervisorRoundProgress['round_' + (state.activeRound?.currentReviewRound || 1)]?.status === 'completed';
-  renderSupervisorCandidatesTable(isLocked || isCompleted);
+  renderSupervisorCandidatesTable(isLocked);
 };
 
-window.toggleSupervisorDecision = async function(studentId) {
+window.setSupervisorDecision = async function(studentId, nextDecision) {
   if (!checkImpersonationWriteGuard('Thay đổi quyết định chọn sinh viên')) return;
 
   const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
   const roundId = state.selectedRoundId;
-  const currentRound = state.activeRound?.currentReviewRound || 1;
   const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
   const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
 
   if (!roundId || !currentSup) return;
 
   const currentDecision = state.supervisorDecisions[studentId];
-  const nextDecision = currentDecision === 'selected' ? 'not_selected' : 'selected';
+  if (!['selected', 'not_selected'].includes(nextDecision) || currentDecision === nextDecision) return;
+  const candidate = (state.supervisorCandidates || []).find(item => String(item.studentId) === String(studentId));
+  const decisionRank = Number(candidate?.candidateRank || 1);
 
   // If selecting, check remaining quota
   if (nextDecision === 'selected') {
     const totalCap = currentSup.capacity || 10;
-    const acceptedPrev = (state.supervisorAcceptedStudents || []).filter(r => r.acceptedRank < currentRound).length || (currentSup.acceptedCount || 0);
+    const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup.acceptedCount || 0);
     const selectedCurr = Object.values(state.supervisorDecisions).filter(v => v === 'selected').length;
     const remaining = totalCap - acceptedPrev - selectedCurr;
 
@@ -3155,7 +3180,7 @@ window.toggleSupervisorDecision = async function(studentId) {
 
   // Recalculate and update stats badges
   const totalCapacity = currentSup.capacity || 10;
-  const acceptedPrev = (state.supervisorAcceptedStudents || []).filter(r => r.acceptedRank < currentRound).length || (currentSup.acceptedCount || 0);
+  const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup.acceptedCount || 0);
   const selectedCurr = Object.values(state.supervisorDecisions).filter(v => v === 'selected').length;
   const remainingCap = Math.max(0, totalCapacity - acceptedPrev - selectedCurr);
 
@@ -3164,9 +3189,9 @@ window.toggleSupervisorDecision = async function(studentId) {
 
   // Persist decision to Firestore
   try {
-    const decId = `r${currentRound}_${studentId}_${currentSup.id}`;
+    const decId = `r${decisionRank}_${studentId}_${currentSup.id}`;
     await setDoc(doc(db, 'graduationRounds', roundId, 'reviewDecisions', decId), {
-      round: currentRound,
+      round: decisionRank,
       studentId,
       supervisorId: currentSup.id,
       supervisorEmail: emailLower,
@@ -3174,10 +3199,19 @@ window.toggleSupervisorDecision = async function(studentId) {
       decidedAt: serverTimestamp(),
       decidedBy: emailLower
     }, { merge: true });
+    showToast(nextDecision === 'selected'
+      ? `Đã chọn sinh viên ${studentId} ở NV${decisionRank}.`
+      : `Đã không chọn sinh viên ${studentId}; hồ sơ được chuyển tự động sang nguyện vọng tiếp theo.`, 'success');
+    await loadSupervisorReviewData(roundId);
   } catch (err) {
     console.error('Error saving review decision:', err);
     showToast('Lỗi lưu quyết định: ' + err.message, 'error');
   }
+};
+
+window.toggleSupervisorDecision = function(studentId) {
+  const currentDecision = state.supervisorDecisions[studentId];
+  return window.setSupervisorDecision(studentId, currentDecision === 'selected' ? 'not_selected' : 'selected');
 };
 
 window.openSupervisorConfirmModal = function() {
