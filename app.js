@@ -22065,9 +22065,30 @@ function validateOfficialFormFields(fields) {
   return true;
 }
 
-window.downloadOfficialTopicRegistrationPdf = function() {
-  const reg = state.myRegistration;
-  if (!reg || reg.topicApprovalStatus !== 'approved') {
+window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
+  let reg = null;
+  let identity = null;
+
+  if (targetStudentId && typeof targetStudentId === 'string') {
+    reg = (state.supervisorAssignedStudents || []).find(st => (st.studentId || st.id) === targetStudentId) ||
+      (typeof findStudentInRound === 'function' ? findStudentInRound(targetStudentId) : null);
+    const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(targetStudentId) : null;
+    identity = {
+      mssv: targetStudentId,
+      fullName: reg?.studentName || studentObj?.fullName || studentObj?.name || targetStudentId,
+      major: reg?.major || studentObj?.major || 'Thiết kế nội thất',
+      email: reg?.personalEmail || reg?.email || studentObj?.email || `${targetStudentId}@student.tdtu.edu.vn`
+    };
+  } else {
+    reg = state.myRegistration;
+    identity = getRegistrationStudentIdentity();
+  }
+
+  if (!reg) {
+    showToast('Không tìm thấy thông tin đăng ký.', 'warning');
+    return;
+  }
+  if (!targetStudentId && reg.topicApprovalStatus !== 'approved') {
     showToast('Phiếu PDF chỉ được tải sau khi GVHD xác nhận tên đề tài.', 'warning');
     return;
   }
@@ -22678,23 +22699,45 @@ window.loadSupervisorPortalData = async function(roundId) {
 
   // 4. Identify Assigned Students for this supervisor
   const mySupId = currentSup?.id || currentSup?.supervisorId;
+  const currentSupName = (currentSup?.name || '').toLowerCase().trim();
   const registrationsById = new Map(allRegistrations.map(r => [String(r.studentId || r.id).trim().toUpperCase(), r]));
-  const assignedFromOfficial = publishedAssignments.map(assignment => {
-    const studentId = String(assignment.studentId || assignment.id).trim().toUpperCase();
-    return normalizeOfficialAssignment(assignment, registrationsById.get(studentId) || null);
-  });
-  const legacyAssigned = (round.status === 'published' || round.reviewStatus === 'completed') ? allRegistrations.filter(r => {
-    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
-    if (officials.length === 0) {
-      if (r.reviewStatus !== 'accepted' && r.reviewStatus !== 'manually_assigned') return false;
+
+  const isAssignedToThisSupervisor = (item) => {
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(item) : [];
+    if (officials.length > 0) {
+      return officials.some(s => {
+        if (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) return true;
+        if (emailLower && ((s.email && s.email.toLowerCase().trim() === emailLower) || (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower))) return true;
+        if (currentSupName && s.supervisorName && s.supervisorName.toLowerCase().trim() === currentSupName) return true;
+        return false;
+      });
     }
-    return officials.some(s => {
-      if (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) return true;
-      if (s.email && s.email.toLowerCase().trim() === emailLower) return true;
-      if (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower) return true;
-      return false;
+    if (mySupId && (item.acceptedSupervisorId === mySupId || item.finalSupervisorId === mySupId || item.supervisorId === mySupId)) return true;
+    if (emailLower && ((item.supervisorEmail && item.supervisorEmail.toLowerCase().trim() === emailLower) || (Array.isArray(item.supervisorEmails) && item.supervisorEmails.map(e => (e||'').toLowerCase().trim()).includes(emailLower)))) return true;
+    if (currentSupName && ((item.acceptedSupervisorName && item.acceptedSupervisorName.toLowerCase().trim() === currentSupName) || (item.supervisorName && item.supervisorName.toLowerCase().trim() === currentSupName))) return true;
+    return false;
+  };
+
+  const assignedFromOfficial = publishedAssignments
+    .map(assignment => {
+      const studentId = String(assignment.studentId || assignment.id).trim().toUpperCase();
+      return normalizeOfficialAssignment(assignment, registrationsById.get(studentId) || null);
+    })
+    .filter(item => {
+      if (currentSup || mySupId) {
+        return isAssignedToThisSupervisor(item);
+      }
+      return true;
     });
+
+  const legacyAssigned = (round.status === 'published' || round.reviewStatus === 'completed') ? allRegistrations.filter(r => {
+    if (currentSup || mySupId) {
+      return isAssignedToThisSupervisor(r);
+    }
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
+    return officials.length > 0 || r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned';
   }) : [];
+
   const assignedMap = new Map();
   [...assignedFromOfficial, ...legacyAssigned].forEach(item => {
     const key = String(item.studentId || item.id).trim().toUpperCase();
@@ -22702,9 +22745,9 @@ window.loadSupervisorPortalData = async function(roundId) {
   });
   const assigned = [...assignedMap.values()];
 
-  // Admin fallback: If admin without personal assignment, can see all assigned students in round
+  // Admin fallback: ONLY if pure admin who is NOT in the supervisor roster at all and has zero personal assignments
   let displayStudents = assigned;
-  if (actor.isAdmin && assigned.length === 0) {
+  if (actor.isAdmin && !currentSup && assigned.length === 0) {
     displayStudents = [...assignedMap.values()];
     if (displayStudents.length === 0 && (round.status === 'published' || round.reviewStatus === 'completed')) displayStudents = allRegistrations.filter(r => {
       const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
@@ -22968,8 +23011,16 @@ window.renderSupervisorAssignedStudents = function() {
               <span class="text-xs text-slate-500 font-medium truncate">Lớp: ${className}</span>
             </div>
             <h3 class="text-sm sm:text-base font-black text-slate-900 leading-snug truncate">${name}</h3>
-            <p class="text-xs text-slate-600 mt-1 line-clamp-1">
-              <strong class="text-slate-700">Đề tài:</strong> ${topicTitle}
+            <p class="text-xs text-slate-600 mt-1 flex items-center gap-2 flex-wrap">
+              <strong class="text-slate-700">Đề tài:</strong>
+              <span class="font-semibold text-slate-900">${topicTitle}</span>
+              ${hasRegistration ? `
+                <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')"
+                        class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer shrink-0"
+                        title="Xem phiếu đăng ký đề tài chính thức (mô phỏng file PDF trình nộp)">
+                  <span>👁️</span> <span>Xem</span>
+                </button>
+              ` : ''}
             </p>
             <div class="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] text-slate-500">
               ${hasRegistration ? topicApprovalBadge : ''}
@@ -22987,8 +23038,6 @@ window.renderSupervisorAssignedStudents = function() {
             ${scoreBadge}
           </div>
           <div class="flex items-center gap-1.5 flex-wrap">
-            ${hasRegistration && topicApprovalStatus !== 'approved' ? `<button type="button" onclick="reviewStudentTopicTitle('${studentId}', 'approved')" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-black cursor-pointer">✓ Duyệt tên</button>` : ''}
-            ${hasRegistration && topicApprovalStatus !== 'rejected' ? `<button type="button" onclick="reviewStudentTopicTitle('${studentId}', 'rejected')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-800 rounded-xl text-xs font-black cursor-pointer">✕ Không duyệt</button>` : ''}
             <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}')" class="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer" title="Xem thông tin chi tiết">
               📋 Xem hồ sơ
             </button>
@@ -23123,6 +23172,169 @@ window.reviewStudentTopicTitle = async function(studentId, decision) {
     showToast('Không thể lưu quyết định duyệt: ' + err.message, 'error');
   }
 };
+
+
+window.openTopicRegistrationPreviewModal = function(studentId) {
+  const modal = document.getElementById('modal-supervisor-topic-preview');
+  if (!modal) return;
+
+  const round = state.activeRound || {};
+  const st = (state.supervisorAssignedStudents || []).find(s => (s.studentId || s.id) === studentId) ||
+    findStudentInRound(studentId);
+  if (!st) {
+    showToast('Không tìm thấy thông tin đăng ký của sinh viên.', 'warning');
+    return;
+  }
+
+  const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(studentId) : null;
+  const fullName = st?.studentName || studentObj?.fullName || studentObj?.name || studentId;
+  const className = st?.currentClass || studentObj?.className || studentObj?.studentClass || st?.className || '--';
+  const major = st?.major || studentObj?.major || 'Thiết kế nội thất';
+  const personalEmail = st?.personalEmail || st?.email || studentObj?.email || '--';
+  const phone = st?.studentPhone || studentObj?.phone || '--';
+  const address = st?.studentTemporaryAddress || st?.studentAddress || studentObj?.address || '--';
+  const courseName = st?.courseName || 'Đồ án tốt nghiệp';
+  const courseCode = st?.courseCode || '--';
+  const courseGroup = st?.courseGroup || '--';
+  const version = Number(st?.topicTitleVersion || 1);
+  const topicTitle = st?.topicTitle || 'Chưa đăng ký đề tài';
+  const topicDescription = st?.topicDescription || '(Chưa có mô tả định hướng thiết kế)';
+  const status = st?.topicApprovalStatus || 'pending';
+
+  const roundLabel = round.title || round.roundName || 'ĐỒ ÁN TỐT NGHIỆP';
+  const normalizedRoundLabel = roundLabel.toUpperCase().replace(/\s+/g, ' ').trim();
+  const roundHeadingMatch = normalizedRoundLabel.match(/^(.*?)(?:\s*-\s*)?(ĐỢT\s+.+)$/);
+  const programHeading = roundHeadingMatch?.[1] || normalizedRoundLabel;
+  const roundHeading = roundHeadingMatch?.[2] || '';
+
+  const approvedDate = st?.topicReviewedAt?.toDate ? st.topicReviewedAt.toDate() : (st?.topicReviewedAt ? new Date(st.topicReviewedAt) : new Date());
+  const dd = String(approvedDate.getDate()).padStart(2, '0');
+  const mm = String(approvedDate.getMonth() + 1).padStart(2, '0');
+  const yyyy = approvedDate.getFullYear();
+
+  // Header info
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '--'; };
+  setEl('topic-preview-student-name', fullName);
+  setEl('topic-preview-mssv', studentId);
+  setEl('topic-preview-round-name', roundLabel);
+
+  // Doc info
+  setEl('topic-preview-doc-program', programHeading);
+  setEl('topic-preview-doc-round', roundHeading);
+  setEl('topic-preview-doc-name', fullName);
+  setEl('topic-preview-doc-mssv', studentId);
+  setEl('topic-preview-doc-class', className);
+  setEl('topic-preview-doc-major', major);
+  setEl('topic-preview-doc-email', personalEmail);
+  setEl('topic-preview-doc-phone', phone);
+  setEl('topic-preview-doc-address', address);
+  setEl('topic-preview-doc-course', courseName);
+  setEl('topic-preview-doc-code', courseCode);
+  setEl('topic-preview-doc-group', courseGroup);
+  setEl('topic-preview-doc-version', `Đăng ký đề tài chính thức lần thứ : ${version}`);
+  setEl('topic-preview-doc-title', topicTitle);
+  setEl('topic-preview-doc-description', topicDescription);
+  setEl('topic-preview-doc-sign-student', fullName);
+  setEl('topic-preview-doc-date', `Tp.HCM, ngày ${dd} tháng ${mm} năm ${yyyy}`);
+
+  // Supervisor info
+  const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
+  const primary = officials.find(s => s.role === 'primary') || officials[0];
+  const supName = primary?.supervisorName || st.acceptedSupervisorName || 'Giảng viên Hướng dẫn';
+  setEl('topic-preview-doc-sup-name', supName);
+
+  // Status badge & sup status in document
+  const badgeEl = document.getElementById('topic-preview-status-badge');
+  const docSupStatusEl = document.getElementById('topic-preview-doc-sup-status');
+  const footerNoteEl = document.getElementById('topic-preview-footer-note');
+  const btnApprove = document.getElementById('btn-topic-preview-approve');
+  const btnReject = document.getElementById('btn-topic-preview-reject');
+
+  if (status === 'approved') {
+    if (badgeEl) {
+      badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300';
+      badgeEl.textContent = '✓ Đã duyệt đề tài';
+    }
+    if (docSupStatusEl) {
+      docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-emerald-700 italic';
+      docSupStatusEl.textContent = '✓ Đã duyệt đề tài';
+    }
+    if (footerNoteEl) {
+      footerNoteEl.textContent = `Tên đề tài đã được GVHD phê duyệt${st.topicReviewedAt ? ' lúc ' + fmtIsoToVietnameseDateTime(st.topicReviewedAt) : ''}.`;
+    }
+    if (btnApprove) btnApprove.classList.add('hidden');
+    if (btnReject) {
+      btnReject.classList.remove('hidden');
+      btnReject.innerHTML = '<span>🔄</span> <span>Yêu cầu sửa lại</span>';
+    }
+  } else if (status === 'rejected') {
+    if (badgeEl) {
+      badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300';
+      badgeEl.textContent = '✕ Yêu cầu chỉnh sửa';
+    }
+    if (docSupStatusEl) {
+      docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-rose-700 italic';
+      docSupStatusEl.textContent = `✕ Yêu cầu chỉnh sửa: ${st.topicApprovalNote || ''}`;
+    }
+    if (footerNoteEl) {
+      footerNoteEl.textContent = `Đã yêu cầu sinh viên chỉnh sửa: "${st.topicApprovalNote || ''}".`;
+    }
+    if (btnApprove) {
+      btnApprove.classList.remove('hidden');
+      btnApprove.innerHTML = '<span>✓</span> <span>Duyệt tên đề tài</span>';
+    }
+    if (btnReject) btnReject.classList.add('hidden');
+  } else {
+    if (badgeEl) {
+      badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300';
+      badgeEl.textContent = '⌛ Chờ duyệt tên đề tài';
+    }
+    if (docSupStatusEl) {
+      docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-amber-700 italic';
+      docSupStatusEl.textContent = '(Chờ GVHD xem xét & ký duyệt)';
+    }
+    if (footerNoteEl) {
+      footerNoteEl.textContent = 'GVHD xem xét nội dung phiếu đăng ký và xác nhận duyệt hoặc yêu cầu chỉnh sửa.';
+    }
+    if (btnApprove) {
+      btnApprove.classList.remove('hidden');
+      btnApprove.innerHTML = '<span>✓</span> <span>Duyệt tên đề tài</span>';
+    }
+    if (btnReject) {
+      btnReject.classList.remove('hidden');
+      btnReject.innerHTML = '<span>✕</span> <span>Không duyệt (Yêu cầu sửa)</span>';
+    }
+  }
+
+  // Bind actions
+  if (btnApprove) {
+    btnApprove.onclick = async () => {
+      await window.reviewStudentTopicTitle(studentId, 'approved');
+      window.openTopicRegistrationPreviewModal(studentId);
+    };
+  }
+  if (btnReject) {
+    btnReject.onclick = async () => {
+      await window.reviewStudentTopicTitle(studentId, 'rejected');
+      window.openTopicRegistrationPreviewModal(studentId);
+    };
+  }
+
+  const btnPdf = document.getElementById('btn-topic-preview-download-pdf');
+  if (btnPdf) {
+    btnPdf.onclick = () => {
+      window.downloadOfficialTopicRegistrationPdf(studentId);
+    };
+  }
+
+  modal.classList.remove('hidden');
+};
+
+window.closeTopicRegistrationPreviewModal = function() {
+  const modal = document.getElementById('modal-supervisor-topic-preview');
+  if (modal) modal.classList.add('hidden');
+};
+
 
 window.setSupervisorStudentFilter = function(filterKey) {
   state.supervisorStudentFilter = filterKey;

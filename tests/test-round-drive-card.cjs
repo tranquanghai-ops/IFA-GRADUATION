@@ -241,3 +241,14 @@ test('official topic form captures student-owned class data and unlocks PDF afte
   assert.match(app, /text: identity\.fullName, bold: true/);
   assert.doesNotMatch(app, /Đã xác nhận tên đề tài trên hệ thống/);
 });
+
+test('supervisor topic preview modal and strict supervisor assignment scoping', () => {
+  assert.match(html, /id="modal-supervisor-topic-preview"/);
+  assert.match(html, /id="btn-topic-preview-approve"/);
+  assert.match(html, /id="btn-topic-preview-reject"/);
+  assert.match(app, /window\.openTopicRegistrationPreviewModal = function/);
+  assert.match(app, /window\.closeTopicRegistrationPreviewModal = function/);
+  assert.match(app, /const isAssignedToThisSupervisor = \(item\) =>/);
+  assert.match(app, /openTopicRegistrationPreviewModal\('\${studentId}'\)/);
+});
+
