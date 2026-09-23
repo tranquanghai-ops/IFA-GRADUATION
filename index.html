@@ -67,6 +67,9 @@
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
+        <button type="button" onclick="openAdminImpersonateModal()" class="px-3 py-1 bg-white/35 hover:bg-white/55 text-slate-950 font-black rounded-lg shadow-sm border border-black/15 transition-all flex items-center gap-1.5 text-xs cursor-pointer">
+          <span>🔄</span> <span>Đổi nhân vật</span>
+        </button>
         <button type="button" onclick="exitImpersonation()" class="px-3 py-1 bg-slate-950 hover:bg-black text-amber-300 font-black rounded-lg shadow-sm border border-amber-400/40 transition-all flex items-center gap-1.5 text-xs cursor-pointer">
           <span>✕</span> <span>Thoát giả lập</span>
         </button>
@@ -769,7 +772,7 @@
           </div>
 
           <!-- Integrated Round Selector Toolbar inside Hero Banner -->
-          <div class="pt-3.5 border-t border-white/15 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+          <div id="supervisor-round-selector-toolbar" class="pt-3.5 border-t border-white/15 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
             <div class="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
               <span class="text-xs font-bold uppercase tracking-wider text-blue-200 flex items-center gap-1.5 shrink-0">
                 <span>🗓️</span> Đợt tốt nghiệp:

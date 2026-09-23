@@ -88,6 +88,7 @@ test('all portals keep branded header and render assignment plus resilient count
 
 test('supervisor portal integrates round selector in banner and hides secondary tabs', () => {
   assert.match(html, /id="supervisor-hero-card"[^]*?id="supervisor-round-select"/);
+  assert.match(html, /id="supervisor-round-selector-toolbar"/);
   assert.doesNotMatch(html, /id="sup-hero-milestone-strip"/);
   assert.doesNotMatch(html, /id="hero-supervisor-profile-btn"/);
   assert.doesNotMatch(html, /id="sup-round-locked-badge"/);
@@ -98,8 +99,22 @@ test('supervisor portal integrates round selector in banner and hides secondary 
   assert.match(app, /const isDirect = isDirectSupervisorAssignment\(round\)/);
   assert.match(app, /tabReviewBtn\.classList\.toggle\('hidden', isDirect\)/);
   assert.match(app, /tabAcceptedBtn\.classList\.toggle\('hidden', isDirect\)/);
+  assert.match(app, /toolbar\.classList\.toggle\('hidden', filteredRounds\.length <= 1\)/);
+  assert.match(app, /isDirect && \(k === 'review' \|\| k === 'accepted'\)/);
+  assert.match(app, /if \(btnGotoStudent\) \{ btnGotoStudent\.classList\.add\('hidden'\)/);
+  assert.match(app, /if \(btnGotoAssessment\) \{\s*btnGotoAssessment\.classList\.add\('hidden'\)/);
   assert.match(app, /const studentAvatarUrl = st\.photoURL \|\| studentObj\?\.photoURL \|\| studentObj\?\.avatar \|\| defaultAvatar/);
   assert.doesNotMatch(app, /defaultAvatar = 'data:image\/svg\+xml,<svg xmlns="http:/);
+});
+
+test('admin round cards hydrate assignment counts from official and draft sources', () => {
+  assert.match(app, /collection\(db, 'graduationRounds', round\.id, 'officialAssignments'\)/);
+  assert.match(app, /collection\(db, 'graduationRounds', round\.id, 'assignmentDrafts'\)/);
+  assert.match(app, /round\.assignedCount = assignedStudentIds\.size/);
+});
+
+test('impersonation banner supports switching directly to another actor', () => {
+  assert.match(html, /onclick="openAdminImpersonateModal\(\)"[^>]*>[\s\S]*?Đổi nhân vật/);
 });
 
 test('student hero banner displays supervisor card, collapses header gap, and renders 10-step journey', () => {

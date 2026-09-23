@@ -1064,14 +1064,14 @@ export function updateAuthUI() {
       }
     } else if (state.currentView === 'supervisor') {
       if (btnGotoSupervisor) btnGotoSupervisor.classList.add('hidden');
-      if (btnGotoStudent) { btnGotoStudent.classList.remove('hidden'); btnGotoStudent.classList.add('flex'); }
+      if (btnGotoStudent) { btnGotoStudent.classList.add('hidden'); btnGotoStudent.classList.remove('flex'); }
       if (btnGotoAdmin) {
         if (state.isAdmin) { btnGotoAdmin.classList.remove('hidden'); btnGotoAdmin.classList.add('flex'); }
         else { btnGotoAdmin.classList.add('hidden'); }
       }
       if (btnGotoAssessment) {
-        btnGotoAssessment.classList.remove('hidden');
-        btnGotoAssessment.classList.add('flex');
+        btnGotoAssessment.classList.add('hidden');
+        btnGotoAssessment.classList.remove('flex');
       }
     } else if (state.currentView === 'assessment') {
       if (btnGotoAssessment) btnGotoAssessment.classList.add('hidden');
@@ -1448,6 +1448,33 @@ async function loadRounds() {
       const timeB = b.createdAtDate ? b.createdAtDate.getTime() : 0;
       return timeB - timeA;
     });
+
+    // Round documents do not always contain denormalized assignment counters.
+    // Hydrate admin cards from the same sources used by the assignment workspace.
+    if (state.isAdmin && !state.impersonation) {
+      await Promise.all(state.rounds.filter(r => !r.deleted).map(async round => {
+        try {
+          const [officialSnap, draftSnap] = await Promise.all([
+            getDocs(collection(db, 'graduationRounds', round.id, 'officialAssignments')),
+            getDocs(collection(db, 'graduationRounds', round.id, 'assignmentDrafts'))
+          ]);
+          const assignedStudentIds = new Set();
+          [...officialSnap.docs, ...draftSnap.docs].forEach(assignmentDoc => {
+            const assignment = { id: assignmentDoc.id, ...assignmentDoc.data() };
+            const supervisors = getOfficialSupervisors(assignment);
+            const hasAssignment = supervisors.length > 0 || Boolean(
+              assignment.acceptedSupervisorId || assignment.assignedSupervisorId || assignment.officialSupervisor
+            );
+            const studentId = String(assignment.studentId || assignment.id || '').trim().toUpperCase();
+            if (hasAssignment && studentId) assignedStudentIds.add(studentId);
+          });
+          round.assignedCount = assignedStudentIds.size;
+          round.officialAssignmentsCount = officialSnap.size;
+        } catch (error) {
+          console.warn(`[Rounds] Could not hydrate assignment count for ${round.id}:`, error);
+        }
+      }));
+    }
 
     renderRoundsDropdowns();
     renderAdminRoundsTable();
@@ -22046,6 +22073,7 @@ window.renderSupervisorRoundsDropdown = function() {
   if (!select) return;
 
   const actor = getEffectiveActor();
+  const toolbar = document.getElementById('supervisor-round-selector-toolbar');
   const lockedBadge = document.getElementById('sup-round-locked-badge');
   const validRounds = (state.rounds || []).filter(r => !r.deleted);
 
@@ -22063,6 +22091,7 @@ window.renderSupervisorRoundsDropdown = function() {
     select.disabled = true;
     select.className = 'bg-slate-900/80 text-white border border-white/25 rounded-xl px-3 py-1.5 text-xs font-bold max-w-full truncate';
     if (lockedBadge) lockedBadge.classList.remove('hidden');
+    if (toolbar) toolbar.classList.add('hidden');
     return;
   }
 
@@ -22098,6 +22127,7 @@ window.renderSupervisorRoundsDropdown = function() {
   if (filteredRounds.length === 0) {
     select.innerHTML = '<option value="">-- Chưa có đợt tốt nghiệp --</option>';
   }
+  if (toolbar) toolbar.classList.toggle('hidden', filteredRounds.length <= 1);
 };
 
 window.onSupervisorRoundSelected = async function(roundId) {
@@ -22666,6 +22696,7 @@ window.setSupervisorStudentFilter = function(filterKey) {
 
 window.switchSupervisorTab = function(tabName) {
   state.currentSupervisorTab = tabName;
+  const isDirect = isDirectSupervisorAssignment(state.activeRound);
   const tabs = {
     assigned: ['sup-tab-btn-assigned', 'sup-panel-assigned'],
     review: ['sup-tab-btn-review', 'sup-panel-review'],
@@ -22680,6 +22711,11 @@ window.switchSupervisorTab = function(tabName) {
     const isTarget = (k === tabName);
 
     if (btn) {
+      if (isDirect && (k === 'review' || k === 'accepted')) {
+        btn.classList.add('hidden');
+        if (panel) panel.classList.add('hidden');
+        return;
+      }
       if (isTarget) {
         btn.className = 'px-4 py-2 rounded-xl text-xs font-bold text-white bg-tdtu-blue shadow-sm transition-all cursor-pointer';
       } else {
