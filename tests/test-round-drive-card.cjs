@@ -170,3 +170,13 @@ test('topic registration supports multi-type selection and supervisor title appr
   assert.match(app, /topicApprovalStatus: decision/);
   assert.match(app, /Đổi tên đề tài/);
 });
+
+test('direct assignment registration removes supervisor preference wording and hero reserves full title row', () => {
+  assert.match(html, /id="round-title-display"[^>]*lg:whitespace-nowrap/);
+  assert.match(html, /id="hero-supervisor-info-card"[^>]*lg:absolute[^>]*lg:top-16/);
+  assert.match(html, /id="registration-cta-title"/);
+  assert.match(html, /id="registration-cta-description"/);
+  assert.match(app, /\? 'Đăng ký Đề tài'/);
+  assert.match(app, /chọn từ 1 đến 3 loại hình đồ án trước khi xác nhận đăng ký/);
+  assert.match(app, /selectionStep\.classList\.add\('hidden'\)/);
+});

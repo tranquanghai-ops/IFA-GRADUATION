@@ -1815,6 +1815,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
   const reviewInProgressCard = document.getElementById('review-in-progress-card');
   const officialResultCard = document.getElementById('official-result-card');
   const flowContainer = document.getElementById('registration-flow-container');
+  applySupervisorAssignmentModeToRegistrationUI();
 
   if (!mssv) {
     if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
@@ -2044,7 +2045,9 @@ function renderStudentExistingRegistration(reg) {
         <div>
           <span class="font-bold block">Trạng thái điều kiện: Chờ kết quả xét từ Nhà trường / Khoa</span>
           <p class="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-            Đăng ký nguyện vọng của bạn đã được ghi nhận vào hệ thống. Trạng thái điều kiện đang là <b>Chờ xét</b>. Sau khi Nhà trường/Khoa ban hành danh sách chính thức, hệ thống sẽ đối chiếu và chuyển hồ sơ sang GVHD xét duyệt.
+            ${directAssignment
+              ? 'Đăng ký đề tài của bạn đã được ghi nhận. Trạng thái điều kiện đang là <b>Chờ xét</b>. Sau khi Nhà trường/Khoa ban hành danh sách chính thức, hồ sơ sẽ tiếp tục quy trình phân công GVHD.'
+              : 'Đăng ký nguyện vọng của bạn đã được ghi nhận vào hệ thống. Trạng thái điều kiện đang là <b>Chờ xét</b>. Sau khi Nhà trường/Khoa ban hành danh sách chính thức, hệ thống sẽ đối chiếu và chuyển hồ sơ sang GVHD xét duyệt.'}
           </p>
         </div>
       `;
@@ -2060,7 +2063,9 @@ function renderStudentExistingRegistration(reg) {
         <div>
           <span class="font-bold block">Kết quả xét duyệt: Không đủ điều kiện làm ĐATN đợt này</span>
           <p class="text-[11px] text-rose-800 mt-0.5 leading-relaxed">
-            Theo danh sách chính thức từ Nhà trường/Khoa, bạn chưa đủ điều kiện làm ĐATN trong đợt này. Nguyện vọng đăng ký không được chuyển sang GVHD xét duyệt.
+            ${directAssignment
+              ? 'Theo danh sách chính thức từ Nhà trường/Khoa, bạn chưa đủ điều kiện làm ĐATN trong đợt này. Đăng ký đề tài sẽ không được tiếp tục xử lý.'
+              : 'Theo danh sách chính thức từ Nhà trường/Khoa, bạn chưa đủ điều kiện làm ĐATN trong đợt này. Nguyện vọng đăng ký không được chuyển sang GVHD xét duyệt.'}
           </p>
         </div>
       `;
@@ -2418,12 +2423,31 @@ function renderPreferencesTray() {
 // --- STEPPER NAVIGATION ---
 function applySupervisorAssignmentModeToRegistrationUI() {
   const directAssignment = shouldSkipStudentSupervisorPreference();
+  const ctaTitle = document.getElementById('registration-cta-title');
+  const ctaDescription = document.getElementById('registration-cta-description');
   const selectionStep = document.getElementById('step-indicator-2');
   const confirmStep = document.getElementById('step-indicator-3');
   const nextButton = document.getElementById('btn-registration-step-1-next');
   const confirmBackButton = document.getElementById('btn-registration-confirm-back');
   const topicDescription = document.getElementById('registration-topic-step-description');
   const confirmTitle = document.getElementById('confirm-step-title');
+  const confirmNote = document.getElementById('registration-confirm-note');
+
+  if (ctaTitle) {
+    ctaTitle.textContent = directAssignment
+      ? 'Đăng ký Đề tài'
+      : 'Đăng ký Đề tài & Chọn Giảng viên hướng dẫn';
+  }
+  if (ctaDescription) {
+    ctaDescription.textContent = directAssignment
+      ? 'Vui lòng nhập tên đề tài dự kiến và chọn từ 1 đến 3 loại hình đồ án trước khi xác nhận đăng ký.'
+      : 'Vui lòng hoàn thành điền tên đề tài dự kiến, chọn loại hình đồ án và đăng ký các nguyện vọng GVHD theo quy định của Khoa.';
+  }
+  if (confirmNote) {
+    confirmNote.innerHTML = directAssignment
+      ? '⚠️ <strong>LƯU Ý:</strong> Sau khi bấm <em>Xác nhận Đăng ký</em>, hệ thống sẽ lưu tên đề tài và loại hình đồ án của bạn. Bạn có thể chỉnh sửa trong thời gian đợt đăng ký còn mở (nếu đợt cho phép).'
+      : '⚠️ <strong>LƯU Ý:</strong> Sau khi bấm <em>Xác nhận Đăng ký</em>, hệ thống sẽ lưu thông tin của bạn vào cơ sở dữ liệu đợt. Bạn có thể thay đổi nguyện vọng trong thời gian đợt đăng ký còn mở (nếu đợt cho phép).';
+  }
 
   if (selectionStep) {
     if (directAssignment) {

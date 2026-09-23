@@ -203,30 +203,30 @@
 
         <!-- 1. CURRENT ROUND HERO CARD -->
         <div id="student-hero-card" class="card-surface px-5 pb-5 pt-3 sm:px-6 sm:pb-6 sm:pt-4 bg-gradient-to-r from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl relative overflow-hidden rounded-2xl border border-white/10">
-          <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4 relative z-10">
-            <div class="space-y-2 flex-1">
+          <div class="relative z-10 min-h-[205px]">
+            <div class="space-y-2">
               <div class="flex flex-wrap items-center gap-2">
                 <span id="round-status-badge" class="hidden badge badge-open font-bold">Đang mở đăng ký</span>
                 <span id="round-mode-badge" class="hidden badge badge-info"></span>
                 <span id="hero-student-state-badge" class="hidden badge bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-400/30">Đủ điều kiện</span>
               </div>
-              <h1 id="round-title-display" class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white leading-snug">
+              <h1 id="round-title-display" class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white leading-tight lg:whitespace-nowrap">
                 Đồ án Tốt nghiệp
               </h1>
-              <div id="hero-registered-topic-wrap" class="hidden mt-1.5 p-2.5 bg-white/10 border border-white/15 rounded-xl text-xs backdrop-blur-sm shadow-2xs max-w-3xl">
+              <div id="hero-registered-topic-wrap" class="hidden mt-1.5 p-2.5 bg-white/10 border border-white/15 rounded-xl text-xs backdrop-blur-sm shadow-2xs max-w-3xl lg:mr-[430px]">
                 <div class="flex items-center gap-1.5 text-amber-300 font-black text-[10px] uppercase tracking-wider">
                   <span>📋</span> <span>Đề tài đã đăng ký:</span>
                 </div>
                 <div id="hero-registered-topic-name" class="font-bold text-white text-xs sm:text-sm mt-0.5 leading-snug break-words">--</div>
                 <div id="hero-registered-topic-meta" class="text-[11px] text-blue-200 mt-0.5 font-medium flex items-center gap-2 flex-wrap"></div>
               </div>
-              <p id="round-academic-year" class="text-xs sm:text-sm text-blue-200 font-medium">Năm học 2026-2027</p>
-              <p id="round-time-range" class="hidden text-xs text-slate-300 flex items-center gap-1.5 pt-0.5">
+              <p id="round-academic-year" class="text-xs sm:text-sm text-blue-200 font-medium lg:mr-[430px]">Năm học 2026-2027</p>
+              <p id="round-time-range" class="hidden text-xs text-slate-300 flex items-center gap-1.5 pt-0.5 lg:mr-[430px]">
                 <span>📅 Thời gian: --</span>
               </p>
 
               <!-- Quick Metrics Bar inside Hero -->
-              <div class="flex flex-wrap items-center gap-3 pt-2 text-xs text-blue-100">
+              <div class="flex flex-wrap items-center gap-3 pt-2 text-xs text-blue-100 lg:mr-[430px]">
                 <!-- Student Info Pill hidden as requested (already in header) -->
                 <button type="button" onclick="openStudentProfileModal()" id="hero-student-profile-btn" class="hidden flex items-center gap-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 px-3 py-1.5 rounded-xl border border-white/20 transition-all cursor-pointer shadow-2xs text-left" title="Xem thông tin chi tiết sinh viên">
                   <img id="hero-student-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23fff'/%3E%3Cpath fill='%23fff' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-6 h-6 rounded-md object-cover border border-white/30 shrink-0" alt="Avatar">
@@ -250,7 +250,7 @@
             </div>
 
             <!-- Supervisor Info Widget (Enlarged and Comfortable) -->
-            <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-sm flex items-center gap-3 min-w-[320px] sm:min-w-[360px] lg:min-w-[390px] max-w-md shrink-0 self-start lg:mt-9">
+            <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-sm flex items-center gap-3 min-w-[320px] sm:min-w-[360px] lg:w-[390px] max-w-md lg:absolute lg:right-0 lg:top-16 mt-4 lg:mt-0">
               <img id="hero-sup-card-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-14 h-14 rounded-2xl object-cover border-2 border-white/30 shrink-0 bg-white/10 shadow-xs" alt="GVHD Avatar">
               <div class="min-w-0 flex-1 space-y-0.5">
                 <div class="flex items-center gap-1.5">
@@ -431,8 +431,8 @@
               </div>
               <div>
                 <span class="badge bg-blue-100 text-blue-800 font-bold text-xs mb-1">ĐỢT ĐANG MỞ ĐĂNG KÝ</span>
-                <h2 class="text-lg sm:text-xl font-black text-slate-900 mt-1">Đăng ký Đề tài & Chọn Giảng viên hướng dẫn</h2>
-                <p class="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                <h2 id="registration-cta-title" class="text-lg sm:text-xl font-black text-slate-900 mt-1">Đăng ký Đề tài & Chọn Giảng viên hướng dẫn</h2>
+                <p id="registration-cta-description" class="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
                   Vui lòng hoàn thành điền tên đề tài dự kiến, chọn loại hình đồ án và đăng ký các nguyện vọng GVHD theo quy định của Khoa.
                 </p>
               </div>
@@ -643,7 +643,7 @@
                   </div>
                 </div>
 
-                <div class="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed max-w-xl mx-auto">
+                <div id="registration-confirm-note" class="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 leading-relaxed max-w-xl mx-auto">
                   ⚠️ <strong>LƯU Ý:</strong> Sau khi bấm <em>Xác nhận Đăng ký</em>, hệ thống sẽ lưu thông tin của bạn vào cơ sở dữ liệu đợt. Bạn có thể thay đổi nguyện vọng trong thời gian đợt đăng ký còn mở (nếu đợt cho phép).
                 </div>
 
