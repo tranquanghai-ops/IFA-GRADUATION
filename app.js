@@ -2972,6 +2972,8 @@ export async function loadSupervisorReviewData(roundId) {
     });
 
     state.supervisorCandidates = candidates;
+    const candidatesBadge = document.getElementById('sup-candidates-count-badge');
+    if (candidatesBadge) candidatesBadge.textContent = candidates.length;
 
     // Filter Accepted Students across rounds for this supervisor
     const acceptedStudents = allRegistrations.filter(r => {
@@ -23065,18 +23067,22 @@ window.loadSupervisorPortalData = async function(roundId) {
     if (notAssignedAlert) notAssignedAlert.classList.add('hidden');
     if (subTabsContainer) subTabsContainer.classList.remove('hidden');
 
+    // In preference-based rounds, a participating GVHD with no assigned
+    // students is normally waiting to review NV1/NV2/NV3 applications. Load
+    // candidates first and focus the review tab so that work is immediately
+    // visible rather than presenting an empty guidance list.
+    if (!isDirect) {
+      await loadSupervisorReviewData(roundId);
+      if (totalAssignedCount === 0) defaultTab = 'review';
+    }
+
     // Switch to the appropriate default tab if current tab is hidden
-    const currentTab = state.currentSupervisorTab || defaultTab;
+    const currentTab = defaultTab === 'review' ? 'review' : (state.currentSupervisorTab || defaultTab);
     const currentBtn = document.getElementById(`sup-tab-btn-${currentTab}`);
     if (!currentBtn || currentBtn.classList.contains('hidden')) {
       switchSupervisorTab(defaultTab);
     } else {
       switchSupervisorTab(currentTab);
-    }
-
-    // Also load legacy review data for candidates tab if needed and tab is visible
-    if (!isDirect) {
-      await loadSupervisorReviewData(roundId);
     }
 
     // Render assigned students list
