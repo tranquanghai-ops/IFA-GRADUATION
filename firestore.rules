@@ -357,6 +357,12 @@ service cloud.firestore {
         && request.resource.data.phone is string
         && request.resource.data.phone.size() > 0
         && request.resource.data.phone.size() <= 20
+        && request.resource.data.permanentAddress is string
+        && request.resource.data.permanentAddress.size() > 0
+        && request.resource.data.permanentAddress.size() <= 250
+        && request.resource.data.temporaryAddress is string
+        && request.resource.data.temporaryAddress.size() > 0
+        && request.resource.data.temporaryAddress.size() <= 250
         && request.resource.data.address is string
         && request.resource.data.address.size() > 0
         && request.resource.data.address.size() <= 250
@@ -364,7 +370,8 @@ service cloud.firestore {
         && request.resource.data.updatedBy is string
         && request.resource.data.updatedBy == email()
         && request.resource.data.keys().hasOnly([
-          'studentId', 'email', 'currentClass', 'personalEmail', 'phone', 'address', 'updatedAt', 'updatedBy'
+          'studentId', 'email', 'currentClass', 'personalEmail', 'phone',
+          'permanentAddress', 'temporaryAddress', 'address', 'updatedAt', 'updatedBy'
         ]));
       allow delete: if admin();
     }
@@ -461,6 +468,8 @@ service cloud.firestore {
           && (!request.resource.data.keys().hasAll(['currentClass']) || (request.resource.data.currentClass is string && request.resource.data.currentClass.size() <= 50))
           && (!request.resource.data.keys().hasAll(['personalEmail']) || (request.resource.data.personalEmail is string && request.resource.data.personalEmail.size() <= 120))
           && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 20))
+          && (!request.resource.data.keys().hasAll(['studentPermanentAddress']) || (request.resource.data.studentPermanentAddress is string && request.resource.data.studentPermanentAddress.size() <= 250))
+          && (!request.resource.data.keys().hasAll(['studentTemporaryAddress']) || (request.resource.data.studentTemporaryAddress is string && request.resource.data.studentTemporaryAddress.size() <= 250))
           && (!request.resource.data.keys().hasAll(['studentAddress']) || (request.resource.data.studentAddress is string && request.resource.data.studentAddress.size() <= 250))
           && (!request.resource.data.keys().hasAll(['courseName']) || (request.resource.data.courseName is string && request.resource.data.courseName.size() <= 100))
           && (!request.resource.data.keys().hasAll(['courseCode']) || (request.resource.data.courseCode is string && request.resource.data.courseCode.size() <= 30))
@@ -522,6 +531,8 @@ service cloud.firestore {
             && (!request.resource.data.keys().hasAll(['currentClass']) || (request.resource.data.currentClass is string && request.resource.data.currentClass.size() <= 50))
             && (!request.resource.data.keys().hasAll(['personalEmail']) || (request.resource.data.personalEmail is string && request.resource.data.personalEmail.size() <= 120))
             && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 20))
+            && (!request.resource.data.keys().hasAll(['studentPermanentAddress']) || (request.resource.data.studentPermanentAddress is string && request.resource.data.studentPermanentAddress.size() <= 250))
+            && (!request.resource.data.keys().hasAll(['studentTemporaryAddress']) || (request.resource.data.studentTemporaryAddress is string && request.resource.data.studentTemporaryAddress.size() <= 250))
             && (!request.resource.data.keys().hasAll(['studentAddress']) || (request.resource.data.studentAddress is string && request.resource.data.studentAddress.size() <= 250))
             && (!request.resource.data.keys().hasAll(['courseName']) || (request.resource.data.courseName is string && request.resource.data.courseName.size() <= 100))
             && (!request.resource.data.keys().hasAll(['courseCode']) || (request.resource.data.courseCode is string && request.resource.data.courseCode.size() <= 30))

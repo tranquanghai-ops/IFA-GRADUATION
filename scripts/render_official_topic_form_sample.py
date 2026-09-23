@@ -9,7 +9,7 @@ from reportlab.platypus import Paragraph
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "output" / "pdf" / "Phieu-dang-ky-de-tai-mau.pdf"
+OUT = ROOT / "output" / "pdf" / "Phieu-dang-ky-de-tai-mau-cap-nhat.pdf"
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
 pdfmetrics.registerFont(TTFont("TNR", r"C:\Windows\Fonts\times.ttf"))
@@ -40,7 +40,6 @@ rows = [
     ("HỌ VÀ TÊN:", "Nguyễn Văn A", "MSSV:", "12345678"),
     ("LỚP:", "220H0101", "NGÀNH:", "Thiết kế nội thất"),
     ("EMAIL:", "nguyenvana.personal@gmail.com", "ĐIỆN THOẠI:", "0901234567"),
-    ("ĐỊA CHỈ:", "19 Nguyễn Hữu Thọ, Phường Tân Hưng, TP.HCM", "", ""),
     ("MÔN HỌC:", "Đồ án tốt nghiệp", "MÃ MÔN/NHÓM:", "701099 / 01"),
 ]
 y = h-190
@@ -49,6 +48,10 @@ for l1, v1, l2, v2 in rows:
     if l2:
         text(340, y, l2, 10, "TNR-Bold"); text(435, y, v2, 10)
     y -= 27
+
+text(62, y, "ĐỊA CHỈ TẠM TRÚ:", 10, "TNR-Bold")
+text(175, y, "19 Nguyễn Hữu Thọ, Phường Tân Hưng, TP.HCM", 10)
+y -= 27
 
 text(w/2, y-2, "Đăng ký đề tài chính thức lần thứ: 1", 11, "TNR-Italic", "center")
 y -= 38

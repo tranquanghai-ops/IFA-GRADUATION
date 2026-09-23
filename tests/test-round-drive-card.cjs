@@ -89,8 +89,15 @@ test('all portals keep branded header and render assignment plus resilient count
 test('supervisor portal integrates round selector in banner and hides secondary tabs', () => {
   assert.match(html, /id="supervisor-hero-card"[^]*?id="supervisor-round-select"/);
   assert.doesNotMatch(html, /id="sup-hero-milestone-strip"/);
+  assert.doesNotMatch(html, /id="hero-supervisor-profile-btn"/);
+  assert.doesNotMatch(html, /id="sup-round-locked-badge"/);
+  assert.doesNotMatch(html, /id="sup-tab-btn-preliminary"/);
+  assert.doesNotMatch(html, /id="sup-tab-btn-reviewer"/);
   assert.match(html, /id="sup-tab-btn-review" [^>]*?class="[^"]*?hidden/);
   assert.match(html, /id="sup-tab-btn-accepted" [^>]*?class="[^"]*?hidden/);
+  assert.match(app, /const isDirect = isDirectSupervisorAssignment\(round\)/);
+  assert.match(app, /tabReviewBtn\.classList\.toggle\('hidden', isDirect\)/);
+  assert.match(app, /tabAcceptedBtn\.classList\.toggle\('hidden', isDirect\)/);
   assert.match(app, /const studentAvatarUrl = st\.photoURL \|\| studentObj\?\.photoURL \|\| studentObj\?\.avatar \|\| defaultAvatar/);
   assert.doesNotMatch(app, /defaultAvatar = 'data:image\/svg\+xml,<svg xmlns="http:/);
 });
@@ -184,7 +191,10 @@ test('direct assignment registration removes supervisor preference wording and h
 test('official topic form captures student-owned class data and unlocks PDF after supervisor approval', () => {
   assert.match(html, /id="registration-current-class"/);
   assert.match(html, /id="registration-student-phone"/);
-  assert.match(html, /id="registration-student-address"/);
+  assert.match(html, /id="registration-student-permanent-address"/);
+  assert.match(html, /id="registration-student-temporary-address"/);
+  assert.doesNotMatch(html, /Họ tên và MSSV lấy từ dữ liệu Khoa/);
+  assert.match(html, />Lớp <span class="text-rose-500">\*<\/span>/);
   assert.match(html, /id="registration-personal-email"/);
   assert.match(html, /<option value="Đồ án tốt nghiệp">Đồ án tốt nghiệp<\/option>/);
   assert.match(html, /<option value="Đồ án tổng hợp">Đồ án tổng hợp<\/option>/);
@@ -197,6 +207,7 @@ test('official topic form captures student-owned class data and unlocks PDF afte
   assert.match(app, /reg\.topicApprovalStatus !== 'approved'/);
   assert.match(app, /PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC/);
   assert.match(app, /fieldRow\('EMAIL:', reg\.personalEmail/);
+  assert.match(app, /fullFieldRow\('ĐỊA CHỈ TẠM TRÚ:', reg\.studentTemporaryAddress \|\| reg\.studentAddress\)/);
   assert.doesNotMatch(app, /text: value\(leftValue\), border: \[false, false, false, true\]/);
   assert.match(app, /text: 'CÁN BỘ HƯỚNG DẪN'/);
   assert.match(app, /text: identity\.fullName, bold: true/);

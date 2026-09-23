@@ -526,17 +526,19 @@
                   <div class="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-3">
                     <div>
                       <h3 class="text-xs font-black uppercase text-blue-900">Thông tin sinh viên trên phiếu chính thức</h3>
-                      <p class="text-[11px] text-blue-700 mt-0.5">Họ tên và MSSV lấy từ dữ liệu Khoa. Lớp hiện tại do sinh viên tự khai.</p>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Họ và tên</label><input id="registration-student-name" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700"></div>
                       <div><label class="block text-[11px] font-bold text-slate-600 mb-1">MSSV</label><input id="registration-student-id" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-700"></div>
-                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Lớp hiện tại <span class="text-rose-500">*</span></label><input id="registration-current-class" maxlength="50" placeholder="Sinh viên tự nhập lớp hiện tại" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Lớp <span class="text-rose-500">*</span></label><input id="registration-current-class" maxlength="50" placeholder="Lớp" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
                       <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Ngành</label><input id="registration-student-major" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700"></div>
                       <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Email cá nhân <span class="text-rose-500">*</span></label><input id="registration-personal-email" type="email" maxlength="120" placeholder="Email cá nhân của sinh viên" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-700"></div>
                       <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Điện thoại <span class="text-rose-500">*</span></label><input id="registration-student-phone" maxlength="20" placeholder="Số điện thoại liên hệ" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
                     </div>
-                    <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Địa chỉ nhà riêng <span class="text-rose-500">*</span></label><input id="registration-student-address" maxlength="250" placeholder="Địa chỉ nhà riêng" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Địa chỉ thường trú <span class="text-rose-500">*</span></label><input id="registration-student-permanent-address" maxlength="250" placeholder="Địa chỉ thường trú" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Địa chỉ tạm trú <span class="text-rose-500">*</span></label><input id="registration-student-temporary-address" maxlength="250" placeholder="Địa chỉ tạm trú dùng trên biểu mẫu" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                    </div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Môn học <span class="text-rose-500">*</span></label><select id="registration-course-name" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"><option value="Đồ án tốt nghiệp">Đồ án tốt nghiệp</option><option value="Đồ án tổng hợp">Đồ án tổng hợp</option></select></div>
                       <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Mã môn học <span class="text-rose-500">*</span></label><input id="registration-course-code" maxlength="30" placeholder="Mã môn" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
@@ -745,40 +747,10 @@
         <div id="supervisor-hero-card" class="card-surface p-6 bg-gradient-to-br from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl rounded-2xl border border-white/10 space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="space-y-2 flex-1">
-              <div class="flex items-center gap-2">
-                <span class="badge bg-amber-400 text-slate-950 font-black text-xs">CỔNG GIẢNG VIÊN HƯỚNG DẪN</span>
-                <span id="sup-hero-role-badge" class="badge bg-white/20 text-white font-mono text-[11px] border border-white/20">GVHD</span>
-              </div>
               <h1 id="supervisor-greeting-name" class="text-xl sm:text-2xl font-black text-white leading-snug">
                 Kính chào Thầy/Cô
               </h1>
               <p class="text-xs text-blue-200" id="supervisor-round-info">Đợt tốt nghiệp: Đang tải...</p>
-
-              <!-- Clickable Supervisor Info Pill & Actions -->
-              <div class="flex flex-wrap items-center gap-2.5 pt-1 text-xs text-blue-100">
-                <button type="button" onclick="openTeacherProfileModal()" id="hero-supervisor-profile-btn" class="flex items-center gap-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 px-3 py-1.5 rounded-xl border border-white/20 transition-all cursor-pointer shadow-2xs text-left" title="Xem thông tin Giảng viên">
-                  <img id="hero-supervisor-avatar" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23fff'/><path fill='%23fff' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" class="w-6 h-6 rounded-md object-cover border border-white/30 shrink-0" alt="Avatar">
-                  <div class="min-w-0">
-                    <div class="flex items-center gap-1">
-                      <span id="hero-supervisor-name" class="font-bold text-white text-xs truncate">--</span>
-                      <span class="text-[9px] text-blue-200">ℹ️</span>
-                    </div>
-                    <span id="hero-supervisor-email" class="text-[10px] text-blue-200 font-mono block truncate max-w-[180px]">--</span>
-                  </div>
-                </button>
-                <a href="/graduation/assessment/" id="hero-sup-goto-assessment" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl border border-white/15 text-purple-200 font-semibold transition-all" title="Chuyển sang Cổng Đánh giá & Chấm thi">
-                  <span>⚖️</span>
-                  <span>Cổng Đánh giá</span>
-                </a>
-                <a href="/graduation/" id="hero-sup-goto-student" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl border border-white/15 text-blue-200 font-semibold transition-all" title="Xem Cổng Sinh viên">
-                  <span>🎓</span>
-                  <span>Cổng SV</span>
-                </a>
-                <button type="button" onclick="handleTeacherLogout()" class="flex items-center gap-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 px-2.5 py-1.5 rounded-xl transition-all font-semibold cursor-pointer" title="Đăng xuất">
-                  <span>🚪</span>
-                  <span>Đăng xuất</span>
-                </button>
-              </div>
             </div>
 
             <!-- Simplified Hero Stat: Số SV hướng dẫn -->
@@ -787,6 +759,9 @@
               <span id="sup-stat-assigned-total" class="text-2xl sm:text-3xl font-black text-white">0</span>
               <!-- Hidden compatibility counters -->
               <span id="sup-stat-total-cap" class="hidden">0</span>
+              <span id="sup-stat-accepted-prev" class="hidden">0</span>
+              <span id="sup-stat-selected-curr" class="hidden">0</span>
+              <span id="sup-stat-remaining-cap" class="hidden">0</span>
               <span id="sup-stat-primary-count" class="hidden">0</span>
               <span id="sup-stat-support-count" class="hidden">0</span>
               <span id="sup-stat-pending-count" class="hidden">0</span>
@@ -802,13 +777,10 @@
               <select id="supervisor-round-select" onchange="onSupervisorRoundSelected(this.value)" class="bg-slate-900/80 hover:bg-slate-900 text-white border border-white/25 rounded-xl px-3 py-1.5 text-xs font-bold focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all cursor-pointer max-w-full truncate">
                 <!-- Dynamically populated -->
               </select>
-              <span id="sup-round-locked-badge" class="hidden text-xs font-bold text-amber-950 bg-amber-400 border border-amber-300 px-2.5 py-1 rounded-lg shrink-0 shadow-2xs">🔒 Đang khóa theo phiên giả lập</span>
             </div>
             <div class="flex items-center gap-2 text-xs shrink-0 flex-wrap">
               <span id="sup-active-round-badge" class="badge bg-white/15 text-white font-mono font-bold border border-white/20">Đang tải...</span>
-              <span id="sup-round-review-indicator" class="text-xs font-bold text-blue-100 bg-white/10 px-3 py-1 rounded-xl border border-white/15">
-                Trạng thái: Đang tải...
-              </span>
+              <span id="sup-round-review-indicator" class="hidden"></span>
             </div>
           </div>
         </div>
@@ -849,12 +821,6 @@
             </button>
             <button id="sup-tab-btn-accepted" onclick="switchSupervisorTab('accepted')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
               🏆 Danh sách Đã nhận (<span id="sup-accepted-count-badge">0</span>)
-            </button>
-            <button id="sup-tab-btn-preliminary" onclick="switchSupervisorTab('preliminary')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
-              🎯 Chấm Sơ khảo
-            </button>
-            <button id="sup-tab-btn-reviewer" onclick="switchSupervisorTab('reviewer')" class="hidden px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer">
-              📖 Phản biện Thuyết minh (<span id="sup-reviewer-count-badge">0</span>)
             </button>
           </div>
         </div>
