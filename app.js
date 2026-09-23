@@ -1612,6 +1612,14 @@ function renderRoundHeader() {
   const round = state.activeRound;
   if (!round) return;
 
+  const heroCard = document.getElementById('student-hero-card');
+  const journeyCard = document.getElementById('student-journey-card');
+  if (state.eligibilityState === 'not_eligible' && (!state.isAdmin || state.impersonation)) {
+    if (heroCard) heroCard.classList.add('hidden');
+    if (journeyCard) journeyCard.classList.add('hidden');
+    return;
+  }
+
   const titleDisplay = document.getElementById('round-title-display');
   if (titleDisplay) titleDisplay.textContent = round.title;
   const yearDisplay = document.getElementById('round-academic-year');
@@ -1841,15 +1849,21 @@ async function checkStudentEligibilityAndRegistration(roundId) {
   state.myOfficialAssignment = null;
 
   const nonEligibleAlert = document.getElementById('non-eligible-alert');
+  const heroCard = document.getElementById('student-hero-card');
+  const journeyCard = document.getElementById('student-journey-card');
+  const timelineSection = document.getElementById('student-timeline-section');
   const alreadyRegCard = document.getElementById('already-registered-card');
   const ctaCard = document.getElementById('registration-cta-card');
   const reviewInProgressCard = document.getElementById('review-in-progress-card');
   const officialResultCard = document.getElementById('official-result-card');
   const flowContainer = document.getElementById('registration-flow-container');
+  const finalScoreCard = document.getElementById('student-final-score-card');
   applySupervisorAssignmentModeToRegistrationUI();
 
   if (!mssv) {
     if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
+    if (heroCard) heroCard.classList.remove('hidden');
+    if (journeyCard) journeyCard.classList.remove('hidden');
     if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
     if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
     if (officialResultCard) officialResultCard.classList.add('hidden');
@@ -1872,20 +1886,28 @@ async function checkStudentEligibilityAndRegistration(roundId) {
     if (isOfficiallyEligible) {
       state.isEligible = true;
       state.eligibilityState = 'eligible';
-      nonEligibleAlert.classList.add('hidden');
+      if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
+      if (heroCard) heroCard.classList.remove('hidden');
+      if (journeyCard) journeyCard.classList.remove('hidden');
     } else if (allowPre) {
       state.isEligible = 'pending';
       state.eligibilityState = 'pending';
-      nonEligibleAlert.classList.add('hidden');
+      if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
+      if (heroCard) heroCard.classList.remove('hidden');
+      if (journeyCard) journeyCard.classList.remove('hidden');
     } else {
       state.isEligible = false;
       state.eligibilityState = 'not_eligible';
       if (nonEligibleAlert) nonEligibleAlert.classList.remove('hidden');
+      if (heroCard) heroCard.classList.add('hidden');
+      if (journeyCard) journeyCard.classList.add('hidden');
+      if (timelineSection) timelineSection.classList.add('hidden');
       if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
       if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
       if (officialResultCard) officialResultCard.classList.add('hidden');
       if (ctaCard) ctaCard.classList.add('hidden');
       if (flowContainer) flowContainer.classList.add('hidden');
+      if (finalScoreCard) finalScoreCard.classList.add('hidden');
       updateStudentJourneyStepper();
       updateStudentPersonalSidebar();
       return;
@@ -11698,6 +11720,11 @@ window.loadStudentRoundActivities = async function(roundId) {
   const actionWrap = document.getElementById('student-timeline-header-actions');
   const timelineSection = document.getElementById('student-timeline-section');
   if (!container) return;
+
+  if (state.eligibilityState === 'not_eligible' && (!state.isAdmin || state.impersonation)) {
+    if (timelineSection) timelineSection.classList.add('hidden');
+    return;
+  }
 
   // Requirement 5: During registration, preference review, and assignment stages, student does NOT see detailed plan.
   // Student only sees detailed plan once they have an official supervisor assigned.

@@ -252,3 +252,12 @@ test('supervisor topic preview modal and strict supervisor assignment scoping', 
   assert.match(app, /openTopicRegistrationPreviewModal\('\${studentId}'\)/);
 });
 
+test('non-eligible student view hides hero card and journey cards, only showing notification', () => {
+  assert.match(html, /id="non-eligible-alert"/);
+  assert.match(app, /state\.eligibilityState = 'not_eligible'/);
+  assert.match(app, /if \(heroCard\) heroCard\.classList\.add\('hidden'\)/);
+  assert.match(app, /if \(journeyCard\) journeyCard\.classList\.add\('hidden'\)/);
+  assert.match(app, /if \(state\.eligibilityState === 'not_eligible'/);
+});
+
+
