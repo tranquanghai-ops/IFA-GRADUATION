@@ -22733,12 +22733,25 @@ window.renderSupervisorRoundsDropdown = async function() {
     // The source of truth is the per-round supervisors subcollection. Round
     // documents may not carry a legacy `supervisors` array, which previously
     // hid a teacher's newly added T4/2027 round.
+    const matchingMaster = (state.supervisorsMaster || []).find(s =>
+      String(s.email || '').toLowerCase().trim() === emailLower ||
+      (actor.uid && (s.id === actor.uid || s.supervisorId === actor.uid))
+    );
+    const supervisorIdentityIds = new Set([
+      actor.uid,
+      matchingMaster?.id,
+      matchingMaster?.supervisorId
+    ].filter(Boolean).map(value => String(value).trim()));
     const membership = await Promise.all(validRounds.map(async r => {
       try {
         const snap = await getDocs(collection(db, 'graduationRounds', r.id, 'supervisors'));
         const isMember = snap.docs.some(d => {
           const data = d.data() || {};
-          return String(data.email || '').toLowerCase().trim() === emailLower;
+          const roundSupervisorIds = [d.id, data.supervisorId, data.id]
+            .filter(Boolean)
+            .map(value => String(value).trim());
+          return String(data.email || '').toLowerCase().trim() === emailLower ||
+            roundSupervisorIds.some(id => supervisorIdentityIds.has(id));
         });
         return [r.id, isMember];
       } catch (error) {
@@ -22794,9 +22807,23 @@ window.loadSupervisorPortalData = async function(roundId) {
   const isDirect = isDirectSupervisorAssignment(round);
 
   // 1. Locate current supervisor profile
-  let currentSup = (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower);
+  const matchingMaster = (state.supervisorsMaster || []).find(s =>
+    (s.email || '').toLowerCase().trim() === emailLower ||
+    (actor.uid && (s.id === actor.uid || s.supervisorId === actor.uid))
+  );
+  const supervisorIdentityIds = new Set([
+    actor.uid,
+    matchingMaster?.id,
+    matchingMaster?.supervisorId
+  ].filter(Boolean).map(value => String(value).trim()));
+  const roundSupervisor = (state.roundSupervisors || []).find(s =>
+    (s.email || '').toLowerCase().trim() === emailLower ||
+    supervisorIdentityIds.has(String(s.id || '').trim()) ||
+    supervisorIdentityIds.has(String(s.supervisorId || '').trim())
+  );
+  let currentSup = roundSupervisor;
   if (!currentSup) {
-    currentSup = (state.supervisorsMaster || []).find(s => (s.email || '').toLowerCase().trim() === emailLower);
+    currentSup = matchingMaster;
   }
 
   // Header and Hero Information
@@ -23021,7 +23048,10 @@ window.loadSupervisorPortalData = async function(roundId) {
   const subTabsContainer = document.getElementById('supervisor-sub-tabs-container');
   const assignedPanel = document.getElementById('sup-panel-assigned');
 
-  const hasSupervisorDuties = actor.isAdmin || totalAssignedCount > 0;
+  // A supervisor in the roster is participating in the round even before a
+  // student is assigned. Show the normal empty list instead of an access-like
+  // warning in that case.
+  const hasSupervisorDuties = actor.isAdmin || Boolean(roundSupervisor) || totalAssignedCount > 0;
 
   if (!hasSupervisorDuties) {
     if (notAssignedAlert) notAssignedAlert.classList.remove('hidden');
