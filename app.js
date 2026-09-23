@@ -20490,6 +20490,85 @@ function getRoundStatusCategory(r) {
   return 'running';
 }
 
+function formatAdminRoundTimelineDate(value) {
+  if (!value) return 'Chưa đặt thời gian';
+  const parsed = value?.toDate ? value.toDate() : new Date(value);
+  if (isNaN(parsed.getTime())) return 'Chưa đặt thời gian';
+  const pad = number => String(number).padStart(2, '0');
+  return `${pad(parsed.getDate())}/${pad(parsed.getMonth() + 1)}/${parsed.getFullYear()}`;
+}
+
+function renderAdminRoundTimelinePreview(round) {
+  const activities = (Array.isArray(round.activities) ? round.activities : [])
+    .map((activity, index) => normalizeActivity(activity, round.id, index))
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const publishedCount = activities.filter(isActivityPublished).length;
+  const draftCount = activities.length - publishedCount;
+
+  const cards = activities.slice(0, 4).map((activity, index) => {
+    const typeMeta = ACTIVITY_TYPES[activity.activityType] || ACTIVITY_TYPES.other;
+    const status = getActivityStatus(activity);
+    const statusMeta = status === 'ongoing'
+      ? { label: 'Đang diễn ra', cls: 'bg-blue-600 text-white border-blue-600' }
+      : status === 'upcoming'
+        ? { label: 'Sắp tới', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+        : status === 'past'
+          ? { label: 'Đã kết thúc', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+          : { label: 'Kế hoạch', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
+    const publication = isActivityPublished(activity)
+      ? '<span class="text-[9px] font-bold text-emerald-700">● Đã công bố</span>'
+      : '<span class="text-[9px] font-bold text-amber-700">● Bản nháp</span>';
+    const dateText = activity.startAt
+      ? `${formatAdminRoundTimelineDate(activity.startAt)}${activity.endAt ? ` – ${formatAdminRoundTimelineDate(activity.endAt)}` : ''}`
+      : 'Chưa đặt thời gian';
+
+    return `
+      <button type="button" onclick="openAdminRoundTimelineActivity('${round.id}', '${activity.id}')" class="min-w-[220px] flex-1 text-left p-3 rounded-2xl border ${status === 'ongoing' ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200' : 'border-slate-200 bg-white'} hover:border-blue-400 hover:shadow-md transition group">
+        <div class="flex items-start justify-between gap-2 mb-2">
+          <span class="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-base">${typeMeta.icon || '📅'}</span>
+          <span class="px-2 py-0.5 rounded-full border text-[9px] font-bold whitespace-nowrap ${statusMeta.cls}">${statusMeta.label}</span>
+        </div>
+        <div class="font-black text-xs text-slate-900 line-clamp-2 group-hover:text-blue-700">${escapeHtml(activity.title || `Mốc ${index + 1}`)}</div>
+        <div class="text-[10px] text-slate-500 mt-1">${dateText}</div>
+        <div class="mt-2 flex items-center justify-between gap-2">
+          ${publication}
+          <span class="text-[9px] font-bold text-blue-600">Sửa ↗</span>
+        </div>
+      </button>`;
+  }).join('');
+
+  const emptyCard = `
+    <button type="button" onclick="openAdminRoundTimelineActivity('${round.id}', '', true)" class="min-h-[116px] w-full border-2 border-dashed border-blue-200 bg-blue-50/40 hover:bg-blue-50 hover:border-blue-400 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-center transition">
+      <span class="w-9 h-9 rounded-xl bg-white border border-blue-200 text-blue-700 flex items-center justify-center text-lg">＋</span>
+      <span class="font-black text-xs text-blue-800">Tạo mốc kế hoạch đầu tiên</span>
+      <span class="text-[10px] text-slate-500">Mốc chỉ hiển thị cho sinh viên sau khi được công bố</span>
+    </button>`;
+
+  return `
+    <section class="px-4 py-3.5 bg-slate-50/60 border-b border-slate-200">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-lg">🗓️</span>
+          <div>
+            <div class="font-black text-sm text-slate-900">Lộ trình đồ án & tiến độ thực hiện</div>
+            <div class="text-[10px] text-slate-500">${activities.length} mốc · ${publishedCount} đã công bố${draftCount ? ` · ${draftCount} bản nháp` : ''}</div>
+          </div>
+        </div>
+        <button type="button" onclick="openRoundWorkspaceModal('${round.id}', 'timeline')" class="px-3 py-1.5 rounded-xl border border-blue-200 bg-white hover:bg-blue-50 text-blue-700 font-bold text-[10px] transition">Quản lý kế hoạch ↗</button>
+      </div>
+      <div class="flex gap-2.5 overflow-x-auto pb-1">${activities.length ? cards : emptyCard}</div>
+      ${activities.length > 4 ? `<button type="button" onclick="openRoundWorkspaceModal('${round.id}', 'timeline')" class="mt-2 text-[10px] font-bold text-blue-700 hover:underline">Xem và chỉnh sửa tất cả ${activities.length} mốc →</button>` : ''}
+    </section>`;
+}
+
+window.openAdminRoundTimelineActivity = async function(roundId, activityId = '', createNew = false) {
+  await window.openRoundWorkspaceModal(roundId, 'timeline');
+  window.setTimeout(() => {
+    if (createNew && typeof window.openCreateActivityModal === 'function') window.openCreateActivityModal();
+    else if (activityId && typeof window.editActivityModal === 'function') window.editActivityModal(activityId);
+  }, 180);
+};
+
 window.renderAdminRoundsCards = function() {
   const container = document.getElementById('admin-rounds-cards');
   if (!container) return;
@@ -20595,7 +20674,7 @@ window.renderAdminRoundsCards = function() {
       const eligibleCount = typeof r.eligibleCount === 'number' ? r.eligibleCount : (r.eligibleStudentsCount || 0);
       const supCount = typeof r.supervisorCount === 'number' ? r.supervisorCount : (r.supervisorsCount || 0);
       const regCount = typeof r.registrationsCount === 'number' ? r.registrationsCount : 0;
-      const actCount = typeof r.activitiesCount === 'number' ? r.activitiesCount : (r.activities ? r.activities.length : 0);
+      const actCount = Array.isArray(r.activities) ? r.activities.length : (typeof r.activitiesCount === 'number' ? r.activitiesCount : 0);
       const assignedCount = typeof r.assignedCount === 'number'
         ? r.assignedCount
         : (typeof r.officialAssignmentsCount === 'number' ? r.officialAssignmentsCount : null);
@@ -20671,6 +20750,8 @@ window.renderAdminRoundsCards = function() {
               <div class="text-xl font-black text-purple-700 mt-0.5">${actCount}</div>
             </button>
           </div>
+
+          ${renderAdminRoundTimelinePreview(r)}
 
           <div class="px-4 py-3 bg-white flex flex-wrap items-center justify-center gap-2">
             <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'timeline')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-sm">📅 Kế hoạch (${actCount})</button>

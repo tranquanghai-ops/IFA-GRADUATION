@@ -40,6 +40,10 @@ test('round cards use the professional dashboard layout and retain workflow acti
   assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'registrations'\)/);
   assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'review', 'assigned'\)/);
   assert.match(app, /openRoundWorkspaceModal\('\$\{r\.id\}', 'scoring-dashboard'\)/);
+  assert.match(app, /renderAdminRoundTimelinePreview\(r\)/);
+  assert.match(app, /window\.openAdminRoundTimelineActivity = async function/);
+  assert.match(app, /Tạo mốc kế hoạch đầu tiên/);
+  assert.match(app, /Mốc chỉ hiển thị cho sinh viên sau khi được công bố/);
   assert.match(app, /directAssignment \? '' : `<button[^`]+Xét nguyện vọng/s);
 });
 
@@ -123,6 +127,7 @@ test('student hero banner displays supervisor card, collapses header gap, and re
   assert.match(html, /id="hero-sup-card-name"/);
   assert.match(html, /id="hero-sup-card-email"/);
   assert.match(html, /id="hero-sup-card-phone"/);
+  assert.match(html, /id="hero-supervisor-info-card" class="[^"]*lg:w-\[340px\][^"]*max-w-\[360px\]/);
   assert.match(html, /id="round-status-badge" class="hidden badge/);
   assert.match(html, /id="hero-student-state-badge" class="hidden badge/);
   assert.match(html, /id="round-time-range" class="hidden text-xs/);
@@ -135,9 +140,9 @@ test('student hero banner displays supervisor card, collapses header gap, and re
   assert.match(app, /title: 'Kết quả'/);
 });
 
-test('student hero banner displays topic, supervisor card is widened, redundant card is hidden, and 12-week timeline renders', () => {
-  // 1. Widened supervisor card on hero
-  assert.match(html, /id="hero-supervisor-info-card"[^>]*min-w-\[320px\]/);
+test('student hero banner displays topic, compact supervisor card, redundant card is hidden, and 12-week timeline renders', () => {
+  // 1. Compact supervisor card on hero
+  assert.match(html, /id="hero-supervisor-info-card"[^>]*min-w-\[290px\][^>]*lg:w-\[340px\]/);
   assert.match(html, /id="hero-sup-card-avatar"[^>]*w-14 h-14/);
 
   // 2. Topic on hero banner
