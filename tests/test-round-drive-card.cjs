@@ -185,6 +185,9 @@ test('official topic form captures student-owned class data and unlocks PDF afte
   assert.match(html, /id="registration-current-class"/);
   assert.match(html, /id="registration-student-phone"/);
   assert.match(html, /id="registration-student-address"/);
+  assert.match(html, /id="registration-personal-email"/);
+  assert.match(html, /<option value="Đồ án tốt nghiệp">Đồ án tốt nghiệp<\/option>/);
+  assert.match(html, /<option value="Đồ án tổng hợp">Đồ án tổng hợp<\/option>/);
   assert.match(html, /id="input-topic-description"/);
   assert.match(html, /id="hero-download-topic-form-btn"/);
   assert.match(html, /pdfmake\.min\.js/);
@@ -193,5 +196,9 @@ test('official topic form captures student-owned class data and unlocks PDF afte
   assert.match(app, /window\.downloadOfficialTopicRegistrationPdf = function/);
   assert.match(app, /reg\.topicApprovalStatus !== 'approved'/);
   assert.match(app, /PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC/);
-  assert.match(app, /Đã xác nhận tên đề tài trên hệ thống/);
+  assert.match(app, /fieldRow\('EMAIL:', reg\.personalEmail/);
+  assert.doesNotMatch(app, /text: value\(leftValue\), border: \[false, false, false, true\]/);
+  assert.match(app, /text: 'CÁN BỘ HƯỚNG DẪN'/);
+  assert.match(app, /text: identity\.fullName, bold: true/);
+  assert.doesNotMatch(app, /Đã xác nhận tên đề tài trên hệ thống/);
 });

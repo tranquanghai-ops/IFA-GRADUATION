@@ -2726,6 +2726,7 @@ window.submitRegistration = async function() {
       studentId: mssv,
       email: studentEmail,
       currentClass: officialFormFields.currentClass,
+      personalEmail: officialFormFields.personalEmail,
       phone: officialFormFields.studentPhone,
       address: officialFormFields.studentAddress,
       updatedAt: serverTimestamp(),
@@ -21536,7 +21537,7 @@ function populateRegistrationStudentForm() {
     'registration-student-name': identity.fullName,
     'registration-student-id': identity.mssv,
     'registration-student-major': identity.major,
-    'registration-student-email': identity.email,
+    'registration-personal-email': reg.personalEmail || profile.personalEmail || '',
     'registration-current-class': reg.currentClass || profile.currentClass || '',
     'registration-student-phone': reg.studentPhone || profile.phone || '',
     'registration-student-address': reg.studentAddress || profile.address || '',
@@ -21557,6 +21558,7 @@ function collectOfficialFormFields() {
   const val = id => (document.getElementById(id)?.value || '').trim();
   return {
     currentClass: val('registration-current-class'),
+    personalEmail: val('registration-personal-email'),
     studentPhone: val('registration-student-phone'),
     studentAddress: val('registration-student-address'),
     courseName: val('registration-course-name'),
@@ -21568,12 +21570,16 @@ function collectOfficialFormFields() {
 
 function validateOfficialFormFields(fields) {
   const labels = {
-    currentClass: 'lớp hiện tại', studentPhone: 'số điện thoại', studentAddress: 'địa chỉ',
+    currentClass: 'lớp hiện tại', personalEmail: 'email cá nhân', studentPhone: 'số điện thoại', studentAddress: 'địa chỉ nhà riêng',
     courseName: 'môn học', courseCode: 'mã môn học', courseGroup: 'nhóm', topicDescription: 'mô tả định hướng thiết kế'
   };
   const missing = Object.entries(labels).find(([key]) => !String(fields[key] || '').trim());
   if (missing) {
     showToast(`Vui lòng nhập ${missing[1]} để hoàn thiện phiếu đăng ký chính thức.`, 'warning');
+    return false;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.personalEmail)) {
+    showToast('Email cá nhân chưa đúng định dạng.', 'warning');
     return false;
   }
   return true;
@@ -21607,9 +21613,9 @@ window.downloadOfficialTopicRegistrationPdf = function() {
       widths: [78, '*', 78, 120],
       body: [[
         { text: leftLabel, bold: true, border: [false, false, false, false] },
-        { text: value(leftValue), border: [false, false, false, true] },
+        { text: value(leftValue), border: [false, false, false, false] },
         { text: rightLabel, bold: true, border: [false, false, false, false] },
-        { text: value(rightValue), border: [false, false, false, true] }
+        { text: value(rightValue), border: [false, false, false, false] }
       ]]
     },
     layout: { hLineColor: () => '#111827', vLineColor: () => '#111827' },
@@ -21631,7 +21637,7 @@ window.downloadOfficialTopicRegistrationPdf = function() {
       { text: roundLabel.toUpperCase(), bold: true, fontSize: 15, alignment: 'center', margin: [0, 2, 0, 24] },
       fieldRow('HỌ VÀ TÊN:', identity.fullName, 'MSSV:', identity.mssv),
       fieldRow('LỚP:', reg.currentClass, 'NGÀNH:', reg.major || identity.major),
-      fieldRow('EMAIL:', identity.email, 'ĐIỆN THOẠI:', reg.studentPhone),
+      fieldRow('EMAIL:', reg.personalEmail, 'ĐIỆN THOẠI:', reg.studentPhone),
       fieldRow('ĐỊA CHỈ:', reg.studentAddress, '', ''),
       fieldRow('MÔN HỌC:', reg.courseName, 'MÃ MÔN/NHÓM:', `${value(reg.courseCode)} / ${value(reg.courseGroup)}`),
       { text: `Đăng ký đề tài chính thức lần thứ: ${version}`, italics: true, alignment: 'center', margin: [0, 4, 0, 14] },
@@ -21644,16 +21650,17 @@ window.downloadOfficialTopicRegistrationPdf = function() {
         columns: [
           {
             width: '55%', stack: [
-              { text: 'Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN', bold: true, alignment: 'center' },
-              { text: 'Đã xác nhận tên đề tài trên hệ thống.', margin: [0, 8, 0, 0], alignment: 'center' },
-              { text: supervisorName, bold: true, alignment: 'center', margin: [0, 28, 0, 0] }
+              { text: 'CÁN BỘ HƯỚNG DẪN', bold: true, alignment: 'center' },
+              { text: '(ký và ghi rõ họ tên)', alignment: 'center' },
+              { text: supervisorName, bold: true, alignment: 'center', margin: [0, 46, 0, 0] }
             ]
           },
           {
             width: '45%', stack: [
               { text: `TP.HCM, ngày ${dd} tháng ${mm} năm ${yyyy}`, italics: true, alignment: 'center' },
               { text: 'NGƯỜI ĐĂNG KÝ', bold: true, alignment: 'center', margin: [0, 5, 0, 0] },
-              { text: '(ký và ghi rõ họ tên)', alignment: 'center' }
+              { text: '(ký và ghi rõ họ tên)', alignment: 'center' },
+              { text: identity.fullName, bold: true, alignment: 'center', margin: [0, 46, 0, 0] }
             ]
           }
         ]
@@ -21777,7 +21784,8 @@ window.updateStudentPersonalSidebar = function() {
           <label class="text-[11px] font-bold text-slate-600">Lớp hiện tại<input id="profile-current-class" maxlength="50" value="${escapeHtml(state.studentSelfProfile?.currentClass || state.myRegistration?.currentClass || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
           <label class="text-[11px] font-bold text-slate-600">Điện thoại<input id="profile-student-phone" maxlength="20" value="${escapeHtml(state.studentSelfProfile?.phone || state.myRegistration?.studentPhone || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
         </div>
-        <label class="text-[11px] font-bold text-slate-600 block">Địa chỉ<input id="profile-student-address" maxlength="250" value="${escapeHtml(state.studentSelfProfile?.address || state.myRegistration?.studentAddress || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
+        <label class="text-[11px] font-bold text-slate-600 block">Email cá nhân<input id="profile-personal-email" type="email" maxlength="120" value="${escapeHtml(state.studentSelfProfile?.personalEmail || state.myRegistration?.personalEmail || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
+        <label class="text-[11px] font-bold text-slate-600 block">Địa chỉ nhà riêng<input id="profile-student-address" maxlength="250" value="${escapeHtml(state.studentSelfProfile?.address || state.myRegistration?.studentAddress || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
         <button type="button" onclick="saveStudentSelfProfile()" class="w-full px-3 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-lg text-xs font-black">Lưu thông tin sinh viên</button>
       </div>
 
@@ -22450,10 +22458,15 @@ window.saveStudentSelfProfile = async function() {
   if (!checkImpersonationWriteGuard('Cập nhật thông tin sinh viên')) return;
   const identity = getRegistrationStudentIdentity();
   const currentClass = (document.getElementById('profile-current-class')?.value || '').trim();
+  const personalEmail = (document.getElementById('profile-personal-email')?.value || '').trim();
   const phone = (document.getElementById('profile-student-phone')?.value || '').trim();
   const address = (document.getElementById('profile-student-address')?.value || '').trim();
-  if (!currentClass || !phone || !address) {
-    showToast('Vui lòng nhập đầy đủ lớp hiện tại, điện thoại và địa chỉ.', 'warning');
+  if (!currentClass || !personalEmail || !phone || !address) {
+    showToast('Vui lòng nhập đầy đủ lớp hiện tại, email cá nhân, điện thoại và địa chỉ nhà riêng.', 'warning');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalEmail)) {
+    showToast('Email cá nhân chưa đúng định dạng.', 'warning');
     return;
   }
   try {
@@ -22461,6 +22474,7 @@ window.saveStudentSelfProfile = async function() {
       studentId: identity.mssv,
       email: identity.email,
       currentClass,
+      personalEmail,
       phone,
       address,
       updatedAt: serverTimestamp(),
@@ -22470,11 +22484,12 @@ window.saveStudentSelfProfile = async function() {
     if (state.myRegistration && state.selectedRoundId) {
       await updateDoc(doc(db, 'graduationRounds', state.selectedRoundId, 'registrations', identity.mssv), {
         currentClass,
+        personalEmail,
         studentPhone: phone,
         studentAddress: address,
         updatedAt: serverTimestamp()
       });
-      Object.assign(state.myRegistration, { currentClass, studentPhone: phone, studentAddress: address });
+      Object.assign(state.myRegistration, { currentClass, personalEmail, studentPhone: phone, studentAddress: address });
     }
     state.studentSelfProfile = { ...(state.studentSelfProfile || {}), ...payload };
     updateStudentPersonalSidebar();
@@ -22493,7 +22508,7 @@ window.reviewStudentTopicTitle = async function(studentId, decision) {
   if (!registration?.topicTitle || !roundId) return;
 
   if (decision === 'approved') {
-    const requiredOfficialFields = ['currentClass', 'studentPhone', 'studentAddress', 'courseName', 'courseCode', 'courseGroup', 'topicDescription'];
+    const requiredOfficialFields = ['currentClass', 'personalEmail', 'studentPhone', 'studentAddress', 'courseName', 'courseCode', 'courseGroup', 'topicDescription'];
     const missingOfficialFields = requiredOfficialFields.filter(key => !String(registration[key] || '').trim());
     if (missingOfficialFields.length > 0) {
       showToast('Sinh viên chưa hoàn thiện đủ thông tin Phiếu đăng ký chính thức. Chưa thể xác nhận.', 'warning');
@@ -22619,7 +22634,7 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
   const officialFormInfo = document.getElementById('dtl-official-form-info');
   if (officialFormInfo) {
     const rows = [
-      ['Lớp hiện tại', st?.currentClass], ['Ngành', st?.major], ['Điện thoại', st?.studentPhone],
+      ['Lớp hiện tại', st?.currentClass], ['Ngành', st?.major], ['Email cá nhân', st?.personalEmail], ['Điện thoại', st?.studentPhone],
       ['Địa chỉ', st?.studentAddress], ['Môn học', st?.courseName], ['Mã môn / Nhóm', [st?.courseCode, st?.courseGroup].filter(Boolean).join(' / ')],
       ['Đăng ký lần', st?.topicTitleVersion || 1], ['Mô tả định hướng', st?.topicDescription]
     ];

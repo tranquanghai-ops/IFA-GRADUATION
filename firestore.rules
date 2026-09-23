@@ -351,6 +351,9 @@ service cloud.firestore {
         && request.resource.data.currentClass is string
         && request.resource.data.currentClass.size() > 0
         && request.resource.data.currentClass.size() <= 50
+        && request.resource.data.personalEmail is string
+        && request.resource.data.personalEmail.size() > 3
+        && request.resource.data.personalEmail.size() <= 120
         && request.resource.data.phone is string
         && request.resource.data.phone.size() > 0
         && request.resource.data.phone.size() <= 20
@@ -361,7 +364,7 @@ service cloud.firestore {
         && request.resource.data.updatedBy is string
         && request.resource.data.updatedBy == email()
         && request.resource.data.keys().hasOnly([
-          'studentId', 'email', 'currentClass', 'phone', 'address', 'updatedAt', 'updatedBy'
+          'studentId', 'email', 'currentClass', 'personalEmail', 'phone', 'address', 'updatedAt', 'updatedBy'
         ]));
       allow delete: if admin();
     }
@@ -456,6 +459,7 @@ service cloud.firestore {
           && (!request.resource.data.keys().hasAll(['topicApprovalStatus']) || request.resource.data.topicApprovalStatus == 'pending')
           && (!request.resource.data.keys().hasAll(['projectTypes']) || (request.resource.data.projectTypes is list && request.resource.data.projectTypes.size() >= 1 && request.resource.data.projectTypes.size() <= 3))
           && (!request.resource.data.keys().hasAll(['currentClass']) || (request.resource.data.currentClass is string && request.resource.data.currentClass.size() <= 50))
+          && (!request.resource.data.keys().hasAll(['personalEmail']) || (request.resource.data.personalEmail is string && request.resource.data.personalEmail.size() <= 120))
           && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 20))
           && (!request.resource.data.keys().hasAll(['studentAddress']) || (request.resource.data.studentAddress is string && request.resource.data.studentAddress.size() <= 250))
           && (!request.resource.data.keys().hasAll(['courseName']) || (request.resource.data.courseName is string && request.resource.data.courseName.size() <= 100))
@@ -516,6 +520,7 @@ service cloud.firestore {
             && request.resource.data.projectType is string
             && (!request.resource.data.keys().hasAll(['projectTypes']) || (request.resource.data.projectTypes is list && request.resource.data.projectTypes.size() >= 1 && request.resource.data.projectTypes.size() <= 3))
             && (!request.resource.data.keys().hasAll(['currentClass']) || (request.resource.data.currentClass is string && request.resource.data.currentClass.size() <= 50))
+            && (!request.resource.data.keys().hasAll(['personalEmail']) || (request.resource.data.personalEmail is string && request.resource.data.personalEmail.size() <= 120))
             && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 20))
             && (!request.resource.data.keys().hasAll(['studentAddress']) || (request.resource.data.studentAddress is string && request.resource.data.studentAddress.size() <= 250))
             && (!request.resource.data.keys().hasAll(['courseName']) || (request.resource.data.courseName is string && request.resource.data.courseName.size() <= 100))

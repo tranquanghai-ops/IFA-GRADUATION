@@ -3,6 +3,9 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.platypus import Paragraph
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,17 +39,15 @@ text(w/2, h-142, "ĐỒ ÁN TỐT NGHIỆP/ĐỒ ÁN TỔNG HỢP - ĐỢT 12/20
 rows = [
     ("HỌ VÀ TÊN:", "Nguyễn Văn A", "MSSV:", "12345678"),
     ("LỚP:", "220H0101", "NGÀNH:", "Thiết kế nội thất"),
-    ("EMAIL:", "12345678@student.tdtu.edu.vn", "ĐIỆN THOẠI:", "0901234567"),
+    ("EMAIL:", "nguyenvana.personal@gmail.com", "ĐIỆN THOẠI:", "0901234567"),
     ("ĐỊA CHỈ:", "19 Nguyễn Hữu Thọ, Phường Tân Hưng, TP.HCM", "", ""),
     ("MÔN HỌC:", "Đồ án tốt nghiệp", "MÃ MÔN/NHÓM:", "701099 / 01"),
 ]
 y = h-190
 for l1, v1, l2, v2 in rows:
     text(62, y, l1, 10, "TNR-Bold"); text(145, y, v1, 10)
-    c.line(140, y-3, 330, y-3)
     if l2:
         text(340, y, l2, 10, "TNR-Bold"); text(435, y, v2, 10)
-        c.line(430, y-3, 535, y-3)
     y -= 27
 
 text(w/2, y-2, "Đăng ký đề tài chính thức lần thứ: 1", 11, "TNR-Italic", "center")
@@ -56,24 +57,26 @@ text(150, y, "Thiết kế nội thất Trung tâm văn hóa nghệ thuật đư
 y -= 40
 text(w/2, y, "MÔ TẢ CHI TIẾT ĐỊNH HƯỚNG THIẾT KẾ CỦA ĐỀ TÀI", 12, "TNR-Bold", "center")
 y -= 28
-description = [
-    "Đề tài hướng đến việc tổ chức không gian văn hóa đa chức năng, kết hợp trưng bày,",
-    "giáo dục và trải nghiệm nghệ thuật. Giải pháp thiết kế chú trọng tính linh hoạt,",
-    "khả năng tiếp cận, bản sắc địa phương và các tiêu chí phát triển bền vững.",
-]
-for line in description:
-    text(70, y, line, 11); y -= 20
+description = ("Đề tài hướng đến việc tổ chức không gian văn hóa đa chức năng, kết hợp trưng bày, "
+               "giáo dục và trải nghiệm nghệ thuật. Giải pháp thiết kế chú trọng tính linh hoạt, "
+               "khả năng tiếp cận, bản sắc địa phương và các tiêu chí phát triển bền vững.")
+style = ParagraphStyle("desc", fontName="TNR", fontSize=11, leading=20, alignment=TA_JUSTIFY)
+paragraph = Paragraph(description, style)
+_, ph = paragraph.wrap(455, 100)
+paragraph.drawOn(c, 70, y-ph+8)
+y -= ph + 4
 for _ in range(4):
     c.line(70, y, 525, y); y -= 22
 
 text(w/2, y-5, "Tôi xin cam đoan thực hiện đúng đề tài đã đăng ký.", 11, "TNR-Bold", "center")
 y -= 48
-text(180, y, "Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN", 11, "TNR-Bold", "center")
+text(180, y, "CÁN BỘ HƯỚNG DẪN", 11, "TNR-Bold", "center")
 text(435, y, "TP.HCM, ngày 23 tháng 09 năm 2026", 10, "TNR-Italic", "center")
-text(180, y-22, "Đã xác nhận tên đề tài trên hệ thống.", 10, align="center")
+text(180, y-18, "(ký và ghi rõ họ tên)", 10, align="center")
 text(435, y-22, "NGƯỜI ĐĂNG KÝ", 11, "TNR-Bold", "center")
 text(435, y-38, "(ký và ghi rõ họ tên)", 10, align="center")
-text(180, y-62, "ThS. KTS. Giảng viên Hướng dẫn", 10, "TNR-Bold", "center")
+text(180, y-75, "ThS. KTS. Giảng viên Hướng dẫn", 10, "TNR-Bold", "center")
+text(435, y-75, "Nguyễn Văn A", 10, "TNR-Bold", "center")
 
 c.save()
 print(OUT)
