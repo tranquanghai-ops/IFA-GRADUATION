@@ -2082,7 +2082,7 @@ function renderStudentOfficialResult(reg) {
 
       return `
         <div class="bg-white/10 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/20 flex flex-col sm:flex-row items-center sm:items-start gap-4 flex-1 min-w-[280px]">
-          <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedSupName}');" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 ${isPrimary ? 'border-amber-400' : 'border-blue-400'} shadow-md shrink-0" alt="${escapedSupName}">
+          <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedSupName}');" class="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 ${isPrimary ? 'border-amber-400' : 'border-blue-400'} shadow-md shrink-0" alt="${escapedSupName}">
           <div class="text-center sm:text-left flex-1 min-w-0">
             <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
               ${roleBadge}
@@ -2108,10 +2108,18 @@ function renderStudentOfficialResult(reg) {
           </div>
         </div>
 
-        <div class="bg-black/30 p-4 rounded-xl border border-white/10 text-xs space-y-1">
-          <span class="text-blue-300 font-bold block uppercase">Đề tài Đồ án Tốt nghiệp chính thức:</span>
-          <p class="text-white font-bold text-sm leading-relaxed">${reg.topicTitle || 'Chưa đăng ký đề tài'}</p>
-          <p class="text-blue-200 text-[11px] mt-1">Loại hình: ${reg.projectType || '--'}</p>
+        <div class="bg-black/30 p-4 rounded-xl border border-white/10 text-xs">
+          <span class="text-blue-300 font-bold block uppercase mb-2">Thông tin đồ án đã đăng ký</span>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <div class="min-w-0">
+              <span class="text-[10px] text-blue-200 uppercase font-bold">Tên đề tài</span>
+              <p class="text-white font-bold text-sm leading-relaxed">${reg.topicTitle || 'Chưa đăng ký đề tài'}</p>
+            </div>
+            <div class="sm:text-right">
+              <span class="text-[10px] text-blue-200 uppercase font-bold">Loại hình đồ án</span>
+              <p class="text-white font-semibold text-xs mt-0.5">${reg.projectType || '--'}</p>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -22672,18 +22680,24 @@ window.initSupervisorPortal = async function() {
   if (workspaceContainer) workspaceContainer.classList.remove('hidden');
 
   // Populate round selector filtered to rounds supervisor participates in (or all for admin)
-  renderSupervisorRoundsDropdown();
+  const supervisorRounds = await renderSupervisorRoundsDropdown();
 
-  // If no round selected yet, pick active round or first available
-  const currentRoundId = state.selectedRoundId || state.activeRound?.id || (state.rounds && state.rounds[0]?.id);
+  // Prefer a round where this supervisor is actually in the round roster.
+  // This prevents the active round of another semester from incorrectly
+  // showing "không tham gia" when the teacher belongs to a later round.
+  const currentRoundId = document.getElementById('supervisor-round-select')?.value
+    || supervisorRounds?.[0]?.id
+    || state.selectedRoundId
+    || state.activeRound?.id
+    || (state.rounds && state.rounds[0]?.id);
   if (currentRoundId) {
     await loadSupervisorPortalData(currentRoundId);
   }
 };
 
-window.renderSupervisorRoundsDropdown = function() {
+window.renderSupervisorRoundsDropdown = async function() {
   const select = document.getElementById('supervisor-round-select');
-  if (!select) return;
+  if (!select) return [];
 
   const actor = getEffectiveActor();
   const toolbar = document.getElementById('supervisor-round-selector-toolbar');
@@ -22705,7 +22719,7 @@ window.renderSupervisorRoundsDropdown = function() {
     select.className = 'bg-slate-900/80 text-white border border-white/25 rounded-xl px-3 py-1.5 text-xs font-bold max-w-full truncate';
     if (lockedBadge) lockedBadge.classList.remove('hidden');
     if (toolbar) toolbar.classList.add('hidden');
-    return;
+    return lockedRound ? [lockedRound] : [];
   }
 
   // Not locked - normal dropdown
@@ -22716,16 +22730,24 @@ window.renderSupervisorRoundsDropdown = function() {
   const emailLower = (actor.email || '').toLowerCase().trim();
   let filteredRounds = validRounds;
   if (!actor.isAdmin) {
-    // Only show rounds this supervisor is part of or active round
-    filteredRounds = validRounds.filter(r => {
-      if (r.isActive) return true;
-      const inSupervisors = Array.isArray(r.supervisors) && r.supervisors.some(s => (s.email || '').toLowerCase().trim() === emailLower);
-      const inAssigned = Array.isArray(r.registrations) && r.registrations.some(reg => {
-        const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(reg) : [];
-        return officials.some(s => (s.supervisorEmail || s.email || '').toLowerCase().trim() === emailLower);
-      });
-      return inSupervisors || inAssigned;
-    });
+    // The source of truth is the per-round supervisors subcollection. Round
+    // documents may not carry a legacy `supervisors` array, which previously
+    // hid a teacher's newly added T4/2027 round.
+    const membership = await Promise.all(validRounds.map(async r => {
+      try {
+        const snap = await getDocs(collection(db, 'graduationRounds', r.id, 'supervisors'));
+        const isMember = snap.docs.some(d => {
+          const data = d.data() || {};
+          return String(data.email || '').toLowerCase().trim() === emailLower;
+        });
+        return [r.id, isMember];
+      } catch (error) {
+        console.warn(`[Supervisor] Cannot check round membership for ${r.id}:`, error);
+        return [r.id, false];
+      }
+    }));
+    const memberRoundIds = new Set(membership.filter(([, isMember]) => isMember).map(([id]) => id));
+    filteredRounds = validRounds.filter(r => memberRoundIds.has(r.id));
     if (filteredRounds.length === 0 && validRounds.length > 0) {
       filteredRounds = [validRounds.find(r => r.isActive) || validRounds[0]];
     }
@@ -22741,6 +22763,7 @@ window.renderSupervisorRoundsDropdown = function() {
     select.innerHTML = '<option value="">-- Chưa có đợt tốt nghiệp --</option>';
   }
   if (toolbar) toolbar.classList.toggle('hidden', filteredRounds.length <= 1);
+  return filteredRounds;
 };
 
 window.onSupervisorRoundSelected = async function(roundId) {
@@ -22762,6 +22785,12 @@ window.loadSupervisorPortalData = async function(roundId) {
   const emailLower = (actor.email || '').toLowerCase().trim();
   const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
   if (!round) return;
+  state.selectedRoundId = roundId;
+  state.activeRound = round;
+  // Always reload roster for the selected round before matching the logged-in
+  // teacher. `state.roundSupervisors` otherwise belongs to the previously
+  // active round and produces a false "không tham gia đợt" notice.
+  await loadRoundSupervisors(roundId);
   const isDirect = isDirectSupervisorAssignment(round);
 
   // 1. Locate current supervisor profile
