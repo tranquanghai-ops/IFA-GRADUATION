@@ -7998,15 +7998,22 @@ function renderAdminReviewDashboard() {
     descEl.textContent = `Theo dõi tiến độ hoàn thành của các GVHD. Khi các GVHD đã chọn xong, bấm Chốt vòng để cập nhật kết quả và chuyển sang vòng tiếp theo.`;
 
     actionsWrap.innerHTML = `
-      <button onclick="openAdminLockRoundModal()" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
+      <button type="button" onclick="openAdminLockRoundModal()" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
         <span>🔒 CHỐT NGUYỆN VỌNG ${currentRound} & CHUYỂN VÒNG →</span>
       </button>
+      ${currentRound <= 2 ? `<button type="button" onclick="openAdminLockRoundModal(true)" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2"><span>📢 CHỐT & CÔNG BỐ SAU VÒNG ${currentRound}</span></button>` : ''}
     `;
   } else if (reviewStatus === 'manual_assignment') {
+    const endedAfterRound = Number(round.reviewEndedAfterRound || 0);
+    const endedEarly = endedAfterRound >= 1 && endedAfterRound <= 2;
     statusPill.className = 'badge bg-indigo-200 text-indigo-900 font-black';
-    statusPill.textContent = 'Phân công thủ công';
-    titleEl.textContent = 'Giai đoạn: Phân công GVHD Thủ công';
-    descEl.textContent = `Tất cả ${preferenceCount} vòng nguyện vọng đã kết thúc. Còn ${unassignedCount} sinh viên chưa có GVHD. Hãy phân công sinh viên vào các GVHD còn chỉ tiêu trước khi Công bố kết quả.`;
+    statusPill.textContent = endedEarly ? `Đã chốt sau NV${endedAfterRound}` : 'Phân công thủ công';
+    titleEl.textContent = endedEarly
+      ? `Đã chốt sau Nguyện vọng ${endedAfterRound} — Sẵn sàng công bố`
+      : 'Giai đoạn: Phân công GVHD Thủ công';
+    descEl.textContent = endedEarly
+      ? `Không cần xét các nguyện vọng còn lại. Còn ${unassignedCount} sinh viên chưa có GVHD; bạn có thể phân công bổ sung hoặc công bố ngay kết quả hiện tại.`
+      : `Tất cả ${preferenceCount} vòng nguyện vọng đã kết thúc. Còn ${unassignedCount} sinh viên chưa có GVHD. Hãy phân công sinh viên vào các GVHD còn chỉ tiêu trước khi Công bố kết quả.`;
 
     actionsWrap.innerHTML = `
       <button onclick="publishAdminResults()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
@@ -8176,14 +8183,31 @@ window.startAdminReviewRound1 = async function() {
   }
 };
 
-window.openAdminLockRoundModal = function() {
+window.openAdminLockRoundModal = function(publishEarly = false) {
   const currentRound = state.activeRound?.currentReviewRound || 1;
-  const supervisors = state.adminReviewData.supervisors;
+  if (publishEarly && (currentRound < 1 || currentRound > 2)) {
+    showToast('Chỉ có thể chốt và công bố sớm sau vòng 1 hoặc vòng 2.', 'warning');
+    return;
+  }
+  const supervisors = state.adminReviewData?.supervisors || [];
   const pendingSups = supervisors.filter(s => {
     return !(s.roundProgress && s.roundProgress['round_' + currentRound]?.status === 'completed');
   });
 
-  document.getElementById('modal-admin-lock-round-title').textContent = `Khóa & Chốt Nguyện vọng ${currentRound}`;
+  const preferenceCount = state.activeRound?.preferenceCount || 3;
+  const titleEl = document.getElementById('modal-admin-lock-round-title');
+  const detailEl = document.getElementById('modal-admin-lock-round-detail');
+  const confirmBtn = document.getElementById('btn-confirm-admin-lock-round');
+  if (titleEl) titleEl.textContent = publishEarly
+    ? `Chốt Nguyện vọng ${currentRound} & Công bố kết quả`
+    : `Khóa & Chốt Nguyện vọng ${currentRound}`;
+  if (detailEl) detailEl.textContent = publishEarly
+    ? `Sau khi chốt, hệ thống sẽ đưa bạn đến bước công bố kết quả. Nguyện vọng còn lại sẽ không tiếp tục xét.`
+    : `Sinh viên chưa được chọn sẽ chuyển sang ${currentRound < preferenceCount ? `Nguyện vọng ${currentRound + 1}` : 'phân công thủ công'}.`;
+  if (confirmBtn) {
+    confirmBtn.dataset.publishEarly = publishEarly ? 'true' : 'false';
+    confirmBtn.textContent = publishEarly ? '📢 Chốt & sang bước công bố' : '🔒 Xác nhận Chốt Vòng';
+  }
   
   const warningEl = document.getElementById('modal-admin-lock-warning');
   if (pendingSups.length > 0) {
@@ -8204,13 +8228,19 @@ window.confirmAdminLockRound = async function() {
   const roundId = state.selectedRoundId;
   const currentRound = state.activeRound?.currentReviewRound || 1;
   const preferenceCount = state.activeRound?.preferenceCount || 3;
-  const supervisors = state.adminReviewData.supervisors;
-  const registrations = state.adminReviewData.registrations;
-  const decisions = state.adminReviewData.decisions;
+  const supervisors = state.adminReviewData?.supervisors || [];
+  const registrations = state.adminReviewData?.registrations || [];
+  const decisions = state.adminReviewData?.decisions || [];
+  const confirmBtn = document.getElementById('btn-confirm-admin-lock-round');
+  const publishEarly = confirmBtn?.dataset.publishEarly === 'true';
 
   if (!roundId) return;
+  if (publishEarly && (currentRound < 1 || currentRound > 2)) {
+    showToast('Chỉ có thể công bố sớm sau vòng 1 hoặc vòng 2.', 'warning');
+    return;
+  }
 
-  const btn = document.querySelector('#modal-admin-lock-round button.bg-rose-600');
+  const btn = confirmBtn || document.querySelector('#modal-admin-lock-round button.bg-rose-600');
   if (btn) {
     btn.disabled = true;
     btn.textContent = '⏳ Đang thực hiện chốt vòng...';
@@ -8280,13 +8310,16 @@ window.confirmAdminLockRound = async function() {
     const roundRef = doc(db, 'graduationRounds', roundId);
     const lockKey = `reviewLocks.round_${currentRound}`;
     const nextRound = currentRound + 1;
-    const nextStatus = nextRound <= preferenceCount ? `round_${nextRound}` : 'manual_assignment';
+    const nextStatus = publishEarly
+      ? 'manual_assignment'
+      : (nextRound <= preferenceCount ? `round_${nextRound}` : 'manual_assignment');
 
     const roundUpdate = {
-      currentReviewRound: nextRound,
+      currentReviewRound: publishEarly ? currentRound : nextRound,
       reviewStatus: nextStatus,
       updatedAt: serverTimestamp()
     };
+    if (publishEarly) roundUpdate.reviewEndedAfterRound = currentRound;
     roundUpdate[lockKey] = {
       lockedAt: serverTimestamp(),
       lockedBy: state.user?.email || 'admin'
@@ -8297,6 +8330,12 @@ window.confirmAdminLockRound = async function() {
     await batch.commit();
 
     closeAdminLockRoundModal();
+    if (publishEarly) {
+      showToast(`🔒 Đã chốt Nguyện vọng ${currentRound}. Xác nhận công bố kết quả ở bước tiếp theo.`, 'success');
+      await loadAdminReviewData(roundId);
+      await publishAdminResults();
+      return;
+    }
     showToast(`🔒 ĐÃ CHỐT THÀNH CÔNG NGUYỆN VỌNG ${currentRound}!\nChuyển sang: ${nextStatus === 'manual_assignment' ? 'Phân công thủ công' : 'Xét Nguyện vọng ' + nextRound}`, 'info');
     await loadAdminReviewData(roundId);
   } catch (err) {
@@ -8305,7 +8344,7 @@ window.confirmAdminLockRound = async function() {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = '🔒 Xác nhận Chốt Vòng';
+      btn.textContent = publishEarly ? '📢 Chốt & sang bước công bố' : '🔒 Xác nhận Chốt Vòng';
     }
   }
 };

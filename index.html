@@ -4033,12 +4033,13 @@
             <li>Khóa quyền chỉnh sửa của GVHD ở vòng này.</li>
             <li>Chuyển toàn bộ sinh viên chưa trúng tuyển sang xét <strong>Nguyện vọng kế tiếp</strong> (hoặc Phân công thủ công nếu đã hết NV).</li>
           </ul>
+          <p id="modal-admin-lock-round-detail" class="pt-2 text-[11px] font-semibold text-slate-600"></p>
         </div>
       </div>
 
       <div class="flex justify-end gap-2 pt-3 border-t">
         <button type="button" onclick="closeAdminLockRoundModal()" class="px-4 py-2 bg-slate-100 rounded-xl font-bold text-xs hover:bg-slate-200">Hủy</button>
-        <button type="button" onclick="confirmAdminLockRound()" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md">
+        <button type="button" id="btn-confirm-admin-lock-round" onclick="confirmAdminLockRound()" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md">
           🔒 Xác nhận Chốt Vòng
         </button>
       </div>
