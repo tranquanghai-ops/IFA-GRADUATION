@@ -2216,9 +2216,25 @@ window.enableEditRegistration = function() {
 // --- ROUND SUPERVISORS ---
 async function loadRoundSupervisors(roundId) {
   try {
-    const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'supervisors'));
-    state.roundSupervisors = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const [snap] = await Promise.all([
+      getDocs(collection(db, 'graduationRounds', roundId, 'supervisors')),
+      ensureSupervisorsMasterLoaded().catch(() => [])
+    ]);
+    state.roundSupervisors = snap.docs.map(d => {
+      const roundSupervisor = { id: d.id, ...d.data() };
+      const master = (state.supervisorsMaster || []).find(item => item.id === roundSupervisor.supervisorId || item.id === roundSupervisor.id);
+      // Old round records can predate a phone/email change in the master list.
+      // Prefer the per-round snapshot, then seamlessly fall back to Master.
+      return {
+        ...master,
+        ...roundSupervisor,
+        email: roundSupervisor.email || master?.email || '',
+        phone: roundSupervisor.phone || master?.phone || '',
+        photoUrl: roundSupervisor.photoUrl || master?.photoUrl || ''
+      };
+    });
     renderSupervisorsGrid();
+    if (state.activeRound?.id === roundId) renderRoundHeader();
   } catch (e) {
     console.error('Error loading round supervisors:', e);
   }
@@ -3673,6 +3689,99 @@ function updateRoundModalConfigSummary() {
 
 // ── Weekly Content Editor (Admin) ──────────────────────────────────────────
 // Renders 12 (or durationWeeks) input cards in #round-weekly-content-grid
+function getRoundWeekDaysFromForm(weekNumber) {
+  const rawStart = document.getElementById('round-form-start-date')?.value || '';
+  let monday;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawStart)) {
+    const [year, month, day] = rawStart.split('-').map(Number);
+    monday = new Date(year, month - 1, day);
+  } else {
+    monday = new Date();
+    const day = monday.getDay();
+    monday.setDate(monday.getDate() - day + (day === 0 ? -6 : 1));
+  }
+  monday.setHours(0, 0, 0, 0);
+  const pad = value => String(value).padStart(2, '0');
+  const weekStart = new Date(monday.getTime() + (Number(weekNumber) - 1) * 7 * 86400000);
+  return Array.from({ length: 7 }, (_, dayIndex) => {
+    const date = new Date(weekStart.getTime() + dayIndex * 86400000);
+    return {
+      dayIndex,
+      shortName: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][dayIndex],
+      label: `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`,
+      date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    };
+  });
+}
+
+function getRoundWeekDraftEvents(weekNumber) {
+  if (!state.roundWeekEventsDraft) state.roundWeekEventsDraft = {};
+  return Array.isArray(state.roundWeekEventsDraft[weekNumber]) ? state.roundWeekEventsDraft[weekNumber] : [];
+}
+
+function renderRoundWeekDayPicker(weekNumber) {
+  const daysEl = document.getElementById(`round-week-${weekNumber}-days`);
+  const eventsEl = document.getElementById(`round-week-${weekNumber}-events`);
+  const selectEl = document.getElementById(`round-week-${weekNumber}-event-day`);
+  if (!daysEl || !eventsEl || !selectEl) return;
+  const days = getRoundWeekDaysFromForm(weekNumber);
+  const events = getRoundWeekDraftEvents(weekNumber);
+
+  selectEl.innerHTML = days.map(day => `<option value="${day.dayIndex}">${day.shortName} · ${day.label}</option>`).join('');
+  daysEl.innerHTML = days.map(day => {
+    const dayEvents = events.filter(event => Number(event.dayIndex) === day.dayIndex || event.date === day.date);
+    const titles = dayEvents.map(event => escapeHtml(event.title)).join('\n');
+    return `<button type="button" onclick="selectRoundWeekEventDay(${weekNumber}, ${day.dayIndex})" title="${titles || `${day.shortName} ${day.label}: chưa có sự kiện`}" class="min-w-0 rounded-lg border px-1 py-1 text-center transition ${dayEvents.length ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-blue-300'}">
+      <span class="block text-[8px] font-black">${day.shortName}</span><span class="block text-[9px] font-bold">${day.label}</span>${dayEvents.length ? '<span class="block text-[8px] leading-none mt-0.5">●</span>' : ''}
+    </button>`;
+  }).join('');
+  eventsEl.innerHTML = events.length
+    ? events.map(event => `<div class="flex items-center justify-between gap-1 rounded-md bg-rose-50 border border-rose-100 px-2 py-1 text-[10px] text-rose-800"><span class="truncate">📌 ${escapeHtml(event.date || '')} · ${escapeHtml(event.title || '')}</span><button type="button" onclick="removeRoundWeekEvent(${weekNumber}, '${escapeHtml(event.id)}')" class="shrink-0 font-black text-rose-500 hover:text-rose-700">×</button></div>`).join('')
+    : '<span class="text-[10px] text-slate-400 italic">Chưa có sự kiện theo ngày.</span>';
+}
+
+window.selectRoundWeekEventDay = function(weekNumber, dayIndex) {
+  const select = document.getElementById(`round-week-${weekNumber}-event-day`);
+  const form = document.getElementById(`round-week-${weekNumber}-event-form`);
+  if (select) select.value = String(dayIndex);
+  if (form) form.classList.remove('hidden');
+  document.getElementById(`round-week-${weekNumber}-event-title`)?.focus();
+};
+
+window.toggleRoundWeekEventForm = function(weekNumber) {
+  const form = document.getElementById(`round-week-${weekNumber}-event-form`);
+  form?.classList.toggle('hidden');
+  if (form && !form.classList.contains('hidden')) document.getElementById(`round-week-${weekNumber}-event-title`)?.focus();
+};
+
+window.addRoundWeekEvent = function(weekNumber) {
+  const titleInput = document.getElementById(`round-week-${weekNumber}-event-title`);
+  const daySelect = document.getElementById(`round-week-${weekNumber}-event-day`);
+  const title = String(titleInput?.value || '').trim();
+  if (!title) {
+    showToast('Nhập tên sự kiện hoặc cột mốc.', 'warning');
+    titleInput?.focus();
+    return;
+  }
+  const dayIndex = Number(daySelect?.value || 0);
+  const day = getRoundWeekDaysFromForm(weekNumber)[dayIndex];
+  const events = getRoundWeekDraftEvents(weekNumber);
+  events.push({ id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, dayIndex, date: day.date, title });
+  state.roundWeekEventsDraft[weekNumber] = events;
+  if (titleInput) titleInput.value = '';
+  renderRoundWeekDayPicker(weekNumber);
+};
+
+window.removeRoundWeekEvent = function(weekNumber, eventId) {
+  state.roundWeekEventsDraft[weekNumber] = getRoundWeekDraftEvents(weekNumber).filter(event => event.id !== eventId);
+  renderRoundWeekDayPicker(weekNumber);
+};
+
+window.refreshRoundWeekDayPickers = function() {
+  const duration = parseInt(document.getElementById('round-form-duration-weeks')?.value, 10) || 12;
+  for (let week = 1; week <= duration; week++) renderRoundWeekDayPicker(week);
+};
+
 function renderRoundWeeklyContentEditor(durationWeeks) {
   const grid = document.getElementById('round-weekly-content-grid');
   if (!grid) return;
@@ -3706,8 +3815,18 @@ function renderRoundWeeklyContentEditor(durationWeeks) {
         </select>
         <input type="text" id="round-week-${n}-milestone-custom" placeholder="Tên mốc tùy chỉnh"
                class="hidden w-full p-1.5 border border-amber-200 rounded-lg text-xs bg-amber-50 focus:ring-2 focus:ring-amber-400 focus:outline-none">
+        <div class="border-t border-slate-100 pt-2 space-y-1.5">
+          <div class="flex items-center justify-between"><span class="text-[10px] font-black text-slate-600">LỊCH THỨ 2 – CHỦ NHẬT</span><button type="button" onclick="toggleRoundWeekEventForm(${n})" class="rounded-md bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-black text-blue-700 hover:bg-blue-100">＋ Sự kiện</button></div>
+          <div id="round-week-${n}-days" class="grid grid-cols-7 gap-1"></div>
+          <div id="round-week-${n}-events" class="space-y-1"></div>
+          <div id="round-week-${n}-event-form" class="hidden rounded-lg bg-blue-50 border border-blue-100 p-2 space-y-1.5">
+            <div class="grid grid-cols-[90px_1fr] gap-1.5"><select id="round-week-${n}-event-day" class="min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"></select><input id="round-week-${n}-event-title" type="text" maxlength="120" placeholder="VD: Sơ khảo" class="min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"></div>
+            <button type="button" onclick="addRoundWeekEvent(${n})" class="w-full rounded-md bg-blue-600 py-1 text-[10px] font-bold text-white hover:bg-blue-700">Thêm vào ngày đã chọn</button>
+          </div>
+        </div>
       </div>`;
   }).join('');
+  window.refreshRoundWeekDayPickers();
 }
 
 window.toggleRoundWeekCustomMilestone = function(weekNumber) {
@@ -3719,6 +3838,7 @@ window.toggleRoundWeekCustomMilestone = function(weekNumber) {
 window.resetWeeklyContentToDefault = function() {
   const durationInput = document.getElementById('round-form-duration-weeks');
   const durationWeeks = parseInt(durationInput?.value, 10) || 12;
+  state.roundWeekEventsDraft = {};
   renderRoundWeeklyContentEditor(durationWeeks);
 };
 
@@ -4043,6 +4163,7 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
 
   // Render weekly content editor and populate saved config
   const editDurationWeeks = parseInt(r.durationWeeks, 10) || 12;
+  state.roundWeekEventsDraft = {};
   if (typeof renderRoundWeeklyContentEditor === 'function') renderRoundWeeklyContentEditor(editDurationWeeks);
   (r.timelineWeeksConfig || []).forEach((wc) => {
     const n = wc.week || 1;
@@ -4053,6 +4174,12 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
     const customMilestoneEl = document.getElementById(`round-week-${n}-milestone-custom`);
     if (titleEl) titleEl.value = wc.title || '';
     if (noteEl)  noteEl.value  = wc.note  || '';
+    state.roundWeekEventsDraft[n] = Array.isArray(wc.events) ? wc.events.map((event, index) => ({
+      id: event.id || `legacy-${n}-${index}`,
+      title: String(event.title || event.name || '').trim(),
+      dayIndex: Number.isInteger(event.dayIndex) ? event.dayIndex : 0,
+      date: event.date || ''
+    })).filter(event => event.title) : [];
     if (visibleEl) visibleEl.checked = wc.visible !== false;
     if (mileEl) {
       const standardMilestones = ['', 'Duyệt đợt 1', 'Duyệt đợt 2', 'Duyệt đợt 3', 'Sơ khảo', 'Khác'];
@@ -4061,6 +4188,7 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
       if (customMilestoneEl && mileEl.value === 'Khác') customMilestoneEl.value = savedMilestone === 'Khác' ? '' : savedMilestone;
       window.toggleRoundWeekCustomMilestone(n);
     }
+    renderRoundWeekDayPicker(n);
   });
 
   document.getElementById('modal-round').classList.remove('hidden');
@@ -5223,6 +5351,12 @@ window.saveRound = async function(e) {
       note: document.getElementById(`round-week-${n}-note`)?.value?.trim() || '',
       milestone: milestoneSelect === 'Khác' ? (customMilestone || 'Mốc khác') : milestoneSelect,
       visible: document.getElementById(`round-week-${n}-visible`)?.checked !== false,
+      events: getRoundWeekDraftEvents(n).map(event => ({
+        id: event.id,
+        title: String(event.title || '').trim(),
+        dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
+        date: event.date || ''
+      })).filter(event => event.title),
     };
   });
 
@@ -20610,6 +20744,16 @@ function getRoundWeekSchedule(round) {
     end.setHours(23, 59, 59, 999);
     const config = weeklyConfig.find(item => Number(item.week) === week) || {};
     const status = now > end ? 'completed' : (now >= start ? 'ongoing' : 'upcoming');
+    const days = Array.from({ length: 7 }, (_, dayIndex) => {
+      const date = new Date(start.getTime() + dayIndex * 86400000);
+      return { dayIndex, shortName: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][dayIndex], date, label: `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`, key: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` };
+    });
+    const events = (Array.isArray(config.events) ? config.events : []).map((event, index) => ({
+      id: event.id || `legacy-${week}-${index}`,
+      title: String(event.title || event.name || '').trim(),
+      dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
+      date: event.date || ''
+    })).filter(event => event.title);
     return {
       week,
       title: config.title || `Tuần ${week}`,
@@ -20617,9 +20761,19 @@ function getRoundWeekSchedule(round) {
       milestone: config.milestone || defaultMilestones[week] || '',
       visible: config.visible !== false,
       status,
-      dateText: `${formatDate(start)} – ${formatDate(end)}`
+      dateText: `${formatDate(start)} – ${formatDate(end)}`,
+      days,
+      events
     };
   });
+}
+
+function renderTimelineWeekDays(days = [], events = []) {
+  return `<div class="grid grid-cols-7 gap-1 w-full mt-2 pt-2 border-t border-slate-200/80">${days.map(day => {
+    const dayEvents = events.filter(event => Number(event.dayIndex) === day.dayIndex || event.date === day.key);
+    const titles = dayEvents.map(event => escapeHtml(event.title)).join(' · ');
+    return `<span title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border px-0.5 py-0.5 text-center ${dayEvents.length ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-white/70 border-slate-200 text-slate-500'}"><b class="block text-[8px] leading-none">${day.shortName}</b><b class="block text-[8px] leading-none mt-0.5">${day.label}</b>${dayEvents.length ? '<i class="block text-[8px] leading-none not-italic">●</i>' : ''}</span>`;
+  }).join('')}</div>`;
 }
 
 function renderAdminRoundTimelinePreview(round) {
@@ -20645,7 +20799,7 @@ function renderAdminRoundTimelinePreview(round) {
   const weekCards = weeks.map(week => {
     const style = statusStyles[week.status] || statusStyles.upcoming;
     return `
-      <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}', ${week.week})" class="relative min-w-[215px] h-[142px] rounded-2xl border p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}">
+      <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}', ${week.week})" class="relative min-w-[215px] h-[184px] rounded-2xl border p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}">
         <div class="flex items-center justify-between w-full mb-1">
           <span class="font-black text-xs text-slate-900">Tuần ${week.week}</span>
           <span class="px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${week.visible ? style.badge : 'bg-slate-200 text-slate-600 border-slate-300'}">${week.visible ? style.label : 'Đang ẩn'}</span>
@@ -20654,6 +20808,7 @@ function renderAdminRoundTimelinePreview(round) {
         <span class="font-mono font-bold text-[11px] text-slate-700">${week.dateText}</span>
         ${week.note ? `<span class="text-[9px] text-slate-500 mt-1 line-clamp-1">${escapeHtml(week.note)}</span>` : ''}
         ${week.milestone ? `<span class="mt-1 px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px]">🚩 ${escapeHtml(week.milestone)}</span>` : ''}
+        ${renderTimelineWeekDays(week.days, week.events)}
         <button type="button" onclick="toggleRoundTimelineWeekVisibility('${round.id}', ${week.week}, event)" class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-white/90 border border-slate-200 text-[9px] font-bold ${week.visible ? 'text-slate-600' : 'text-blue-700'}">${week.visible ? 'Ẩn' : 'Hiện'}</button>
       </div>`;
   }).join('');
@@ -21398,6 +21553,7 @@ window.onRoundStartDateChanged = function(val) {
   const feedback = document.getElementById('round-start-date-feedback');
   if (!val) {
     if (feedback) feedback.innerHTML = '<span class="text-slate-500 italic">Chưa chọn ngày bắt đầu (mặc định sẽ dùng ngày mở đợt).</span>';
+    window.refreshRoundWeekDayPickers?.();
     return;
   }
   const parts = val.split('-');
@@ -21420,6 +21576,7 @@ window.onRoundStartDateChanged = function(val) {
       feedback.innerHTML = `<span class="text-emerald-700 font-bold">✓ Hợp lệ: Thứ Hai (${val})</span>`;
     }
   }
+  window.refreshRoundWeekDayPickers?.();
 };
 
 window.prevTimelineWeek = function() {
@@ -21510,8 +21667,12 @@ window.renderStudentTimelineWeeks = function() {
       status = 'ongoing';
       currentWeekNum = weekNum;
     }
+    const days = Array.from({ length: 7 }, (_, dayIndex) => {
+      const date = new Date(wStart.getTime() + dayIndex * 86400000);
+      return { dayIndex, shortName: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][dayIndex], date, label: fmtShortDate(date), key: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` };
+    });
     weeks.push({ num: weekNum, start: wStart, end: wEnd,
-      dateText: `${fmtFullDate(wStart)} – ${fmtFullDate(wEnd)}`, status });
+      dateText: `${fmtFullDate(wStart)} – ${fmtFullDate(wEnd)}`, status, days });
   }
 
   // ── Header badge & date range ──────────────────────────────────
@@ -21583,6 +21744,12 @@ window.renderStudentTimelineWeeks = function() {
     if (cfg.visible === false) return;
     const defMilestone = defaultMilestones[w.num] || null;
     const milestone = cfg.milestone || (defMilestone ? defMilestone : null);
+    const events = (Array.isArray(cfg.events) ? cfg.events : []).map((event, index) => ({
+      id: event.id || `legacy-${w.num}-${index}`,
+      title: String(event.title || event.name || '').trim(),
+      dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
+      date: event.date || ''
+    })).filter(event => event.title);
     allCards.push({
       type: 'week',
       num: w.num,
@@ -21591,6 +21758,8 @@ window.renderStudentTimelineWeeks = function() {
       title: cfg.title || `Tuần ${w.num}`,
       subtitle: cfg.note || '',
       milestone,
+      days: w.days,
+      events,
     });
   });
 
@@ -21692,6 +21861,7 @@ window.renderStudentTimelineWeeks = function() {
         <span class="text-[13px] font-mono font-bold text-slate-700 tracking-tight">${card.dateText}</span>
         ${noteHtml}
         ${milestoneHtml}
+        ${renderTimelineWeekDays(card.days, card.events)}
       </div>`;
     } else {
       // Milestone card (intro/outro)
