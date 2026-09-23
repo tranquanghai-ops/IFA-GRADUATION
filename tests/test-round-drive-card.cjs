@@ -180,3 +180,18 @@ test('direct assignment registration removes supervisor preference wording and h
   assert.match(app, /chọn từ 1 đến 3 loại hình đồ án trước khi xác nhận đăng ký/);
   assert.match(app, /selectionStep\.classList\.add\('hidden'\)/);
 });
+
+test('official topic form captures student-owned class data and unlocks PDF after supervisor approval', () => {
+  assert.match(html, /id="registration-current-class"/);
+  assert.match(html, /id="registration-student-phone"/);
+  assert.match(html, /id="registration-student-address"/);
+  assert.match(html, /id="input-topic-description"/);
+  assert.match(html, /id="hero-download-topic-form-btn"/);
+  assert.match(html, /pdfmake\.min\.js/);
+  assert.match(app, /graduationStudentProfiles/);
+  assert.match(app, /studentClass = state\.studentSelfProfile\?\.currentClass \|\| state\.myRegistration\?\.currentClass/);
+  assert.match(app, /window\.downloadOfficialTopicRegistrationPdf = function/);
+  assert.match(app, /reg\.topicApprovalStatus !== 'approved'/);
+  assert.match(app, /PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC/);
+  assert.match(app, /Đã xác nhận tên đề tài trên hệ thống/);
+});

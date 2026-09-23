@@ -32,6 +32,9 @@
   </script>
   <!-- SheetJS for local Excel parsing -->
   <script src="xlsx.full.min.js"></script>
+  <!-- pdfmake for the official student topic-registration form -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-blue-100 selection:text-blue-900">
@@ -219,6 +222,7 @@
                 </div>
                 <div id="hero-registered-topic-name" class="font-bold text-white text-xs sm:text-sm mt-0.5 leading-snug break-words">--</div>
                 <div id="hero-registered-topic-meta" class="text-[11px] text-blue-200 mt-0.5 font-medium flex items-center gap-2 flex-wrap"></div>
+                <button id="hero-download-topic-form-btn" type="button" onclick="downloadOfficialTopicRegistrationPdf()" class="hidden mt-2 px-3 py-1.5 bg-white text-tdtu-blue rounded-lg text-[11px] font-black shadow-sm hover:bg-blue-50">⬇ Tải phiếu đăng ký PDF</button>
               </div>
               <p id="round-academic-year" class="text-xs sm:text-sm text-blue-200 font-medium lg:mr-[430px]">Năm học 2026-2027</p>
               <p id="round-time-range" class="hidden text-xs text-slate-300 flex items-center gap-1.5 pt-0.5 lg:mr-[430px]">
@@ -461,6 +465,9 @@
                 <button id="btn-edit-existing-reg" onclick="enableEditRegistration()" class="hidden px-4 py-2 bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto cursor-pointer">
                   ✏️ Chỉnh sửa đăng ký
                 </button>
+                <button id="btn-download-official-topic-form" onclick="downloadOfficialTopicRegistrationPdf()" class="hidden px-4 py-2 bg-tdtu-blue text-white hover:bg-tdtu-dark font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto cursor-pointer">
+                  ⬇ Tải phiếu PDF
+                </button>
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -516,6 +523,26 @@
                 </div>
 
                 <div class="space-y-5 max-w-xl mx-auto text-left">
+                  <div class="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-3">
+                    <div>
+                      <h3 class="text-xs font-black uppercase text-blue-900">Thông tin sinh viên trên phiếu chính thức</h3>
+                      <p class="text-[11px] text-blue-700 mt-0.5">Họ tên và MSSV lấy từ dữ liệu Khoa. Lớp hiện tại do sinh viên tự khai.</p>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Họ và tên</label><input id="registration-student-name" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">MSSV</label><input id="registration-student-id" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-700"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Lớp hiện tại <span class="text-rose-500">*</span></label><input id="registration-current-class" maxlength="50" placeholder="Sinh viên tự nhập lớp hiện tại" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Ngành</label><input id="registration-student-major" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Email</label><input id="registration-student-email" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-700"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Điện thoại <span class="text-rose-500">*</span></label><input id="registration-student-phone" maxlength="20" placeholder="Số điện thoại liên hệ" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                    </div>
+                    <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Địa chỉ <span class="text-rose-500">*</span></label><input id="registration-student-address" maxlength="250" placeholder="Địa chỉ hiện tại" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Môn học <span class="text-rose-500">*</span></label><input id="registration-course-name" maxlength="100" value="Đồ án tốt nghiệp" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Mã môn học <span class="text-rose-500">*</span></label><input id="registration-course-code" maxlength="30" placeholder="Mã môn" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Nhóm <span class="text-rose-500">*</span></label><input id="registration-course-group" maxlength="20" placeholder="Nhóm" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
+                    </div>
+                  </div>
                   <div>
                     <label for="input-topic-title" class="block text-xs font-bold uppercase text-slate-600 mb-1.5">
                       Tên đề tài tốt nghiệp dự kiến <span class="text-rose-500">*</span>
@@ -526,6 +553,12 @@
                       <span>Bắt buộc bắt đầu bằng: <strong>"Thiết kế nội thất"</strong></span>
                       <span id="topic-char-count">0/250</span>
                     </div>
+                  </div>
+
+                  <div>
+                    <label for="input-topic-description" class="block text-xs font-bold uppercase text-slate-600 mb-1.5">Mô tả chi tiết định hướng thiết kế <span class="text-rose-500">*</span></label>
+                    <textarea id="input-topic-description" rows="5" maxlength="2000" oninput="document.getElementById('topic-description-char-count').textContent=this.value.length" placeholder="Trình bày mục tiêu, đối tượng, không gian và định hướng thiết kế chính..." class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                    <div class="text-right text-[11px] text-slate-400"><span id="topic-description-char-count">0</span>/2000</div>
                   </div>
 
                   <div>
@@ -1036,6 +1069,7 @@
               </div>
               <p id="dtl-topic-title" class="text-sm font-black text-slate-900 leading-snug">Tên đề tài...</p>
               <p id="dtl-registered-time" class="text-[11px] text-slate-400">Đăng ký ngày: --</p>
+              <div id="dtl-official-form-info" class="mt-3 pt-3 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]"></div>
             </div>
 
             <!-- Section B: Phân công GVHD -->

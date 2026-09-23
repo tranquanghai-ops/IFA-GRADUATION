@@ -340,6 +340,32 @@ service cloud.firestore {
     }
 
     // Các Đợt Đồ án Tốt nghiệp
+    // Student-maintained contact data for official Graduation forms.
+    match /graduationStudentProfiles/{studentId} {
+      allow get: if admin() || (student() && email().matches('^' + studentId + '@student\\.tdtu\\.edu\\.vn$'));
+      allow list: if admin();
+      allow create, update: if admin() || (student()
+        && email().matches('^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
+        && request.resource.data.studentId == studentId
+        && request.resource.data.email == email()
+        && request.resource.data.currentClass is string
+        && request.resource.data.currentClass.size() > 0
+        && request.resource.data.currentClass.size() <= 50
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() > 0
+        && request.resource.data.phone.size() <= 20
+        && request.resource.data.address is string
+        && request.resource.data.address.size() > 0
+        && request.resource.data.address.size() <= 250
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.updatedBy is string
+        && request.resource.data.updatedBy == email()
+        && request.resource.data.keys().hasOnly([
+          'studentId', 'email', 'currentClass', 'phone', 'address', 'updatedAt', 'updatedBy'
+        ]));
+      allow delete: if admin();
+    }
+
     match /graduationRounds/{roundId} {
       allow read: if signedIn();
       allow create, update, delete: if admin();
@@ -427,6 +453,15 @@ service cloud.firestore {
           && request.resource.data.topicTitle.size() > 0
           && request.resource.data.topicTitle.size() <= 250
           && request.resource.data.projectType is string
+          && (!request.resource.data.keys().hasAll(['topicApprovalStatus']) || request.resource.data.topicApprovalStatus == 'pending')
+          && (!request.resource.data.keys().hasAll(['projectTypes']) || (request.resource.data.projectTypes is list && request.resource.data.projectTypes.size() >= 1 && request.resource.data.projectTypes.size() <= 3))
+          && (!request.resource.data.keys().hasAll(['currentClass']) || (request.resource.data.currentClass is string && request.resource.data.currentClass.size() <= 50))
+          && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 20))
+          && (!request.resource.data.keys().hasAll(['studentAddress']) || (request.resource.data.studentAddress is string && request.resource.data.studentAddress.size() <= 250))
+          && (!request.resource.data.keys().hasAll(['courseName']) || (request.resource.data.courseName is string && request.resource.data.courseName.size() <= 100))
+          && (!request.resource.data.keys().hasAll(['courseCode']) || (request.resource.data.courseCode is string && request.resource.data.courseCode.size() <= 30))
+          && (!request.resource.data.keys().hasAll(['courseGroup']) || (request.resource.data.courseGroup is string && request.resource.data.courseGroup.size() <= 20))
+          && (!request.resource.data.keys().hasAll(['topicDescription']) || (request.resource.data.topicDescription is string && request.resource.data.topicDescription.size() <= 2000))
           && request.resource.data.preferences is list
           && (request.resource.data.preferences.size() > 0
             || (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['supervisorAssignmentMode'])
@@ -479,6 +514,22 @@ service cloud.firestore {
             && request.resource.data.topicTitle.size() > 0
             && request.resource.data.topicTitle.size() <= 250
             && request.resource.data.projectType is string
+            && (!request.resource.data.keys().hasAll(['projectTypes']) || (request.resource.data.projectTypes is list && request.resource.data.projectTypes.size() >= 1 && request.resource.data.projectTypes.size() <= 3))
+            && (!request.resource.data.keys().hasAll(['currentClass']) || (request.resource.data.currentClass is string && request.resource.data.currentClass.size() <= 50))
+            && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 20))
+            && (!request.resource.data.keys().hasAll(['studentAddress']) || (request.resource.data.studentAddress is string && request.resource.data.studentAddress.size() <= 250))
+            && (!request.resource.data.keys().hasAll(['courseName']) || (request.resource.data.courseName is string && request.resource.data.courseName.size() <= 100))
+            && (!request.resource.data.keys().hasAll(['courseCode']) || (request.resource.data.courseCode is string && request.resource.data.courseCode.size() <= 30))
+            && (!request.resource.data.keys().hasAll(['courseGroup']) || (request.resource.data.courseGroup is string && request.resource.data.courseGroup.size() <= 20))
+            && (!request.resource.data.keys().hasAll(['topicDescription']) || (request.resource.data.topicDescription is string && request.resource.data.topicDescription.size() <= 2000))
+            && ((!request.resource.data.keys().hasAll(['topicApprovalStatus'])
+                && !resource.data.keys().hasAll(['topicApprovalStatus']))
+              || (request.resource.data.topicTitle == resource.data.topicTitle
+                && request.resource.data.topicApprovalStatus == resource.data.topicApprovalStatus)
+              || (request.resource.data.topicTitle != resource.data.topicTitle
+                && request.resource.data.topicApprovalStatus == 'pending'))
+            && (!resource.data.keys().hasAll(['topicReviewedBy']) || request.resource.data.topicReviewedBy == resource.data.topicReviewedBy)
+            && (!resource.data.keys().hasAll(['topicReviewedAt']) || request.resource.data.topicReviewedAt == resource.data.topicReviewedAt)
             && request.resource.data.preferences is list
             && (request.resource.data.preferences.size() > 0
               || (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['supervisorAssignmentMode'])

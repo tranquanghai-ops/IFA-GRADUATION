@@ -641,6 +641,7 @@ export const state = {
   eligibleStudents: [],
   myRegistration: null,
   myOfficialAssignment: null,
+  studentSelfProfile: null,
   
   // Registration Flow State
   currentStep: 1,
@@ -1715,6 +1716,7 @@ function renderRoundHeader() {
   const topicWrap = document.getElementById('hero-registered-topic-wrap');
   const topicNameEl = document.getElementById('hero-registered-topic-name');
   const topicMetaEl = document.getElementById('hero-registered-topic-meta');
+  const topicDownloadBtn = document.getElementById('hero-download-topic-form-btn');
   const reg = state.myRegistration;
   const registeredTopic = reg?.topicTitle || reg?.topic || reg?.proposalTitle || reg?.title || reg?.topicName;
 
@@ -1729,8 +1731,10 @@ function renderRoundHeader() {
         const approvalText = reg?.topicApprovalStatus === 'approved' ? '✓ GVHD đã duyệt' : reg?.topicApprovalStatus === 'rejected' ? '✕ GVHD yêu cầu chỉnh sửa' : '⌛ Chờ GVHD duyệt';
         topicMetaEl.innerHTML = [typeStr, versionStr, approvalText, timeStr].filter(Boolean).map(s => `<span>${escapeHtml(s)}</span>`).join('<span class="text-white/30">•</span>');
       }
+      if (topicDownloadBtn) topicDownloadBtn.classList.toggle('hidden', reg?.topicApprovalStatus !== 'approved');
     } else {
       topicWrap.classList.add('hidden');
+      if (topicDownloadBtn) topicDownloadBtn.classList.add('hidden');
     }
   }
 
@@ -1831,6 +1835,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
   }
 
   try {
+    await loadStudentSelfProfile(mssv);
     const roundData = state.activeRound || state.rounds?.find(r => r.id === roundId);
     const allowPre = Boolean(roundData?.allowRegistrationBeforeEligibility && !roundData?.eligibilityFinalized);
 
@@ -2030,6 +2035,8 @@ function renderStudentExistingRegistration(reg) {
   const bannerEl = document.getElementById('reg-card-eligibility-banner');
   const statusEl = document.getElementById('reg-card-status');
   const topicStatus = reg.topicApprovalStatus || 'pending';
+  const downloadBtn = document.getElementById('btn-download-official-topic-form');
+  if (downloadBtn) downloadBtn.classList.toggle('hidden', topicStatus !== 'approved');
   const reviewNoteEl = document.getElementById('reg-card-topic-review-note');
   if (reviewNoteEl) {
     const showReviewNote = topicStatus === 'rejected' && String(reg.topicApprovalNote || '').trim();
@@ -2167,6 +2174,7 @@ window.enableEditRegistration = function() {
   document.getElementById('input-topic-title').value = state.myRegistration.topicTitle || '';
   const storedTypes = state.myRegistration.projectTypes || parseStoredProjectTypes(state.myRegistration.projectType || '');
   setSelectedProjectTypes(storedTypes, state.myRegistration.projectTypeOther || '');
+  populateRegistrationStudentForm();
   state.selectedPreferences = [...(state.myRegistration.preferences || [])];
 
   const alreadyCard = document.getElementById('already-registered-card');
@@ -2526,6 +2534,7 @@ window.validateAndGoToStep2 = function() {
   const errorEl = document.getElementById('topic-title-error');
   const topic = (topicInput?.value || '').trim();
   const projectTypes = getSelectedProjectTypes();
+  const officialFormFields = collectOfficialFormFields();
 
   if (errorEl) {
     errorEl.classList.add('hidden');
@@ -2561,6 +2570,8 @@ window.validateAndGoToStep2 = function() {
     document.getElementById('project-types-checkbox-list')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
+
+  if (!validateOfficialFormFields(officialFormFields)) return;
   if (projectTypes.includes('Khác') && !(document.getElementById('input-project-type-other')?.value || '').trim()) {
     showToast('Vui lòng nhập nội dung cho loại hình “Khác”.', 'warning');
     document.getElementById('input-project-type-other')?.focus();
@@ -2640,9 +2651,15 @@ window.submitRegistration = async function() {
   const projectTypes = getSelectedProjectTypes();
   const projectTypeOther = (document.getElementById('input-project-type-other')?.value || '').trim();
   const projectType = projectTypes.map(t => t === 'Khác' && projectTypeOther ? `Khác: ${projectTypeOther}` : t).join('; ');
+  const officialFormFields = collectOfficialFormFields();
 
   if (!roundId || !mssv) {
     showToast('Không xác định được phiên làm việc hoặc MSSV.', 'warning');
+    return;
+  }
+
+  if (!validateOfficialFormFields(officialFormFields)) {
+    goToStep(1);
     return;
   }
 
@@ -2686,6 +2703,8 @@ window.submitRegistration = async function() {
       projectType,
       projectTypes,
       projectTypeOther,
+      ...officialFormFields,
+      major: getRegistrationStudentIdentity().major,
       topicTitleVersion: nextVersion,
       topicTitleHistory,
       topicApprovalStatus: titleChanged ? 'pending' : (previous?.topicApprovalStatus || 'pending'),
@@ -2703,6 +2722,15 @@ window.submitRegistration = async function() {
       eligibilityStatus: eligibilityStatus
     };
 
+    await setDoc(doc(db, 'graduationStudentProfiles', mssv), {
+      studentId: mssv,
+      email: studentEmail,
+      currentClass: officialFormFields.currentClass,
+      phone: officialFormFields.studentPhone,
+      address: officialFormFields.studentAddress,
+      updatedAt: serverTimestamp(),
+      updatedBy: state.user?.email || studentEmail
+    }, { merge: true });
     await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload, { merge: true });
     
     showToast(directAssignment ? '🎉 ĐĂNG KÝ THÀNH CÔNG! Vui lòng chờ Khoa phân công GVHD.' : '🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
@@ -20907,6 +20935,7 @@ window.startStudentRegistration = function() {
   const topicInput = document.getElementById('input-topic-title');
   if (topicInput) topicInput.value = '';
   setSelectedProjectTypes([]);
+  populateRegistrationStudentForm();
   goToStep(1);
 };
 
@@ -21476,6 +21505,167 @@ window.renderStudentTimelineWeeks = function() {
   }
 };
 
+async function loadStudentSelfProfile(mssv) {
+  if (!mssv) return null;
+  try {
+    const snap = await getDoc(doc(db, 'graduationStudentProfiles', mssv));
+    state.studentSelfProfile = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (err) {
+    console.warn('[StudentProfile] Unable to load self profile:', err.message);
+    state.studentSelfProfile = null;
+  }
+  return state.studentSelfProfile;
+}
+
+function getRegistrationStudentIdentity() {
+  const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
+  const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(mssv) : null;
+  return {
+    mssv,
+    fullName: studentObj?.fullName || studentObj?.name || state.myRegistration?.studentName || state.user?.displayName || `Sinh viên ${mssv}`,
+    major: studentObj?.major || state.myRegistration?.major || 'Thiết kế nội thất',
+    email: state.myRegistration?.email || (state.impersonation?.target?.email) || state.user?.email || `${mssv}@student.tdtu.edu.vn`
+  };
+}
+
+function populateRegistrationStudentForm() {
+  const identity = getRegistrationStudentIdentity();
+  const reg = state.myRegistration || {};
+  const profile = state.studentSelfProfile || {};
+  const values = {
+    'registration-student-name': identity.fullName,
+    'registration-student-id': identity.mssv,
+    'registration-student-major': identity.major,
+    'registration-student-email': identity.email,
+    'registration-current-class': reg.currentClass || profile.currentClass || '',
+    'registration-student-phone': reg.studentPhone || profile.phone || '',
+    'registration-student-address': reg.studentAddress || profile.address || '',
+    'registration-course-name': reg.courseName || 'Đồ án tốt nghiệp',
+    'registration-course-code': reg.courseCode || '',
+    'registration-course-group': reg.courseGroup || '',
+    'input-topic-description': reg.topicDescription || ''
+  };
+  Object.entries(values).forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value;
+  });
+  const counter = document.getElementById('topic-description-char-count');
+  if (counter) counter.textContent = String(values['input-topic-description'].length);
+}
+
+function collectOfficialFormFields() {
+  const val = id => (document.getElementById(id)?.value || '').trim();
+  return {
+    currentClass: val('registration-current-class'),
+    studentPhone: val('registration-student-phone'),
+    studentAddress: val('registration-student-address'),
+    courseName: val('registration-course-name'),
+    courseCode: val('registration-course-code'),
+    courseGroup: val('registration-course-group'),
+    topicDescription: val('input-topic-description')
+  };
+}
+
+function validateOfficialFormFields(fields) {
+  const labels = {
+    currentClass: 'lớp hiện tại', studentPhone: 'số điện thoại', studentAddress: 'địa chỉ',
+    courseName: 'môn học', courseCode: 'mã môn học', courseGroup: 'nhóm', topicDescription: 'mô tả định hướng thiết kế'
+  };
+  const missing = Object.entries(labels).find(([key]) => !String(fields[key] || '').trim());
+  if (missing) {
+    showToast(`Vui lòng nhập ${missing[1]} để hoàn thiện phiếu đăng ký chính thức.`, 'warning');
+    return false;
+  }
+  return true;
+}
+
+window.downloadOfficialTopicRegistrationPdf = function() {
+  const reg = state.myRegistration;
+  if (!reg || reg.topicApprovalStatus !== 'approved') {
+    showToast('Phiếu PDF chỉ được tải sau khi GVHD xác nhận tên đề tài.', 'warning');
+    return;
+  }
+  if (!window.pdfMake) {
+    showToast('Bộ tạo PDF chưa tải xong. Vui lòng thử lại sau vài giây.', 'warning');
+    return;
+  }
+
+  const identity = getRegistrationStudentIdentity();
+  const round = state.activeRound || {};
+  const official = getOfficialSupervisors(reg);
+  const primary = official.find(s => s.role === 'primary') || official[0] || {};
+  const supervisorName = primary.supervisorName || reg.acceptedSupervisorName || '........................................';
+  const approvedDate = reg.topicReviewedAt?.toDate ? reg.topicReviewedAt.toDate() : new Date();
+  const dd = String(approvedDate.getDate()).padStart(2, '0');
+  const mm = String(approvedDate.getMonth() + 1).padStart(2, '0');
+  const yyyy = approvedDate.getFullYear();
+  const roundLabel = round.title || round.roundName || 'ĐỒ ÁN TỐT NGHIỆP';
+  const version = Number(reg.topicTitleVersion || 1);
+  const value = text => String(text || '').trim() || '........................................';
+  const fieldRow = (leftLabel, leftValue, rightLabel, rightValue) => ({
+    table: {
+      widths: [78, '*', 78, 120],
+      body: [[
+        { text: leftLabel, bold: true, border: [false, false, false, false] },
+        { text: value(leftValue), border: [false, false, false, true] },
+        { text: rightLabel, bold: true, border: [false, false, false, false] },
+        { text: value(rightValue), border: [false, false, false, true] }
+      ]]
+    },
+    layout: { hLineColor: () => '#111827', vLineColor: () => '#111827' },
+    margin: [0, 0, 0, 8]
+  });
+
+  const docDefinition = {
+    pageSize: 'A4',
+    pageMargins: [50, 38, 50, 45],
+    defaultStyle: { font: 'Roboto', fontSize: 11, lineHeight: 1.15 },
+    content: [
+      {
+        columns: [
+          { width: '48%', stack: [{ text: 'TRƯỜNG ĐẠI HỌC TÔN ĐỨC THẮNG', alignment: 'center' }, { text: 'KHOA MỸ THUẬT CÔNG NGHIỆP', bold: true, alignment: 'center' }, { text: '________________________', alignment: 'center' }] },
+          { width: '52%', stack: [{ text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', alignment: 'center' }, { text: 'Độc lập - Tự do - Hạnh phúc', alignment: 'center' }, { text: '________________________', alignment: 'center' }] }
+        ], margin: [0, 0, 0, 24]
+      },
+      { text: 'PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC', bold: true, fontSize: 19, alignment: 'center' },
+      { text: roundLabel.toUpperCase(), bold: true, fontSize: 15, alignment: 'center', margin: [0, 2, 0, 24] },
+      fieldRow('HỌ VÀ TÊN:', identity.fullName, 'MSSV:', identity.mssv),
+      fieldRow('LỚP:', reg.currentClass, 'NGÀNH:', reg.major || identity.major),
+      fieldRow('EMAIL:', identity.email, 'ĐIỆN THOẠI:', reg.studentPhone),
+      fieldRow('ĐỊA CHỈ:', reg.studentAddress, '', ''),
+      fieldRow('MÔN HỌC:', reg.courseName, 'MÃ MÔN/NHÓM:', `${value(reg.courseCode)} / ${value(reg.courseGroup)}`),
+      { text: `Đăng ký đề tài chính thức lần thứ: ${version}`, italics: true, alignment: 'center', margin: [0, 4, 0, 14] },
+      { text: 'TÊN ĐỀ TÀI', bold: true, fontSize: 12, margin: [0, 0, 0, 5] },
+      { text: value(reg.topicTitle), bold: true, fontSize: 12, margin: [14, 0, 14, 14] },
+      { text: 'MÔ TẢ CHI TIẾT ĐỊNH HƯỚNG THIẾT KẾ CỦA ĐỀ TÀI', bold: true, alignment: 'center', fontSize: 12, margin: [0, 0, 0, 7] },
+      { text: value(reg.topicDescription), alignment: 'justify', minHeight: 105, margin: [8, 0, 8, 18] },
+      { text: 'Tôi xin cam đoan thực hiện đúng đề tài đã đăng ký.', bold: true, alignment: 'center', margin: [0, 2, 0, 20] },
+      {
+        columns: [
+          {
+            width: '55%', stack: [
+              { text: 'Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN', bold: true, alignment: 'center' },
+              { text: 'Đã xác nhận tên đề tài trên hệ thống.', margin: [0, 8, 0, 0], alignment: 'center' },
+              { text: supervisorName, bold: true, alignment: 'center', margin: [0, 28, 0, 0] }
+            ]
+          },
+          {
+            width: '45%', stack: [
+              { text: `TP.HCM, ngày ${dd} tháng ${mm} năm ${yyyy}`, italics: true, alignment: 'center' },
+              { text: 'NGƯỜI ĐĂNG KÝ', bold: true, alignment: 'center', margin: [0, 5, 0, 0] },
+              { text: '(ký và ghi rõ họ tên)', alignment: 'center' }
+            ]
+          }
+        ]
+      }
+    ],
+    styles: {}
+  };
+
+  const safeId = String(identity.mssv || 'sinh-vien').replace(/[^0-9A-Za-z_-]/g, '');
+  window.pdfMake.createPdf(docDefinition).download(`Phieu-dang-ky-de-tai-${safeId}-lan-${version}.pdf`);
+};
+
 window.updateStudentPersonalSidebar = function() {
   const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
   const heroName = document.getElementById('hero-student-name');
@@ -21498,7 +21688,7 @@ window.updateStudentPersonalSidebar = function() {
 
   const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(mssv) : null;
   const fullName = studentObj?.fullName || studentObj?.name || state.user?.displayName || `Sinh viên ${mssv}`;
-  const studentClass = studentObj?.className || studentObj?.studentClass || 'Chưa cập nhật';
+  const studentClass = state.studentSelfProfile?.currentClass || state.myRegistration?.currentClass || 'Chưa cập nhật';
   const major = studentObj?.major || 'Thiết kế nội thất';
 
   const avatarUrl = state.user?.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%2394a3b8'/%3E%3Cpath fill='%2394a3b8' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
@@ -21576,6 +21766,19 @@ window.updateStudentPersonalSidebar = function() {
           <h3 class="font-bold text-sm text-slate-900 truncate leading-snug">${fullName}</h3>
           <p class="text-xs text-slate-500 font-mono">MSSV: <span class="font-bold text-tdtu-blue">${mssv}</span></p>
         </div>
+      </div>
+
+      <div class="p-3.5 bg-blue-50 border border-blue-200 rounded-xl space-y-2.5">
+        <div>
+          <span class="font-black text-xs text-blue-900 block">Thông tin sinh viên tự cập nhật</span>
+          <span class="text-[10px] text-blue-700">Lớp tại đây không lấy từ danh sách chung của Khoa.</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <label class="text-[11px] font-bold text-slate-600">Lớp hiện tại<input id="profile-current-class" maxlength="50" value="${escapeHtml(state.studentSelfProfile?.currentClass || state.myRegistration?.currentClass || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
+          <label class="text-[11px] font-bold text-slate-600">Điện thoại<input id="profile-student-phone" maxlength="20" value="${escapeHtml(state.studentSelfProfile?.phone || state.myRegistration?.studentPhone || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
+        </div>
+        <label class="text-[11px] font-bold text-slate-600 block">Địa chỉ<input id="profile-student-address" maxlength="250" value="${escapeHtml(state.studentSelfProfile?.address || state.myRegistration?.studentAddress || '')}" class="mt-1 w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></label>
+        <button type="button" onclick="saveStudentSelfProfile()" class="w-full px-3 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-lg text-xs font-black">Lưu thông tin sinh viên</button>
       </div>
 
       <!-- Student Details -->
@@ -22243,11 +22446,60 @@ window.renderSupervisorAssignedStudents = function() {
   }).join('');
 };
 
+window.saveStudentSelfProfile = async function() {
+  if (!checkImpersonationWriteGuard('Cập nhật thông tin sinh viên')) return;
+  const identity = getRegistrationStudentIdentity();
+  const currentClass = (document.getElementById('profile-current-class')?.value || '').trim();
+  const phone = (document.getElementById('profile-student-phone')?.value || '').trim();
+  const address = (document.getElementById('profile-student-address')?.value || '').trim();
+  if (!currentClass || !phone || !address) {
+    showToast('Vui lòng nhập đầy đủ lớp hiện tại, điện thoại và địa chỉ.', 'warning');
+    return;
+  }
+  try {
+    const payload = {
+      studentId: identity.mssv,
+      email: identity.email,
+      currentClass,
+      phone,
+      address,
+      updatedAt: serverTimestamp(),
+      updatedBy: state.user?.email || identity.email
+    };
+    await setDoc(doc(db, 'graduationStudentProfiles', identity.mssv), payload, { merge: true });
+    if (state.myRegistration && state.selectedRoundId) {
+      await updateDoc(doc(db, 'graduationRounds', state.selectedRoundId, 'registrations', identity.mssv), {
+        currentClass,
+        studentPhone: phone,
+        studentAddress: address,
+        updatedAt: serverTimestamp()
+      });
+      Object.assign(state.myRegistration, { currentClass, studentPhone: phone, studentAddress: address });
+    }
+    state.studentSelfProfile = { ...(state.studentSelfProfile || {}), ...payload };
+    updateStudentPersonalSidebar();
+    populateRegistrationStudentForm();
+    showToast('Đã cập nhật thông tin sinh viên.', 'success');
+  } catch (err) {
+    console.error('Save student self profile failed:', err);
+    showToast('Không thể lưu thông tin sinh viên: ' + err.message, 'error');
+  }
+};
+
 window.reviewStudentTopicTitle = async function(studentId, decision) {
   if (!checkImpersonationWriteGuard('Duyệt tên đề tài')) return;
   const registration = (state.supervisorAssignedStudents || []).find(st => (st.studentId || st.id) === studentId);
   const roundId = state.selectedRoundId || state.activeRound?.id;
   if (!registration?.topicTitle || !roundId) return;
+
+  if (decision === 'approved') {
+    const requiredOfficialFields = ['currentClass', 'studentPhone', 'studentAddress', 'courseName', 'courseCode', 'courseGroup', 'topicDescription'];
+    const missingOfficialFields = requiredOfficialFields.filter(key => !String(registration[key] || '').trim());
+    if (missingOfficialFields.length > 0) {
+      showToast('Sinh viên chưa hoàn thiện đủ thông tin Phiếu đăng ký chính thức. Chưa thể xác nhận.', 'warning');
+      return;
+    }
+  }
 
   let note = '';
   if (decision === 'rejected') {
@@ -22364,6 +22616,20 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
   document.getElementById('dtl-class-major').textContent = `Lớp: ${className} • Ngành: ${major}`;
   document.getElementById('dtl-topic-title').textContent = st?.topicTitle || 'Chưa cập nhật tên đề tài';
   document.getElementById('dtl-project-type').textContent = `Loại hình: ${st?.projectType || '--'}`;
+  const officialFormInfo = document.getElementById('dtl-official-form-info');
+  if (officialFormInfo) {
+    const rows = [
+      ['Lớp hiện tại', st?.currentClass], ['Ngành', st?.major], ['Điện thoại', st?.studentPhone],
+      ['Địa chỉ', st?.studentAddress], ['Môn học', st?.courseName], ['Mã môn / Nhóm', [st?.courseCode, st?.courseGroup].filter(Boolean).join(' / ')],
+      ['Đăng ký lần', st?.topicTitleVersion || 1], ['Mô tả định hướng', st?.topicDescription]
+    ];
+    officialFormInfo.innerHTML = rows.map(([label, value]) => `
+      <div class="${label === 'Mô tả định hướng' || label === 'Địa chỉ' ? 'sm:col-span-2' : ''}">
+        <span class="text-slate-400 block">${label}</span>
+        <span class="font-semibold text-slate-800 whitespace-pre-wrap">${escapeHtml(value || '--')}</span>
+      </div>
+    `).join('');
+  }
 
   const dateStr = st?.submittedAt ? (st.submittedAt.toDate ? st.submittedAt.toDate() : new Date(st.submittedAt)).toLocaleString('vi-VN') : '--';
   document.getElementById('dtl-registered-time').textContent = `Đăng ký ngày: ${dateStr}`;
