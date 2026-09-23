@@ -6706,6 +6706,75 @@ window.deleteEligibleStudent = async function(studentId) {
   }
 };
 
+// Add one supplementary student without requiring an Excel import.  The
+// authoritative profile is always resolved from the Faculty Student Master,
+// so a manually-added row has the same data shape as an imported student.
+window.addEligibleStudentByMssv = async function() {
+  const input = document.getElementById('quick-add-eligible-mssv');
+  const rawMssv = String(input?.value || '').trim().replace(/\s+/g, '').toUpperCase();
+  const roundId = document.getElementById('admin-round-student-select')?.value;
+
+  if (!roundId) {
+    showToast('Vui lòng chọn đợt tốt nghiệp trước khi thêm sinh viên.', 'warning');
+    return;
+  }
+  if (!rawMssv) {
+    showToast('Nhập MSSV sinh viên cần bổ sung.', 'warning');
+    input?.focus();
+    return;
+  }
+  if (!/^[A-Z0-9_-]+$/.test(rawMssv)) {
+    showToast('MSSV chỉ gồm chữ cái, chữ số, dấu gạch nối hoặc gạch dưới.', 'warning');
+    return;
+  }
+
+  try {
+    if (typeof ensureFacultyDatasetLoaded === 'function') {
+      await ensureFacultyDatasetLoaded();
+    } else if (typeof loadFacultyDatasetFromIFAA === 'function' && !state.facultyStudentsLoaded) {
+      await loadFacultyDatasetFromIFAA();
+    }
+
+    const master = typeof window.getFacultyStudentByMssv === 'function'
+      ? window.getFacultyStudentByMssv(rawMssv)
+      : (state.facultyStudents || []).find(s => String(s.mssv || s.studentId || '').trim().toUpperCase() === rawMssv);
+    if (!master || master.notFoundInMaster || !(master.fullName || master.name)) {
+      showToast(`Không tìm thấy MSSV ${rawMssv} trong dữ liệu sinh viên Khoa.`, 'error');
+      return;
+    }
+
+    const studentRef = doc(db, 'graduationRounds', roundId, 'eligibleStudents', rawMssv);
+    const existing = await getDoc(studentRef);
+    if (existing.exists()) {
+      showToast(`Sinh viên ${rawMssv} đã có trong đợt này.`, 'warning');
+      return;
+    }
+
+    const fullName = master.fullName || master.name;
+    const className = master.className || master.studentClass || '';
+    await setDoc(studentRef, {
+      studentId: rawMssv,
+      mssv: rawMssv,
+      name: fullName,
+      fullName,
+      email: master.email || `${rawMssv.toLowerCase()}@student.tdtu.edu.vn`,
+      className,
+      studentClass: className,
+      major: master.major || 'Thiết kế Nội thất',
+      eligible: true,
+      source: 'manual_supplement',
+      createdAt: serverTimestamp()
+    });
+
+    if (input) input.value = '';
+    showToast(`Đã thêm ${fullName} (${rawMssv}) vào đợt.`, 'success');
+    await loadAdminEligibleStudents(roundId);
+  } catch (e) {
+    console.error('Quick add eligible student failed:', e);
+    showToast('Không thể thêm sinh viên: ' + e.message, 'error');
+  }
+};
+
 window.handleExcelFileUpload = function(event) {
   const file = event.target.files[0];
   if (!file) return;
