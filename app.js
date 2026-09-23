@@ -21109,7 +21109,7 @@ window.renderStudentTimelineWeeks = function() {
       currentWeekNum = weekNum;
     }
     weeks.push({ num: weekNum, start: wStart, end: wEnd,
-      dateText: `${fmtShortDate(wStart)} – ${fmtShortDate(wEnd)}`, status });
+      dateText: `${fmtFullDate(wStart)} – ${fmtFullDate(wEnd)}`, status });
   }
 
   // ── Header badge & date range ──────────────────────────────────
@@ -21286,7 +21286,7 @@ window.renderStudentTimelineWeeks = function() {
         <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${st.icon_bg} my-1">
           ${card.status === 'completed' ? '✓' : (card.status === 'ongoing' || card.status === 'active') ? '●' : card.num}
         </div>
-        <span class="text-[10px] font-mono text-slate-500">${card.dateText}</span>
+        <span class="text-[13px] font-mono font-bold text-slate-700 tracking-tight">${card.dateText}</span>
         ${noteHtml}
         ${milestoneHtml}
       </div>`;
