@@ -22148,7 +22148,7 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
     return;
   }
 
-  const identity = getRegistrationStudentIdentity();
+  identity = identity || getRegistrationStudentIdentity();
   const round = state.activeRound || {};
   const approvedDate = reg.topicReviewedAt?.toDate ? reg.topicReviewedAt.toDate() : new Date();
   const dd = String(approvedDate.getDate()).padStart(2, '0');
