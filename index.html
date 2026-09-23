@@ -3399,17 +3399,20 @@
                 </div>
                 <div>
                   <label class="font-semibold text-slate-600 block mb-1">Số tuần thực hiện:</label>
-                  <input type="number" id="round-form-duration-weeks" value="12" min="1" max="24" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-bold">
+                  <input type="number" id="round-form-duration-weeks" value="12" min="1" max="24" onchange="resizeRoundTimelineWeeks(this.value)" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-bold">
                 </div>
               </div>
-              <p class="text-[10px] text-slate-500 italic">Hệ thống sẽ tự động tính toán và hiển thị thanh tiến độ 12 tuần trên trang sinh viên bắt đầu từ Thứ Hai của tuần bắt đầu.</p>
+              <p class="text-[10px] text-slate-500 italic">Hệ thống tự động tính lịch từ Thứ Hai của tuần bắt đầu. Có thể thêm tuần ngoài 12 tuần mặc định.</p>
             </div>
 
             <!-- Admin Weekly Content Editor -->
             <div id="round-weekly-content-editor-wrap" class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between gap-2">
                 <span class="font-bold text-slate-800 text-xs uppercase tracking-wider">📝 Nội dung từng tuần</span>
-                <button type="button" onclick="resetWeeklyContentToDefault()" class="text-[10px] text-slate-500 hover:text-red-600 font-semibold transition-colors">Đặt lại mặc định</button>
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="addRoundTimelineWeek()" class="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700 hover:bg-blue-100">＋ Thêm tuần</button>
+                  <button type="button" onclick="resetWeeklyContentToDefault()" class="text-[10px] text-slate-500 hover:text-red-600 font-semibold transition-colors">Đặt lại mặc định</button>
+                </div>
               </div>
               <div id="round-weekly-content-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <!-- Populated by renderRoundWeeklyContentEditor() -->

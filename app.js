@@ -3891,33 +3891,85 @@ function getRoundWeekDraftEvents(weekNumber) {
   return Array.isArray(state.roundWeekEventsDraft[weekNumber]) ? state.roundWeekEventsDraft[weekNumber] : [];
 }
 
+function normalizeRoundWeekEventColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#dc2626';
+}
+
+function getRoundWeekEventRange(event = {}) {
+  const fallback = Math.max(0, Math.min(6, Number(event.dayIndex) || 0));
+  let startDayIndex = Number.isInteger(Number(event.startDayIndex))
+    ? Math.max(0, Math.min(6, Number(event.startDayIndex)))
+    : fallback;
+  let endDayIndex = Number.isInteger(Number(event.endDayIndex))
+    ? Math.max(0, Math.min(6, Number(event.endDayIndex)))
+    : startDayIndex;
+  if (endDayIndex < startDayIndex) [startDayIndex, endDayIndex] = [endDayIndex, startDayIndex];
+  return { startDayIndex, endDayIndex };
+}
+
+function roundWeekEventOccursOnDay(event, day) {
+  const { startDayIndex, endDayIndex } = getRoundWeekEventRange(event);
+  return day.dayIndex >= startDayIndex && day.dayIndex <= endDayIndex;
+}
+
 function renderRoundWeekDayPicker(weekNumber) {
   const daysEl = document.getElementById(`round-week-${weekNumber}-days`);
   const eventsEl = document.getElementById(`round-week-${weekNumber}-events`);
-  const selectEl = document.getElementById(`round-week-${weekNumber}-event-day`);
-  if (!daysEl || !eventsEl || !selectEl) return;
+  const startSelectEl = document.getElementById(`round-week-${weekNumber}-event-start-day`);
+  const endSelectEl = document.getElementById(`round-week-${weekNumber}-event-end-day`);
+  if (!daysEl || !eventsEl || !startSelectEl || !endSelectEl) return;
   const days = getRoundWeekDaysFromForm(weekNumber);
   const events = getRoundWeekDraftEvents(weekNumber);
 
-  selectEl.innerHTML = days.map(day => `<option value="${day.dayIndex}">${day.shortName} · ${day.label}</option>`).join('');
+  const dayOptions = days.map(day => `<option value="${day.dayIndex}">${day.shortName} · ${day.label}</option>`).join('');
+  const currentStart = startSelectEl.value;
+  const currentEnd = endSelectEl.value;
+  startSelectEl.innerHTML = dayOptions;
+  endSelectEl.innerHTML = dayOptions;
+  if (currentStart !== '') startSelectEl.value = currentStart;
+  if (currentEnd !== '') endSelectEl.value = currentEnd;
   daysEl.innerHTML = days.map(day => {
-    const dayEvents = events.filter(event => Number(event.dayIndex) === day.dayIndex || event.date === day.date);
+    const dayEvents = events.filter(event => roundWeekEventOccursOnDay(event, day));
     const titles = dayEvents.map(event => escapeHtml(event.title)).join('\n');
-    return `<button type="button" onclick="selectRoundWeekEventDay(${weekNumber}, ${day.dayIndex})" title="${titles || `${day.shortName} ${day.label}: chưa có sự kiện`}" class="min-w-0 rounded-lg border px-1 py-1 text-center transition ${dayEvents.length ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-blue-300'}">
+    const eventColor = dayEvents.length ? normalizeRoundWeekEventColor(dayEvents[0].color) : '';
+    const eventStyle = eventColor ? ` style="background-color:${eventColor}18;border-color:${eventColor};color:${eventColor}"` : '';
+    return `<button type="button" onclick="selectRoundWeekEventDay(${weekNumber}, ${day.dayIndex})" title="${titles || `${day.shortName} ${day.label}: chưa có sự kiện`}" class="min-w-0 rounded-lg border px-1 py-1 text-center transition ${dayEvents.length ? 'shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-blue-300'}"${eventStyle}>
       <span class="block text-[8px] font-black">${day.shortName}</span><span class="block text-[9px] font-bold">${day.label}</span>${dayEvents.length ? '<span class="block text-[8px] leading-none mt-0.5">●</span>' : ''}
     </button>`;
   }).join('');
   eventsEl.innerHTML = events.length
-    ? events.map(event => `<div class="flex items-center justify-between gap-1 rounded-md bg-rose-50 border border-rose-100 px-2 py-1 text-[10px] text-rose-800"><span class="truncate">📌 ${escapeHtml(event.date || '')} · ${escapeHtml(event.title || '')}</span><button type="button" onclick="removeRoundWeekEvent(${weekNumber}, '${escapeHtml(event.id)}')" class="shrink-0 font-black text-rose-500 hover:text-rose-700">×</button></div>`).join('')
+    ? events.map(event => {
+      const color = normalizeRoundWeekEventColor(event.color);
+      const { startDayIndex, endDayIndex } = getRoundWeekEventRange(event);
+      const startDate = event.startDate || event.date || days[startDayIndex]?.date || '';
+      const endDate = event.endDate || event.date || days[endDayIndex]?.date || startDate;
+      const dateText = startDate === endDate ? startDate : `${startDate} → ${endDate}`;
+      return `<div class="flex items-center justify-between gap-1 rounded-md border px-2 py-1 text-[10px]" style="background-color:${color}18;border-color:${color}55;color:${color}"><span class="truncate">📌 ${escapeHtml(dateText)} · ${escapeHtml(event.title || '')}</span><button type="button" onclick="removeRoundWeekEvent(${weekNumber}, '${escapeHtml(event.id)}')" class="shrink-0 font-black opacity-70 hover:opacity-100">×</button></div>`;
+    }).join('')
     : '<span class="text-[10px] text-slate-400 italic">Chưa có sự kiện theo ngày.</span>';
 }
 
 window.selectRoundWeekEventDay = function(weekNumber, dayIndex) {
-  const select = document.getElementById(`round-week-${weekNumber}-event-day`);
+  const startSelect = document.getElementById(`round-week-${weekNumber}-event-start-day`);
+  const endSelect = document.getElementById(`round-week-${weekNumber}-event-end-day`);
   const form = document.getElementById(`round-week-${weekNumber}-event-form`);
-  if (select) select.value = String(dayIndex);
+  if (startSelect) startSelect.value = String(dayIndex);
+  if (endSelect) endSelect.value = String(dayIndex);
   if (form) form.classList.remove('hidden');
   document.getElementById(`round-week-${weekNumber}-event-title`)?.focus();
+};
+
+window.syncRoundWeekEventRange = function(weekNumber, changedField) {
+  const startSelect = document.getElementById(`round-week-${weekNumber}-event-start-day`);
+  const endSelect = document.getElementById(`round-week-${weekNumber}-event-end-day`);
+  if (!startSelect || !endSelect) return;
+  const start = Number(startSelect.value || 0);
+  const end = Number(endSelect.value || 0);
+  if (end < start) {
+    if (changedField === 'start') endSelect.value = String(start);
+    else startSelect.value = String(end);
+  }
 };
 
 window.toggleRoundWeekEventForm = function(weekNumber) {
@@ -3928,17 +3980,36 @@ window.toggleRoundWeekEventForm = function(weekNumber) {
 
 window.addRoundWeekEvent = function(weekNumber) {
   const titleInput = document.getElementById(`round-week-${weekNumber}-event-title`);
-  const daySelect = document.getElementById(`round-week-${weekNumber}-event-day`);
+  const startDaySelect = document.getElementById(`round-week-${weekNumber}-event-start-day`);
+  const endDaySelect = document.getElementById(`round-week-${weekNumber}-event-end-day`);
+  const colorInput = document.getElementById(`round-week-${weekNumber}-event-color`);
   const title = String(titleInput?.value || '').trim();
   if (!title) {
     showToast('Nhập tên sự kiện hoặc cột mốc.', 'warning');
     titleInput?.focus();
     return;
   }
-  const dayIndex = Number(daySelect?.value || 0);
-  const day = getRoundWeekDaysFromForm(weekNumber)[dayIndex];
+  const startDayIndex = Number(startDaySelect?.value || 0);
+  const endDayIndex = Number(endDaySelect?.value || startDayIndex);
+  const days = getRoundWeekDaysFromForm(weekNumber);
+  const startDay = days[startDayIndex];
+  const endDay = days[endDayIndex];
+  if (!startDay || !endDay || endDayIndex < startDayIndex) {
+    showToast('Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.', 'warning');
+    return;
+  }
   const events = getRoundWeekDraftEvents(weekNumber);
-  events.push({ id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, dayIndex, date: day.date, title });
+  events.push({
+    id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    title,
+    dayIndex: startDayIndex,
+    date: startDay.date,
+    startDayIndex,
+    endDayIndex,
+    startDate: startDay.date,
+    endDate: endDay.date,
+    color: normalizeRoundWeekEventColor(colorInput?.value)
+  });
   state.roundWeekEventsDraft[weekNumber] = events;
   if (titleInput) titleInput.value = '';
   renderRoundWeekDayPicker(weekNumber);
@@ -3957,19 +4028,22 @@ window.refreshRoundWeekDayPickers = function() {
 function renderRoundWeeklyContentEditor(durationWeeks) {
   const grid = document.getElementById('round-weekly-content-grid');
   if (!grid) return;
-  durationWeeks = parseInt(durationWeeks, 10) || 12;
+  durationWeeks = Math.max(1, Math.min(24, parseInt(durationWeeks, 10) || 12));
   const defaultMilestones = { 4: 'Duyệt đợt 1', 8: 'Duyệt đợt 2', 12: 'Duyệt đợt 3' };
   grid.innerHTML = Array.from({ length: durationWeeks }, (_, i) => {
     const n = i + 1;
     const defMilestone = defaultMilestones[n] || '';
     return `
-      <div class="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
+      <div data-round-week-card="${n}" class="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
         <div class="flex items-center justify-between">
           <span class="font-black text-xs text-slate-800">Tuần ${n}</span>
-          <label class="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 cursor-pointer">
-            <input type="checkbox" id="round-week-${n}-visible" checked class="rounded text-emerald-600">
-            Hiển thị cho SV
-          </label>
+          <div class="flex items-center gap-2">
+            <label class="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 cursor-pointer">
+              <input type="checkbox" id="round-week-${n}-visible" checked class="rounded text-emerald-600">
+              Hiển thị cho SV
+            </label>
+            ${n > 12 ? `<button type="button" onclick="removeRoundTimelineWeek(${n})" title="Xóa tuần này" class="rounded-md border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] font-black text-rose-600 hover:bg-rose-100">× Xóa</button>` : ''}
+          </div>
         </div>
         <input type="text" id="round-week-${n}-title" placeholder="Tiêu đề tuần ${n}"
                class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
@@ -3992,14 +4066,93 @@ function renderRoundWeeklyContentEditor(durationWeeks) {
           <div id="round-week-${n}-days" class="grid grid-cols-7 gap-1"></div>
           <div id="round-week-${n}-events" class="space-y-1"></div>
           <div id="round-week-${n}-event-form" class="hidden rounded-lg bg-blue-50 border border-blue-100 p-2 space-y-1.5">
-            <div class="grid grid-cols-[90px_1fr] gap-1.5"><select id="round-week-${n}-event-day" class="min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"></select><input id="round-week-${n}-event-title" type="text" maxlength="120" placeholder="VD: Sơ khảo" class="min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"></div>
-            <button type="button" onclick="addRoundWeekEvent(${n})" class="w-full rounded-md bg-blue-600 py-1 text-[10px] font-bold text-white hover:bg-blue-700">Thêm vào ngày đã chọn</button>
+            <div class="grid grid-cols-2 gap-1.5">
+              <label class="min-w-0 text-[9px] font-bold text-slate-500">Bắt đầu<select id="round-week-${n}-event-start-day" onchange="syncRoundWeekEventRange(${n}, 'start')" class="mt-0.5 w-full min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"></select></label>
+              <label class="min-w-0 text-[9px] font-bold text-slate-500">Kết thúc<select id="round-week-${n}-event-end-day" onchange="syncRoundWeekEventRange(${n}, 'end')" class="mt-0.5 w-full min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"></select></label>
+            </div>
+            <div class="grid grid-cols-[1fr_72px] gap-1.5 items-end"><input id="round-week-${n}-event-title" type="text" maxlength="120" placeholder="VD: Sơ khảo" class="min-w-0 rounded-md border border-slate-200 bg-white p-1 text-[10px]"><label class="text-[9px] font-bold text-slate-500">Màu<input id="round-week-${n}-event-color" type="color" value="#dc2626" title="Chọn màu sự kiện" class="mt-0.5 h-7 w-full cursor-pointer rounded-md border border-slate-200 bg-white p-0.5"></label></div>
+            <button type="button" onclick="addRoundWeekEvent(${n})" class="w-full rounded-md bg-blue-600 py-1 text-[10px] font-bold text-white hover:bg-blue-700">Thêm khoảng sự kiện</button>
           </div>
         </div>
       </div>`;
   }).join('');
   window.refreshRoundWeekDayPickers();
 }
+
+function readRoundWeeklyContentDraft(durationWeeks) {
+  return Array.from({ length: durationWeeks }, (_, index) => {
+    const week = index + 1;
+    return {
+      title: document.getElementById(`round-week-${week}-title`)?.value || '',
+      note: document.getElementById(`round-week-${week}-note`)?.value || '',
+      milestone: document.getElementById(`round-week-${week}-milestone`)?.value || '',
+      customMilestone: document.getElementById(`round-week-${week}-milestone-custom`)?.value || '',
+      visible: document.getElementById(`round-week-${week}-visible`)?.checked !== false,
+      events: [...getRoundWeekDraftEvents(week)]
+    };
+  });
+}
+
+function restoreRoundWeeklyContentDraft(drafts = []) {
+  state.roundWeekEventsDraft = {};
+  drafts.forEach((draft, index) => {
+    const week = index + 1;
+    const titleEl = document.getElementById(`round-week-${week}-title`);
+    const noteEl = document.getElementById(`round-week-${week}-note`);
+    const milestoneEl = document.getElementById(`round-week-${week}-milestone`);
+    const customEl = document.getElementById(`round-week-${week}-milestone-custom`);
+    const visibleEl = document.getElementById(`round-week-${week}-visible`);
+    if (titleEl) titleEl.value = draft.title || `Tuần ${week}`;
+    if (noteEl) noteEl.value = draft.note || '';
+    if (milestoneEl) milestoneEl.value = draft.milestone || '';
+    if (customEl) customEl.value = draft.customMilestone || '';
+    if (visibleEl) visibleEl.checked = draft.visible !== false;
+    state.roundWeekEventsDraft[week] = Array.isArray(draft.events) ? draft.events : [];
+    window.toggleRoundWeekCustomMilestone(week);
+    renderRoundWeekDayPicker(week);
+  });
+}
+
+window.addRoundTimelineWeek = function() {
+  const durationInput = document.getElementById('round-form-duration-weeks');
+  const currentDuration = Math.max(1, parseInt(durationInput?.value, 10) || 12);
+  if (currentDuration >= 24) {
+    showToast('Một đợt được cấu hình tối đa 24 tuần.', 'warning');
+    return;
+  }
+  const drafts = readRoundWeeklyContentDraft(currentDuration);
+  const nextDuration = currentDuration + 1;
+  if (durationInput) durationInput.value = String(nextDuration);
+  renderRoundWeeklyContentEditor(nextDuration);
+  restoreRoundWeeklyContentDraft([...drafts, { title: `Tuần ${nextDuration}`, note: '', milestone: '', customMilestone: '', visible: true, events: [] }]);
+  document.querySelector(`[data-round-week-card="${nextDuration}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+
+window.removeRoundTimelineWeek = function(weekNumber) {
+  const durationInput = document.getElementById('round-form-duration-weeks');
+  const currentDuration = Math.max(1, parseInt(durationInput?.value, 10) || 12);
+  if (weekNumber <= 12 || weekNumber > currentDuration) return;
+  const drafts = readRoundWeeklyContentDraft(currentDuration).filter((_, index) => index + 1 !== weekNumber);
+  const nextDuration = currentDuration - 1;
+  if (durationInput) durationInput.value = String(nextDuration);
+  renderRoundWeeklyContentEditor(nextDuration);
+  restoreRoundWeeklyContentDraft(drafts);
+  showToast(`Đã xóa tuần ${weekNumber}.`, 'success');
+};
+
+window.resizeRoundTimelineWeeks = function(value) {
+  const requestedDuration = Math.max(1, Math.min(24, parseInt(value, 10) || 12));
+  const currentDuration = document.querySelectorAll('[data-round-week-card]').length || 12;
+  const drafts = readRoundWeeklyContentDraft(currentDuration).slice(0, requestedDuration);
+  while (drafts.length < requestedDuration) {
+    const week = drafts.length + 1;
+    drafts.push({ title: `Tuần ${week}`, note: '', milestone: '', customMilestone: '', visible: true, events: [] });
+  }
+  const durationInput = document.getElementById('round-form-duration-weeks');
+  if (durationInput) durationInput.value = String(requestedDuration);
+  renderRoundWeeklyContentEditor(requestedDuration);
+  restoreRoundWeeklyContentDraft(drafts);
+};
 
 window.toggleRoundWeekCustomMilestone = function(weekNumber) {
   const select = document.getElementById(`round-week-${weekNumber}-milestone`);
@@ -4350,7 +4503,12 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
       id: event.id || `legacy-${n}-${index}`,
       title: String(event.title || event.name || '').trim(),
       dayIndex: Number.isInteger(event.dayIndex) ? event.dayIndex : 0,
-      date: event.date || ''
+      date: event.date || event.startDate || '',
+      startDayIndex: Number.isInteger(Number(event.startDayIndex)) ? Number(event.startDayIndex) : (Number.isInteger(event.dayIndex) ? event.dayIndex : 0),
+      endDayIndex: Number.isInteger(Number(event.endDayIndex)) ? Number(event.endDayIndex) : (Number.isInteger(event.dayIndex) ? event.dayIndex : 0),
+      startDate: event.startDate || event.date || '',
+      endDate: event.endDate || event.date || '',
+      color: normalizeRoundWeekEventColor(event.color)
     })).filter(event => event.title) : [];
     if (visibleEl) visibleEl.checked = wc.visible !== false;
     if (mileEl) {
@@ -5526,8 +5684,13 @@ window.saveRound = async function(e) {
       events: getRoundWeekDraftEvents(n).map(event => ({
         id: event.id,
         title: String(event.title || '').trim(),
-        dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
-        date: event.date || ''
+        dayIndex: getRoundWeekEventRange(event).startDayIndex,
+        date: event.startDate || event.date || '',
+        startDayIndex: getRoundWeekEventRange(event).startDayIndex,
+        endDayIndex: getRoundWeekEventRange(event).endDayIndex,
+        startDate: event.startDate || event.date || '',
+        endDate: event.endDate || event.startDate || event.date || '',
+        color: normalizeRoundWeekEventColor(event.color)
       })).filter(event => event.title),
     };
   });
@@ -20984,7 +21147,12 @@ function getRoundWeekSchedule(round) {
       id: event.id || `legacy-${week}-${index}`,
       title: String(event.title || event.name || '').trim(),
       dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
-      date: event.date || ''
+      date: event.date || event.startDate || '',
+      startDayIndex: Number.isInteger(Number(event.startDayIndex)) ? Math.max(0, Math.min(6, Number(event.startDayIndex))) : Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
+      endDayIndex: Number.isInteger(Number(event.endDayIndex)) ? Math.max(0, Math.min(6, Number(event.endDayIndex))) : Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
+      startDate: event.startDate || event.date || '',
+      endDate: event.endDate || event.date || '',
+      color: normalizeRoundWeekEventColor(event.color)
     })).filter(event => event.title);
     return {
       week,
@@ -21002,13 +21170,13 @@ function getRoundWeekSchedule(round) {
 
 function renderTimelineWeekDays(days = [], events = []) {
   return `<div class="grid grid-cols-7 gap-1 w-full mt-2 pt-2 border-t border-slate-200/80">${days.map(day => {
-    const dayEvents = events.filter(event => Number(event.dayIndex) === day.dayIndex || event.date === day.key);
+    const dayEvents = events.filter(event => roundWeekEventOccursOnDay(event, day));
     const titles = dayEvents.map(event => escapeHtml(event.title)).join(' · ');
     const isToday = day.date instanceof Date && day.date.toDateString() === new Date().toDateString();
-    const dayClass = dayEvents.length
-      ? 'bg-rose-50 border-rose-300 text-rose-700'
-      : (isToday ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' : 'bg-white/70 border-slate-200 text-slate-500');
-    return `<span title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border px-0.5 py-0.5 text-center ${dayClass}"><b class="block text-[8px] leading-none">${day.shortName}</b><b class="block text-[8px] leading-none mt-0.5">${day.label}</b>${dayEvents.length ? '<i class="block text-[8px] leading-none not-italic">●</i>' : ''}</span>`;
+    const eventColor = dayEvents.length ? normalizeRoundWeekEventColor(dayEvents[0].color) : '';
+    const dayClass = dayEvents.length ? '' : (isToday ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' : 'bg-white/70 border-slate-200 text-slate-500');
+    const dayStyle = eventColor ? ` style="background-color:${eventColor}18;border-color:${eventColor};color:${eventColor}"` : '';
+    return `<span title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border px-0.5 py-0.5 text-center ${dayClass}"${dayStyle}><b class="block text-[8px] leading-none">${day.shortName}</b><b class="block text-[8px] leading-none mt-0.5">${day.label}</b>${dayEvents.length ? '<i class="block text-[8px] leading-none not-italic">●</i>' : ''}</span>`;
   }).join('')}</div>`;
 }
 
@@ -21996,7 +22164,12 @@ window.renderStudentTimelineWeeks = function() {
       id: event.id || `legacy-${w.num}-${index}`,
       title: String(event.title || event.name || '').trim(),
       dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
-      date: event.date || ''
+      date: event.date || event.startDate || '',
+      startDayIndex: Number.isInteger(Number(event.startDayIndex)) ? Math.max(0, Math.min(6, Number(event.startDayIndex))) : Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
+      endDayIndex: Number.isInteger(Number(event.endDayIndex)) ? Math.max(0, Math.min(6, Number(event.endDayIndex))) : Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
+      startDate: event.startDate || event.date || '',
+      endDate: event.endDate || event.date || '',
+      color: normalizeRoundWeekEventColor(event.color)
     })).filter(event => event.title);
     allCards.push({
       type: 'week',
