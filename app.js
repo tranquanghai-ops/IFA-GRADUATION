@@ -23059,132 +23059,181 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
   const yyyy = approvedDate.getFullYear();
   const roundLabel = round.title || round.roundName || 'ĐỒ ÁN TỐT NGHIỆP';
   const version = Number(reg.topicTitleVersion || 1);
-  const value = text => String(text || '').trim() || '........................................';
   const normalizedRoundLabel = roundLabel.toUpperCase().replace(/\s+/g, ' ').trim();
   const roundHeadingMatch = normalizedRoundLabel.match(/^(.*?)(?:\s*-\s*)?(ĐỢT\s+.+)$/);
-  const programHeading = roundHeadingMatch?.[1] || normalizedRoundLabel;
-  const roundHeading = roundHeadingMatch?.[2] || '';
-  const dottedText = '........................................................................................................................';
+  const programHeading = roundHeadingMatch?.[1] || 'ĐỒ ÁN TỐT NGHIỆP/ĐỒ ÁN TỔNG HỢP';
+  const roundHeading = roundHeadingMatch?.[2] || (round.roundName ? `ĐỢT ${round.roundName}` : '');
   const descriptionText = String(reg.topicDescription || '').trim();
-  const estimatedDescriptionLines = Math.max(1, Math.ceil(descriptionText.length / 88));
-  const descriptionDotLines = Array.from({ length: descriptionText ? 0 : Math.max(0, 8 - estimatedDescriptionLines) }, () => ({
-    text: dottedText, fontSize: 12, lineHeight: 1, margin: [0, 0, 0, 6]
-  }));
-  const estimatedTopicLines = Math.max(1, Math.ceil(String(reg.topicTitle || '').trim().length / 70));
-  const topicDotLines = Array.from({ length: String(reg.topicTitle || '').trim() ? 0 : Math.max(0, 3 - estimatedTopicLines) }, () => ({
-    text: dottedText, bold: true, fontSize: 12, lineHeight: 1, margin: [28, 0, 0, 5]
-  }));
-  const fieldRow = (leftLabel, leftValue, rightLabel, rightValue) => ({
-    table: {
-      widths: [80, '*', 46, 105],
-      body: [[
-        { text: leftLabel, fontSize: 12, border: [false, false, false, false] },
-        { text: value(leftValue), fontSize: 12, border: [false, false, false, false] },
-        { text: rightLabel, fontSize: 12, border: [false, false, false, false] },
-        { text: value(rightValue), fontSize: 12, border: [false, false, false, false] }
-      ]]
-    },
-    layout: {
-      paddingLeft: () => 0, paddingRight: () => 0,
-      paddingTop: () => 0, paddingBottom: () => 0
-    },
-    margin: [0, 0, 0, 12]
-  });
-  const fullFieldRow = (label, fieldValue) => ({
-    table: {
-      widths: [118, '*'],
-      body: [[
-        { text: label, fontSize: 12, border: [false, false, false, false] },
-        { text: value(fieldValue), fontSize: 12, border: [false, false, false, false] }
-      ]]
-    },
-    layout: {
-      paddingLeft: () => 0, paddingRight: () => 0,
-      paddingTop: () => 0, paddingBottom: () => 0
-    },
-    margin: [0, 0, 0, 12]
-  });
-  const courseRow = {
-    table: {
-      widths: [62, '*', 82, 55, 42, 28],
-      body: [[
-        { text: 'MÔN HỌC:', fontSize: 12, border: [false, false, false, false] },
-        { text: value(reg.courseName), fontSize: 12, border: [false, false, false, false] },
-        { text: 'MÃ MÔN HỌC:', fontSize: 12, border: [false, false, false, false] },
-        { text: value(reg.courseCode), fontSize: 12, border: [false, false, false, false] },
-        { text: 'NHÓM:', fontSize: 12, border: [false, false, false, false] },
-        { text: value(reg.courseGroup), fontSize: 12, border: [false, false, false, false] }
-      ]]
-    },
-    layout: {
-      paddingLeft: () => 0, paddingRight: () => 0,
-      paddingTop: () => 0, paddingBottom: () => 0
-    },
-    margin: [0, 0, 0, 12]
-  };
 
   const docDefinition = {
     pageSize: 'A4',
-    pageMargins: [56, 23, 56, 40],
-    defaultStyle: { font: 'Roboto', fontSize: 12, lineHeight: 1 },
+    pageMargins: [54, 36, 54, 36],
+    defaultStyle: { font: 'Roboto', fontSize: 12, lineHeight: 1.2 },
     content: [
       {
         columns: [
           {
-            width: '48%', stack: [
-              { text: 'TRƯỜNG ĐẠI HỌC TÔN ĐỨC THẮNG', fontSize: 10, alignment: 'center' },
-              { text: 'KHOA MỸ THUẬT CÔNG NGHIỆP', fontSize: 10, bold: true, alignment: 'center', margin: [0, 1, 0, 7] },
-              { canvas: [{ type: 'line', x1: 26, y1: 0, x2: 190, y2: 0, lineWidth: 0.8 }] }
+            width: '46%',
+            stack: [
+              { text: 'TRƯỜNG ĐẠI HỌC TÔN ĐỨC THẮNG', fontSize: 10.5, alignment: 'center' },
+              { text: 'KHOA MỸ THUẬT CÔNG NGHIỆP', fontSize: 10.5, bold: true, alignment: 'center', margin: [0, 2, 0, 4] },
+              { canvas: [{ type: 'line', x1: 25, y1: 0, x2: 175, y2: 0, lineWidth: 0.8 }] }
             ]
           },
           {
-            width: '52%', stack: [
-              { text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', fontSize: 10, alignment: 'center' },
-              { text: 'Độc lập - Tự do - Hạnh phúc', fontSize: 10, alignment: 'center', margin: [0, 1, 0, 7] },
-              { canvas: [{ type: 'line', x1: 42, y1: 0, x2: 175, y2: 0, lineWidth: 0.8 }] }
+            width: '54%',
+            stack: [
+              { text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', fontSize: 10.5, bold: true, alignment: 'center' },
+              { text: 'Độc lập -Tự do – Hạnh phúc', fontSize: 10.5, bold: true, alignment: 'center', margin: [0, 2, 0, 4] },
+              { canvas: [{ type: 'line', x1: 45, y1: 0, x2: 175, y2: 0, lineWidth: 0.8 }] }
             ]
           }
-        ], margin: [0, 0, 0, 20]
+        ],
+        margin: [0, 0, 0, 20]
       },
-      { text: 'PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC', bold: true, fontSize: 18, alignment: 'center' },
-      { text: programHeading, bold: true, fontSize: 16, alignment: 'center', margin: [0, 3, 0, 0] },
-      ...(roundHeading ? [{ text: roundHeading, bold: true, fontSize: 16, alignment: 'center', margin: [0, 1, 0, 22] }] : [{ text: '', margin: [0, 0, 0, 22] }]),
-      fieldRow('HỌ VÀ TÊN:', identity.fullName, 'MSSV:', identity.mssv),
-      fieldRow('LỚP:', reg.currentClass, 'NGÀNH:', reg.major || identity.major),
-      fullFieldRow('EMAIL:', reg.personalEmail),
-      fullFieldRow('ĐIỆN THOẠI:', reg.studentPhone),
-      fullFieldRow('ĐỊA CHỈ TẠM TRÚ:', reg.studentTemporaryAddress || reg.studentAddress),
-      courseRow,
-      { text: `Đăng ký đề tài chính thức lần thứ : ${version}`, italics: true, fontSize: 12, alignment: 'center', margin: [0, 0, 0, 22] },
-      {
-        table: {
-          widths: [92, '*'],
-          body: [[
-            { text: 'TÊN ĐỀ TÀI :', bold: true, fontSize: 12, border: [false, false, false, false] },
-            { text: value(reg.topicTitle), bold: true, fontSize: 12, border: [false, false, false, false] }
-          ]]
-        },
-        layout: { paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
-        margin: [0, 0, 0, 5]
-      },
-      ...topicDotLines,
-      { text: 'MÔ TẢ CHI TIẾT ĐỊNH HƯỚNG THIẾT KẾ CỦA ĐỀ TÀI :', bold: true, alignment: 'center', fontSize: 12, margin: [0, 13, 0, 11] },
-      { text: value(descriptionText), alignment: 'justify', fontSize: 12, lineHeight: 1.3, margin: [0, 0, 0, 5] },
-      ...descriptionDotLines,
-      { text: 'Tôi xin cam đoan thực hiện đúng đề tài đã đăng ký.', bold: true, fontSize: 12, alignment: 'center', margin: [0, 12, 0, 22] },
+      { text: 'PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC', bold: true, fontSize: 15, alignment: 'center' },
+      { text: 'ĐỒ ÁN TỐT NGHIỆP/ĐỒ ÁN TỔNG HỢP', bold: true, fontSize: 13.5, alignment: 'center', margin: [0, 2, 0, 0] },
+      ...(roundHeading
+        ? [{ text: roundHeading, bold: true, italics: true, fontSize: 13.5, alignment: 'center', margin: [0, 2, 0, 18] }]
+        : [{ text: '', margin: [0, 0, 0, 18] }]),
+
+      // Thông tin sinh viên (inline, không bị cách xa)
       {
         columns: [
           {
-            width: '58%', stack: [
-              { text: 'Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN', bold: true, fontSize: 12, alignment: 'center', margin: [0, 19, 0, 0] }
+            width: '62%',
+            text: [
+              { text: 'HỌ VÀ TÊN : ', bold: true },
+              { text: identity.fullName || '' }
             ]
           },
           {
-            width: '42%', stack: [
+            width: '38%',
+            text: [
+              { text: 'MSSV: ', bold: true },
+              { text: identity.mssv || '' }
+            ]
+          }
+        ],
+        margin: [0, 0, 0, 8]
+      },
+      {
+        columns: [
+          {
+            width: '46%',
+            text: [
+              { text: 'LỚP : ', bold: true },
+              { text: reg.currentClass || '' }
+            ]
+          },
+          {
+            width: '54%',
+            text: [
+              { text: 'NGÀNH: ', bold: true },
+              { text: reg.major || identity.major || 'Thiết kế nội thất' }
+            ]
+          }
+        ],
+        margin: [0, 0, 0, 8]
+      },
+      {
+        text: [
+          { text: 'EMAIL: ', bold: true },
+          { text: reg.personalEmail || identity.email || '' }
+        ],
+        margin: [0, 0, 0, 8]
+      },
+      {
+        text: [
+          { text: 'ĐIỆN THOẠI: ', bold: true },
+          { text: reg.studentPhone || '' }
+        ],
+        margin: [0, 0, 0, 8]
+      },
+      {
+        text: [
+          { text: 'ĐỊA CHỈ : ', bold: true },
+          { text: reg.studentTemporaryAddress || reg.studentPermanentAddress || reg.studentAddress || '' }
+        ],
+        margin: [0, 0, 0, 8]
+      },
+      {
+        columns: [
+          {
+            width: '45%',
+            text: [
+              { text: 'MÔN HỌC: ', bold: true },
+              { text: reg.courseName || reg.projectType || 'Đồ án tốt nghiệp' }
+            ]
+          },
+          {
+            width: '35%',
+            text: [
+              { text: 'MÃ MÔN HỌC: ', bold: true },
+              { text: reg.courseCode || '' }
+            ]
+          },
+          {
+            width: '20%',
+            text: [
+              { text: 'NHÓM: ', bold: true },
+              { text: reg.courseGroup || '1' }
+            ]
+          }
+        ],
+        margin: [0, 0, 0, 14]
+      },
+      {
+        text: `Đăng ký đề tài chính thức lần thứ : ${version}`,
+        italics: true,
+        fontSize: 12,
+        alignment: 'center',
+        margin: [0, 0, 0, 14]
+      },
+      {
+        text: [
+          { text: 'TÊN ĐỀ TÀI : ', bold: true },
+          { text: reg.topicTitle || '', bold: true }
+        ],
+        lineHeight: 1.35,
+        margin: [0, 0, 0, 14]
+      },
+      {
+        text: 'MÔ TẢ CHI TIẾT ĐỊNH HƯỚNG THIẾT KẾ CỦA ĐỀ TÀI :',
+        bold: true,
+        alignment: 'center',
+        fontSize: 12,
+        margin: [0, 0, 0, 8]
+      },
+      {
+        text: descriptionText || '',
+        alignment: 'justify',
+        fontSize: 12,
+        lineHeight: 1.35,
+        margin: [0, 0, 0, 14]
+      },
+      {
+        text: 'Tôi xin cam đoan thực hiện đúng đề tài đã đăng ký.',
+        bold: true,
+        fontSize: 12,
+        alignment: 'center',
+        margin: [0, 4, 0, 18]
+      },
+      {
+        columns: [
+          {
+            width: '56%',
+            stack: [
+              { text: 'Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN', bold: true, fontSize: 12, alignment: 'center', margin: [0, 18, 0, 0] }
+            ]
+          },
+          {
+            width: '44%',
+            stack: [
               { text: `Tp.HCM, ngày ${dd} tháng ${mm} năm ${yyyy}`, italics: true, fontSize: 12, alignment: 'center' },
-              { text: 'NGƯỜI ĐĂNG KÝ', fontSize: 12, alignment: 'center', margin: [0, 4, 0, 0] },
-              { text: '(ký và ghi rõ họ tên)', fontSize: 12, alignment: 'center' },
-              { text: identity.fullName, bold: true, fontSize: 12, alignment: 'center', margin: [0, 46, 0, 0] }
+              { text: 'NGƯỜI ĐĂNG KÝ', bold: true, fontSize: 12, alignment: 'center', margin: [0, 3, 0, 0] },
+              { text: '(ký và ghi rõ họ tên)', italics: true, fontSize: 11, alignment: 'center', margin: [0, 1, 0, 40] },
+              { text: identity.fullName, bold: true, fontSize: 12, alignment: 'center' }
             ]
           }
         ]
