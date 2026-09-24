@@ -78,28 +78,28 @@ window.rawRunTransaction = rawRunTransaction;
 function getCurrentPortal() {
   try {
     const path = (window.location.pathname || '').toLowerCase();
-    if (path.includes('/graduation/admin') || path.endsWith('/admin') || path.endsWith('/admin/')) {
+    if (path.includes('/admin') || path.endsWith('/admin') || path.endsWith('/admin/')) {
       return 'admin';
     }
-    if (path.includes('/graduation/supervisor') || path.endsWith('/supervisor') || path.endsWith('/supervisor/') ||
-        path.includes('/graduation/gvhd') || path.endsWith('/gvhd') || path.endsWith('/gvhd/')) {
-      if (path.includes('/graduation/gvhd') || path.endsWith('/gvhd') || path.endsWith('/gvhd/')) {
+    if (path.includes('/supervisor') || path.endsWith('/supervisor') || path.endsWith('/supervisor/') ||
+        path.includes('/gvhd') || path.endsWith('/gvhd') || path.endsWith('/gvhd/')) {
+      if (path.includes('/gvhd') || path.endsWith('/gvhd') || path.endsWith('/gvhd/')) {
         try {
-          window.history.replaceState(null, '', '/graduation/supervisor/');
+          window.history.replaceState(null, '', '/supervisor/');
         } catch (e) {}
       }
       return 'supervisor';
     }
-    if (path.includes('/graduation/assessment') || path.endsWith('/assessment') || path.endsWith('/assessment/') ||
-        path.includes('/graduation/mark') || path.endsWith('/mark') || path.endsWith('/mark/')) {
-      if (path.includes('/graduation/mark') || path.endsWith('/mark') || path.endsWith('/mark/')) {
+    if (path.includes('/assessment') || path.endsWith('/assessment') || path.endsWith('/assessment/') ||
+        path.includes('/mark') || path.endsWith('/mark') || path.endsWith('/mark/')) {
+      if (path.includes('/mark') || path.endsWith('/mark') || path.endsWith('/mark/')) {
         try {
-          window.history.replaceState(null, '', '/graduation/assessment/');
+          window.history.replaceState(null, '', '/assessment/');
         } catch (e) {}
       }
       return 'assessment';
     }
-    if (path.includes('/graduation') || path === '/' || path.endsWith('/graduation/')) {
+    if (path === '/' || path.endsWith('/') || path.includes('/student')) {
       return 'student';
     }
   } catch (e) {}
@@ -624,11 +624,13 @@ export function hideLoading() {
 // --- INITIALIZATION ---
 async function initFirebase() {
   const config = {
-    apiKey: "AIzaSyA7HDp4XThUSN2XO3m0GoBGnYf-nFjvM_M",
-    authDomain: "tknt-tdtu.firebaseapp.com",
-    projectId: "tknt-tdtu",
-    storageBucket: "tknt-tdtu.firebasestorage.app",
-    messagingSenderId: "52631763904"
+    apiKey: "AIzaSyBwpZyNyskZ1OJ6tDvh249aeH70MLtO1iI",
+    authDomain: "ifa-graduation.firebaseapp.com",
+    projectId: "ifa-graduation",
+    storageBucket: "ifa-graduation.firebasestorage.app",
+    messagingSenderId: "38525030677",
+    appId: "1:38525030677:web:2180f20ae9c0cadf63991c",
+    measurementId: "G-HJEH0T842C"
   };
   app = getApps().length > 0 ? getApp() : initializeApp(config);
   auth = getAuth(app);

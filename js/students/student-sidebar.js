@@ -231,8 +231,8 @@ window.updateTeacherPersonalModal = function() {
 
     <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <a href="/graduation/" class="text-xs text-blue-600 font-bold hover:underline">🎓 Cổng SV</a>
-        ${actor.isAdmin ? '<a href="/graduation/admin/" class="text-xs text-amber-600 font-bold hover:underline ml-2">⚙️ Quản trị</a>' : ''}
+        <a href="/" class="text-xs text-blue-600 font-bold hover:underline">🎓 Cổng SV</a>
+        ${actor.isAdmin ? '<a href="/admin/" class="text-xs text-amber-600 font-bold hover:underline ml-2">⚙️ Quản trị</a>' : ''}
       </div>
       <button type="button" onclick="handleTeacherLogout()" class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-rose-200 cursor-pointer">
         <span>🚪</span>

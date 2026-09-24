@@ -2,6 +2,9 @@ node_modules/
 .DS_Store
 firestore-debug.log
 firebase.test.json
-output/
+.firebase/
 .playwright-mcp/
+backups/
+migration-data/
+output/
 

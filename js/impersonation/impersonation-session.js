@@ -313,7 +313,7 @@ window.startImpersonating = async function(target) {
   // Navigate to corresponding portal
   if (target.type === 'student') {
     if (window.location.pathname.includes('/admin') || window.location.pathname.includes('/supervisor') || window.location.pathname.includes('/assessment')) {
-      window.location.href = '/graduation/';
+      window.location.href = '/';
     } else {
       await switchView('student');
       const rId = target.roundId || state.selectedRoundId;
@@ -323,7 +323,7 @@ window.startImpersonating = async function(target) {
     }
   } else if (target.type === 'supervisor') {
     if (!window.location.pathname.includes('/supervisor')) {
-      window.location.href = '/graduation/supervisor/';
+      window.location.href = '/supervisor/';
     } else {
       await switchView('supervisor');
       if (typeof initSupervisorPortal === 'function') {
@@ -332,7 +332,7 @@ window.startImpersonating = async function(target) {
     }
   } else if (target.type === 'reviewer' || target.type === 'council' || target.type === 'preliminary') {
     if (!window.location.pathname.includes('/assessment')) {
-      window.location.href = '/graduation/assessment/';
+      window.location.href = '/assessment/';
     } else {
       await switchView('assessment');
       if (typeof initAssessmentPortal === 'function') {
@@ -371,7 +371,7 @@ window.exitImpersonation = async function() {
       switchAdminTab(state.currentAdminTab || 'rounds');
     }
   } else {
-    window.location.href = '/graduation/admin/';
+    window.location.href = '/admin/';
   }
 
   if (typeof showToast === 'function') {
@@ -386,13 +386,13 @@ window.goToCurrentRolePortal = function() {
   }
   const type = state.impersonation.target?.type;
   if (type === 'student') {
-    window.location.href = '/graduation/';
+    window.location.href = '/';
   } else if (type === 'supervisor') {
-    window.location.href = '/graduation/supervisor/';
+    window.location.href = '/supervisor/';
   } else if (type === 'reviewer' || type === 'council' || type === 'preliminary') {
-    window.location.href = '/graduation/assessment/';
+    window.location.href = '/assessment/';
   } else {
-    window.location.href = '/graduation/';
+    window.location.href = '/';
   }
 };
 
