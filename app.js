@@ -640,6 +640,7 @@ export const state = {
   facultyStudentsMap: new Map(),
   roundSupervisors: [],
   eligibleStudents: [],
+  eligibleStudentDetails: null,
   myRegistration: null,
   myOfficialAssignment: null,
   studentSelfProfile: null,
@@ -1445,6 +1446,12 @@ async function loadRounds() {
     });
 
     state.rounds.sort((a, b) => {
+      const orderA = Number(a.displayOrder);
+      const orderB = Number(b.displayOrder);
+      const hasOrderA = a.displayOrder !== undefined && Number.isFinite(orderA);
+      const hasOrderB = b.displayOrder !== undefined && Number.isFinite(orderB);
+      if (hasOrderA && hasOrderB && orderA !== orderB) return orderA - orderB;
+      if (hasOrderA !== hasOrderB) return hasOrderA ? 1 : -1;
       const timeA = a.createdAtDate ? a.createdAtDate.getTime() : 0;
       const timeB = b.createdAtDate ? b.createdAtDate.getTime() : 0;
       return timeB - timeA;
@@ -3934,6 +3941,9 @@ function getRoundWeekEventRange(event = {}) {
 }
 
 function roundWeekEventOccursOnDay(event, day) {
+  if (event.activityId && event.startDate && event.endDate) {
+    return day.key >= event.startDate && day.key <= event.endDate;
+  }
   const { startDayIndex, endDayIndex } = getRoundWeekEventRange(event);
   return day.dayIndex >= startDayIndex && day.dayIndex <= endDayIndex;
 }
@@ -7136,11 +7146,23 @@ window.loadAdminEligibleStudents = async function(roundId) {
   try {
     if (typeof loadFacultyDatasetFromIFAA === 'function' && !state.facultyStudentsLoaded) {
       loadFacultyDatasetFromIFAA().then(() => {
-        renderAdminEligibleStudentsTable();
+        if (state.eligibleStudentDetails?.roundId === roundId) renderAdminEligibleStudentsTable();
       }).catch(err => console.warn('[EligibleStudents] Faculty dataset load notice:', err));
     }
-    const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents'));
-    state.eligibleStudents = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const [eligibleSnap, registrationSnap, assignmentSnap, draftSnap] = await Promise.all([
+      getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents')),
+      getDocs(collection(db, 'graduationRounds', roundId, 'registrations')),
+      getDocs(collection(db, 'graduationRounds', roundId, 'officialAssignments')),
+      getDocs(collection(db, 'graduationRounds', roundId, 'assignmentDrafts'))
+    ]);
+    if (document.getElementById('admin-round-student-select')?.value !== roundId) return;
+    state.eligibleStudents = eligibleSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    state.eligibleStudentDetails = {
+      roundId,
+      registrations: new Map(registrationSnap.docs.map(d => [d.id.toUpperCase(), d.data()])),
+      assignments: new Map(assignmentSnap.docs.map(d => [d.id.toUpperCase(), d.data()])),
+      drafts: new Map(draftSnap.docs.map(d => [d.id.toUpperCase(), d.data()]))
+    };
     renderAdminEligibleStudentsTable();
   } catch (e) {
     console.error('Error loading eligible students:', e);
@@ -7152,6 +7174,10 @@ function renderAdminEligibleStudentsTable() {
   if (!tbody) return;
 
   const searchTerm = (document.getElementById('search-eligible-input')?.value || '').toLowerCase().trim();
+  const roundId = state.eligibleStudentDetails?.roundId;
+  const round = (state.rounds || []).find(item => item.id === roundId);
+  const directAssignment = isDirectSupervisorAssignment(round);
+  const details = state.eligibleStudentDetails;
 
   // Merge each eligible record with Faculty Student Master
   const mergedList = (state.eligibleStudents || []).map(s => {
@@ -7198,12 +7224,36 @@ function renderAdminEligibleStudentsTable() {
     };
   });
 
+  const getStudentStatus = student => {
+    const registration = details?.registrations.get(student.studentId) || null;
+    const published = details?.assignments.get(student.studentId) || null;
+    const draft = details?.drafts.get(student.studentId) || null;
+    const effective = normalizeOfficialAssignment(
+      published?.assignmentStatus === 'published' ? published : (draft || published), registration
+    );
+    const supervisors = getOfficialSupervisors(effective);
+    const names = supervisors.map(item => item.supervisorName || item.name || '').filter(Boolean);
+    if (!names.length) {
+      const fallback = effective?.acceptedSupervisorName || effective?.assignedSupervisorName || effective?.supervisorName || registration?.acceptedSupervisorName;
+      if (fallback) names.push(fallback);
+    }
+    const topic = String(registration?.topicTitle || registration?.topic || '').trim();
+    const preferences = !directAssignment && !names.length && Array.isArray(registration?.preferences)
+      ? registration.preferences.slice().sort((a, b) => Number(a.rank) - Number(b.rank))
+        .map(pref => `NV${pref.rank}: ${pref.supervisorName || pref.name || ''}`).filter(item => !item.endsWith(': '))
+      : [];
+    return { topic, names, preferences };
+  };
+
   const filtered = mergedList.filter(s => {
     if (!searchTerm) return true;
     const nameText = typeof s.resolvedName === 'string' ? s.resolvedName.replace(/<[^>]*>/g, '').toLowerCase() : '';
+    const status = getStudentStatus(s);
     return (s.studentId || '').toLowerCase().includes(searchTerm) ||
       nameText.includes(searchTerm) ||
-      (s.resolvedEmail || '').toLowerCase().includes(searchTerm) ||
+      status.topic.toLowerCase().includes(searchTerm) ||
+      status.names.join(' ').toLowerCase().includes(searchTerm) ||
+      status.preferences.join(' ').toLowerCase().includes(searchTerm) ||
       (s.resolvedClass || '').toLowerCase().includes(searchTerm);
   });
 
@@ -7212,22 +7262,30 @@ function renderAdminEligibleStudentsTable() {
     return;
   }
 
-  tbody.innerHTML = filtered.map(s => `
+  tbody.innerHTML = filtered.map(s => {
+    const status = getStudentStatus(s);
+    const supervisorLine = status.names.length
+      ? `<div class="mt-1 text-[11px] text-emerald-700"><b>GVHD:</b> ${escapeHtml(status.names.join(' · '))}</div>`
+      : (status.preferences.length
+        ? `<div class="mt-1 text-[11px] text-slate-600">${status.preferences.map(escapeHtml).join(' · ')}</div>`
+        : (directAssignment ? '<div class="mt-1 text-[11px] text-slate-500">GVHD: Chưa phân công</div>' : ''));
+    return `
     <tr class="hover:bg-slate-50 transition-colors">
-      <td class="p-3 font-mono font-bold text-slate-900">${s.studentId}</td>
+      <td class="p-3 font-mono font-bold text-slate-900">${escapeHtml(s.studentId)}</td>
       <td class="p-3">
-        <div class="font-bold text-slate-800">${s.resolvedName}</div>
+        <div class="font-bold text-slate-800">${s.isMissingInfo ? s.resolvedName : escapeHtml(s.resolvedName)}</div>
         ${!s.isFoundInMaster && !s.isMissingInfo ? '<span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-slate-100 text-slate-500">Từ file nhập</span>' : ''}
       </td>
-      <td class="p-3 text-slate-600 font-mono text-xs">${s.resolvedEmail}</td>
-      <td class="p-3 font-mono text-slate-700">${s.resolvedClass}</td>
-      <td class="p-3 text-slate-700">${s.resolvedMajor}</td>
+      <td class="p-3 min-w-[260px]"><div class="font-bold ${status.topic ? 'text-blue-900' : 'text-slate-500 italic'}">${status.topic ? escapeHtml(status.topic) : 'Sinh viên chưa đăng ký đề tài'}</div>${supervisorLine}</td>
+      <td class="p-3 font-mono text-slate-700">${String(s.resolvedClass).includes('<span') ? s.resolvedClass : escapeHtml(s.resolvedClass)}</td>
+      <td class="p-3 text-slate-700">${escapeHtml(s.resolvedMajor)}</td>
       <td class="p-3"><span class="badge badge-open">Đủ ĐK</span></td>
       <td class="p-3 text-right">
         <button type="button" onclick="deleteEligibleStudent('${s.studentId}')" class="text-rose-600 hover:underline font-bold text-xs cursor-pointer">Xóa</button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 window.filterEligibleTable = function() {
@@ -12224,6 +12282,8 @@ window.loadStudentRoundActivities = async function(roundId) {
     .map((a, idx) => normalizeActivity(a, roundId, idx))
     .filter(a => (state.isAdmin && !state.impersonation) || isActivityPublished(a))
     .sort((a, b) => (a.order || 0) - (b.order || 0));
+  state.studentVisibleActivities = { roundId, activities: visible };
+  if (typeof renderStudentTimelineWeeks === 'function') renderStudentTimelineWeeks();
 
   if (visible.length === 0) {
     container.innerHTML = `
@@ -21296,7 +21356,7 @@ function getRoundWeekSchedule(round) {
   });
 }
 
-function renderTimelineWeekDays(days = [], events = []) {
+function renderTimelineWeekDays(days = [], events = [], weekNumber = null) {
   return `<div class="grid grid-cols-7 gap-1 w-full mt-2 pt-2 border-t border-slate-200/80">${days.map(day => {
     const dayEvents = events.filter(event => roundWeekEventOccursOnDay(event, day));
     const titles = dayEvents.map(event => escapeHtml(event.title)).join(' · ');
@@ -21304,11 +21364,14 @@ function renderTimelineWeekDays(days = [], events = []) {
     const eventColor = dayEvents.length ? normalizeRoundWeekEventColor(dayEvents[0].color) : '';
     const dayClass = dayEvents.length ? '' : (isToday ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' : 'bg-white/70 border-slate-200 text-slate-500');
     const dayStyle = eventColor ? ` style="background-color:${eventColor}18;border-color:${eventColor};color:${eventColor}"` : '';
-    return `<span title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border px-0.5 py-0.5 text-center ${dayClass}"${dayStyle}><b class="block text-[8px] leading-none">${day.shortName}</b><b class="block text-[8px] leading-none mt-0.5">${day.label}</b>${dayEvents.length ? '<i class="block text-[8px] leading-none not-italic">●</i>' : ''}</span>`;
+    const clickable = weekNumber !== null && dayEvents.length;
+    const tag = clickable ? 'button' : 'span';
+    const click = clickable ? ` type="button" onclick="openStudentTimelineDay(${weekNumber}, '${day.key}')" aria-label="Xem ${dayEvents.length} sự kiện ngày ${day.label}"` : '';
+    return `<${tag}${click} title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border px-0.5 py-0.5 text-center ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md' : ''}"${dayStyle}><b class="block text-[8px] leading-none">${day.shortName}</b><b class="block text-[8px] leading-none mt-0.5">${day.label}</b>${dayEvents.length ? '<i class="block text-[8px] leading-none not-italic">●</i>' : ''}</${tag}>`;
   }).join('')}</div>`;
 }
 
-function renderTimelineWeekEvents(events = []) {
+function renderTimelineWeekEvents(events = [], weekNumber = null) {
   if (!events.length) return '';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -21323,7 +21386,7 @@ function renderTimelineWeekEvents(events = []) {
     const date = parseEventDate(value);
     return date ? `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}` : '';
   };
-  return `<div class="mt-2 w-full space-y-1 text-left">${events.map(event => {
+  return `<div class="mt-2 w-full space-y-1 text-left">${events.map((event, eventIndex) => {
     const color = normalizeRoundWeekEventColor(event.color);
     const startValue = event.startDate || event.date || '';
     const endValue = event.endDate || startValue;
@@ -21334,11 +21397,56 @@ function renderTimelineWeekEvents(events = []) {
       ? ''
       : (dayCount > 0 ? `Còn ${dayCount} ngày` : (endDate >= today ? (dayCount === 0 ? 'Hôm nay' : 'Đang diễn ra') : 'Đã diễn ra'));
     const dateLabel = startValue === endValue ? shortDate(startValue) : `${shortDate(startValue)}–${shortDate(endValue)}`;
-    return `<div class="flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-[9px] leading-tight" style="background-color:${color}18;border-color:${color}66;color:${color}">
+    return `<button type="button" onclick="openStudentTimelineEvent(${weekNumber}, ${eventIndex})" title="Xem chi tiết sự kiện" class="flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-[9px] leading-tight hover:shadow-sm" style="background-color:${color}18;border-color:${color}66;color:${color}">
       <span class="shrink-0">📌 ${escapeHtml(dateLabel)}</span><span class="min-w-0 flex-1 truncate font-black">${escapeHtml(event.title)}</span>${countdown ? `<span class="shrink-0 font-bold opacity-80">${countdown}</span>` : ''}
-    </div>`;
+    </button>`;
   }).join('')}</div>`;
 }
+
+window.closeStudentTimelineEvent = function() {
+  document.getElementById('student-timeline-event-dialog')?.remove();
+};
+
+window.openStudentTimelineEvent = function(weekNumber, eventIndex) {
+  const event = state.studentTimelineEventMap?.get(Number(weekNumber))?.[Number(eventIndex)];
+  if (!event) return;
+  window.closeStudentTimelineEvent();
+  const activity = event.activity;
+  const details = activity?.descriptionHtml
+    ? sanitizeRichHtml(activity.descriptionHtml)
+    : escapeHtml(activity?.description || '').replace(/\n/g, '<br>');
+  const dialog = document.createElement('div');
+  dialog.id = 'student-timeline-event-dialog';
+  dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
+  dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
+  dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Chi tiết sự kiện" class="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
+    <div class="flex items-start justify-between gap-3"><div><div class="text-[11px] font-bold uppercase text-blue-700">${activity ? 'Mốc kế hoạch' : 'Sự kiện trong tuần'}</div><h3 class="mt-1 text-lg font-black text-slate-900">${escapeHtml(event.title)}</h3></div><button type="button" onclick="closeStudentTimelineEvent()" class="rounded-lg bg-slate-100 px-3 py-1.5 text-lg text-slate-600" aria-label="Đóng">×</button></div>
+    <div class="mt-4 space-y-2 text-sm text-slate-700"><div>🕒 ${activity ? escapeHtml(fmtActivityTime(activity.startAt, activity.endAt)) : escapeHtml(event.startDate === event.endDate ? event.startDate : `${event.startDate} – ${event.endDate}`)}</div>${activity?.location ? `<div>📍 ${escapeHtml(activity.location)}</div>` : ''}${activity?.isTentative ? '<div class="text-amber-700">Thời gian dự kiến</div>' : ''}</div>
+    ${details ? `<div class="rich-rendered-content mt-4 border-t border-slate-200 pt-4 text-sm leading-relaxed text-slate-700">${details}</div>` : ''}
+  </div>`;
+  document.body.appendChild(dialog);
+  dialog.querySelector('button')?.focus();
+};
+
+window.openStudentTimelineDay = function(weekNumber, dateKey) {
+  const events = state.studentTimelineEventMap?.get(Number(weekNumber)) || [];
+  const date = new Date(`${dateKey}T00:00:00`);
+  const dayIndex = (date.getDay() + 6) % 7;
+  const matches = events.map((event, index) => ({ event, index }))
+    .filter(item => roundWeekEventOccursOnDay(item.event, { key: dateKey, dayIndex }));
+  if (matches.length === 1) {
+    window.openStudentTimelineEvent(weekNumber, matches[0].index);
+    return;
+  }
+  if (matches.length < 2) return;
+  window.closeStudentTimelineEvent();
+  const dialog = document.createElement('div');
+  dialog.id = 'student-timeline-event-dialog';
+  dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
+  dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
+  dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Sự kiện trong ngày" class="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><div class="flex items-center justify-between gap-2"><h3 class="text-lg font-black text-slate-900">Sự kiện ngày ${escapeHtml(dateKey)}</h3><button type="button" onclick="closeStudentTimelineEvent()" class="rounded-lg bg-slate-100 px-3 py-1.5 text-lg" aria-label="Đóng">×</button></div><div class="mt-4 space-y-2">${matches.map(item => `<button type="button" onclick="openStudentTimelineEvent(${weekNumber}, ${item.index})" class="block w-full rounded-xl border border-slate-200 p-3 text-left text-sm font-bold text-blue-800 hover:bg-blue-50">${escapeHtml(item.event.title)}</button>`).join('')}</div></div>`;
+  document.body.appendChild(dialog);
+};
 
 function renderAdminRoundTimelinePreview(round) {
   const weeks = getRoundWeekSchedule(round);
@@ -21429,6 +21537,36 @@ window.toggleRoundTimelineWeekVisibility = async function(roundId, weekNumber, e
   }
 };
 
+window.moveAdminRoundCard = async function(roundId, neighborId) {
+  if (!state.isAdmin || !neighborId || state.roundOrderSaving) return;
+  const ordered = (state.rounds || []).filter(round => !round.deleted && !round.isDeleted);
+  const sourceIndex = ordered.findIndex(round => round.id === roundId);
+  const neighborIndex = ordered.findIndex(round => round.id === neighborId);
+  if (sourceIndex < 0 || neighborIndex < 0) return;
+  [ordered[sourceIndex], ordered[neighborIndex]] = [ordered[neighborIndex], ordered[sourceIndex]];
+  state.roundOrderSaving = true;
+  try {
+    for (let offset = 0; offset < ordered.length; offset += 450) {
+      const batch = writeBatch(db);
+      ordered.slice(offset, offset + 450).forEach((round, index) => {
+        batch.update(doc(db, 'graduationRounds', round.id), { displayOrder: offset + index });
+      });
+      await batch.commit();
+    }
+    ordered.forEach((round, index) => { round.displayOrder = index; });
+    const omitted = (state.rounds || []).filter(round => round.deleted || round.isDeleted);
+    state.rounds = [...ordered, ...omitted];
+    renderAdminRoundsCards();
+    renderAdminRoundsTable();
+    renderRoundsDropdowns();
+    showToast('Đã lưu thứ tự các đợt tốt nghiệp.', 'success');
+  } catch (error) {
+    showToast('Không thể lưu thứ tự đợt: ' + error.message, 'error');
+  } finally {
+    state.roundOrderSaving = false;
+  }
+};
+
 window.renderAdminRoundsCards = function() {
   const container = document.getElementById('admin-rounds-cards');
   if (!container) return;
@@ -21504,7 +21642,7 @@ window.renderAdminRoundsCards = function() {
       return;
     }
 
-    container.innerHTML = filtered.map(r => {
+    container.innerHTML = filtered.map((r, cardIndex) => {
       const directAssignment = isDirectSupervisorAssignment(r);
       const cat = getRoundStatusCategory(r);
       const shortCode = r.shortCode || r.slug || r.roundName || r.id;
@@ -21565,8 +21703,12 @@ window.renderAdminRoundsCards = function() {
 
       return `
         <article class="card-surface rounded-2xl overflow-hidden border ${isCurrentActive ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'} shadow-sm hover:shadow-lg transition-all w-full">
-          <header class="bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white p-4 sm:p-5">
-            <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Bấm để sao chép liên kết đợt" class="block w-full text-left group mb-3">
+          <header class="relative bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white p-4 sm:p-5">
+            <div class="absolute left-4 top-4 flex flex-col gap-1" aria-label="Sắp xếp thứ tự đợt">
+              <button type="button" onclick="moveAdminRoundCard('${r.id}', '${filtered[cardIndex - 1]?.id || ''}')" ${cardIndex === 0 ? 'disabled' : ''} title="Đưa đợt lên trên" aria-label="Đưa ${escapeHtml(r.title || 'đợt')} lên trên" class="h-5 w-7 rounded border border-white/25 bg-white/10 text-[10px] leading-none hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed">▲</button>
+              <button type="button" onclick="moveAdminRoundCard('${r.id}', '${filtered[cardIndex + 1]?.id || ''}')" ${cardIndex === filtered.length - 1 ? 'disabled' : ''} title="Đưa đợt xuống dưới" aria-label="Đưa ${escapeHtml(r.title || 'đợt')} xuống dưới" class="h-5 w-7 rounded border border-white/25 bg-white/10 text-[10px] leading-none hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed">▼</button>
+            </div>
+            <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Bấm để sao chép liên kết đợt" class="block w-full pl-11 text-left group mb-3">
               <h3 class="text-lg sm:text-xl xl:text-2xl font-black tracking-tight leading-tight lg:whitespace-nowrap group-hover:text-blue-200 transition-colors">${escapeHtml(r.title || '')}</h3>
             </button>
             <div class="flex flex-wrap items-center gap-2 mb-2.5">
@@ -22269,6 +22411,23 @@ window.renderStudentTimelineWeeks = function() {
   // ── Default milestone labels per week (overrideable by admin) ──
   const defaultMilestones = { 4: 'Duyệt đợt 1', 8: 'Duyệt đợt 2', 12: 'Duyệt đợt 3' };
   const weeklyConfig = Array.isArray(round?.timelineWeeksConfig) ? round.timelineWeeksConfig : [];
+  const activitySource = state.studentVisibleActivities?.roundId === round?.id
+    ? state.studentVisibleActivities.activities
+    : (Array.isArray(round?.activities) ? round.activities : []);
+  const toLocalDateKey = value => {
+    if (!value) return '';
+    const date = new Date(value?.toDate ? value.toDate() : value);
+    return isNaN(date.getTime()) ? '' : `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  };
+  const activityEvents = activitySource
+    .filter(activity => isActivityPublished(activity) && (activity.startAt || activity.endAt))
+    .map(activity => {
+      const startDate = toLocalDateKey(activity.startAt || activity.endAt);
+      const endDate = toLocalDateKey(activity.endAt || activity.startAt);
+      return { id: `activity-${activity.id}`, activityId: activity.id, activity,
+        title: String(activity.title || '').trim(), startDate: startDate <= endDate ? startDate : endDate,
+        endDate: startDate <= endDate ? endDate : startDate, color: '#dc2626' };
+    }).filter(event => event.title && event.startDate && event.endDate);
 
   // ── Build the full unified card array (17 cards) ──────────────
   const allCards = [];
@@ -22320,7 +22479,7 @@ window.renderStudentTimelineWeeks = function() {
     if (cfg.visible === false) return;
     const defMilestone = defaultMilestones[w.num] || null;
     const milestone = cfg.milestone || (defMilestone ? defMilestone : null);
-    const events = (Array.isArray(cfg.events) ? cfg.events : []).map((event, index) => ({
+    const manualEvents = (Array.isArray(cfg.events) ? cfg.events : []).map((event, index) => ({
       id: event.id || `legacy-${w.num}-${index}`,
       title: String(event.title || event.name || '').trim(),
       dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
@@ -22331,6 +22490,9 @@ window.renderStudentTimelineWeeks = function() {
       endDate: event.endDate || event.date || '',
       color: normalizeRoundWeekEventColor(event.color)
     })).filter(event => event.title);
+    const firstDay = w.days[0]?.key;
+    const lastDay = w.days[6]?.key;
+    const events = [...manualEvents, ...activityEvents.filter(event => event.startDate <= lastDay && event.endDate >= firstDay)];
     allCards.push({
       type: 'week',
       num: w.num,
@@ -22343,6 +22505,7 @@ window.renderStudentTimelineWeeks = function() {
       events,
     });
   });
+  state.studentTimelineEventMap = new Map(allCards.filter(card => card.type === 'week').map(card => [card.num, card.events]));
 
   // Card N – Sơ khảo
   const afterWeeks = lastWeekEnd ? now > lastWeekEnd : false;
@@ -22440,8 +22603,8 @@ window.renderStudentTimelineWeeks = function() {
           ${card.status === 'completed' ? '✓' : (card.status === 'ongoing' || card.status === 'active') ? '●' : card.num}
         </div>
         <span class="text-[13px] font-mono font-bold text-slate-700 tracking-tight">${card.dateText}</span>
-        ${renderTimelineWeekDays(card.days, card.events)}
-        ${renderTimelineWeekEvents(card.events)}
+        ${renderTimelineWeekDays(card.days, card.events, card.num)}
+        ${renderTimelineWeekEvents(card.events, card.num)}
         ${milestoneHtml}
         ${noteHtml}
       </div>`;
