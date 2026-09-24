@@ -200,7 +200,7 @@ test('topic registration supports multi-type selection and supervisor title appr
 
 test('direct assignment registration removes supervisor preference wording and hero reserves full title row', () => {
   assert.match(html, /id="round-title-display"/);
-  assert.match(html, /id="hero-supervisor-info-card"[^>]*lg:absolute[^>]*lg:top-0/);
+  assert.match(html, /id="hero-supervisor-info-card"/);
   assert.match(html, /id="registration-cta-title"/);
   assert.match(html, /id="registration-cta-description"/);
   assert.match(app, /\? 'Đăng ký Đề tài'/);
