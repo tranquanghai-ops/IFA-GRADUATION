@@ -1396,17 +1396,6 @@ window.updateTeacherPersonalModal = function() {
   `;
 };
 
-window.openTeacherProfileModal = function() {
-  updateTeacherPersonalModal();
-  const modal = document.getElementById('modal-teacher-profile');
-  if (modal) modal.classList.remove('hidden');
-};
-
-window.closeTeacherProfileModal = function() {
-  const modal = document.getElementById('modal-teacher-profile');
-  if (modal) modal.classList.add('hidden');
-};
-
 window.handleTeacherLogout = async function() {
   try {
     await signOut(auth);
