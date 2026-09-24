@@ -1835,46 +1835,124 @@ window.publishAdminResults = async function() {
 };
 
 
-// --- SUPERVISOR BIO MODAL ---
-window.openBioModal = function(supId) {
-  const sup = state.roundSupervisors.find(s => s.id === supId) || state.supervisorsMaster.find(s => s.id === supId);
-  if (!sup) return;
+// --- UNIFIED TEACHER / SUPERVISOR PROFILE & BIO MODAL ---
+window.openTeacherProfileModal = function(supId = null) {
+  const modal = document.getElementById('modal-teacher-profile');
+  if (!modal) return;
 
-  const bioPhoto = document.getElementById('bio-modal-photo');
-  const avatarSrc = (sup.showPhoto !== false && sup.photoUrl && sup.photoUrl.trim()) ? sup.photoUrl : getSupervisorAvatarSvgDataUri(sup.name);
-  if (bioPhoto) {
-    bioPhoto.onerror = function() {
-      this.onerror = null;
-      this.src = getSupervisorAvatarSvgDataUri(sup.name);
+  const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
+  const isSelf = !supId || (actor?.email && (supId === actor.email || supId === actor.id));
+  const isSupervisorSelf = isSelf && (state.currentRole === 'supervisor');
+
+  let sup = null;
+  if (supId) {
+    sup = (state.roundSupervisors || []).find(s => s.id === supId || s.email === supId) ||
+          (state.supervisorsMaster || []).find(s => s.id === supId || s.email === supId);
+  }
+  
+  if (!sup && isSelf) {
+    sup = {
+      name: actor?.displayName || state.supervisorName || actor?.email || 'Giảng viên',
+      email: actor?.email || state.supervisorEmail || '',
+      department: 'Khoa Mỹ thuật Công nghiệp',
+      degree: 'Thạc sĩ',
+      expertise: state.supervisorExpertise || 'Đồ án Tốt nghiệp & Nghiên cứu ứng dụng',
+      bio: state.supervisorBio || 'Thông tin giảng viên hướng dẫn.',
+      photoUrl: actor?.photoURL || ''
     };
-    bioPhoto.src = avatarSrc;
-    bioPhoto.alt = escapeHtml(sup.name || 'Giảng viên');
   }
-  document.getElementById('bio-modal-name').textContent = sup.name || '--';
-  document.getElementById('bio-modal-dept').textContent = sup.department || '--';
-  document.getElementById('bio-modal-expertise').textContent = sup.expertise || 'Đang cập nhật';
-  document.getElementById('bio-modal-text').textContent = sup.bio || 'Chưa có thông tin giới thiệu.';
 
-  // Requirement 7: Hide email and phone during registration / before published
-  let contactHtml = '';
-  const isPublished = state.activeRound?.status === 'published' || state.activeRound?.reviewStatus === 'completed';
-  if (isPublished && state.activeRound?.showEmailAfterPublish !== false && sup.email) {
-    contactHtml += `<div class="flex items-center gap-1.5 text-slate-600"><span>✉️ Email:</span> <a href="mailto:${sup.email}" class="text-blue-600 hover:underline">${sup.email}</a></div>`;
+  if (!sup) {
+    showToast('Không tìm thấy thông tin giảng viên.', 'warning');
+    return;
   }
-  if (isPublished && state.activeRound?.showPhoneAfterPublish !== false && sup.phone) {
-    contactHtml += `<div class="flex items-center gap-1.5 text-slate-600"><span>📞 SĐT:</span> <a href="tel:${sup.phone}" class="text-blue-600 hover:underline">${sup.phone}</a></div>`;
-  }
-  if (!isPublished) {
-    contactHtml = '<div class="text-[11px] text-slate-400 italic">Thông tin liên hệ (Email, SĐT) sẽ được hiển thị sau khi Khoa công bố kết quả phân công chính thức.</div>';
-  }
-  document.getElementById('bio-modal-contacts').innerHTML = contactHtml;
 
-  document.getElementById('modal-sup-bio').classList.remove('hidden');
+  const nameEl = document.getElementById('teacher-profile-name');
+  if (nameEl) nameEl.textContent = sup.name || sup.displayName || '--';
+
+  const deptEl = document.getElementById('teacher-profile-dept');
+  if (deptEl) deptEl.textContent = sup.department || 'Khoa Mỹ thuật Công nghiệp • TDTU';
+
+  const degreeBadge = document.getElementById('teacher-profile-degree-badge');
+  if (degreeBadge) degreeBadge.textContent = sup.degree || 'Giảng viên';
+
+  const expEl = document.getElementById('teacher-profile-expertise');
+  if (expEl) expEl.textContent = sup.bio || sup.expertise || 'Chưa có thông tin giới thiệu.';
+
+  const emailEl = document.getElementById('teacher-profile-email');
+  if (emailEl) {
+    emailEl.textContent = sup.email || '--';
+    emailEl.href = sup.email ? 'mailto:' + sup.email : '#';
+  }
+
+  const phoneWrap = document.getElementById('teacher-profile-phone-wrap');
+  const phoneEl = document.getElementById('teacher-profile-phone');
+  if (phoneWrap && phoneEl) {
+    if (sup.phone) {
+      phoneWrap.classList.remove('hidden');
+      phoneEl.textContent = sup.phone;
+      phoneEl.href = 'tel:' + sup.phone;
+    } else {
+      phoneWrap.classList.add('hidden');
+    }
+  }
+
+  const quotaWrap = document.getElementById('teacher-profile-quota-wrap');
+  const quotaEl = document.getElementById('teacher-profile-quota');
+  if (quotaWrap && quotaEl) {
+    if (sup.quota !== undefined && (state.isAdmin || state.currentRole === 'supervisor')) {
+      quotaWrap.classList.remove('hidden');
+      quotaEl.textContent = `${sup.currentAssigned || 0} / ${sup.quota} sinh viên`;
+    } else {
+      quotaWrap.classList.add('hidden');
+    }
+  }
+
+  const photoEl = document.getElementById('teacher-profile-photo');
+  if (photoEl) {
+    const fallback = (typeof getSupervisorAvatarSvgDataUri === 'function') ? getSupervisorAvatarSvgDataUri(sup.name || 'GV') : '';
+    photoEl.src = sup.photoUrl || fallback;
+    photoEl.onerror = function() {
+      this.onerror = null;
+      this.src = fallback;
+    };
+  }
+
+  const logoutBtn = document.getElementById('btn-teacher-profile-logout');
+  if (logoutBtn) {
+    logoutBtn.classList.toggle('hidden', !isSupervisorSelf);
+  }
+
+  const adminEditBtn = document.getElementById('btn-teacher-profile-admin-edit');
+  if (adminEditBtn) {
+    adminEditBtn.classList.toggle('hidden', !state.isAdmin);
+    if (state.isAdmin && sup.id) {
+      adminEditBtn.onclick = () => {
+        closeTeacherProfileModal();
+        if (typeof openAdminEditSupervisorModal === 'function') {
+          openAdminEditSupervisorModal(sup.id);
+        }
+      };
+    }
+  }
+
+  modal.classList.remove('hidden');
+};
+
+window.closeTeacherProfileModal = function() {
+  const modal = document.getElementById('modal-teacher-profile');
+  if (modal) modal.classList.add('hidden');
+};
+
+window.openBioModal = function(supId) {
+  window.openTeacherProfileModal(supId);
 };
 
 window.closeBioModal = function() {
-  document.getElementById('modal-sup-bio').classList.add('hidden');
+  window.closeTeacherProfileModal();
 };
+
+
 
 
 // ============================================================================

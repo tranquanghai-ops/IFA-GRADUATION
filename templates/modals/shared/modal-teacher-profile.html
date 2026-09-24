@@ -1,16 +1,62 @@
+<!-- MODAL: HỒ SƠ & LÝ LỊCH GIẢNG VIÊN DÙNG CHUNG TOÀN HỆ THỐNG (SV, GVHD, HỘI ĐỒNG & ADMIN) -->
+<div id="modal-teacher-profile" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 relative border border-slate-200 animate-in fade-in zoom-in duration-200">
+    <button type="button" onclick="closeTeacherProfileModal()" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer leading-none" title="Đóng">✕</button>
 
-  <!-- 4.6. TEACHER / EVALUATOR PROFILE MODAL -->
-  <div id="modal-teacher-profile" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 relative">
-      <button type="button" onclick="closeTeacherProfileModal()" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer">✕</button>
-
-      <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
-        <span class="text-xl">👨‍🏫</span>
-        <h3 class="font-bold text-base text-slate-900">Thông tin Giảng viên / Đánh giá</h3>
-      </div>
-
-      <div id="teacher-profile-modal-body" class="space-y-4">
-        <!-- Injected dynamically by updateTeacherPersonalModal() -->
+    <div class="flex items-center gap-4 border-b border-slate-100 pb-4">
+      <img id="teacher-profile-photo" src="" class="w-16 h-16 rounded-2xl object-cover border-2 border-slate-200 shadow-sm shrink-0" alt="Giảng viên" onerror="this.src=window.getSupervisorAvatarSvgDataUri ? window.getSupervisorAvatarSvgDataUri('GV') : ''">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span id="teacher-profile-degree-badge" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">Giảng viên</span>
+          <span id="teacher-profile-role-badge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">GVHD</span>
+        </div>
+        <h3 id="teacher-profile-name" class="font-extrabold text-base sm:text-lg text-slate-900 truncate mt-0.5">--</h3>
+        <p id="teacher-profile-dept" class="text-xs text-slate-500 truncate">Khoa Mỹ thuật Công nghiệp • TDTU</p>
       </div>
     </div>
-  </div>
+
+    <!-- Expertise & Bio -->
+    <div class="space-y-2 text-xs">
+      <span class="font-bold text-slate-700 uppercase tracking-wider text-[11px] block">Chuyên môn & Hướng nghiên cứu:</span>
+      <div id="teacher-profile-expertise" class="text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed max-h-40 overflow-y-auto text-xs">
+        --
+      </div>
+    </div>
+
+    <!-- Contact Info -->
+    <div id="teacher-profile-contacts" class="space-y-2 pt-2 border-t border-slate-100 text-xs">
+      <div class="flex items-center gap-2 text-slate-600">
+        <span class="w-5 text-center">✉️</span>
+        <span class="text-slate-500">Email:</span>
+        <a id="teacher-profile-email" href="#" class="font-semibold text-blue-700 hover:underline break-all">--</a>
+      </div>
+      <div id="teacher-profile-phone-wrap" class="flex items-center gap-2 text-slate-600">
+        <span class="w-5 text-center">📞</span>
+        <span class="text-slate-500">Điện thoại:</span>
+        <a id="teacher-profile-phone" href="#" class="font-semibold text-slate-800 hover:underline">--</a>
+      </div>
+      <div id="teacher-profile-quota-wrap" class="hidden flex items-center gap-2 text-slate-600">
+        <span class="w-5 text-center">📊</span>
+        <span class="text-slate-500">Hạn mức hướng dẫn:</span>
+        <span id="teacher-profile-quota" class="font-bold text-slate-800">--</span>
+      </div>
+    </div>
+
+    <!-- Modal Footer Actions -->
+    <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+      <div>
+        <button type="button" id="btn-teacher-profile-logout" onclick="handleTeacherLogout()" class="hidden px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-rose-200 cursor-pointer">
+          <span>🚪</span> <span>Đăng xuất</span>
+        </button>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" id="btn-teacher-profile-admin-edit" onclick="closeTeacherProfileModal();" class="hidden px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl transition cursor-pointer">
+          <span>✏️</span> <span>Sửa thông tin</span>
+        </button>
+        <button type="button" onclick="closeTeacherProfileModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer">
+          Đóng
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
