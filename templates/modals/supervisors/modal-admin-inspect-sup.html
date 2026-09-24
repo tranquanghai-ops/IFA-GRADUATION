@@ -1,0 +1,32 @@
+
+  <!-- 8. ADMIN INSPECT SUPERVISOR DECISIONS MODAL -->
+  <div id="modal-admin-inspect-sup" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div>
+          <h3 id="inspect-sup-name" class="font-bold text-base text-tdtu-blue">Chi tiết Xét duyệt: Thầy/Cô</h3>
+          <p id="inspect-sup-quota-info" class="text-xs text-slate-500">Chỉ tiêu: 0 | Đã nhận: 0 | Còn lại: 0</p>
+        </div>
+        <button onclick="closeAdminInspectSupModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto border rounded-xl">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-100 text-slate-600 font-bold uppercase sticky top-0 border-b">
+            <tr>
+              <th class="p-3">MSSV</th>
+              <th class="p-3">Họ và tên</th>
+              <th class="p-3">Đề tài</th>
+              <th class="p-3">Trạng thái lựa chọn</th>
+            </tr>
+          </thead>
+          <tbody id="inspect-sup-candidates-tbody" class="divide-y divide-slate-100">
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex justify-end pt-2 border-t">
+        <button type="button" onclick="closeAdminInspectSupModal()" class="px-4 py-2 bg-slate-100 rounded-xl font-bold text-xs hover:bg-slate-200">Đóng</button>
+      </div>
+    </div>
+  </div>

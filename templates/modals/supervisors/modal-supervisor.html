@@ -1,0 +1,115 @@
+
+  <!-- 2. CREATE / EDIT SUPERVISOR MASTER MODAL -->
+  <div id="modal-supervisor" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+      <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0">
+        <h3 id="modal-supervisor-title" class="font-bold text-base text-tdtu-blue">Thêm Giảng viên Hướng dẫn</h3>
+        <button type="button" onclick="closeSupervisorModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+      </div>
+
+      <form id="form-supervisor" onsubmit="saveSupervisorMaster(event)" class="flex flex-col flex-1 overflow-hidden">
+        <div class="p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
+          <input type="hidden" id="sup-form-id">
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Họ và tên *</label>
+            <input type="text" id="sup-form-name" required placeholder="ThS. NCS. Nguyễn Văn A" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="col-span-2">
+              <label class="font-bold text-slate-700 block mb-1">Email *</label>
+              <input type="email" id="sup-form-email" required placeholder="email@tdtu.edu.vn hoặc @gmail.com" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Giới tính</label>
+              <select id="sup-form-gender" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <option value="Nam">Nam</option>
+                <option value="Nữ">Nữ</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Số điện thoại</label>
+              <input type="tel" id="sup-form-phone" placeholder="0901234567" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Bộ môn / Ngành</label>
+              <select id="sup-form-dept-select" onchange="handleSupervisorDeptChange(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <option value="Thiết kế nội thất">Thiết kế nội thất</option>
+                <option value="Thiết kế đồ họa">Thiết kế đồ họa</option>
+                <option value="Thiết kế thời trang">Thiết kế thời trang</option>
+                <option value="Thiết kế công nghiệp">Thiết kế công nghiệp</option>
+                <option value="Nghệ thuật số">Nghệ thuật số</option>
+                <option value="__other__">Khác...</option>
+              </select>
+              <input type="text" id="sup-form-dept-custom" placeholder="Nhập tên bộ môn khác..." class="hidden mt-1.5 w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <input type="hidden" id="sup-form-dept" value="Thiết kế nội thất">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Loại giảng viên <span class="text-rose-500">*</span></label>
+              <select id="sup-form-employment-type" onchange="handleEmploymentTypeChange(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <option value="internal" selected>Cơ hữu (Tối đa 10 SV)</option>
+                <option value="adjunct">Thỉnh giảng (Tối đa 5 SV)</option>
+              </select>
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Số SV hướng dẫn mặc định <span class="text-rose-500">*</span></label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="sup-form-default-quota" min="1" max="10" value="10" required class="w-24 p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-center focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <span class="text-xs text-slate-500 font-semibold">SV / đợt</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-400">💡 Quy định hạn mức: Giảng viên Cơ hữu tối đa 10 SV, Giảng viên Thỉnh giảng tối đa 5 SV.</p>
+          
+          <!-- Image upload & Preview (Storage + Auto-resize/compress) -->
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Ảnh chân dung (Portrait)</label>
+            <div class="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <div class="w-16 h-16 rounded-full border-2 border-white shadow bg-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                <img id="sup-photo-preview" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%23cbd5e1'/><path fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" class="w-full h-full object-cover">
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <label class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl cursor-pointer transition-colors border border-slate-300 shadow-sm">
+                    <span>📁 Chọn ảnh mới</span>
+                    <input type="file" id="sup-form-file" accept="image/jpeg,image/png,image/webp,image/jpg" class="hidden" onchange="previewSupervisorPhoto(this)">
+                  </label>
+                  <button type="button" id="sup-btn-remove-photo" onclick="removeSupervisorPhoto()" class="hidden px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition-colors cursor-pointer">
+                    <span>✕ Xóa ảnh</span>
+                  </button>
+                </div>
+                <input type="hidden" id="sup-form-photo">
+                <input type="hidden" id="sup-form-photo-path">
+                <p id="sup-photo-info" class="text-[11px] text-slate-500 mt-1">Hỗ trợ JPG, PNG, WebP (tối đa 10MB, tự động tối ưu & nén &lt; 300KB)</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Lĩnh vực / Chuyên môn hướng dẫn</label>
+            <input type="text" id="sup-form-expertise" placeholder="Nhà ở dân dụng, Thương mại dịch vụ, Khách sạn..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Giới thiệu ngắn (Bio)</label>
+            <textarea id="sup-form-bio" rows="2" placeholder="Kinh nghiệm, định hướng nghiên cứu..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+          </div>
+
+          <div class="pt-2 border-t border-slate-200 text-slate-700">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="sup-form-active" checked class="rounded text-blue-600">
+              <span class="font-bold text-xs">Đang hoạt động (Active trong Danh sách GVHD)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+          <button type="button" onclick="closeSupervisorModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Hủy</button>
+          <button type="submit" class="px-6 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md transition-colors">Lưu GVHD</button>
+        </div>
+      </form>
+    </div>
+  </div>

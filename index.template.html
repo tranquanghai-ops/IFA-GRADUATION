@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base href="/graduation/">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IFA+ Graduation Beta — Đăng ký & Xét duyệt GVHD Đồ án Tốt nghiệp</title>
+  <script>
+    window.IFA_CONFIG = {
+      graduationApiEndpoint: 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi',
+      driveUploadEndpoint: 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi'
+    };
+  </script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            tdtu: {
+              blue: '#1a3c5e',
+              dark: '#132b43',
+              light: '#2563eb',
+              accent: '#f59e0b',
+              surface: '#f8fafc'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- SheetJS for local Excel parsing -->
+  <script src="xlsx.full.min.js"></script>
+  <!-- pdfmake for the official student topic-registration form -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-blue-100 selection:text-blue-900">
+
+  <!-- APP LOADING OVERLAY -->
+  <div id="app-loading-overlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-white transition-opacity duration-300">
+    <div class="bg-white text-slate-800 p-6 rounded-2xl shadow-2xl flex flex-col items-center max-w-xs text-center border border-slate-100">
+      <div class="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <div class="font-bold text-base text-tdtu-blue">IFA+ Graduation Beta</div>
+      <div id="app-loading-msg" class="text-xs text-slate-500 mt-1">Đang tải IFA+ Graduation Beta...</div>
+    </div>
+  </div>
+
+  <!-- GLOBAL IMPERSONATION BANNER (v2.7.0-beta.1) -->
+  <div id="global-impersonation-banner" class="hidden bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 text-slate-950 px-4 py-2.5 shadow-lg border-b border-amber-400 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
+      <div class="flex items-center gap-2.5">
+        <span class="px-2 py-0.5 rounded-md bg-black/20 text-slate-950 font-black tracking-wider text-[10px] uppercase border border-black/10 flex items-center gap-1">
+          <span>🎭</span> ĐANG ĐÓNG VAI
+        </span>
+        <div class="leading-tight">
+          <span class="font-bold" id="impersonate-banner-name">Nguyễn Văn A</span>
+          <span class="text-slate-900 ml-1 font-mono text-[11px] font-semibold" id="impersonate-banner-identifier">(52000888)</span>
+          <span class="mx-1.5 text-black/30">•</span>
+          <span class="font-semibold text-slate-900 bg-white/40 px-1.5 py-0.5 rounded text-[11px]" id="impersonate-banner-role">Sinh viên</span>
+          <span class="hidden sm:inline-block mx-1.5 text-black/30">•</span>
+          <span class="hidden sm:inline-block text-amber-950 font-medium text-[11px]" id="impersonate-banner-round">Đợt tốt nghiệp</span>
+          <span class="hidden md:inline-block mx-1.5 text-black/30">•</span>
+          <span class="hidden md:inline-block text-[10px] text-amber-950 font-bold bg-amber-400/50 px-1.5 py-0.5 rounded border border-amber-600/30">⚡ Toàn quyền thao tác</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" onclick="openAdminImpersonateModal()" class="px-3 py-1 bg-white/35 hover:bg-white/55 text-slate-950 font-black rounded-lg shadow-sm border border-black/15 transition-all flex items-center gap-1.5 text-xs cursor-pointer">
+          <span>🔄</span> <span>Đổi nhân vật</span>
+        </button>
+        <button type="button" onclick="exitImpersonation()" class="px-3 py-1 bg-slate-950 hover:bg-black text-amber-300 font-black rounded-lg shadow-sm border border-amber-400/40 transition-all flex items-center gap-1.5 text-xs cursor-pointer">
+          <span>✕</span> <span>Thoát đóng vai</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP HEADER & BRANDING -->
+  <header class="ifa-global-header sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="ifa-header-row">
+        <!-- Logo & Title -->
+        <div class="ifa-header-brand">
+          <img class="ifa-header-logo" src="https://ifa-activities.web.app/ifa-logo.svg" alt="Logo Khoa Mỹ thuật Công nghiệp">
+          <div class="ifa-header-copy">
+            <div class="ifa-header-title-row">
+              <span class="ifa-header-title">IFA+ Graduation</span>
+              <span class="ifa-version-badge">v2.7.0-beta.1</span>
+            </div>
+            <p class="ifa-header-subtitle">Quản lý Đồ án Tốt nghiệp</p>
+            <p class="ifa-header-faculty">Khoa Mỹ thuật Công nghiệp</p>
+          </div>
+        </div>
+
+        <!-- View Navigation for Admins / Supervisors -->
+        <div id="role-nav-group" class="hidden">
+          <button id="nav-btn-student" onclick="switchView('student')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/20 transition-all flex items-center gap-1.5 shadow-sm">
+            <span>🎓</span> Sinh viên
+          </button>
+          <button id="nav-btn-supervisor" onclick="switchView('supervisor')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all hidden items-center gap-1.5">
+            <span>👨‍🏫</span> Giảng viên
+          </button>
+          <button id="nav-btn-admin" onclick="switchView('admin')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white transition-all hidden items-center gap-1.5">
+            <span>⚙️</span> Quản trị
+          </button>
+        </div>
+
+        <!-- User profile or Login trigger -->
+        <div class="ifa-header-account">
+          <div id="user-info-bar" class="hidden items-center gap-2.5">
+            <!-- Subtle Portal Switch Buttons -->
+            <a id="btn-goto-admin" href="/graduation/admin/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-300 bg-white/10 hover:bg-white/20 border border-amber-400/30 transition-all shadow-xs" title="Chuyển sang Cổng Quản trị">
+              <span>⚙️</span> <span class="hidden sm:inline">Quản trị</span>
+            </a>
+                        <a id="btn-goto-supervisor" href="/graduation/supervisor/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-200 bg-white/10 hover:bg-white/20 border border-emerald-400/30 transition-all shadow-xs" title="Chuyển sang Cổng GVHD">
+              <span>👨‍🏫</span> <span class="hidden sm:inline">Cổng GVHD</span>
+            </a>
+<a id="btn-goto-student" href="/graduation/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-200 bg-white/10 hover:bg-white/20 border border-blue-400/30 transition-all shadow-xs" title="Xem Cổng Sinh viên">
+              <span>🎓</span> <span class="hidden sm:inline">Cổng SV</span>
+            </a>
+            <a id="btn-goto-assessment" href="/graduation/assessment/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-purple-200 bg-white/10 hover:bg-white/20 border border-purple-400/30 transition-all shadow-xs" title="Chuyển sang Cổng Đánh giá">
+              <span>📝</span> <span class="hidden sm:inline">Đánh giá</span>
+            </a>
+            <!-- Admin Impersonate Entry Point (v2.6.0-beta.1) -->
+            <button id="btn-open-impersonate" onclick="openAdminImpersonateModal()" type="button" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-300 transition-all shadow-xs cursor-pointer" title="Đóng vai người dùng">
+              <span>🎭</span> <span class="hidden sm:inline">Đóng vai</span>
+            </button>
+            <img id="user-avatar" class="ifa-user-avatar" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%2364748b'/><path fill='%2364748b' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" alt="Ảnh đại diện người dùng">
+            <div class="ifa-account-identity">
+              <div id="user-display-name" class="ifa-account-name">Đang tải...</div>
+              <div id="user-email" class="ifa-account-email"></div>
+              <div class="flex items-center justify-end gap-1.5 mt-0.5">
+                <span id="user-role-badge" class="ifa-role-badge ifa-role-student">Sinh viên</span>
+                <span id="user-viewing-badge" class="hidden ifa-role-badge ifa-role-viewing">Đang xem: Sinh viên</span>
+              </div>
+            </div>
+            <button id="btn-logout" title="Đăng xuất" class="ifa-logout-button">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+              <span>Đăng xuất</span>
+            </button>
+          </div>
+          <button id="btn-header-login" class="hidden ifa-login-button">
+            Đăng nhập Google
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <nav class="ifa-portal-nav" aria-label="Điều hướng cổng Graduation">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-x-auto">
+        <div id="portal-navigation" class="ifa-portal-nav-items"></div>
+      </div>
+    </nav>
+
+    <!-- Legacy mobile view controls retained for switchView compatibility. -->
+    <div id="mobile-role-nav" class="hidden">
+      <button id="m-nav-student" onclick="switchView('student')" class="px-3 py-1 rounded-lg text-xs font-semibold text-white bg-white/20 whitespace-nowrap">🎓 Sinh viên</button>
+      <button id="m-nav-supervisor" onclick="switchView('supervisor')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 whitespace-nowrap hidden">👨‍🏫 Giảng viên</button>
+      <button id="m-nav-admin" onclick="switchView('admin')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-300 whitespace-nowrap hidden">⚙️ Quản trị</button>
+    </div>
+  </header>
+
+  <!-- PREVIEW MODE BANNER -->
+  <div id="preview-mode-banner" class="hidden bg-amber-500 text-slate-900 px-4 py-2 font-semibold text-xs text-center shadow-inner flex items-center justify-center gap-2">
+    <span>⚠️ <strong>CHẾ ĐỘ XEM THỬ ADMIN:</strong> Đang mô phỏng giao diện sinh viên MSSV: <span id="preview-mssv-badge" class="font-mono bg-white/40 px-1.5 py-0.5 rounded">20000000</span></span>
+    <button onclick="exitPreviewMode()" class="ml-3 underline font-bold hover:text-white">Thoát chế độ xem thử</button>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-2 sm:pt-3 pb-8">
+
+    <!-- AUTH GUARD PLACEHOLDER -->
+    <section id="login-required-section" class="hidden py-12">
+      <div class="max-w-md mx-auto card-surface p-8 text-center space-y-4">
+        <div class="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto text-3xl font-bold">
+          🎓
+        </div>
+        <h2 class="text-xl font-bold text-tdtu-blue">Hệ thống IFA+ Graduation</h2>
+        <p class="text-xs text-slate-500 leading-relaxed">
+          Đăng nhập bằng tài khoản email trường <strong>@student.tdtu.edu.vn</strong> (Sinh viên) hoặc <strong>@tdtu.edu.vn</strong> (Giảng viên / Quản trị) để tiếp tục.
+        </p>
+        <button id="btn-login-main" class="w-full py-3 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+          <span>Đăng nhập với Google TDTU</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- VIEW 1: STUDENT VIEW -->
+        <!-- VIEW 1: STUDENT VIEW -->
+<!-- PARTIAL:views/student.html -->
+<!-- PARTIAL:views/supervisor.html -->
+<!-- PARTIAL:views/assessment.html -->
+<!-- PARTIAL:views/admin.html -->
+
+<!-- === MODALS & DIALOGS === -->
+<!-- PARTIAL:templates/modals/rounds/modal-round.html -->
+<!-- PARTIAL:templates/modals/students/modal-add-eligible-student.html -->
+<!-- PARTIAL:templates/modals/supervisors/modal-supervisor.html -->
+<!-- PARTIAL:templates/modals/supervisors/modal-add-sup-to-round.html -->
+<!-- PARTIAL:templates/modals/shared/modal-project-type.html -->
+<!-- PARTIAL:templates/modals/students/modal-student-profile.html -->
+<!-- PARTIAL:templates/modals/shared/modal-teacher-profile.html -->
+<!-- PARTIAL:templates/modals/supervisors/modal-sup-bio.html -->
+<!-- PARTIAL:templates/modals/supervisors/modal-supervisor-confirm.html -->
+<!-- PARTIAL:templates/modals/rounds/modal-admin-lock-round.html -->
+<!-- PARTIAL:templates/modals/supervisors/modal-admin-inspect-sup.html -->
+<!-- PARTIAL:templates/modals/supervisors/modal-admin-edit-supervisor.html -->
+<!-- PARTIAL:templates/modals/supervisors/modal-admin-manual-assign.html -->
+<!-- PARTIAL:templates/modals/supervisors/modal-assignment-excel-preview.html -->
+<!-- PARTIAL:templates/modals/rounds/modal-round-workspace.html -->
+<!-- PARTIAL:templates/modals/rounds/modal-activity.html -->
+<!-- PARTIAL:templates/modals/rounds/modal-copy-round.html -->
+<!-- PARTIAL:templates/modals/supervisors/modal-add-support-supervisor.html -->
+<!-- PARTIAL:templates/modals/grading/modal-activity-councils.html -->
+<!-- PARTIAL:templates/modals/grading/modal-edit-council.html -->
+<!-- PARTIAL:templates/modals/grading/modal-add-guest-slot.html -->
+<!-- PARTIAL:templates/modals/shared/modal-confirm.html -->
+<!-- PARTIAL:templates/modals/students/modal-add-letter-option.html -->
+<!-- PARTIAL:templates/modals/grading/modal-milestone-quick-council.html -->
+<!-- PARTIAL:templates/modals/grading/modal-add-council-internal-member.html -->
+<!-- PARTIAL:templates/modals/grading/modal-add-council-guest-member.html -->
+<!-- PARTIAL:templates/modals/grading/modal-council-workspace.html -->
+<!-- PARTIAL:templates/modals/grading/modal-admin-score-detail.html -->
+<!-- PARTIAL:templates/modals/grading/modal-score-entry.html -->
+<!-- PARTIAL:templates/modals/grading/modal-rubric-criterion.html -->
+<!-- PARTIAL:templates/modals/grading/modal-score-calibration.html -->
+<!-- PARTIAL:templates/modals/grading/modal-reopen-council.html -->
+<!-- PARTIAL:templates/modals/grading/modal-guest-passcode-entry.html -->
+<!-- PARTIAL:templates/modals/rounds/modal-reopen-round.html -->
+<!-- PARTIAL:templates/modals/grading/modal-final-score-detail.html -->
+<!-- PARTIAL:templates/modals/shared/modal-activity-submissions.html -->
+<!-- PARTIAL:templates/modals/shared/modal-submission-override.html -->
+<!-- PARTIAL:templates/modals/shared/modal-submission-history.html -->
+<!-- PARTIAL:templates/modals/shared/modal-admin-impersonate.html -->
+
+            <span class="absolute left-2.5 top-2 text-slate-400">🔍</span>
+          </div>
+
+        </div>
+
+        <div class="flex items-center justify-between text-[11px] text-slate-500">
+          <span>Tìm thấy: <strong id="impersonate-candidate-count" class="text-slate-900 font-bold">0</strong> người dùng thực tế</span>
+          <span class="text-amber-800 font-bold flex items-center gap-1">⚡ Toàn quyền thao tác (Real Actions)</span>
+        </div>
+      </div>
+
+      <!-- Candidate list container -->
+      <div id="impersonate-candidates-list" class="p-4 flex-1 overflow-y-auto space-y-2">
+        <div class="text-center py-8 text-slate-400">Đang tải danh sách người dùng...</div>
+      </div>
+
+      <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="text-[11px] text-slate-500">
+          💡 Chọn đúng 1 người dùng để đóng vai. Thao tác được thực hiện theo quyền của nhân vật và lưu dấu Quản trị viên thực hiện trong nhật ký kiểm toán.
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button type="button" onclick="closeAdminImpersonateModal()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer">Hủy</button>
+          <button type="button" id="btn-confirm-impersonate" onclick="confirmImpersonateSelectedCandidate()" disabled class="px-5 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-slate-950 font-black rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
+            <span>🎭</span> <span id="btn-confirm-impersonate-text">Bắt đầu đóng vai</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

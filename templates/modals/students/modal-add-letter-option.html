@@ -1,0 +1,38 @@
+       MODAL: LETTER OPTION EDITOR (v1.9.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-add-letter-option" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+        <h4 id="modal-letter-option-title" class="font-bold text-slate-900 text-sm">Mức điểm chữ</h4>
+        <button type="button" onclick="closeLetterOptionModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+      </div>
+      <div class="p-4 space-y-3 text-xs">
+        <input type="hidden" id="letter-option-id">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Mã mức điểm (Key/Code) <span class="text-rose-500">*</span></label>
+          <input type="text" id="letter-option-key" placeholder="Ví dụ: A++, A+, A, B..." class="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold font-mono uppercase">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Nhãn hiển thị (Label) <span class="text-rose-500">*</span></label>
+          <input type="text" id="letter-option-label" placeholder="Ví dụ: Xuất sắc, Rất tốt, Tốt..." class="w-full p-2 border border-slate-300 rounded-lg text-xs">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">
+            Điểm quy đổi (0 – 10) <span class="text-rose-500">*</span>
+            <span class="text-[10px] text-blue-600 font-normal ml-1">(Chỉ Admin thấy để tính toán)</span>
+          </label>
+          <input type="number" id="letter-option-numeric" min="0" max="10" step="0.1" placeholder="Ví dụ: 10, 9.5, 8.0..." class="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold font-mono">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Mô tả / Ghi chú (Description)</label>
+          <input type="text" id="letter-option-desc" placeholder="Ví dụ: Xuất sắc, Đạt yêu cầu..." class="w-full p-2 border border-slate-300 rounded-lg text-xs">
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 p-3 bg-slate-50 border-t border-slate-100 text-xs font-bold">
+        <button type="button" onclick="closeLetterOptionModal()" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg">Hủy</button>
+        <button type="button" onclick="saveLetterOption()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs">Lưu mức điểm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================

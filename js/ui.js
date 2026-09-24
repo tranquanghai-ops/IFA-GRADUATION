@@ -7,3 +7,8 @@ export function initUIHelpers() {
   }
 }
 window.initUIHelpers = initUIHelpers;
+
+// --- SUBMODULE WINDOW BRIDGE ---
+if (typeof window !== 'undefined') {
+  if (typeof initUIHelpers !== 'undefined') window.initUIHelpers = initUIHelpers;
+}

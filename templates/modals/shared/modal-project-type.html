@@ -1,0 +1,33 @@
+
+  <!-- 4. ADD / EDIT PROJECT TYPE MODAL -->
+  <div id="modal-project-type" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b pb-3">
+        <h3 class="font-bold text-base text-tdtu-blue">Thêm Loại hình Đồ án</h3>
+        <button onclick="closeProjectTypeModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+      </div>
+
+      <form id="form-project-type" onsubmit="saveProjectType(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="pt-form-id">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Tên loại hình *</label>
+          <input type="text" id="pt-form-name" required placeholder="Ví dụ: Khách sạn / Nghỉ dưỡng" class="w-full p-2.5 border rounded-xl text-xs">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Thứ tự hiển thị</label>
+          <input type="number" id="pt-form-order" value="1" min="1" class="w-full p-2.5 border rounded-xl text-xs">
+        </div>
+        <div class="pt-2">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="pt-form-active" checked class="rounded text-blue-600">
+            <span>Hiển thị cho sinh viên chọn</span>
+          </label>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t">
+          <button type="button" onclick="closeProjectTypeModal()" class="px-4 py-2 bg-slate-100 rounded-xl font-bold hover:bg-slate-200">Hủy</button>
+          <button type="submit" class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md">Lưu</button>
+        </div>
+      </form>
+    </div>
+  </div>

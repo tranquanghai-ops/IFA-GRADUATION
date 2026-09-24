@@ -1167,6 +1167,24 @@ window.confirmImpersonateSelectedCandidate = function() {
   window.startImpersonating(state.selectedImpersonateCandidate);
 };
 
-// Global window bridges for cross-module accessibility
-window.preparePreviewStudentDropdown = preparePreviewStudentDropdown;
-window.updateSettingsActAsSessionUI = updateSettingsActAsSessionUI;
+// --- SUBMODULE WINDOW BRIDGE ---
+if (typeof window !== 'undefined') {
+  if (typeof preparePreviewStudentDropdown !== 'undefined') window.preparePreviewStudentDropdown = preparePreviewStudentDropdown;
+  if (typeof isImpersonating !== 'undefined') window.isImpersonating = isImpersonating;
+  if (typeof getRealUser !== 'undefined') window.getRealUser = getRealUser;
+  if (typeof getEffectiveActor !== 'undefined') window.getEffectiveActor = getEffectiveActor;
+  if (typeof checkImpersonationWriteGuard !== 'undefined') window.checkImpersonationWriteGuard = checkImpersonationWriteGuard;
+  if (typeof loadSystemSettingsDoc !== 'undefined') window.loadSystemSettingsDoc = loadSystemSettingsDoc;
+  if (typeof setupSystemSettingsRealtimeListener !== 'undefined') window.setupSystemSettingsRealtimeListener = setupSystemSettingsRealtimeListener;
+  if (typeof loadAdminSystemSettings !== 'undefined') window.loadAdminSystemSettings = loadAdminSystemSettings;
+  if (typeof updateSettingsActAsSessionUI !== 'undefined') window.updateSettingsActAsSessionUI = updateSettingsActAsSessionUI;
+  if (typeof onSettingsActAsRoundOrRoleChange !== 'undefined') window.onSettingsActAsRoundOrRoleChange = onSettingsActAsRoundOrRoleChange;
+  if (typeof onSettingsActAsSearchInput !== 'undefined') window.onSettingsActAsSearchInput = onSettingsActAsSearchInput;
+  if (typeof populateSettingsActAsCandidates !== 'undefined') window.populateSettingsActAsCandidates = populateSettingsActAsCandidates;
+  if (typeof onSettingsActAsStartClick !== 'undefined') window.onSettingsActAsStartClick = onSettingsActAsStartClick;
+  if (typeof loadImpersonationSession !== 'undefined') window.loadImpersonationSession = loadImpersonationSession;
+  if (typeof applyImpersonationActor !== 'undefined') window.applyImpersonationActor = applyImpersonationActor;
+  if (typeof gatherRoundCandidates !== 'undefined') window.gatherRoundCandidates = gatherRoundCandidates;
+  if (typeof addCandidate !== 'undefined') window.addCandidate = addCandidate;
+  if (typeof gatherAndRenderImpersonateCandidates !== 'undefined') window.gatherAndRenderImpersonateCandidates = gatherAndRenderImpersonateCandidates;
+}

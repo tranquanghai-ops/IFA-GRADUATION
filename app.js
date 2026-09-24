@@ -5,33 +5,25 @@
 
 // 1. Core Services, State & Utilities
 import './js/core.js';
-
-// 2. UI Components & Dialogs
 import './js/ui.js';
 
-// 3. Exact Act-As Impersonation Test Mode
-import './js/impersonation.js';
-
-// 4. Authentication, Roles & View Routing
-import './js/auth.js';
-
-// 5. Google Drive Provisioning & Submissions
-import './js/drive.js';
-
-// 6. Graduation Rounds Management
-import './js/rounds.js';
-
-// 7. Milestones, Unified Cards & Timeline Planning
-import './js/planning.js';
-
-// 8. Students, Eligibility, IFAA Master & Registrations
+// 2. Foundation Data & Masters
+import './js/supervisors.js';
 import './js/students.js';
 
-// 9. Supervisors Master, Review Workflow & Assignment Matrix
-import './js/supervisors.js';
+// 3. Rounds, Planning & Google Drive
+import './js/rounds.js';
+import './js/planning.js';
+import './js/drive.js';
 
-// 10. Councils, Rubric Scoring, Defense & Final Assessment
+// 4. Councils, Rubric Scoring & Grading
 import './js/grading.js';
+
+// 5. Exact Act-As Impersonation Test Mode
+import './js/impersonation.js';
+
+// 6. Authentication, Roles & Session Router (Initializes onAuthStateChanged)
+import './js/auth.js';
 
 // Bootstrap Notice
 if (typeof window !== 'undefined') {

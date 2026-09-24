@@ -1,0 +1,27 @@
+
+  <!-- MODAL: ADD GUEST SLOT TO ACTIVITY COUNCIL STRUCTURE -->
+  <div id="modal-add-guest-slot" class="hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 border-b border-slate-100">
+        <h4 class="font-bold text-sm text-slate-900">Thêm vị trí Khách mời / Doanh nghiệp</h4>
+        <button type="button" onclick="closeAddGuestSlotModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+      </div>
+
+      <div class="p-4 space-y-3 text-xs">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Tên vị trí đầy đủ *</label>
+          <input type="text" id="slot-form-name" placeholder="Ví dụ: Đại diện Doanh nghiệp 1, Chuyên gia ngoài..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Mã / Tên viết tắt *</label>
+          <input type="text" id="slot-form-label" placeholder="Ví dụ: DN1, Khách mời 1..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <p class="text-[11px] text-slate-400">Vị trí mới sẽ xuất hiện trên tất cả các Hội đồng thuộc Mốc này.</p>
+      </div>
+
+      <div class="flex justify-end gap-2 p-3.5 bg-slate-50 border-t border-slate-100">
+        <button type="button" onclick="closeAddGuestSlotModal()" class="px-4 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold">Hủy</button>
+        <button type="button" onclick="saveGuestSlot()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-sm">Thêm Vị trí</button>
+      </div>
+    </div>
+  </div>

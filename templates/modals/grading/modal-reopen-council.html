@@ -1,0 +1,30 @@
+       MODAL: REOPEN FINALIZED COUNCIL (ADMIN ONLY) (v2.0.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-reopen-council" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-rose-50 flex items-center justify-between">
+        <div>
+          <h4 class="font-black text-sm text-rose-950 flex items-center gap-1.5">
+            <span>🔓</span> Mở lại Hội đồng đã chốt điểm
+          </h4>
+          <p class="text-[11px] text-rose-700 mt-0.5 font-bold">Chỉ dành cho Quản trị viên</p>
+        </div>
+        <button type="button" onclick="closeReopenCouncilModal()" class="text-rose-700 hover:text-rose-950 font-bold p-1">✕</button>
+      </div>
+
+      <div class="p-5 space-y-3">
+        <p class="text-slate-700 text-xs">Hội đồng đang ở trạng thái <strong>Đã chốt điểm (Finalized)</strong>. Việc mở lại sẽ chuyển trạng thái về <strong>Đã kết thúc (Ended)</strong> để cho phép hiệu chỉnh tiếp.</p>
+        <div>
+          <label class="font-bold text-slate-800 block mb-1">Lý do mở lại Hội đồng <span class="text-rose-500">*</span></label>
+          <textarea id="reopen-council-reason" rows="3" placeholder="Ghi rõ lý do mở lại Hội đồng..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs"></textarea>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button type="button" onclick="closeReopenCouncilModal()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-600">Hủy</button>
+        <button type="button" onclick="confirmReopenCouncil()" class="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-xs">Xác nhận Mở lại</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================

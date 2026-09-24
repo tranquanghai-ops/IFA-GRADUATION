@@ -1,0 +1,81 @@
+       MODAL: ADMIN ACTIVITY SUBMISSIONS DASHBOARD (v2.2.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-activity-submissions" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-5xl w-full shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh] text-xs">
+      <div class="p-4 border-b border-slate-200 bg-emerald-50 flex items-center justify-between">
+        <div>
+          <h4 id="sub-dash-title" class="font-black text-sm sm:text-base text-emerald-950 flex items-center gap-1.5">
+            <span>📥</span> Quản lý Sinh viên Nộp bài — Mốc Kế hoạch
+          </h4>
+          <p id="sub-dash-subtitle" class="text-[11px] text-emerald-800 mt-0.5 font-semibold">Đợt: ... • Mốc: ...</p>
+        </div>
+        <button type="button" onclick="closeActivitySubmissionDashboard()" class="text-emerald-800 hover:text-emerald-950 font-bold text-base p-1">✕</button>
+      </div>
+
+      <!-- Stats Bar & Controls -->
+      <div class="p-4 bg-slate-50 border-b border-slate-200 space-y-3">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          <div class="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
+            <span class="text-[10px] text-slate-500 font-bold block uppercase">Tổng số SV</span>
+            <span id="sub-dash-stat-total" class="font-mono text-base font-black text-slate-800">0</span>
+          </div>
+          <div class="bg-white p-2.5 rounded-xl border border-emerald-200 shadow-xs">
+            <span class="text-[10px] text-emerald-600 font-bold block uppercase">Đã nộp</span>
+            <span id="sub-dash-stat-submitted" class="font-mono text-base font-black text-emerald-700">0</span>
+          </div>
+          <div class="bg-white p-2.5 rounded-xl border border-amber-200 shadow-xs">
+            <span class="text-[10px] text-amber-600 font-bold block uppercase">Chưa nộp</span>
+            <span id="sub-dash-stat-missing" class="font-mono text-base font-black text-amber-700">0</span>
+          </div>
+          <div class="bg-white p-2.5 rounded-xl border border-rose-200 shadow-xs">
+            <span class="text-[10px] text-rose-600 font-bold block uppercase">Nộp trễ</span>
+            <span id="sub-dash-stat-late" class="font-mono text-base font-black text-rose-700">0</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <input type="text" id="sub-dash-search" oninput="filterAdminSubmissionsTable()" placeholder="Tìm kiếm MSSV, Họ tên..." class="p-2 border border-slate-300 rounded-xl text-xs w-full sm:w-64">
+            <select id="sub-dash-filter-status" onchange="filterAdminSubmissionsTable()" class="p-2 border border-slate-300 rounded-xl text-xs font-bold">
+              <option value="all">Tất cả trạng thái</option>
+              <option value="submitted">Đã nộp</option>
+              <option value="missing">Chưa nộp</option>
+              <option value="late">Nộp trễ</option>
+              <option value="withdrawn">Đã rút bài</option>
+            </select>
+          </div>
+          <button type="button" onclick="exportCurrentActivitySubmissionsToExcel()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs flex items-center gap-1.5 shrink-0">
+            <span>📥 Xuất Excel danh sách</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="flex-1 overflow-auto p-4">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px] sticky top-0">
+            <tr>
+              <th class="p-2.5 text-center w-12">#</th>
+              <th class="p-2.5">MSSV & Họ tên</th>
+              <th class="p-2.5 text-center">Hội đồng</th>
+              <th class="p-2.5 text-center">Trạng thái</th>
+              <th class="p-2.5 text-center">Lần nộp</th>
+              <th class="p-2.5">Thời gian nộp</th>
+              <th class="p-2.5">Files</th>
+              <th class="p-2.5 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="sub-dash-tbody" class="divide-y divide-slate-100">
+            <tr><td colspan="8" class="p-6 text-center text-slate-400">Đang tải danh sách bài nộp...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-[11px] text-slate-500">
+        <span>Google Drive Storage: Tích hợp Provider Abstraction</span>
+        <button type="button" onclick="closeActivitySubmissionDashboard()" class="px-4 py-1.5 bg-slate-200 text-slate-700 rounded-xl font-bold">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================

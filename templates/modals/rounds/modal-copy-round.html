@@ -1,0 +1,50 @@
+
+  <!-- COPY ACTIVITIES FROM ANOTHER ROUND MODAL -->
+  <div id="modal-copy-round" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
+        <div>
+          <h3 class="font-bold text-base text-tdtu-blue">Sao chép Kế hoạch từ Đợt khác</h3>
+          <p id="copy-round-target-desc" class="text-xs text-slate-500 mt-0.5">Đợt tiếp nhận: ...</p>
+        </div>
+        <button type="button" onclick="closeCopyFromRoundModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs overflow-y-auto flex-1">
+        <!-- Bước 1: Chọn đợt nguồn -->
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Bước 1: Chọn Đợt tốt nghiệp nguồn <span class="text-rose-500">*</span></label>
+          <select id="copy-round-source-select" onchange="onSelectSourceRoundForCopy(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+            <option value="">-- Chọn đợt nguồn --</option>
+          </select>
+        </div>
+
+        <!-- Bước 2: Danh sách mốc -->
+        <div id="copy-round-milestones-container" class="space-y-2 hidden">
+          <div class="flex items-center justify-between">
+            <label class="font-bold text-slate-700">Bước 2: Chọn các mốc cần sao chép</label>
+            <div class="space-x-2">
+              <button type="button" onclick="toggleSelectAllCopyMilestones(true)" class="text-blue-600 hover:underline font-bold text-[11px]">Chọn tất cả</button>
+              <span class="text-slate-300">|</span>
+              <button type="button" onclick="toggleSelectAllCopyMilestones(false)" class="text-slate-500 hover:underline font-semibold text-[11px]">Bỏ chọn</button>
+            </div>
+          </div>
+
+          <div id="copy-round-milestones-list" class="max-h-60 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-slate-50/50 p-2 space-y-1">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <p class="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 p-2.5 rounded-xl leading-relaxed">
+            💡 <strong>Lưu ý:</strong> Các mốc được sao chép sẽ sinh ID và Slug mới (không ghi đè mốc đang có). Sau khi sao chép, bạn có thể chỉnh sửa ngày giờ cho phù hợp với đợt hiện tại.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+        <button type="button" onclick="closeCopyFromRoundModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Đóng</button>
+        <button type="button" id="btn-submit-copy-from-round" onclick="executeCopyFromRound()" disabled class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold shadow-md transition-colors">
+          Sao chép các mốc đã chọn
+        </button>
+      </div>
+    </div>
+  </div>

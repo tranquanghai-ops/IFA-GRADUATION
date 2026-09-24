@@ -1,0 +1,35 @@
+       MODAL: RUBRIC CRITERION EDITOR (v2.0.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-rubric-criterion" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <h4 id="modal-rubric-criterion-title" class="font-black text-sm text-slate-900">Thêm tiêu chí Rubric</h4>
+        <button type="button" onclick="closeRubricCriterionModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+      </div>
+      <div class="p-4 space-y-3">
+        <input type="hidden" id="rubric-criterion-id">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Mã tiêu chí (Key / duy nhất) <span class="text-rose-500">*</span></label>
+          <input type="text" id="rubric-criterion-key" placeholder="VD: idea, practicality, technique..." class="w-full p-2 border border-slate-300 rounded-xl font-mono text-xs">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Tên tiêu chí hiển thị <span class="text-rose-500">*</span></label>
+          <input type="text" id="rubric-criterion-label" placeholder="VD: Ý tưởng, Tính ứng dụng..." class="w-full p-2 border border-slate-300 rounded-xl text-xs font-bold">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Điểm tối đa (Max Score > 0) <span class="text-rose-500">*</span></label>
+          <input type="number" id="rubric-criterion-max" min="0.1" max="100" step="0.5" value="4" class="w-full p-2 border border-slate-300 rounded-xl font-mono text-xs font-bold">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Mô tả / Hướng dẫn chấm (tùy chọn):</label>
+          <textarea id="rubric-criterion-desc" rows="2" placeholder="Ghi chú chi tiết về tiêu chí..." class="w-full p-2 border border-slate-300 rounded-xl text-xs"></textarea>
+        </div>
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button type="button" onclick="closeRubricCriterionModal()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-600">Hủy</button>
+        <button type="button" onclick="saveRubricCriterion()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-xs">Lưu tiêu chí</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================

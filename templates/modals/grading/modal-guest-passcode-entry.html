@@ -1,0 +1,31 @@
+       MODAL: GUEST PASSCODE ENTRY (UI PLACEHOLDER PER SECTION 37) (v2.0.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-guest-passcode-entry" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <h4 class="font-black text-sm text-slate-900 flex items-center gap-1.5">
+          <span>🔑</span> Đăng nhập Khách mời bằng Passcode
+        </h4>
+        <button type="button" onclick="closeGuestPasscodeModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900">
+          <p class="font-bold">⚠️ Thông báo an toàn hệ thống:</p>
+          <p class="text-[11px] mt-1 text-amber-800">Cơ chế xác thực mã Passcode 6 chữ số an toàn yêu cầu Cloud Functions / Backend tin cậy để chống lộ mã trên client. Tính năng hiện đang ở chế độ chờ triển khai backend an toàn.</p>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Mã Passcode 6 chữ số:</label>
+          <input type="text" id="guest-passcode-input" maxlength="6" placeholder="123456" disabled class="w-full p-2.5 border border-slate-200 rounded-xl font-mono text-center text-lg font-black tracking-widest bg-slate-100 text-slate-400">
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button type="button" onclick="closeGuestPasscodeModal()" class="px-4 py-1.5 bg-slate-200 text-slate-700 rounded-xl font-bold">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================================

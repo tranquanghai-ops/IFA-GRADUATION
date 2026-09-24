@@ -1,0 +1,49 @@
+       MODAL: ADD GUEST MEMBER TO COUNCIL (Item D)
+       ============================================================================ -->
+  <div id="modal-add-council-guest-member" class="hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-amber-50/50">
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+            <span>🌐</span> Thêm Khách mời / Doanh nghiệp ngoài trường
+          </h4>
+          <p id="guest-member-council-label" class="text-[11px] text-slate-500 mt-0.5">Hội đồng: ...</p>
+        </div>
+        <button type="button" onclick="closeAddCouncilGuestMemberModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
+      </div>
+      <div class="p-4 space-y-3 text-xs">
+        <input type="hidden" id="guest-member-council-id">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Họ và tên khách mời <span class="text-rose-500">*</span></label>
+          <input type="text" id="guest-member-name" required placeholder="Ví dụ: TS. Lê Văn C, Ông Nguyễn Văn D..." class="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">
+            Email khách mời <span class="text-rose-500">*</span>
+            <span class="text-[10px] text-amber-600 font-normal ml-1">(Bắt buộc để định danh và phân quyền)</span>
+          </label>
+          <input type="email" id="guest-member-email" required placeholder="name@company.com" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono lowercase">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Đơn vị / Doanh nghiệp công tác</label>
+          <input type="text" id="guest-member-org" placeholder="Ví dụ: Công ty Cổ phần ABC, Viện Nghiên cứu XYZ..." class="w-full p-2 border border-slate-300 rounded-lg text-xs">
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Vai trò trong Hội đồng <span class="text-rose-500">*</span></label>
+          <select id="guest-member-role" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="guest_business" selected>Ủy viên Khách mời / Doanh nghiệp</option>
+            <option value="member">Ủy viên Hội đồng</option>
+            <option value="reviewer">Ủy viên Phản biện</option>
+            <option value="chair">Chủ tịch Hội đồng</option>
+            <option value="secretary">Thư ký Hội đồng</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 p-3 bg-slate-50 border-t border-slate-100 text-xs font-bold">
+        <button type="button" onclick="closeAddCouncilGuestMemberModal()" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg">Hủy</button>
+        <button type="button" onclick="saveCouncilGuestMember()" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg shadow-xs">Thêm khách mời</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================

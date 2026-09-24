@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "node scripts/build-html.cjs",
+    "test": "node scripts/build-html.cjs && node tests/test-official-assignments-integration.cjs && node tests/test-round-drive-card.cjs && node tests/test-v234-ifaa-integration.cjs",
     "test:rules": "firebase emulators:exec --only firestore --project tknt-tdtu-test \"node --test tests/firestore-official-assignments.rules.test.mjs\""
   },
   "devDependencies": {

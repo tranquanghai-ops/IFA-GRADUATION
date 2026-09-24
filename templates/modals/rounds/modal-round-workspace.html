@@ -1,0 +1,20 @@
+
+  <!-- ROUND WORKSPACE POPUP: reuses the live admin panels without duplicating IDs or state -->
+  <div id="modal-round-workspace" class="hidden fixed inset-0 z-[65] modal-backdrop flex items-center justify-center p-2 sm:p-4" onclick="if(event.target === this) closeRoundWorkspaceModal()">
+    <div class="bg-slate-50 rounded-2xl w-full max-w-6xl h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+      <div class="px-4 sm:px-5 py-3 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
+        <div class="min-w-0">
+          <h3 id="modal-round-workspace-title" class="font-black text-base text-slate-950">Quản lý đợt tốt nghiệp</h3>
+          <p id="modal-round-workspace-subtitle" class="text-[11px] text-slate-500 truncate">Đợt tốt nghiệp</p>
+        </div>
+        <button type="button" onclick="closeRoundWorkspaceModal()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-lg transition" aria-label="Đóng bảng">✕</button>
+      </div>
+      <div id="modal-round-workspace-body" class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5"></div>
+    </div>
+  </div>
+
+  <!-- MODULE ENTRYPOINT -->
+  <script type="module" src="app.js"></script>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>

@@ -1,0 +1,30 @@
+
+  <!-- 5. SUPERVISOR BIO MODAL -->
+  <div id="modal-sup-bio" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 relative">
+      <button onclick="closeBioModal()" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
+
+      <div class="flex items-center gap-4">
+        <img id="bio-modal-photo" src="" class="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-sm" alt="Supervisor">
+        <div>
+          <h3 id="bio-modal-name" class="font-extrabold text-base text-tdtu-blue">--</h3>
+          <p id="bio-modal-dept" class="text-xs text-slate-500">--</p>
+          <p id="bio-modal-expertise" class="text-xs font-semibold text-indigo-600 mt-0.5">--</p>
+        </div>
+      </div>
+
+      <div class="space-y-2 text-xs">
+        <span class="font-bold text-slate-700 uppercase block">Giới thiệu & Định hướng:</span>
+        <p id="bio-modal-text" class="text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed max-h-48 overflow-y-auto">
+          --
+        </p>
+      </div>
+
+      <div id="bio-modal-contacts" class="space-y-1.5 pt-2 border-t text-xs">
+      </div>
+
+      <div class="pt-2 flex justify-end">
+        <button type="button" onclick="closeBioModal()" class="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-200">Đóng</button>
+      </div>
+    </div>
+  </div>

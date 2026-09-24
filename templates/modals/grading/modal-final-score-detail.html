@@ -1,0 +1,83 @@
+       MODAL: STUDENT FINAL SCORE FORMULA & DETAIL (v2.1.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-final-score-detail" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs">
+      <div class="p-4 border-b border-slate-200 bg-indigo-50 flex items-center justify-between">
+        <div>
+          <h4 class="font-black text-sm text-indigo-950 flex items-center gap-1.5">
+            <span>📊</span> Chi tiết Điểm Tổng kết & Công thức
+          </h4>
+          <p id="fs-detail-student-meta" class="text-[11px] text-indigo-800 mt-0.5 font-bold">Sinh viên: ...</p>
+        </div>
+        <button type="button" onclick="closeFinalScoreDetailModal()" class="text-indigo-800 hover:text-indigo-950 font-bold p-1">✕</button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <!-- Components breakdown -->
+        <div class="space-y-2">
+          <div class="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-emerald-950 block">1. Điểm GVHD (<span id="fs-detail-w-gvhd">20</span>%)</span>
+              <span class="text-[10px] text-slate-500">Giảng viên hướng dẫn chính thức</span>
+            </div>
+            <div class="text-right">
+              <span id="fs-detail-gvhd-val" class="font-black font-mono text-sm text-emerald-900">8.70</span>
+              <span id="fs-detail-gvhd-raw" class="hidden text-[10px] text-slate-400 font-mono block">Raw: 8.7</span>
+            </div>
+          </div>
+
+          <div class="p-3 bg-blue-50/60 rounded-xl border border-blue-200 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-blue-950 block">2. Điểm Thuyết minh (<span id="fs-detail-w-tm">20</span>%)</span>
+              <span class="text-[10px] text-slate-500">Trung bình (TM HD + TM PB) / 2</span>
+            </div>
+            <div class="text-right">
+              <span id="fs-detail-tm-val" class="font-black font-mono text-sm text-blue-900">8.62</span>
+              <span id="fs-detail-tm-raw" class="hidden text-[10px] text-slate-400 font-mono block">Raw: 8.615</span>
+            </div>
+          </div>
+
+          <div class="p-3 bg-purple-50/60 rounded-xl border border-purple-200 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-purple-950 block">3. Điểm Bảo vệ Hội đồng (<span id="fs-detail-w-def">60</span>%)</span>
+              <span class="text-[10px] text-slate-500">Điểm Hội đồng chính thức (sau hiệu chỉnh & khách mời)</span>
+            </div>
+            <div class="text-right">
+              <span id="fs-detail-def-val" class="font-black font-mono text-sm text-purple-900">9.13</span>
+              <span id="fs-detail-def-raw" class="hidden text-[10px] text-slate-400 font-mono block">Raw: 9.128333...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formula display -->
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1 font-mono text-[11px]">
+          <span class="font-bold text-slate-500 block text-[10px]">CÔNG THỨC ÁP DỤNG:</span>
+          <p id="fs-detail-formula-text" class="text-slate-800 font-semibold leading-relaxed">
+            Điểm = (GVHD × 20%) + (TM × 20%) + (Bảo vệ × 60%)
+          </p>
+        </div>
+
+        <!-- Final Score Result -->
+        <div class="p-4 bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl text-white flex items-center justify-between">
+          <div>
+            <span class="text-[11px] font-bold text-blue-100 uppercase tracking-wider block">KẾT QUẢ ĐIỂM TỔNG KẾT</span>
+            <span id="fs-detail-raw-toggle-hint" class="text-[10px] text-blue-200">Không làm tròn số trung gian trong toàn bộ phép tính</span>
+          </div>
+          <div class="text-right">
+            <span id="fs-detail-display-score" class="font-black font-mono text-2xl text-white">8.91</span>
+            <span id="fs-detail-raw-score" class="hidden text-[11px] font-mono text-blue-200 block">Raw: 8.912733...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <button type="button" id="btn-toggle-raw-precision" onclick="toggleRawPrecisionInDetailModal()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-700 font-bold hover:bg-slate-100 text-[11px]">
+          🔍 Hiện điểm chi tiết (Full Raw)
+        </button>
+        <button type="button" onclick="closeFinalScoreDetailModal()" class="px-4 py-1.5 bg-slate-200 text-slate-700 rounded-xl font-bold">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================================================

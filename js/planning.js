@@ -1934,16 +1934,22 @@ window.loadStudentRoundActivities = async function(roundId) {
   }
 };
 
-
-// Global window bridges for cross-module accessibility
-window.getActivityStatus = getActivityStatus;
-window.fmtActivityTime = fmtActivityTime;
-window.isoToVietnameseDateTime = isoToVietnameseDateTime;
-window.parseVietnameseDateTime = parseVietnameseDateTime;
-window.sanitizeRichHtml = sanitizeRichHtml;
-window.generateUniqueSlug = generateUniqueSlug;
-window.isActivityPublished = isActivityPublished;
-window.normalizeActivity = normalizeActivity;
-
-window.ACTIVITY_TYPES = ACTIVITY_TYPES;
-window.DEFAULT_LETTER_GRADE_SCALE = DEFAULT_LETTER_GRADE_SCALE;
+// --- SUBMODULE WINDOW BRIDGE ---
+if (typeof window !== 'undefined') {
+  if (typeof getActivityStatus !== 'undefined') window.getActivityStatus = getActivityStatus;
+  if (typeof fmtActivityTime !== 'undefined') window.fmtActivityTime = fmtActivityTime;
+  if (typeof isoToVietnameseDateTime !== 'undefined') window.isoToVietnameseDateTime = isoToVietnameseDateTime;
+  if (typeof parseVietnameseDateTime !== 'undefined') window.parseVietnameseDateTime = parseVietnameseDateTime;
+  if (typeof sanitizeRichHtml !== 'undefined') window.sanitizeRichHtml = sanitizeRichHtml;
+  if (typeof cleanNode !== 'undefined') window.cleanNode = cleanNode;
+  if (typeof generateUniqueSlug !== 'undefined') window.generateUniqueSlug = generateUniqueSlug;
+  if (typeof isActivityPublished !== 'undefined') window.isActivityPublished = isActivityPublished;
+  if (typeof normalizeActivity !== 'undefined') window.normalizeActivity = normalizeActivity;
+  if (typeof formatCountdownText !== 'undefined') window.formatCountdownText = formatCountdownText;
+  if (typeof findNearestMilestone !== 'undefined') window.findNearestMilestone = findNearestMilestone;
+  if (typeof startMilestoneCountdownTicker !== 'undefined') window.startMilestoneCountdownTicker = startMilestoneCountdownTicker;
+  if (typeof renderUnifiedActivityCard !== 'undefined') window.renderUnifiedActivityCard = renderUnifiedActivityCard;
+  if (typeof renderActivityCard !== 'undefined') window.renderActivityCard = renderActivityCard;
+  if (typeof pad !== 'undefined') window.pad = pad;
+  if (typeof fmtPart !== 'undefined') window.fmtPart = fmtPart;
+}

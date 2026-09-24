@@ -7,11 +7,20 @@ const root = path.resolve(__dirname, '..');
 function loadFullAppSource(dir) {
   let code = fs.readFileSync(path.join(dir, 'app.js'), 'utf8');
   const jsDir = path.join(dir, 'js');
-  if (fs.existsSync(jsDir)) {
-    for (const f of fs.readdirSync(jsDir).filter(x => x.endsWith('.js')).sort()) {
-      code += '\n' + fs.readFileSync(path.join(jsDir, f), 'utf8');
+  function readRec(d) {
+    let out = '';
+    if (!fs.existsSync(d)) return out;
+    for (const f of fs.readdirSync(d).sort()) {
+      const p = path.join(d, f);
+      if (fs.statSync(p).isDirectory()) {
+        out += readRec(p);
+      } else if (f.endsWith('.js')) {
+        out += '\n' + fs.readFileSync(p, 'utf8');
+      }
     }
+    return out;
   }
+  code += readRec(jsDir);
   return code;
 }
 const app = loadFullAppSource(root);

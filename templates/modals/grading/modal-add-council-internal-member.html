@@ -1,0 +1,38 @@
+       MODAL: ADD INTERNAL MEMBER TO COUNCIL (Item D)
+       ============================================================================ -->
+  <div id="modal-add-council-internal-member" class="hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm">Thêm Thành viên Nội bộ</h4>
+          <p id="internal-member-council-label" class="text-[11px] text-slate-500 mt-0.5">Hội đồng: ...</p>
+        </div>
+        <button type="button" onclick="closeAddCouncilInternalMemberModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
+      </div>
+      <div class="p-4 space-y-3 text-xs">
+        <input type="hidden" id="internal-member-council-id">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Chọn Giảng viên / Cán bộ <span class="text-rose-500">*</span></label>
+          <input type="search" id="internal-member-search" oninput="filterCouncilInternalMembers(this.value)" placeholder="Tìm theo họ tên, email, khoa/bộ môn..." class="w-full p-2 mb-2 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <select id="internal-member-select" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="">-- Chọn giảng viên --</option>
+          </select>
+        </div>
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Vai trò trong Hội đồng <span class="text-rose-500">*</span></label>
+          <select id="internal-member-role" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="chair">Chủ tịch Hội đồng</option>
+            <option value="member" selected>Ủy viên Hội đồng</option>
+            <option value="secretary">Thư ký Hội đồng</option>
+            <option value="reviewer">Ủy viên Phản biện</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 p-3 bg-slate-50 border-t border-slate-100 text-xs font-bold">
+        <button type="button" onclick="closeAddCouncilInternalMemberModal()" class="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg">Hủy</button>
+        <button type="button" onclick="saveCouncilInternalMember()" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs">Thêm thành viên</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================

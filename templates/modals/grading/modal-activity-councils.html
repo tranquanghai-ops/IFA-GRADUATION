@@ -1,0 +1,129 @@
+       MODAL: ACTIVITY COUNCIL MANAGEMENT (v1.9.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-activity-councils" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[94vh] overflow-hidden border border-slate-200">
+      <!-- Header -->
+      <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0 bg-slate-50/50">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xl">⚖️</span>
+            <h3 id="council-modal-act-title" class="font-black text-base sm:text-lg text-slate-900 tracking-tight">QUẢN LÝ HỘI ĐỒNG — Mốc Kế hoạch</h3>
+            <span class="badge bg-indigo-100 text-indigo-800 font-bold text-[10px]">Council Foundation</span>
+          </div>
+          <p id="council-modal-act-subtitle" class="text-xs text-slate-500 mt-0.5">Đợt tốt nghiệp: ...</p>
+        </div>
+        <button type="button" onclick="closeActivityCouncilManagement()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-lg">✕</button>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="flex border-b border-slate-200 px-4 sm:px-5 bg-white shrink-0 gap-4 text-xs font-bold overflow-x-auto">
+        <button type="button" onclick="switchCouncilTab('councils')" id="ctab-btn-councils" class="py-3 border-b-2 border-indigo-600 text-indigo-700 whitespace-nowrap">
+          🏛️ Danh sách Hội đồng (<span id="cbadge-councils-count">0</span>)
+        </button>
+        <button type="button" onclick="switchCouncilTab('structure')" id="ctab-btn-structure" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+          🧩 Cấu trúc Thành viên (<span id="cbadge-slots-count">3</span>)
+        </button>
+        <button type="button" onclick="switchCouncilTab('students')" id="ctab-btn-students" class="py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+          👥 Phân Sinh viên & Thứ tự (<span id="cbadge-students-count">0/0</span>)
+        </button>
+      </div>
+
+      <!-- Main Body -->
+      <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 text-xs bg-slate-50/30">
+        
+        <!-- TAB 1: DANH SÁCH HỘI ĐỒNG -->
+        <div id="ctab-panel-councils" class="space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
+            <span class="text-slate-600 font-medium text-xs">
+              Mỗi Hội đồng chịu trách nhiệm đánh giá cho một nhóm sinh viên tại phòng và khung giờ cụ thể.
+            </span>
+            <div class="flex items-center gap-2 shrink-0">
+              <button type="button" onclick="openCreateCouncilModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
+                <span>+ Thêm Hội đồng</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="councils-cards-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- TAB 2: CẤU TRÚC THÀNH VIÊN THEO MỐC -->
+        <div id="ctab-panel-structure" class="hidden space-y-4">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-2">
+            <div class="flex items-center justify-between">
+              <div>
+                <h4 class="font-bold text-slate-900 text-sm">Cơ cấu Vị trí Thành viên trong Mốc</h4>
+                <p class="text-xs text-slate-500 mt-0.5">Tất cả Hội đồng trong cùng Mốc này sẽ có chung danh sách và số lượng vị trí (slots) này.</p>
+              </div>
+              <button type="button" onclick="openAddGuestSlotModal()" class="px-3.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl font-bold text-xs border border-blue-200 transition-colors">
+                + Thêm vị trí Khách mời / DN
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                <tr>
+                  <th class="p-3.5 w-16 text-center">STT</th>
+                  <th class="p-3.5">Tên vị trí (Vai trò)</th>
+                  <th class="p-3.5">Mã / Tên viết tắt</th>
+                  <th class="p-3.5">Loại slot</th>
+                  <th class="p-3.5 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="council-slots-tbody" class="divide-y divide-slate-100">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 3: PHÂN CÔNG SINH VIÊN & THỨ TỰ TRÌNH BÀY -->
+        <div id="ctab-panel-students" class="hidden space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <input type="text" id="council-student-search" oninput="filterCouncilStudents()" placeholder="Tìm MSSV, họ tên, đề tài..." class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-56">
+              <select id="council-student-filter-council" onchange="filterCouncilStudents()" class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold">
+                <option value="all">Tất cả sinh viên</option>
+                <option value="unassigned">Chưa phân Hội đồng</option>
+              </select>
+            </div>
+            <span id="council-student-filter-count" class="text-slate-500 font-semibold text-[11px]">
+              Hiển thị: 0 sinh viên
+            </span>
+          </div>
+
+          <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                <tr>
+                  <th class="p-3.5 w-16 text-center">STT</th>
+                  <th class="p-3.5 w-24">MSSV</th>
+                  <th class="p-3.5">Họ và tên</th>
+                  <th class="p-3.5">Đề tài</th>
+                  <th class="p-3.5 w-44">Hội đồng đánh giá</th>
+                  <th class="p-3.5 w-28 text-center">Thứ tự</th>
+                  <th class="p-3.5 w-40 text-center">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody id="council-students-tbody" class="divide-y divide-slate-100">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="flex justify-between items-center p-3.5 sm:p-4 bg-slate-100 border-t border-slate-200 shrink-0">
+        <span class="text-[11px] text-slate-500">Mỗi Mốc Kế hoạch có thể phân chia các Hội đồng độc lập với nhau.</span>
+        <button type="button" onclick="closeActivityCouncilManagement()" class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs transition-colors">
+          Xong / Đóng
+        </button>
+      </div>
+    </div>
+  </div>

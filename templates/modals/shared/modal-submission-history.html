@@ -1,0 +1,24 @@
+       MODAL: SUBMISSION ATTEMPTS HISTORY (v2.2.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-submission-history" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[85vh]">
+      <div class="p-4 border-b border-slate-200 bg-slate-100 flex items-center justify-between">
+        <h4 class="font-black text-sm text-slate-900 flex items-center gap-1.5">
+          <span>📜</span> Lịch sử các lần nộp bài (Version History)
+        </h4>
+        <button type="button" onclick="closeSubmissionHistoryModal()" class="text-slate-600 hover:text-slate-900 font-bold p-1">✕</button>
+      </div>
+      <div class="p-4 bg-slate-50 border-b border-slate-200">
+        <div class="font-bold text-slate-900 text-xs" id="sub-hist-student-info">Sinh viên: ...</div>
+        <div class="text-[11px] text-slate-500 mt-0.5" id="sub-hist-activity-info">Mốc: ...</div>
+      </div>
+      <div class="p-4 flex-1 overflow-auto space-y-3" id="sub-hist-list">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <button type="button" onclick="closeSubmissionHistoryModal()" class="px-4 py-1.5 bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================================

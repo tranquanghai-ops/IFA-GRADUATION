@@ -1,0 +1,128 @@
+       MODAL: COUNCIL WORKSPACE / ĐIỀU HÀNH & CHẤM ĐIỂM HỘI ĐỒNG (v1.9.0-beta.1)
+       ============================================================================ -->
+  <div id="modal-council-workspace" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-6xl w-full shadow-2xl flex flex-col max-h-[96vh] overflow-hidden border border-slate-200">
+      
+      <!-- Top Header -->
+      <div class="flex flex-wrap items-center justify-between p-3.5 sm:p-4 border-b border-slate-200 bg-slate-50/80 shrink-0 gap-2">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-indigo-100 text-indigo-700 rounded-xl text-lg font-black shrink-0">🏛️</div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 id="cws-council-name" class="font-black text-sm sm:text-base text-slate-900 tracking-tight">HỘI ĐỒNG HĐ1</h3>
+              <span id="cws-council-status-badge" class="badge bg-amber-100 text-amber-800 font-bold text-[10px]">Chuẩn bị</span>
+              <span id="cws-my-role-badge" class="badge bg-blue-100 text-blue-800 font-bold text-[10px]">Ủy viên</span>
+            </div>
+            <p id="cws-council-meta" class="text-[11px] text-slate-500 mt-0.5">📍 Phòng: D501A • 📅 25/09/2026 (08:00 - 11:30)</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Secretary / Admin Council State Controls -->
+          <div id="cws-session-controls" class="hidden items-center gap-1.5 flex-wrap">
+            <button type="button" id="btn-start-council-session" onclick="startCouncilSession()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
+              <span>▶ Bắt đầu Hội đồng</span>
+            </button>
+            <button type="button" id="btn-end-council-session" onclick="endCouncilSession()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
+              <span>⏹ Kết thúc Hội đồng</span>
+            </button>
+            <button type="button" id="btn-finalize-council-session" onclick="finalizeCouncilSession()" class="hidden px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
+              <span>🔒 Chốt điểm Hội đồng</span>
+            </button>
+            <button type="button" id="btn-reopen-council-session" onclick="openReopenCouncilModal()" class="hidden px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
+              <span>🔓 Mở lại Hội đồng</span>
+            </button>
+          </div>
+          <button type="button" onclick="closeCouncilWorkspace()" class="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors">✕ Đóng</button>
+        </div>
+      </div>
+
+      <!-- Main Body: 2 Columns Responsive -->
+      <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
+        
+        <!-- LEFT COLUMN: DANH SÁCH SINH VIÊN -->
+        <div class="w-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col bg-slate-50/40 shrink-0">
+          <div class="p-3 border-b border-slate-200 bg-white space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                <span>👥</span> DANH SÁCH BÁO CÁO (<span id="cws-student-count-badge">0</span>)
+              </span>
+              <span id="cws-presenting-indicator" class="text-[10px] font-bold text-emerald-600 hidden">● 1 đang trình bày</span>
+            </div>
+            <input type="text" id="cws-student-search" oninput="filterCouncilWorkspaceStudents(this.value)" placeholder="Tìm MSSV, họ tên, đề tài..." class="w-full p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          
+          <div id="cws-students-list" class="flex-1 overflow-y-auto p-2 space-y-1.5 text-xs">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: WORKSPACE FOR SELECTED STUDENT -->
+        <div class="flex-1 flex flex-col overflow-y-auto p-4 sm:p-6 space-y-4 bg-white">
+          
+          <!-- BANNER: HỘI ĐỒNG HIỆN ĐANG TRÌNH BÀY -->
+          <div id="cws-presenting-banner" class="hidden p-3.5 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-center justify-between shadow-xs">
+            <div class="flex items-center gap-3">
+              <span class="flex h-3 w-3 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+              </span>
+              <div>
+                <div class="text-[10px] font-black uppercase text-rose-700 tracking-wider">Hội đồng hiện đang trình bày</div>
+                <div id="cws-presenting-banner-text" class="font-black text-slate-900 text-xs sm:text-sm">Trần Văn B (12345678)</div>
+              </div>
+            </div>
+            <button type="button" onclick="goToCurrentPresentingStudent()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1 shrink-0">
+              <span>↩ Quay lại SV đang trình bày</span>
+            </button>
+          </div>
+
+          <!-- SELECTED STUDENT DETAILS CARD -->
+          <div id="cws-selected-student-card" class="p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- SECRETARY CONTROLS FOR THIS STUDENT -->
+          <div id="cws-secretary-actions" class="hidden p-3 bg-indigo-50/60 border border-indigo-200 rounded-xl flex items-center justify-between gap-2">
+            <span class="font-bold text-indigo-950 text-xs flex items-center gap-1.5">
+              <span>⚡</span> Điều hành báo cáo (Thư ký / Admin):
+            </span>
+            <div id="cws-secretary-buttons" class="flex items-center gap-2">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- SCORING CARD (LETTER / NUMERIC) -->
+          <div id="cws-scoring-section" class="p-4 sm:p-5 bg-white border border-slate-200 rounded-2xl space-y-4 shadow-xs">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- PROGRESS OF SCORERS IN COUNCIL (PRIVACY PRESERVED) -->
+          <div id="cws-scorers-progress-section" class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- ADMIN REAL-TIME MONITOR (ONLY FOR ADMIN) -->
+          <div id="cws-admin-monitor-section" class="hidden p-4 bg-indigo-50/40 border border-indigo-200 rounded-2xl space-y-3">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- POST-COUNCIL CALIBRATION & GUEST INCLUSION (CHAIR & ADMIN) (v2.0.0-beta.1) -->
+          <div id="cws-post-council-section" class="hidden p-4 sm:p-5 bg-amber-50/60 border-2 border-amber-300 rounded-2xl space-y-4">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <!-- AUDIT LOG HISTORY PANEL (CHAIR & ADMIN) (v2.0.0-beta.1) -->
+          <div id="cws-audit-logs-section" class="hidden p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+            <!-- Rendered dynamically -->
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ============================================================================

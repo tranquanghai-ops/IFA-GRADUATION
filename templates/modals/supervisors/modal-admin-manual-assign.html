@@ -1,0 +1,30 @@
+  </div>
+
+  <div id="modal-admin-manual-assign" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b pb-3">
+        <h3 class="font-bold text-base text-tdtu-blue">Phân công GVHD Thủ công</h3>
+        <button onclick="closeAdminManualAssignModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="bg-slate-50 p-3 rounded-xl border">
+          <span class="text-slate-400 block font-semibold">Sinh viên:</span>
+          <p id="manual-assign-student-info" class="font-bold text-slate-900 text-sm mt-0.5">--</p>
+          <p id="manual-assign-topic-info" class="text-slate-600 mt-1 italic">Đề tài: --</p>
+        </div>
+
+        <div>
+          <label for="select-manual-supervisor" class="block font-bold text-slate-700 mb-1">Chọn Giảng viên Hướng dẫn:</label>
+          <select id="select-manual-supervisor" class="w-full p-2.5 bg-white border rounded-xl font-semibold text-xs text-slate-800">
+          </select>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3 border-t">
+        <button type="button" onclick="closeAdminManualAssignModal()" class="px-4 py-2 bg-slate-100 rounded-xl font-bold text-xs hover:bg-slate-200">Hủy</button>
+        <button type="button" onclick="saveAdminManualAssign()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md">
+          ✓ Xác nhận Phân công
+        </button>
+      </div>
+    </div>

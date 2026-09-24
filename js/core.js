@@ -660,7 +660,29 @@ if (typeof window !== 'undefined') {
   Object.defineProperty(window, 'storage', { get: () => storage, set: (v) => { storage = v; }, configurable: true });
 }
 
-// Global window bridges for cross-module accessibility
-window.updateModalLayer = updateModalLayer;
-window.watchModalLayers = watchModalLayers;
-window.copyLinkWithFallback = copyLinkWithFallback;
+// --- SUBMODULE WINDOW BRIDGE ---
+if (typeof window !== 'undefined') {
+  if (typeof getCurrentPortal !== 'undefined') window.getCurrentPortal = getCurrentPortal;
+  if (typeof updateModalLayer !== 'undefined') window.updateModalLayer = updateModalLayer;
+  if (typeof watchModalLayers !== 'undefined') window.watchModalLayers = watchModalLayers;
+  if (typeof copyLinkWithFallback !== 'undefined') window.copyLinkWithFallback = copyLinkWithFallback;
+  if (typeof getSupervisorId !== 'undefined') window.getSupervisorId = getSupervisorId;
+  if (typeof logImpersonationAudit !== 'undefined') window.logImpersonationAudit = logImpersonationAudit;
+  if (typeof assertWriteAllowedForEffectiveActor !== 'undefined') window.assertWriteAllowedForEffectiveActor = assertWriteAllowedForEffectiveActor;
+  if (typeof setDoc !== 'undefined') window.setDoc = setDoc;
+  if (typeof updateDoc !== 'undefined') window.updateDoc = updateDoc;
+  if (typeof addDoc !== 'undefined') window.addDoc = addDoc;
+  if (typeof deleteDoc !== 'undefined') window.deleteDoc = deleteDoc;
+  if (typeof writeBatch !== 'undefined') window.writeBatch = writeBatch;
+  if (typeof runTransaction !== 'undefined') window.runTransaction = runTransaction;
+  if (typeof showLoading !== 'undefined') window.showLoading = showLoading;
+  if (typeof hideLoading !== 'undefined') window.hideLoading = hideLoading;
+  if (typeof initFirebase !== 'undefined') window.initFirebase = initFirebase;
+  if (typeof removeToast !== 'undefined') window.removeToast = removeToast;
+  if (typeof cleanup !== 'undefined') window.cleanup = cleanup;
+  if (typeof close !== 'undefined') window.close = close;
+  if (typeof onKeyDown !== 'undefined') window.onKeyDown = onKeyDown;
+  if (typeof pad !== 'undefined') window.pad = pad;
+  if (typeof fmt24h !== 'undefined') window.fmt24h = fmt24h;
+  if (typeof fmtDateRange24h !== 'undefined') window.fmtDateRange24h = fmtDateRange24h;
+}

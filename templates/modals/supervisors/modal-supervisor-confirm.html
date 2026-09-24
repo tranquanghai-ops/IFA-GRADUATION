@@ -1,0 +1,31 @@
+
+  <!-- 6. SUPERVISOR CONFIRM ROUND COMPLETION MODAL -->
+  <div id="modal-supervisor-confirm" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center gap-3 border-b pb-3">
+        <span class="text-2xl">🚀</span>
+        <div>
+          <h3 class="font-bold text-base text-tdtu-blue">Xác nhận Kết thúc Lựa chọn Vòng</h3>
+          <p class="text-xs text-slate-500" id="modal-sup-confirm-round-title">Nguyện vọng 1</p>
+        </div>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-700">
+        <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-1.5">
+          <p>Thầy/Cô đang xác nhận chọn: <strong id="modal-sup-selected-count" class="text-indigo-700 text-sm font-black">0 SV</strong></p>
+          <p>Chỉ tiêu còn lại sau vòng này: <strong id="modal-sup-rem-count" class="text-amber-700 font-bold">0 SV</strong></p>
+        </div>
+
+        <p class="text-slate-600 leading-relaxed">
+          Sau khi xác nhận, Quản trị viên sẽ thấy Thầy/Cô đã hoàn tất lựa chọn. Thầy/Cô <strong>vẫn có thể mở lại để chỉnh sửa</strong> cho đến khi Quản trị viên chính thức chốt vòng.
+        </p>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-3 border-t">
+        <button type="button" onclick="closeSupervisorConfirmModal()" class="px-4 py-2 bg-slate-100 rounded-xl font-bold text-xs hover:bg-slate-200">Quay lại</button>
+        <button type="button" onclick="confirmSupervisorRoundCompletion()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-md">
+          ✓ Xác nhận Hoàn thành Vòng
+        </button>
+      </div>
+    </div>
+  </div>

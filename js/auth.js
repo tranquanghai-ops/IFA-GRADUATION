@@ -727,13 +727,18 @@ initFirebase().then(() => {
   setupAuthListener();
 });
 
-
-// Global window bridges for cross-module accessibility
-window.setupAuthListener = setupAuthListener;
-window.loadInitialData = loadInitialData;
-window.loadProjectTypes = loadProjectTypes;
-window.bootstrapProjectTypesIfNeeded = bootstrapProjectTypesIfNeeded;
-window.parseStoredProjectTypes = parseStoredProjectTypes;
-window.getSelectedProjectTypes = getSelectedProjectTypes;
-window.syncProjectTypesHiddenInput = syncProjectTypesHiddenInput;
-window.setSelectedProjectTypes = setSelectedProjectTypes;
+// --- SUBMODULE WINDOW BRIDGE ---
+if (typeof window !== 'undefined') {
+  if (typeof isSystemOwner !== 'undefined') window.isSystemOwner = isSystemOwner;
+  if (typeof setupAuthListener !== 'undefined') window.setupAuthListener = setupAuthListener;
+  if (typeof resolveActualRoles !== 'undefined') window.resolveActualRoles = resolveActualRoles;
+  if (typeof updateAuthUI !== 'undefined') window.updateAuthUI = updateAuthUI;
+  if (typeof loadInitialData !== 'undefined') window.loadInitialData = loadInitialData;
+  if (typeof loadProjectTypes !== 'undefined') window.loadProjectTypes = loadProjectTypes;
+  if (typeof bootstrapProjectTypesIfNeeded !== 'undefined') window.bootstrapProjectTypesIfNeeded = bootstrapProjectTypesIfNeeded;
+  if (typeof renderProjectTypesDropdown !== 'undefined') window.renderProjectTypesDropdown = renderProjectTypesDropdown;
+  if (typeof parseStoredProjectTypes !== 'undefined') window.parseStoredProjectTypes = parseStoredProjectTypes;
+  if (typeof getSelectedProjectTypes !== 'undefined') window.getSelectedProjectTypes = getSelectedProjectTypes;
+  if (typeof syncProjectTypesHiddenInput !== 'undefined') window.syncProjectTypesHiddenInput = syncProjectTypesHiddenInput;
+  if (typeof setSelectedProjectTypes !== 'undefined') window.setSelectedProjectTypes = setSelectedProjectTypes;
+}

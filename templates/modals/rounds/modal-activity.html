@@ -1,0 +1,529 @@
+
+  <!-- CREATE / EDIT ACTIVITY MODAL (v1.9.0-beta.1) -->
+  <div id="modal-activity" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
+        <div>
+          <h3 id="modal-activity-title" class="font-bold text-base text-tdtu-blue">Thêm Mốc Kế hoạch Đợt TN</h3>
+          <p class="text-[11px] text-slate-400 mt-0.5">Thời gian hiển thị theo chuẩn Việt Nam (DD/MM/YYYY • 24h)</p>
+        </div>
+        <button type="button" onclick="closeActivityModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
+      </div>
+
+      <form id="form-activity" onsubmit="saveActivity(event)" class="flex flex-col flex-1 overflow-hidden">
+        <div class="p-4 sm:p-5 space-y-4 text-xs overflow-y-auto flex-1">
+          <input type="hidden" id="activity-form-id">
+          <input type="hidden" id="activity-form-round-id">
+
+          <!-- Tiêu đề mốc -->
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Tên mốc kế hoạch <span class="text-rose-500">*</span></label>
+            <input type="text" id="activity-form-title" required placeholder="Ví dụ: Nộp thuyết minh đợt 1, Duyệt hội đồng..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <!-- Loại hoạt động & Địa điểm -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Loại hoạt động <span class="text-rose-500">*</span></label>
+              <select id="activity-form-type" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <option value="announcement">📢 Thông báo</option>
+                <option value="submission">📥 Nộp bài</option>
+                <option value="review">📋 Duyệt hội đồng</option>
+                <option value="preliminary">🔍 Sơ khảo</option>
+                <option value="thesis">📖 Chấm thuyết minh</option>
+                <option value="defense">🎓 Bảo vệ</option>
+                <option value="other" selected>📌 Khác</option>
+              </select>
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Địa điểm / Phòng / Nền tảng</label>
+              <input type="text" id="activity-form-location" placeholder="Phòng A403 / Online Zoom..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <label class="mb-1 block font-bold text-slate-700">Màu sự kiện trên lịch</label>
+            <p class="mb-2 text-[11px] text-slate-500">Chọn một trong 12 màu. Mặc định màu đỏ; sự kiện trùng ngày sẽ được phân biệt màu trên lịch.</p>
+            <input id="activity-form-color" type="hidden" value="#dc2626">
+            <div id="activity-form-color-options" class="flex flex-wrap gap-2" role="group" aria-label="Màu sự kiện"></div>
+          </div>
+
+          <!-- THỜI GIAN THEO CHUẨN VIỆT NAM (DD/MM/YYYY - 24H) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- THỜI GIAN BẮT ĐẦU -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="font-bold text-slate-700 text-xs flex items-center gap-1.5">
+                  <span>🕒</span> Bắt đầu
+                </label>
+                <button type="button" onclick="clearActivityDateTime('start')" class="text-[10px] text-slate-400 hover:text-rose-600 font-semibold transition-colors">Xóa</button>
+              </div>
+              <div class="grid grid-cols-5 gap-1.5">
+                <div class="col-span-3">
+                  <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Ngày (DD/MM/YYYY):</span>
+                  <div class="relative flex items-center">
+                    <input type="text" id="activity-form-start-date" placeholder="25/09/2026" maxlength="10"
+                      class="w-full p-2 border border-slate-300 rounded-l-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                      oninput="formatDateInput(this)" onblur="validateDateInput(this)">
+                    <button type="button" onclick="openActivityDatePicker('start')" class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch" aria-label="Chọn ngày bắt đầu từ lịch">📅</button>
+                    <input type="date" id="activity-form-start-date-picker" tabindex="-1" class="absolute h-px w-px opacity-0 pointer-events-none" onchange="syncPickerToDateInput('start', this.value)">
+                  </div>
+                </div>
+                <div class="col-span-2">
+                  <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Giờ (24h):</span>
+                  <input type="text" id="activity-form-start-time" placeholder="08:00" maxlength="5"
+                    class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono font-bold"
+                    onblur="validateTimeInput(this)">
+                </div>
+              </div>
+            </div>
+
+            <!-- THỜI GIAN KẾT THÚC / HẠN CUỐI -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="font-bold text-slate-700 text-xs flex items-center gap-1.5">
+                  <span>🏁</span> Kết thúc / Hạn cuối
+                </label>
+                <button type="button" onclick="clearActivityDateTime('end')" class="text-[10px] text-slate-400 hover:text-rose-600 font-semibold transition-colors">Xóa</button>
+              </div>
+              <div class="grid grid-cols-5 gap-1.5">
+                <div class="col-span-3">
+                  <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Ngày (DD/MM/YYYY):</span>
+                  <div class="relative flex items-center">
+                    <input type="text" id="activity-form-end-date" placeholder="26/09/2026" maxlength="10"
+                      class="w-full p-2 border border-slate-300 rounded-l-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                      oninput="formatDateInput(this)" onblur="validateDateInput(this)">
+                    <button type="button" onclick="openActivityDatePicker('end')" class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch" aria-label="Chọn ngày kết thúc từ lịch">📅</button>
+                    <input type="date" id="activity-form-end-date-picker" tabindex="-1" class="absolute h-px w-px opacity-0 pointer-events-none" onchange="syncPickerToDateInput('end', this.value)">
+                  </div>
+                </div>
+                <div class="col-span-2">
+                  <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Giờ (24h):</span>
+                  <input type="text" id="activity-form-end-time" placeholder="17:00" maxlength="5"
+                    class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono font-bold"
+                    onblur="validateTimeInput(this)">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RICH TEXT EDITOR CHO "NỘI DUNG / HƯỚNG DẪN CHI TIẾT" -->
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Nội dung / Hướng dẫn chi tiết</label>
+            
+            <!-- Toolbar -->
+            <div class="rich-editor-toolbar">
+              <!-- Undo / Redo -->
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('undo')" title="Hoàn tác (Undo)">↶</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('redo')" title="Làm lại (Redo)">↷</button>
+              
+              <div class="rich-separator"></div>
+
+              <!-- Heading / Normal -->
+              <select class="rich-select" onchange="richFormatHeading(this.value); this.value='p';" title="Định dạng đoạn văn / Tiêu đề">
+                <option value="p">Đoạn văn</option>
+                <option value="h1">Tiêu đề 1 (H1)</option>
+                <option value="h2">Tiêu đề 2 (H2)</option>
+                <option value="h3">Tiêu đề 3 (H3)</option>
+              </select>
+
+              <!-- Font Size -->
+              <select class="rich-select" onchange="setRichFontSize(this.value); this.value='';" title="Cỡ chữ">
+                <option value="">Cỡ chữ</option>
+                <option value="10">10px</option>
+                <option value="12">12px</option>
+                <option value="14">14px</option>
+                <option value="16">16px</option>
+                <option value="18">18px</option>
+                <option value="20">20px</option>
+                <option value="24">24px</option>
+                <option value="28">28px</option>
+                <option value="32">32px</option>
+              </select>
+
+              <div class="rich-separator"></div>
+
+              <!-- Bold, Italic, Underline -->
+              <button type="button" class="rich-btn font-black" onmousedown="event.preventDefault(); document.execCommand('bold')" title="In đậm (Ctrl+B)">B</button>
+              <button type="button" class="rich-btn italic" onmousedown="event.preventDefault(); document.execCommand('italic')" title="In nghiêng (Ctrl+I)">I</button>
+              <button type="button" class="rich-btn underline" onmousedown="event.preventDefault(); document.execCommand('underline')" title="Gạch chân (Ctrl+U)">U</button>
+
+              <div class="rich-separator"></div>
+
+              <!-- Text color & Background highlight -->
+              <label class="rich-btn relative cursor-pointer" title="Màu chữ" onmousedown="event.preventDefault()">
+                <span class="font-bold text-blue-600">A</span>
+                <input type="color" class="sr-only" onchange="document.execCommand('foreColor', false, this.value)">
+              </label>
+
+              <label class="rich-btn relative cursor-pointer" title="Màu nền nổi bật (Highlight)" onmousedown="event.preventDefault()">
+                <span class="px-1 bg-yellow-200 text-slate-900 rounded font-bold text-[10px]">H</span>
+                <input type="color" value="#fef08a" class="sr-only" onchange="document.execCommand('hiliteColor', false, this.value)">
+              </label>
+
+              <div class="rich-separator"></div>
+
+              <!-- Alignment -->
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('justifyLeft')" title="Căn trái">⇤</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('justifyCenter')" title="Căn giữa">≡</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('justifyRight')" title="Căn phải">⇥</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('justifyFull')" title="Căn đều hai bên">≣</button>
+
+              <div class="rich-separator"></div>
+
+              <!-- Lists & Indent -->
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('insertUnorderedList')" title="Danh sách chấm">• List</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('insertOrderedList')" title="Danh sách số">1. List</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('outdent')" title="Giảm thụt lề">«</button>
+              <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('indent')" title="Tăng thụt lề">»</button>
+
+              <div class="rich-separator"></div>
+
+              <!-- Link & Clear formatting -->
+              <button type="button" class="rich-btn text-blue-600" onmousedown="event.preventDefault(); insertRichLink()" title="Chèn liên kết">🔗</button>
+              <button type="button" class="rich-btn text-slate-500" onmousedown="event.preventDefault(); document.execCommand('unlink')" title="Bỏ liên kết">🚫</button>
+              <button type="button" class="rich-btn text-rose-500" onmousedown="event.preventDefault(); document.execCommand('removeFormat')" title="Xóa định dạng">Tx</button>
+            </div>
+
+            <!-- Contenteditable Container -->
+            <div id="activity-editor" contenteditable="true" data-placeholder="Nhập yêu cầu đồ án, khối lượng sản phẩm, lưu ý quan trọng..." class="rich-editor-content"></div>
+          </div>
+
+          <!-- Tùy chọn hiển thị & nộp bài -->
+          <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 text-slate-700">
+            <label class="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg bg-amber-50/80 border border-amber-200 hover:bg-amber-100/60 transition-colors">
+              <input type="checkbox" id="activity-form-is-tentative" class="rounded text-amber-600 focus:ring-amber-500">
+              <span class="font-bold text-xs text-amber-900">🟡 Mốc kế hoạch Dự kiến (isTentative)</span>
+              <span class="text-[10px] text-amber-700 ml-1 font-normal">(Hiển thị nhãn Dự kiến cho SV và Giảng viên)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="activity-form-visibility" class="rounded text-tdtu-blue">
+              <span class="font-bold text-xs">Công bố ngay cho sinh viên</span>
+              <span class="text-[10px] text-slate-500">(Nếu bỏ chọn, mốc được lưu dưới dạng bản nháp)</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="activity-form-show-expired" checked class="rounded text-tdtu-blue">
+              <span class="font-semibold text-xs">Sau khi kết thúc vẫn hiển thị cho sinh viên</span>
+            </label>
+            <!-- SUBMISSION CONFIGURATION (v2.2.0-beta.1) -->
+            <div class="border-t border-slate-200 pt-2.5 space-y-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="activity-form-submission" onchange="toggleActivitySubmissionConfig(this.checked)" class="rounded text-tdtu-blue">
+                <span class="font-bold text-xs text-emerald-800">📥 Cho phép Nộp bài tại mốc này (submissionEnabled)</span>
+              </label>
+
+              <div id="activity-submission-config-panel" class="hidden pl-2 space-y-3 bg-emerald-50/40 p-3.5 rounded-xl border border-emerald-200 text-xs">
+                <!-- 1. Accepted Extensions -->
+                <div>
+                  <label class="font-bold text-slate-800 block mb-1">1. Định dạng file được phép nộp:</label>
+                  <div class="flex items-center flex-wrap gap-3 font-semibold text-slate-700">
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-pdf" value="pdf" checked class="rounded text-emerald-600">
+                      <span>PDF</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-zip" value="zip" class="rounded text-emerald-600">
+                      <span>ZIP</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-rar" value="rar" class="rounded text-emerald-600">
+                      <span>RAR</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-7z" value="7z" class="rounded text-emerald-600">
+                      <span>7Z</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-jpg" value="jpg" class="rounded text-emerald-600">
+                      <span>JPG/JPEG</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-png" value="png" class="rounded text-emerald-600">
+                      <span>PNG</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-docx" value="docx" class="rounded text-emerald-600">
+                      <span>DOCX</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-xlsx" value="xlsx" class="rounded text-emerald-600">
+                      <span>XLSX</span>
+                    </label>
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" id="sub-ext-pptx" value="pptx" class="rounded text-emerald-600">
+                      <span>PPTX</span>
+                    </label>
+                  </div>
+                  <div class="mt-1.5 flex items-center gap-2">
+                    <span class="text-[11px] text-slate-500 font-medium">Khác (cách nhau bởi dấu phẩy):</span>
+                    <input type="text" id="sub-ext-custom" placeholder="rar, 7z" class="p-1 border border-slate-300 rounded text-[11px] w-36">
+                  </div>
+                </div>
+
+                <!-- 2. Constraints: Max files, Max Size MB, Max Attempts -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">Số file tối đa</label>
+                    <input type="number" id="sub-max-files" value="1" min="1" max="20" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
+                  </div>
+                  <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">Dung lượng tối đa (MB)</label>
+                    <input type="number" id="sub-max-size" value="100" min="1" max="500" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
+                  </div>
+                  <div>
+                    <label class="text-[11px] font-bold text-slate-700 block mb-0.5">Số lần nộp tối đa</label>
+                    <input type="number" id="sub-max-attempts" value="3" min="1" max="10" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
+                  </div>
+                </div>
+
+                <!-- 3. Deadline mode -->
+                <div class="space-y-1.5 pt-1">
+                  <label class="font-bold text-slate-800 block">2. Hạn chót nhận bài:</label>
+                  <div class="flex items-center gap-4 text-xs font-semibold">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="sub_deadline_mode" value="activity_end" checked onchange="toggleSubCustomDeadline(false)">
+                      <span>Theo thời gian kết thúc mốc</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="sub_deadline_mode" value="custom" onchange="toggleSubCustomDeadline(true)">
+                      <span>Hạn riêng cho nộp bài</span>
+                    </label>
+                  </div>
+                  <div id="sub-custom-deadline-wrap" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Ngày hết hạn (DD/MM/YYYY):</label>
+                      <input type="text" id="sub-deadline-date" placeholder="DD/MM/YYYY" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs">
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Giờ hết hạn (HH:mm):</label>
+                      <input type="text" id="sub-deadline-time" placeholder="23:59" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs">
+                    </div>
+                  </div>
+                  <label class="flex items-center gap-1.5 text-xs cursor-pointer text-slate-600 pt-0.5">
+                    <input type="checkbox" id="sub-allow-late" class="rounded text-emerald-600">
+                    <span>Cho phép nộp trễ (ghi nhận nhãn "Nộp trễ")</span>
+                  </label>
+                </div>
+
+                <!-- 4. Filename Rule Engine -->
+                <div class="border-t border-emerald-100 pt-2 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <label class="font-bold text-slate-800 block">3. Quy tắc đặt tên file (Rule Engine):</label>
+                    <span class="text-[10px] text-slate-500">Chuẩn hóa không dấu, viết hoa</span>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Mẫu tên file (Template):</label>
+                      <input type="text" id="sub-filename-template" value="{HOI_DONG}_{MSSV}_{HO_TEN}" oninput="updateFilenamePreviewInAdmin()" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs font-bold">
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Giá trị {LOAI} mặc định:</label>
+                      <input type="text" id="sub-loai-val" value="THUYET_MINH" oninput="updateFilenamePreviewInAdmin()" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs font-bold">
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4 text-xs font-semibold mt-1">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="sub_filename_mode" value="exact" checked onchange="updateFilenamePreviewInAdmin()">
+                      <span>Khớp chính xác</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="sub_filename_mode" value="prefix" onchange="updateFilenamePreviewInAdmin()">
+                      <span>Bắt đầu đúng mẫu (Tiền tố)</span>
+                    </label>
+                  </div>
+                  <div class="p-2 bg-white rounded-lg border border-slate-200 text-xs">
+                    <span class="text-[10px] text-slate-500 font-bold block">XEM TRƯỚC TÊN FILE YÊU CẦU:</span>
+                    <div id="sub-filename-preview" class="font-mono font-bold text-emerald-800 mt-0.5">
+                      HD1_12100314_NGUYEN_VAN_A.pdf
+                    </div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">
+                      Biến: {MSSV}, {HO_TEN}, {HOI_DONG}, {STT}, {LOAI}, {ACTIVITY}, {ROUND}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 5. Visibility / Access permissions -->
+                <div class="border-t border-emerald-100 pt-2 space-y-1.5">
+                  <label class="font-bold text-slate-800 block">4. Quyền xem bài nộp:</label>
+                  <div class="flex items-center flex-wrap gap-4 text-xs font-semibold text-slate-700">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" id="sub-vis-supervisor" checked class="rounded text-emerald-600">
+                      <span>GVHD (Xem SV hướng dẫn)</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" id="sub-vis-reviewer" checked class="rounded text-emerald-600">
+                      <span>GVPB (Xem SV phản biện)</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" id="sub-vis-council" checked class="rounded text-emerald-600">
+                      <span>Hội đồng (Xem SV thuộc HĐ)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- 6. Google Drive Storage Integration -->
+                <div class="border-t border-emerald-100 pt-2 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <label class="font-bold text-slate-800 block">5. Nơi lưu trữ (Google Drive):</label>
+                    <span class="text-[10px] text-blue-600 font-bold">Resumable Chunked Upload</span>
+                  </div>
+                  <input type="hidden" id="sub-storage-provider" value="google_drive">
+                  <input type="hidden" id="activity-form-drive-folder-id">
+
+                  <div class="space-y-1.5">
+                    <label class="text-[10px] font-bold text-slate-600 block">Tên thư mục Drive cho mốc này:</label>
+                    <div class="flex gap-2">
+                      <input type="text" id="activity-form-drive-folder-name" placeholder="VD: NỘP THUYẾT MINH ĐỢT 1"
+                        class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                      <button type="button" id="btn-connect-activity-drive" onclick="connectActivityDriveFolder()"
+                        class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center gap-1 cursor-pointer">
+                        <span>📁 Tạo / Kết nối Thư mục</span>
+                      </button>
+                    </div>
+                    <p class="text-[10px] text-slate-400">
+                      Hệ thống tự động kiểm tra/tạo thư mục con từ <strong>Thư mục gốc của Đợt</strong>.
+                    </p>
+                  </div>
+
+                  <div id="activity-drive-folder-status" class="hidden"></div>
+
+                  <!-- Fallback URL input (collapsed by default) -->
+                  <details class="text-[10px] text-slate-500 pt-1">
+                    <summary class="cursor-pointer hover:text-slate-800 font-semibold">Tùy chọn nâng cao: Nhập URL thư mục Drive thủ công</summary>
+                    <div class="mt-1.5 space-y-1">
+                      <input type="url" id="sub-drive-folder-url" placeholder="https://drive.google.com/drive/folders/..."
+                        class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-[10px]"
+                        onchange="onActivityDriveFolderUrlChange(this.value)">
+                      <span class="text-[9px] text-slate-400 block">Dùng khi muốn chỉ định thư mục riêng biệt ngoài Thư mục gốc của Đợt.</span>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-t border-slate-200 pt-2.5 space-y-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="activity-form-council-enabled" onchange="toggleActivityCouncilFields(this.checked)" class="rounded text-tdtu-blue">
+                <span class="font-bold text-xs text-indigo-700">⚖️ Có Hội đồng đánh giá / chấm điểm (councilEnabled)</span>
+              </label>
+              <div id="activity-council-extra-fields" class="hidden pl-6 space-y-3">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" id="activity-form-show-order" class="rounded text-tdtu-blue">
+                  <span class="font-semibold text-xs text-slate-600">Cho Sinh viên xem thứ tự trình bày (showPresentationOrderToStudents)</span>
+                </label>
+
+                <!-- Phân Hội đồng & Thành viên (Item D) -->
+                <div class="border-t border-indigo-100 pt-3 space-y-2 bg-indigo-50/40 p-3 rounded-xl border border-indigo-200">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <label class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                        <span>🏛️</span> Cấu hình Hội đồng & Phân thành viên:
+                      </label>
+                      <p class="text-[10px] text-slate-500 mt-0.5">Tạo hội đồng cho mốc này, thêm Giảng viên nội bộ hoặc Khách mời ngoài qua Email.</p>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <button type="button" onclick="openAddCouncilFromMilestoneModal()" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-xs">
+                        <span>+ Thêm Hội đồng</span>
+                      </button>
+                      <button type="button" id="btn-open-advanced-councils" onclick="openAdvancedCouncilManagementFromMilestone()" class="hidden px-2.5 py-1.5 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold transition-all shadow-2xs" title="Mở modal phân sinh viên & thứ tự trình bày">
+                        <span>⚙️ Phân Sinh viên</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Danh sách card Hội đồng trong mốc -->
+                  <div id="activity-councils-list-container" class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                    <!-- Rendered dynamically by renderActivityCouncilsInModal() -->
+                  </div>
+                </div>
+
+                <!-- SCORING CONFIGURATION (v1.9.0-beta.1) -->
+                <div class="border-t border-slate-200 pt-2.5 space-y-2">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="activity-form-scoring-enabled" onchange="toggleActivityScoringConfig(this.checked)" class="rounded text-tdtu-blue">
+                    <span class="font-bold text-xs text-emerald-700">📝 Cho phép chấm điểm tại mốc này (scoringEnabled)</span>
+                  </label>
+                  
+                  <div id="activity-scoring-config-panel" class="hidden pl-2 space-y-3 bg-emerald-50/50 p-3 rounded-xl border border-emerald-200">
+                    <div>
+                      <label class="font-bold text-slate-700 block mb-1 text-xs">Kiểu chấm điểm:</label>
+                      <div class="flex items-center flex-wrap gap-4 text-xs font-semibold">
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="activity_scoring_mode" value="numeric" checked onchange="switchActivityScoringMode('numeric')">
+                          <span>Điểm số (Numeric)</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="activity_scoring_mode" value="letter" onchange="switchActivityScoringMode('letter')">
+                          <span>Điểm chữ (Letter)</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="activity_scoring_mode" value="defense_rubric" onchange="switchActivityScoringMode('defense_rubric')">
+                          <span class="text-indigo-700 font-bold">🎯 Rubric bảo vệ (Defense Rubric 4+3+2+1)</span>
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <!-- Numeric Config -->
+                    <div id="activity-scoring-numeric-wrap" class="grid grid-cols-3 gap-2">
+                      <div>
+                        <label class="text-[11px] font-bold text-slate-600 block mb-0.5">Điểm tối thiểu</label>
+                        <input type="number" id="activity-scoring-min" value="0" step="0.5" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold">
+                      </div>
+                      <div>
+                        <label class="text-[11px] font-bold text-slate-600 block mb-0.5">Điểm tối đa</label>
+                        <input type="number" id="activity-scoring-max" value="10" step="0.5" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold">
+                      </div>
+                      <div>
+                        <label class="text-[11px] font-bold text-slate-600 block mb-0.5">Bước điểm (step)</label>
+                        <input type="number" id="activity-scoring-step" value="0.1" step="0.05" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold">
+                      </div>
+                    </div>
+
+                    <!-- Letter Config -->
+                    <div id="activity-scoring-letter-wrap" class="hidden space-y-2">
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <label class="text-[11px] font-bold text-slate-700">Danh sách mức điểm chữ:</label>
+                          <span class="text-[10px] text-blue-600 block">(Điểm quy đổi chỉ hiển thị cho Quản trị viên)</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                          <button type="button" onclick="resetDefaultLetterOptions()" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-[11px] font-bold" title="Khôi phục thang chuẩn A++ → D">↺ Khôi phục mặc định</button>
+                          <button type="button" onclick="openAddLetterOptionModal()" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shadow-xs">+ Thêm mức điểm</button>
+                        </div>
+                      </div>
+                      <div id="activity-scoring-letter-list" class="space-y-1.5 max-h-48 overflow-y-auto">
+                        <!-- Rendered dynamically -->
+                      </div>
+                    </div>
+
+                    <!-- Defense Rubric Config (v2.0.0-beta.1) -->
+                    <div id="activity-scoring-rubric-wrap" class="hidden space-y-2">
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <label class="text-[11px] font-bold text-slate-700">Các tiêu chí chấm theo Rubric:</label>
+                          <span class="text-[10px] text-slate-500 block">Mặc định chuẩn: Ý tưởng (4) + Tính ứng dụng (3) + Kỹ thuật (2) + Trình bày (1) = 10đ</span>
+                        </div>
+                        <button type="button" onclick="openAddRubricCriterionModal()" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold shadow-xs">+ Thêm tiêu chí</button>
+                      </div>
+                      <div id="activity-scoring-rubric-list" class="space-y-1.5 max-h-56 overflow-y-auto">
+                        <!-- Rendered dynamically -->
+                      </div>
+                      <div class="p-2 bg-indigo-50/70 border border-indigo-200 rounded-lg flex items-center justify-between text-xs font-bold text-indigo-950">
+                        <span>Tổng điểm tối đa Rubric:</span>
+                        <span id="activity-scoring-rubric-total-max" class="font-mono text-sm text-indigo-700 font-black">10.0</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+          <button type="button" onclick="closeActivityModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Hủy</button>
+          <button type="submit" class="px-6 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md transition-colors">Lưu Mốc</button>
+        </div>
+      </form>
+    </div>
+  </div>

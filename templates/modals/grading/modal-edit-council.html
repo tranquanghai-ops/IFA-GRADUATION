@@ -1,0 +1,119 @@
+
+  <!-- MODAL: CREATE / EDIT / COPY COUNCIL -->
+  <div id="modal-edit-council" class="hidden fixed inset-0 z-[60] modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
+      <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
+        <h3 id="modal-edit-council-title" class="font-bold text-base text-tdtu-blue">Thêm Hội đồng mới</h3>
+        <button type="button" onclick="closeEditCouncilModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
+      </div>
+
+      <form id="form-edit-council" onsubmit="saveCouncil(event)" class="flex flex-col flex-1 overflow-hidden">
+        <div class="p-4 sm:p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
+          <input type="hidden" id="council-form-id">
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Tên Hội đồng <span class="text-rose-500">*</span></label>
+            <input type="text" id="council-form-name" required placeholder="Ví dụ: HĐ1, Hội đồng Nội thất 1..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Phòng / Địa điểm</label>
+              <input type="text" id="council-form-room" placeholder="Phòng D501A / Online Zoom..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="font-bold text-slate-700 block mb-1">Trạng thái</label>
+              <select id="council-form-status" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <option value="preparing" selected>Chuẩn bị</option>
+                <option value="ongoing">Đang diễn ra</option>
+                <option value="completed">Đã kết thúc</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Ngày & Giờ (Chuẩn Việt Nam DD/MM/YYYY 24h) -->
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="font-bold text-slate-700 text-xs flex items-center gap-1.5">
+                <span>🕒</span> Thời gian đánh giá
+              </label>
+              <button type="button" onclick="clearCouncilDateTime()" class="text-[10px] text-slate-400 hover:text-rose-600 font-semibold transition-colors">Xóa</button>
+            </div>
+            <div class="grid grid-cols-5 gap-2">
+              <div class="col-span-3">
+                <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Ngày (DD/MM/YYYY):</span>
+                <div class="flex items-center">
+                  <input type="text" id="council-form-date" placeholder="05/09/2026" maxlength="10"
+                    class="w-full p-2 border border-slate-300 rounded-l-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                    oninput="formatDateInput(this)" onblur="validateDateInput(this)">
+                  <label class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch">
+                    📅
+                    <input type="date" id="council-form-date-picker" class="sr-only" onchange="syncCouncilDatePicker(this.value)">
+                  </label>
+                </div>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Bắt đầu:</span>
+                <input type="text" id="council-form-start-time" placeholder="08:00" maxlength="5"
+                  class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono font-bold"
+                  onblur="validateTimeInput(this)">
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Kết thúc:</span>
+                <input type="text" id="council-form-end-time" placeholder="11:30" maxlength="5"
+                  class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono font-bold"
+                  onblur="validateTimeInput(this)">
+              </div>
+            </div>
+          </div>
+
+          <!-- Phân công Thành viên Hội đồng theo các Slot -->
+          <div>
+            <label class="font-bold text-slate-800 block mb-1.5 flex items-center justify-between">
+              <span>Phân công Thành viên Hội đồng</span>
+              <span class="text-[11px] text-slate-400 font-normal">Cùng cấu trúc slot của Mốc</span>
+            </label>
+            <div id="council-members-form-container" class="space-y-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <!-- Rendered dynamically based on activity.councilStructure.slots -->
+            </div>
+          </div>
+
+          <!-- Thư mục Google Drive của Hội đồng -->
+          <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="font-bold text-blue-900 text-xs flex items-center gap-1.5">
+                <span>📁</span> Thư mục Google Drive của Hội đồng
+              </label>
+              <span class="text-[10px] text-blue-600 font-medium">Tự động tạo từ Thư mục gốc</span>
+            </div>
+            <input type="hidden" id="council-form-drive-folder-id">
+            <input type="hidden" id="council-form-drive-folder-url">
+            <div>
+              <div class="flex gap-2">
+                <input type="text" id="council-form-drive-folder-name" placeholder="VD: HỘI ĐỒNG 1"
+                  class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <button type="button" id="btn-connect-council-drive" onclick="connectCouncilDriveFolder()"
+                  class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center gap-1 cursor-pointer">
+                  <span>Tạo / Kết nối</span>
+                </button>
+              </div>
+              <p class="text-[10px] text-slate-500 mt-1">Nhập tên thư mục và bấm nút để hệ thống tự tạo hoặc kết nối thư mục con trong Thư mục gốc.</p>
+            </div>
+            <div id="council-drive-folder-status" class="text-[11px] font-semibold text-slate-600">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Ghi chú</label>
+            <textarea id="council-form-note" rows="2" placeholder="Ghi chú dành cho Hội đồng..." class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+          <button type="button" onclick="closeEditCouncilModal()" class="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-100 transition-colors">Hủy</button>
+          <button type="submit" class="px-6 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md transition-colors">Lưu Hội đồng</button>
+        </div>
+      </form>
+    </div>
+  </div>
