@@ -272,3 +272,35 @@ if (typeof window !== 'undefined') {
 `;
 fs.writeFileSync(path.join(root, 'app.js'), appContent, 'utf8');
 console.log('Updated app.js (' + appContent.split('\n').length + ' lines)');
+
+// Post-processing: Attach all top-level functions and constants to window for 100% interoperability
+const moduleFiles = fs.readdirSync(jsDir).filter(f => f.endsWith('.js'));
+moduleFiles.forEach(file => {
+  const filePath = path.join(jsDir, file);
+  let content = fs.readFileSync(filePath, 'utf8');
+  const matches = [...content.matchAll(/(?:^|\n)(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_]+)\s*\(/g)];
+  const fnNames = new Set(matches.map(m => m[1]));
+  const alreadyOnWindow = new Set();
+  for (const m of content.matchAll(/window\.([a-zA-Z0-9_]+)\s*=/g)) {
+    alreadyOnWindow.add(m[1]);
+  }
+  const toAttach = [];
+  for (const fn of fnNames) {
+    if (!alreadyOnWindow.has(fn)) {
+      toAttach.push(fn);
+    }
+  }
+  if (toAttach.length > 0) {
+    const bridgeCode = `\n// Global window bridges for cross-module accessibility\n` +
+      toAttach.map(fn => `window.${fn} = ${fn};`).join('\n') + '\n';
+    content += bridgeCode;
+    fs.writeFileSync(filePath, content, 'utf8');
+  }
+});
+
+// Explicit cross-module constants
+fs.appendFileSync(path.join(jsDir, 'planning.js'), '\nwindow.ACTIVITY_TYPES = ACTIVITY_TYPES;\nwindow.DEFAULT_LETTER_GRADE_SCALE = DEFAULT_LETTER_GRADE_SCALE;\n');
+fs.appendFileSync(path.join(jsDir, 'supervisors.js'), '\nwindow.SAMPLE_SUPERVISORS = SAMPLE_SUPERVISORS;\n');
+fs.appendFileSync(path.join(jsDir, 'students.js'), '\nwindow.IFAA_FIREBASE_CONFIG = IFAA_FIREBASE_CONFIG;\nwindow.DEFAULT_IFAA_DATASET_URL = DEFAULT_IFAA_DATASET_URL;\nwindow.BACKUP_IFAA_DATASET_URL = BACKUP_IFAA_DATASET_URL;\nwindow.FACULTY_MAJORS = FACULTY_MAJORS;\n');
+console.log('Attached cross-module window bridges and constants.');
+

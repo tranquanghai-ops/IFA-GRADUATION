@@ -1166,4 +1166,7 @@ window.confirmImpersonateSelectedCandidate = function() {
   }
   window.startImpersonating(state.selectedImpersonateCandidate);
 };
-
+
+// Global window bridges for cross-module accessibility
+window.preparePreviewStudentDropdown = preparePreviewStudentDropdown;
+window.updateSettingsActAsSessionUI = updateSettingsActAsSessionUI;

@@ -3002,4 +3002,39 @@ window.toggleRoundHiddenStatus = async function(roundId) {
   }
 };
 
-
+
+// Global window bridges for cross-module accessibility
+window.refreshRoundCardMetrics = refreshRoundCardMetrics;
+window.renderRoundsDropdowns = renderRoundsDropdowns;
+window.selectRound = selectRound;
+window.resolveStudentSupervisorProfiles = resolveStudentSupervisorProfiles;
+window.renderRoundHeader = renderRoundHeader;
+window.startCountdown = startCountdown;
+window.formatDuration = formatDuration;
+window.renderAdminTrashTable = renderAdminTrashTable;
+window.renderAdminRoundsTable = renderAdminRoundsTable;
+window.updateRoundModalBadges = updateRoundModalBadges;
+window.updateRoundModalConfigSummary = updateRoundModalConfigSummary;
+window.getRoundWeekDaysFromForm = getRoundWeekDaysFromForm;
+window.getRoundWeekDraftEvents = getRoundWeekDraftEvents;
+window.normalizeRoundWeekEventColor = normalizeRoundWeekEventColor;
+window.getRoundWeekEditingEventId = getRoundWeekEditingEventId;
+window.setRoundWeekEventFormMode = setRoundWeekEventFormMode;
+window.updateRoundWeekEventColorPresets = updateRoundWeekEventColorPresets;
+window.getRoundWeekEventRange = getRoundWeekEventRange;
+window.roundWeekEventOccursOnDay = roundWeekEventOccursOnDay;
+window.distinguishOverlappingTimelineEvents = distinguishOverlappingTimelineEvents;
+window.renderRoundWeekDayPicker = renderRoundWeekDayPicker;
+window.getRoundTimelineDefaultTitle = getRoundTimelineDefaultTitle;
+window.resolveRoundWeekTitle = resolveRoundWeekTitle;
+window.renderRoundWeeklyContentEditor = renderRoundWeeklyContentEditor;
+window.readRoundWeeklyContentDraft = readRoundWeeklyContentDraft;
+window.restoreRoundWeeklyContentDraft = restoreRoundWeeklyContentDraft;
+window.renderAdminProjectTypesTable = renderAdminProjectTypesTable;
+window.getRoundStatusCategory = getRoundStatusCategory;
+window.getRoundWeekSchedule = getRoundWeekSchedule;
+window.getRoundTimelineWeeksWithActivities = getRoundTimelineWeeksWithActivities;
+window.rememberRoundTimelineEvents = rememberRoundTimelineEvents;
+window.renderTimelineWeekDays = renderTimelineWeekDays;
+window.renderTimelineWeekEvents = renderTimelineWeekEvents;
+window.renderAdminRoundTimelinePreview = renderAdminRoundTimelinePreview;

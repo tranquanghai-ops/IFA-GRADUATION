@@ -2034,4 +2034,8 @@ window.getStudentSubmissionsRecord = async function(roundId, activityId, student
 
   return { currentSubmission: null, attempts: [] };
 };
-
+
+// Global window bridges for cross-module accessibility
+window.normalizeRoundDriveFolderNames = normalizeRoundDriveFolderNames;
+window.provisionRoundDriveFolders = provisionRoundDriveFolders;
+window.getGraduationApiBase = getGraduationApiBase;

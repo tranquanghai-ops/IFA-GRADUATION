@@ -4213,4 +4213,42 @@ window.handleTeacherLogout = async function() {
   window.location.reload();
 };
 
-
+
+// Global window bridges for cross-module accessibility
+window.checkStudentEligibilityAndRegistration = checkStudentEligibilityAndRegistration;
+window.renderStudentOfficialResult = renderStudentOfficialResult;
+window.renderStudentExistingRegistration = renderStudentExistingRegistration;
+window.applySupervisorAssignmentModeToRegistrationUI = applySupervisorAssignmentModeToRegistrationUI;
+window.renderConfirmationPanel = renderConfirmationPanel;
+window.removeVietnameseTones = removeVietnameseTones;
+window.renderRoundModalEligibleTable = renderRoundModalEligibleTable;
+window.renderAddEligibleCandidateResults = renderAddEligibleCandidateResults;
+window.updateAddEligibleSelectionUI = updateAddEligibleSelectionUI;
+window.renderAdminEligibleStudentsTable = renderAdminEligibleStudentsTable;
+window.parseAndValidateExcel = parseAndValidateExcel;
+window.renderAdminRegistrationsTable = renderAdminRegistrationsTable;
+window.getIFAAFirebase = getIFAAFirebase;
+window.openFacultyCache = openFacultyCache;
+window.getFacultyCache = getFacultyCache;
+window.setFacultyCache = setFacultyCache;
+window.gunzipData = gunzipData;
+window.updateFacultyStatusUI = updateFacultyStatusUI;
+window.normalizeFacultyRows = normalizeFacultyRows;
+window.loadFacultyDatasetFromIFAA = loadFacultyDatasetFromIFAA;
+window.populateFacultyClassFilter = populateFacultyClassFilter;
+window.applyFacultyFiltersAndRender = applyFacultyFiltersAndRender;
+window.renderFacultyStudentsCurrentPage = renderFacultyStudentsCurrentPage;
+window._getTimelineVisibleCount = _getTimelineVisibleCount;
+window.renderSupervisorRoundTimeline = renderSupervisorRoundTimeline;
+window.renderSupervisorPlanList = renderSupervisorPlanList;
+window.positionStudentRegistrationCta = positionStudentRegistrationCta;
+window.loadStudentSelfProfile = loadStudentSelfProfile;
+window.getRegistrationStudentIdentity = getRegistrationStudentIdentity;
+window.populateRegistrationStudentForm = populateRegistrationStudentForm;
+window.collectOfficialFormFields = collectOfficialFormFields;
+window.validateOfficialFormFields = validateOfficialFormFields;
+
+window.IFAA_FIREBASE_CONFIG = IFAA_FIREBASE_CONFIG;
+window.DEFAULT_IFAA_DATASET_URL = DEFAULT_IFAA_DATASET_URL;
+window.BACKUP_IFAA_DATASET_URL = BACKUP_IFAA_DATASET_URL;
+window.FACULTY_MAJORS = FACULTY_MAJORS;

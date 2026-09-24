@@ -727,4 +727,13 @@ initFirebase().then(() => {
   setupAuthListener();
 });
 
-
+
+// Global window bridges for cross-module accessibility
+window.setupAuthListener = setupAuthListener;
+window.loadInitialData = loadInitialData;
+window.loadProjectTypes = loadProjectTypes;
+window.bootstrapProjectTypesIfNeeded = bootstrapProjectTypesIfNeeded;
+window.parseStoredProjectTypes = parseStoredProjectTypes;
+window.getSelectedProjectTypes = getSelectedProjectTypes;
+window.syncProjectTypesHiddenInput = syncProjectTypesHiddenInput;
+window.setSelectedProjectTypes = setSelectedProjectTypes;

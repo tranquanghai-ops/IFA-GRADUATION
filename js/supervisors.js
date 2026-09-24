@@ -5019,4 +5019,46 @@ window.closeSupervisorStudentDetailModal = function() {
   if (modal) modal.classList.add('hidden');
 };
 
-
+
+// Global window bridges for cross-module accessibility
+window.getOfficialSupervisors = getOfficialSupervisors;
+window.normalizeOfficialAssignment = normalizeOfficialAssignment;
+window.getAdminAssignmentRows = getAdminAssignmentRows;
+window.buildOfficialAssignmentPayload = buildOfficialAssignmentPayload;
+window.buildAssignmentDraftPayload = buildAssignmentDraftPayload;
+window.isAssignmentEditingLocked = isAssignmentEditingLocked;
+window.ensureAssignmentEditingAllowed = ensureAssignmentEditingAllowed;
+window.getSupervisorAssignmentCount = getSupervisorAssignmentCount;
+window.isOfficialSupervisor = isOfficialSupervisor;
+window.getPreliminaryExcludedSupervisorIds = getPreliminaryExcludedSupervisorIds;
+window.getSupervisorTotalAssignedCount = getSupervisorTotalAssignedCount;
+window.getSupervisorAssignmentMode = getSupervisorAssignmentMode;
+window.isDirectSupervisorAssignment = isDirectSupervisorAssignment;
+window.shouldSkipStudentSupervisorPreference = shouldSkipStudentSupervisorPreference;
+window.loadRoundSupervisors = loadRoundSupervisors;
+window.renderSupervisorsGrid = renderSupervisorsGrid;
+window.renderPreferencesTray = renderPreferencesTray;
+window.loadSupervisorReviewData = loadSupervisorReviewData;
+window.renderSupervisorReviewUI = renderSupervisorReviewUI;
+window.renderSupervisorCandidatesTable = renderSupervisorCandidatesTable;
+window.renderSupervisorAcceptedTable = renderSupervisorAcceptedTable;
+window.loadAdminStats = loadAdminStats;
+window.renderRoundModalSupervisorsList = renderRoundModalSupervisorsList;
+window.loadAdminSupervisorsMaster = loadAdminSupervisorsMaster;
+window.renderAdminSupervisorsMasterTable = renderAdminSupervisorsMasterTable;
+window.formatSupervisorFileSize = formatSupervisorFileSize;
+window.blobToBase64DataUrl = blobToBase64DataUrl;
+window.processSupervisorPhotoFile = processSupervisorPhotoFile;
+window.dataUrlToCompressedBlob = dataUrlToCompressedBlob;
+window.renderAdminRoundSupervisorsTable = renderAdminRoundSupervisorsTable;
+window.renderAdminReviewDashboard = renderAdminReviewDashboard;
+window.renderAdminReviewSupervisorsTable = renderAdminReviewSupervisorsTable;
+window.renderAdminManualAssignmentTable = renderAdminManualAssignmentTable;
+window.normalizeAssignmentImportHeader = normalizeAssignmentImportHeader;
+window.getAssignmentImportCell = getAssignmentImportCell;
+window.buildSupervisorAssignmentImportPreview = buildSupervisorAssignmentImportPreview;
+window.renderSupervisorAssignmentImportPreview = renderSupervisorAssignmentImportPreview;
+window.computeSupervisorQuotaInfo = computeSupervisorQuotaInfo;
+window.buildEditSupervisorOptions = buildEditSupervisorOptions;
+
+window.SAMPLE_SUPERVISORS = SAMPLE_SUPERVISORS;

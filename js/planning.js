@@ -1934,4 +1934,16 @@ window.loadStudentRoundActivities = async function(roundId) {
   }
 };
 
-
+
+// Global window bridges for cross-module accessibility
+window.getActivityStatus = getActivityStatus;
+window.fmtActivityTime = fmtActivityTime;
+window.isoToVietnameseDateTime = isoToVietnameseDateTime;
+window.parseVietnameseDateTime = parseVietnameseDateTime;
+window.sanitizeRichHtml = sanitizeRichHtml;
+window.generateUniqueSlug = generateUniqueSlug;
+window.isActivityPublished = isActivityPublished;
+window.normalizeActivity = normalizeActivity;
+
+window.ACTIVITY_TYPES = ACTIVITY_TYPES;
+window.DEFAULT_LETTER_GRADE_SCALE = DEFAULT_LETTER_GRADE_SCALE;

@@ -659,3 +659,8 @@ if (typeof window !== 'undefined') {
   Object.defineProperty(window, 'app', { get: () => app, set: (v) => { app = v; }, configurable: true });
   Object.defineProperty(window, 'storage', { get: () => storage, set: (v) => { storage = v; }, configurable: true });
 }
+
+// Global window bridges for cross-module accessibility
+window.updateModalLayer = updateModalLayer;
+window.watchModalLayers = watchModalLayers;
+window.copyLinkWithFallback = copyLinkWithFallback;
