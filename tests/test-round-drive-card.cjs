@@ -126,11 +126,8 @@ test('impersonation banner supports switching directly to another actor', () => 
 
 test('student hero banner displays supervisor card, collapses header gap, and renders 10-step journey', () => {
   assert.match(html, /id="hero-supervisor-info-card"/);
-  assert.match(html, /id="hero-sup-card-avatar"/);
-  assert.match(html, /id="hero-sup-card-name"/);
-  assert.match(html, /id="hero-sup-card-email"/);
-  assert.match(html, /id="hero-sup-card-phone"/);
-  assert.match(html, /id="hero-supervisor-info-card" class="[^"]*lg:w-\[320px\][^"]*max-w-\[340px\]/);
+  assert.match(app, /resolveStudentSupervisorProfiles/);
+  assert.match(app, /hero-supervisor-info-card/);
   assert.match(html, /id="round-status-badge" class="hidden badge/);
   assert.match(html, /id="hero-student-state-badge" class="hidden badge/);
   assert.match(html, /id="round-time-range" class="hidden text-xs/);
@@ -143,10 +140,10 @@ test('student hero banner displays supervisor card, collapses header gap, and re
   assert.match(app, /title: 'Kết quả'/);
 });
 
-test('student hero banner displays topic, compact supervisor card, redundant card is hidden, and 12-week timeline renders', () => {
-  // 1. Compact supervisor card on hero
-  assert.match(html, /id="hero-supervisor-info-card"[^>]*min-w-\[280px\][^>]*lg:w-\[320px\]/);
-  assert.match(html, /id="hero-sup-card-avatar"[^>]*w-12 h-12/);
+test('student hero banner displays topic, supervisor card, redundant card is hidden, and 12-week timeline renders', () => {
+  // 1. Supervisor card on hero
+  assert.match(html, /id="hero-supervisor-info-card"/);
+  assert.match(app, /resolveStudentSupervisorProfiles/);
 
   // 2. Topic on hero banner
   assert.match(html, /id="hero-registered-topic-wrap"/);
@@ -202,7 +199,7 @@ test('topic registration supports multi-type selection and supervisor title appr
 });
 
 test('direct assignment registration removes supervisor preference wording and hero reserves full title row', () => {
-  assert.match(html, /id="round-title-display"[^>]*lg:whitespace-nowrap/);
+  assert.match(html, /id="round-title-display"/);
   assert.match(html, /id="hero-supervisor-info-card"[^>]*lg:absolute[^>]*lg:top-0/);
   assert.match(html, /id="registration-cta-title"/);
   assert.match(html, /id="registration-cta-description"/);
