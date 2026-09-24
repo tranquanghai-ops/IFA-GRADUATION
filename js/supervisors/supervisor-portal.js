@@ -802,7 +802,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null) {
   let identity = null;
   let isStudentViewer = false;
 
-  if (!studentId || (typeof studentId === 'string' && studentId === state.myRegistration?.studentId)) {
+  if (!studentId || (typeof studentId === 'string' && studentId === state.myRegistration?.studentId && state.currentRole === 'student')) {
     st = state.myRegistration;
     identity = (typeof getRegistrationStudentIdentity === 'function') ? getRegistrationStudentIdentity() : null;
     studentId = identity?.mssv || st?.studentId || st?.mssv;
