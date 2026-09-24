@@ -11130,6 +11130,10 @@ export function normalizeActivity(a, roundId, idx = 0) {
     showAfterExpired: a.showAfterExpired !== false,
     isTentative: Boolean(a.isTentative),
     submissionEnabled: Boolean(a.submissionEnabled),
+    submissionConfig: a.submissionConfig || null,
+    driveFolderId: a.driveFolderId || a.submissionConfig?.driveFolderId || null,
+    driveFolderName: a.driveFolderName || a.submissionConfig?.driveFolderName || null,
+    driveFolderUrl: a.driveFolderUrl || a.submissionConfig?.driveFolderUrl || null,
     councilEnabled: Boolean(a.councilEnabled),
     showPresentationOrderToStudents: Boolean(a.showPresentationOrderToStudents),
     councilStructure: (a.councilStructure && Array.isArray(a.councilStructure.slots)) ? a.councilStructure : { slots: defaultSlots },
@@ -11442,7 +11446,12 @@ window.editActivityModal = function(actId) {
   const subEnabled = Boolean(act.submissionEnabled);
   document.getElementById('activity-form-submission').checked = subEnabled;
   if (typeof toggleActivitySubmissionConfig === 'function') toggleActivitySubmissionConfig(subEnabled);
-  if (typeof populateActivitySubmissionForm === 'function') populateActivitySubmissionForm(act.submissionConfig);
+  if (typeof populateActivitySubmissionForm === 'function') populateActivitySubmissionForm({
+    ...(act.submissionConfig || {}),
+    driveFolderId: act.submissionConfig?.driveFolderId || act.driveFolderId || '',
+    driveFolderName: act.submissionConfig?.driveFolderName || act.driveFolderName || '',
+    driveFolderUrl: act.submissionConfig?.driveFolderUrl || act.driveFolderUrl || ''
+  });
 
   const councilEnabled = Boolean(act.councilEnabled);
   if (document.getElementById('activity-form-council-enabled')) {
@@ -11531,7 +11540,12 @@ window.copyActivityModal = function(actId) {
   const subEnabled = Boolean(act.submissionEnabled);
   document.getElementById('activity-form-submission').checked = subEnabled;
   if (typeof toggleActivitySubmissionConfig === 'function') toggleActivitySubmissionConfig(subEnabled);
-  if (typeof populateActivitySubmissionForm === 'function') populateActivitySubmissionForm(act.submissionConfig);
+  if (typeof populateActivitySubmissionForm === 'function') populateActivitySubmissionForm({
+    ...(act.submissionConfig || {}),
+    driveFolderId: '',
+    driveFolderName: '',
+    driveFolderUrl: ''
+  });
 
   const councilEnabled = Boolean(act.councilEnabled);
   if (document.getElementById('activity-form-council-enabled')) {
@@ -21357,7 +21371,8 @@ function getRoundWeekSchedule(round) {
 }
 
 function renderTimelineWeekDays(days = [], events = [], weekNumber = null) {
-  return `<div class="grid grid-cols-7 gap-1 w-full mt-2 pt-2 border-t border-slate-200/80">${days.map(day => {
+  const studentCalendar = weekNumber !== null;
+  return `<div class="grid grid-cols-7 ${studentCalendar ? 'gap-1.5' : 'gap-1'} w-full mt-2 pt-2 border-t border-slate-200/80">${days.map(day => {
     const dayEvents = events.filter(event => roundWeekEventOccursOnDay(event, day));
     const titles = dayEvents.map(event => escapeHtml(event.title)).join(' · ');
     const isToday = day.date instanceof Date && day.date.toDateString() === new Date().toDateString();
@@ -21367,7 +21382,7 @@ function renderTimelineWeekDays(days = [], events = [], weekNumber = null) {
     const clickable = weekNumber !== null && dayEvents.length;
     const tag = clickable ? 'button' : 'span';
     const click = clickable ? ` type="button" onclick="openStudentTimelineDay(${weekNumber}, '${day.key}')" aria-label="Xem ${dayEvents.length} sự kiện ngày ${day.label}"` : '';
-    return `<${tag}${click} title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border px-0.5 py-0.5 text-center ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md' : ''}"${dayStyle}><b class="block text-[8px] leading-none">${day.shortName}</b><b class="block text-[8px] leading-none mt-0.5">${day.label}</b>${dayEvents.length ? '<i class="block text-[8px] leading-none not-italic">●</i>' : ''}</${tag}>`;
+    return `<${tag}${click} title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border text-center ${studentCalendar ? 'min-h-[48px] px-1 py-1.5' : 'px-0.5 py-0.5'} ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md' : ''}"${dayStyle}><b class="block ${studentCalendar ? 'text-[10px]' : 'text-[8px]'} leading-none">${day.shortName}</b><b class="block ${studentCalendar ? 'text-[10px]' : 'text-[8px]'} leading-none mt-1">${day.label}</b>${dayEvents.length ? `<i class="block ${studentCalendar ? 'text-[10px]' : 'text-[8px]'} leading-none not-italic">●</i>` : ''}</${tag}>`;
   }).join('')}</div>`;
 }
 
@@ -22315,9 +22330,9 @@ function _getTimelineVisibleCount() {
   const wrapper = document.getElementById('timeline-cards-track')?.parentElement;
   if (!wrapper) return 4;
   const w = wrapper.offsetWidth;
-  if (w < 480) return 1;
-  if (w < 768) return 2;
-  return 4;
+  if (w < 720) return 1;
+  if (w < 1150) return 2;
+  return 3;
 }
 
 window.renderStudentTimelineWeeks = function() {
