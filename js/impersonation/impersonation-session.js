@@ -1,3 +1,9 @@
+
+// --- Module Bridges ---
+const selectRound = (id) => window.selectRound?.(id);
+const switchAdminTab = (tab) => window.switchAdminTab?.(tab);
+const initSupervisorPortal = () => window.initSupervisorPortal?.();
+const initAssessmentPortal = () => window.initAssessmentPortal?.();
 /**
  * IFA+ Graduation — Impersonation Session Lifecycle & Routing
  */

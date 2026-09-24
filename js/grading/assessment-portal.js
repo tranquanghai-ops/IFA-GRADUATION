@@ -1,3 +1,6 @@
+
+// --- Module Bridges ---
+const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
 // ============================================================================
 // PHASE 4: ASSESSMENT PORTAL ENGINE
 // ============================================================================

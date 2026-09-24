@@ -1,3 +1,15 @@
+
+const renderTimelineWeekDays = (...args) => (typeof window !== 'undefined' && window.renderTimelineWeekDays ? window.renderTimelineWeekDays(...args) : '');
+const renderTimelineWeekEvents = (...args) => (typeof window !== 'undefined' && window.renderTimelineWeekEvents ? window.renderTimelineWeekEvents(...args) : '');
+const getRoundTimelineWeeksWithActivities = (...args) => (typeof window !== 'undefined' && window.getRoundTimelineWeeksWithActivities ? window.getRoundTimelineWeeksWithActivities(...args) : []);
+const getRoundWeekSchedule = (...args) => (typeof window !== 'undefined' && window.getRoundWeekSchedule ? window.getRoundWeekSchedule(...args) : []);
+const rememberRoundTimelineEvents = (...args) => (typeof window !== 'undefined' && window.rememberRoundTimelineEvents ? window.rememberRoundTimelineEvents(...args) : undefined);
+
+const resolveRoundWeekTitle = (w, t) => (typeof window !== 'undefined' && window.resolveRoundWeekTitle ? window.resolveRoundWeekTitle(w, t) : (t || ('Tuần ' + w)));
+const getRoundTimelineDefaultTitle = (w) => (typeof window !== 'undefined' && window.getRoundTimelineDefaultTitle ? window.getRoundTimelineDefaultTitle(w) : ('Tuần ' + w));
+
+// --- Module Bridges ---
+const isDirectSupervisorAssignment = (rnd) => (typeof window !== 'undefined' && window.isDirectSupervisorAssignment ? window.isDirectSupervisorAssignment(rnd) : false);
 /**
  * IFA+ Graduation — Unified Timeline & Weekly Roadmap Submodule
  */
@@ -52,6 +64,8 @@ export function findNearestMilestone(activities) {
   return null;
 }
 window.findNearestMilestone = findNearestMilestone;
+
+let milestoneCountdownInterval = null;
 
 export function startMilestoneCountdownTicker() {
   if (milestoneCountdownInterval) return;
@@ -579,14 +593,4 @@ if (typeof window !== 'undefined') {
   if (typeof renderActivityCard !== 'undefined') window.renderActivityCard = renderActivityCard;
   if (typeof pad !== 'undefined') window.pad = pad;
   if (typeof fmtPart !== 'undefined') window.fmtPart = fmtPart;
-}
-
-
-
-// --- SUBMODULE WINDOW BRIDGE ---
-if (typeof window !== 'undefined') {
-  if (typeof renderUnifiedActivityCard !== 'undefined') window.renderUnifiedActivityCard = renderUnifiedActivityCard;
-  if (typeof renderUnifiedTimelineWeekCard !== 'undefined') window.renderUnifiedTimelineWeekCard = renderUnifiedTimelineWeekCard;
-  if (typeof renderUnifiedRoundTimeline !== 'undefined') window.renderUnifiedRoundTimeline = renderUnifiedRoundTimeline;
-  if (typeof renderUnifiedPlanList !== 'undefined') window.renderUnifiedPlanList = renderUnifiedPlanList;
 }

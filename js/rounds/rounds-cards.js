@@ -1,3 +1,15 @@
+
+const resolveRoundWeekTitle = (w, t) => (typeof window !== 'undefined' && window.resolveRoundWeekTitle ? window.resolveRoundWeekTitle(w, t) : (t || ('Tuần ' + w)));
+const getRoundTimelineDefaultTitle = (w) => (typeof window !== 'undefined' && window.getRoundTimelineDefaultTitle ? window.getRoundTimelineDefaultTitle(w) : ('Tuần ' + w));
+
+// --- Module Bridges ---
+const isDirectSupervisorAssignment = (rnd) => (typeof window !== 'undefined' && window.isDirectSupervisorAssignment ? window.isDirectSupervisorAssignment(rnd) : false);
+const getSupervisorAssignmentMode = (rnd) => (typeof window !== 'undefined' && window.getSupervisorAssignmentMode ? window.getSupervisorAssignmentMode(rnd) : 'student_preference');
+const renderAdminRoundsCards = () => window.renderAdminRoundsCards?.();
+const populateRoundSelectors = () => window.populateRoundSelectors?.();
+const loadAdminStats = () => window.loadAdminStats?.();
+const loadRounds = () => window.loadRounds?.();
+const switchAdminTab = (tab) => window.switchAdminTab?.(tab);
 /**
  * IFA+ Graduation — Admin Rounds Cards, Workspace & Actions Module
  */
@@ -740,30 +752,9 @@ window.toggleRoundHiddenStatus = async function(roundId) {
 
 // --- SUBMODULE WINDOW BRIDGE ---
 if (typeof window !== 'undefined') {
-  if (typeof loadRounds !== 'undefined') window.loadRounds = loadRounds;
-  if (typeof refreshRoundCardMetrics !== 'undefined') window.refreshRoundCardMetrics = refreshRoundCardMetrics;
-  if (typeof renderRoundsDropdowns !== 'undefined') window.renderRoundsDropdowns = renderRoundsDropdowns;
-  if (typeof selectRound !== 'undefined') window.selectRound = selectRound;
-  if (typeof resolveStudentSupervisorProfiles !== 'undefined') window.resolveStudentSupervisorProfiles = resolveStudentSupervisorProfiles;
-  if (typeof renderRoundHeader !== 'undefined') window.renderRoundHeader = renderRoundHeader;
-  if (typeof startCountdown !== 'undefined') window.startCountdown = startCountdown;
-  if (typeof formatDuration !== 'undefined') window.formatDuration = formatDuration;
-  if (typeof renderAdminTrashTable !== 'undefined') window.renderAdminTrashTable = renderAdminTrashTable;
+    if (typeof refreshRoundCardMetrics !== 'undefined') window.refreshRoundCardMetrics = refreshRoundCardMetrics;
+      if (typeof resolveStudentSupervisorProfiles !== 'undefined') window.resolveStudentSupervisorProfiles = resolveStudentSupervisorProfiles;
+        if (typeof renderAdminTrashTable !== 'undefined') window.renderAdminTrashTable = renderAdminTrashTable;
   if (typeof renderAdminRoundsTable !== 'undefined') window.renderAdminRoundsTable = renderAdminRoundsTable;
   if (typeof getRoundStatusCategory !== 'undefined') window.getRoundStatusCategory = getRoundStatusCategory;
-  if (typeof getRoundWeekSchedule !== 'undefined') window.getRoundWeekSchedule = getRoundWeekSchedule;
-  if (typeof getRoundTimelineWeeksWithActivities !== 'undefined') window.getRoundTimelineWeeksWithActivities = getRoundTimelineWeeksWithActivities;
-  if (typeof rememberRoundTimelineEvents !== 'undefined') window.rememberRoundTimelineEvents = rememberRoundTimelineEvents;
-  if (typeof renderTimelineWeekDays !== 'undefined') window.renderTimelineWeekDays = renderTimelineWeekDays;
-  if (typeof renderTimelineWeekEvents !== 'undefined') window.renderTimelineWeekEvents = renderTimelineWeekEvents;
-  if (typeof renderAdminRoundTimelinePreview !== 'undefined') window.renderAdminRoundTimelinePreview = renderAdminRoundTimelinePreview;
-  if (typeof parseRoundDate !== 'undefined') window.parseRoundDate = parseRoundDate;
-  if (typeof fmtDate !== 'undefined') window.fmtDate = fmtDate;
-  if (typeof toMillis !== 'undefined') window.toMillis = toMillis;
-  if (typeof updateTimer !== 'undefined') window.updateTimer = updateTimer;
-  if (typeof pad !== 'undefined') window.pad = pad;
-  if (typeof formatDate !== 'undefined') window.formatDate = formatDate;
-  if (typeof toDateKey !== 'undefined') window.toDateKey = toDateKey;
-  if (typeof parseEventDate !== 'undefined') window.parseEventDate = parseEventDate;
-  if (typeof shortDate !== 'undefined') window.shortDate = shortDate;
-}
+                              }

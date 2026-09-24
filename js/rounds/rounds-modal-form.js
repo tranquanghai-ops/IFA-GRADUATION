@@ -1,3 +1,15 @@
+
+const resolveRoundWeekTitle = (w, t) => (typeof window !== 'undefined' && window.resolveRoundWeekTitle ? window.resolveRoundWeekTitle(w, t) : (t || ('Tuần ' + w)));
+const getRoundTimelineDefaultTitle = (w) => (typeof window !== 'undefined' && window.getRoundTimelineDefaultTitle ? window.getRoundTimelineDefaultTitle(w) : ('Tuần ' + w));
+
+const roundWeekEventOccursOnDay = (e, d) => (typeof window !== 'undefined' && window.roundWeekEventOccursOnDay ? window.roundWeekEventOccursOnDay(e, d) : false);
+const distinguishOverlappingTimelineEvents = (evs, ds) => (typeof window !== 'undefined' && window.distinguishOverlappingTimelineEvents ? window.distinguishOverlappingTimelineEvents(evs, ds) : (evs || []));
+const normalizeRoundWeekEventColor = (val) => (typeof window !== 'undefined' && window.normalizeRoundWeekEventColor ? window.normalizeRoundWeekEventColor(val) : (val || '#2563eb'));
+
+// --- Module Bridges ---
+const getSupervisorAssignmentMode = (rnd) => (typeof window !== 'undefined' && window.getSupervisorAssignmentMode ? window.getSupervisorAssignmentMode(rnd) : 'student_preference');
+const renderAdminRoundsTable = () => window.renderAdminRoundsTable?.();
+const loadRounds = () => window.loadRounds?.();
 /**
  * IFA+ Graduation — Round Create & Edit Modal Form Management Module
  */
@@ -757,27 +769,3 @@ window.saveRound = async function(e) {
   }
 };
 
-// --- SUBMODULE WINDOW BRIDGE ---
-if (typeof window !== 'undefined') {
-  if (typeof getSupervisorDefaultAndMaxQuota !== 'undefined') window.getSupervisorDefaultAndMaxQuota = getSupervisorDefaultAndMaxQuota;
-  if (typeof ensureSupervisorsMasterLoaded !== 'undefined') window.ensureSupervisorsMasterLoaded = ensureSupervisorsMasterLoaded;
-  if (typeof updateRoundModalBadges !== 'undefined') window.updateRoundModalBadges = updateRoundModalBadges;
-  if (typeof updateRoundModalConfigSummary !== 'undefined') window.updateRoundModalConfigSummary = updateRoundModalConfigSummary;
-  if (typeof getRoundWeekDaysFromForm !== 'undefined') window.getRoundWeekDaysFromForm = getRoundWeekDaysFromForm;
-  if (typeof getRoundWeekDraftEvents !== 'undefined') window.getRoundWeekDraftEvents = getRoundWeekDraftEvents;
-  if (typeof normalizeRoundWeekEventColor !== 'undefined') window.normalizeRoundWeekEventColor = normalizeRoundWeekEventColor;
-  if (typeof setActivityFormColor !== 'undefined') window.setActivityFormColor = setActivityFormColor;
-  if (typeof getRoundWeekEditingEventId !== 'undefined') window.getRoundWeekEditingEventId = getRoundWeekEditingEventId;
-  if (typeof setRoundWeekEventFormMode !== 'undefined') window.setRoundWeekEventFormMode = setRoundWeekEventFormMode;
-  if (typeof updateRoundWeekEventColorPresets !== 'undefined') window.updateRoundWeekEventColorPresets = updateRoundWeekEventColorPresets;
-  if (typeof getRoundWeekEventRange !== 'undefined') window.getRoundWeekEventRange = getRoundWeekEventRange;
-  if (typeof roundWeekEventOccursOnDay !== 'undefined') window.roundWeekEventOccursOnDay = roundWeekEventOccursOnDay;
-  if (typeof distinguishOverlappingTimelineEvents !== 'undefined') window.distinguishOverlappingTimelineEvents = distinguishOverlappingTimelineEvents;
-  if (typeof renderRoundWeekDayPicker !== 'undefined') window.renderRoundWeekDayPicker = renderRoundWeekDayPicker;
-  if (typeof getRoundTimelineDefaultTitle !== 'undefined') window.getRoundTimelineDefaultTitle = getRoundTimelineDefaultTitle;
-  if (typeof resolveRoundWeekTitle !== 'undefined') window.resolveRoundWeekTitle = resolveRoundWeekTitle;
-  if (typeof renderRoundWeeklyContentEditor !== 'undefined') window.renderRoundWeeklyContentEditor = renderRoundWeeklyContentEditor;
-  if (typeof readRoundWeeklyContentDraft !== 'undefined') window.readRoundWeeklyContentDraft = readRoundWeeklyContentDraft;
-  if (typeof restoreRoundWeeklyContentDraft !== 'undefined') window.restoreRoundWeeklyContentDraft = restoreRoundWeeklyContentDraft;
-  if (typeof pad !== 'undefined') window.pad = pad;
-}

@@ -1,3 +1,25 @@
+
+const ACTIVITY_TYPES = (typeof window !== 'undefined' && window.ACTIVITY_TYPES) || {
+  announcement: { label: 'Thông báo', icon: '📢', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  submission: { label: 'Nộp bài', icon: '📥', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  review: { label: 'Duyệt hội đồng', icon: '📋', color: 'bg-amber-50 text-amber-800 border-amber-200' },
+  preliminary: { label: 'Sơ khảo', icon: '🔍', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  thesis: { label: 'Chấm thuyết minh', icon: '📖', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  defense: { label: 'Bảo vệ', icon: '🎓', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+  other: { label: 'Khác', icon: '📌', color: 'bg-slate-100 text-slate-700 border-slate-200' }
+};
+const isActivityPublished = (a) => (typeof window !== 'undefined' && window.isActivityPublished ? window.isActivityPublished(a) : (a && a.visibility !== false));
+
+const resolveRoundWeekTitle = (w, t) => (typeof window !== 'undefined' && window.resolveRoundWeekTitle ? window.resolveRoundWeekTitle(w, t) : (t || ('Tuần ' + w)));
+const getRoundTimelineDefaultTitle = (w) => (typeof window !== 'undefined' && window.getRoundTimelineDefaultTitle ? window.getRoundTimelineDefaultTitle(w) : ('Tuần ' + w));
+
+const roundWeekEventOccursOnDay = (e, d) => (typeof window !== 'undefined' && window.roundWeekEventOccursOnDay ? window.roundWeekEventOccursOnDay(e, d) : false);
+const distinguishOverlappingTimelineEvents = (evs, ds) => (typeof window !== 'undefined' && window.distinguishOverlappingTimelineEvents ? window.distinguishOverlappingTimelineEvents(evs, ds) : (evs || []));
+const normalizeRoundWeekEventColor = (val) => (typeof window !== 'undefined' && window.normalizeRoundWeekEventColor ? window.normalizeRoundWeekEventColor(val) : (val || '#2563eb'));
+
+// --- Module Bridges ---
+const isDirectSupervisorAssignment = (rnd) => (typeof window !== 'undefined' && window.isDirectSupervisorAssignment ? window.isDirectSupervisorAssignment(rnd) : false);
+const renderAdminRoundsCards = () => window.renderAdminRoundsCards?.();
 /**
  * IFA+ Graduation — Rounds Timeline Preview & Calendar Events Module
  */
@@ -285,3 +307,16 @@ window.toggleRoundTimelineWeekVisibility = async function(roundId, weekNumber, e
     showToast('Không thể cập nhật hiển thị tuần: ' + error.message, 'error');
   }
 };
+
+if (typeof window !== 'undefined') {
+  window.renderAdminRoundTimelinePreview = renderAdminRoundTimelinePreview;
+}
+
+if (typeof window !== 'undefined') {
+  window.getRoundWeekSchedule = getRoundWeekSchedule;
+  window.getRoundTimelineWeeksWithActivities = getRoundTimelineWeeksWithActivities;
+  window.rememberRoundTimelineEvents = rememberRoundTimelineEvents;
+  window.renderTimelineWeekDays = renderTimelineWeekDays;
+  window.renderTimelineWeekEvents = renderTimelineWeekEvents;
+  window.renderAdminRoundTimelinePreview = renderAdminRoundTimelinePreview;
+}

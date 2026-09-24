@@ -1,3 +1,6 @@
+
+// --- Module Bridges ---
+const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
 /**
  * IFA+ Graduation — Student Personal Sidebar & Profile Modal
  */
@@ -267,3 +270,5 @@ if (typeof window !== 'undefined') {
   if (typeof val !== 'undefined') window.val = val;
   if (typeof isInvalid !== 'undefined') window.isInvalid = isInvalid;
 }
+
+if (typeof window !== "undefined" && typeof updateStudentPersonalSidebar !== "undefined") { window.updateStudentPersonalSidebar = updateStudentPersonalSidebar; }

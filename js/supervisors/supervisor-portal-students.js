@@ -1,3 +1,7 @@
+
+// --- Module Bridges ---
+const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
+const isDirectSupervisorAssignment = (rnd) => (typeof window !== 'undefined' && window.isDirectSupervisorAssignment ? window.isDirectSupervisorAssignment(rnd) : false);
 /**
  * IFA+ Graduation — Supervisor Assigned Students & Detail Modal
  */

@@ -1,3 +1,9 @@
+const renderRoundHeader = () => window.renderRoundHeader?.();
+
+// --- Module Bridges ---
+const renderAdminRoundsTable = () => window.renderAdminRoundsTable?.();
+const renderAdminRoundsCards = () => window.renderAdminRoundsCards?.();
+const populateRoundSelectors = () => window.populateRoundSelectors?.();
 /**
  * IFA+ Graduation — Supervisor Assignments & Preference Matching Submodule
  */
@@ -8,6 +14,7 @@
 // OFFICIAL SUPERVISORS HELPERS (v1.6.0-beta.3)
 // ============================================================================
 export function getOfficialSupervisors(reg) {
+
   if (!reg) return [];
   if (Array.isArray(reg.officialSupervisors) && reg.officialSupervisors.length > 0) {
     return reg.officialSupervisors;
@@ -1080,10 +1087,17 @@ window.setActiveRound = async function(roundId) {
 
 // --- SUBMODULE WINDOW BRIDGE ---
 if (typeof window !== 'undefined') {
+  if (typeof loadAdminStats !== 'undefined') window.loadAdminStats = loadAdminStats;
+  if (typeof switchAdminTab !== 'undefined') window.switchAdminTab = switchAdminTab;
   if (typeof loadSupervisorReviewData !== 'undefined') window.loadSupervisorReviewData = loadSupervisorReviewData;
   if (typeof renderSupervisorReviewCards !== 'undefined') window.renderSupervisorReviewCards = renderSupervisorReviewCards;
   if (typeof acceptCandidate !== 'undefined') window.acceptCandidate = acceptCandidate;
   if (typeof rejectCandidate !== 'undefined') window.rejectCandidate = rejectCandidate;
   if (typeof undoCandidateDecision !== 'undefined') window.undoCandidateDecision = undoCandidateDecision;
   if (typeof submitSupervisorReviewBatch !== 'undefined') window.submitSupervisorReviewBatch = submitSupervisorReviewBatch;
+}
+
+if (typeof window !== 'undefined') {
+  window.loadRoundSupervisors = loadRoundSupervisors;
+  window.renderSupervisorsGrid = renderSupervisorsGrid;
 }

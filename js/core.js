@@ -686,3 +686,178 @@ if (typeof window !== 'undefined') {
   if (typeof fmt24h !== 'undefined') window.fmt24h = fmt24h;
   if (typeof fmtDateRange24h !== 'undefined') window.fmtDateRange24h = fmtDateRange24h;
 }
+
+// --- OFFICIAL SUPERVISORS & ASSIGNMENT DOMAIN HELPERS ---
+export function getOfficialSupervisors(reg) {
+  if (!reg) return [];
+  if (Array.isArray(reg.officialSupervisors) && reg.officialSupervisors.length > 0) {
+    return reg.officialSupervisors;
+  }
+  const primaryId = reg.acceptedSupervisorId || reg.finalSupervisorId;
+  if (primaryId) {
+    return [{
+      supervisorId: primaryId,
+      supervisorName: reg.acceptedSupervisorName || '',
+      source: 'preference',
+      role: 'primary',
+      addedAt: reg.acceptedAt || reg.updatedAt || new Date().toISOString()
+    }];
+  }
+  return [];
+}
+
+export function normalizeOfficialAssignment(assignment, registration = null) {
+  if (!assignment && !registration) return null;
+  const source = assignment || {};
+  const legacy = registration || {};
+  const supervisors = Array.isArray(source.supervisors) && source.supervisors.length > 0
+    ? source.supervisors
+    : getOfficialSupervisors(legacy);
+  const primary = supervisors.find(s => s.role === 'primary') || supervisors[0] || null;
+  return {
+    ...legacy,
+    ...source,
+    studentId: source.studentId || legacy.studentId || source.id || legacy.id || '',
+    studentName: source.studentName || legacy.studentName || '',
+    email: source.studentEmail || source.email || legacy.email || '',
+    topicTitle: legacy.topicTitle || source.topicTitle || '',
+    projectType: legacy.projectType || source.projectType || '',
+    officialSupervisors: supervisors,
+    acceptedSupervisorId: source.acceptedSupervisorId || primary?.supervisorId || legacy.acceptedSupervisorId || '',
+    acceptedSupervisorName: source.acceptedSupervisorName || primary?.supervisorName || legacy.acceptedSupervisorName || '',
+    acceptedRank: source.acceptedRank || legacy.acceptedRank || 'manual',
+    reviewStatus: supervisors.length > 0 ? 'manually_assigned' : (legacy.reviewStatus || 'unassigned'),
+    assignmentStatus: source.assignmentStatus || (legacy.reviewStatus === 'accepted' || legacy.reviewStatus === 'manually_assigned' ? 'published' : '')
+  };
+}
+
+export function getSupervisorAssignmentMode(round = state?.activeRound) {
+  return round?.supervisorAssignmentMode === 'direct_assignment'
+    ? 'direct_assignment'
+    : 'student_preference';
+}
+
+export function isDirectSupervisorAssignment(round = state?.activeRound) {
+  return getSupervisorAssignmentMode(round) === 'direct_assignment';
+}
+
+export function shouldSkipStudentSupervisorPreference(round = state?.activeRound) {
+  return isDirectSupervisorAssignment(round)
+    || state.myOfficialAssignment?.assignmentStatus === 'published';
+}
+
+if (typeof window !== 'undefined') {
+  window.getOfficialSupervisors = getOfficialSupervisors;
+  window.normalizeOfficialAssignment = normalizeOfficialAssignment;
+  window.getSupervisorAssignmentMode = getSupervisorAssignmentMode;
+  window.isDirectSupervisorAssignment = isDirectSupervisorAssignment;
+  window.shouldSkipStudentSupervisorPreference = shouldSkipStudentSupervisorPreference;
+}
+
+// --- TIMELINE EVENT & COLOR DOMAIN HELPERS ---
+export const ROUND_WEEK_EVENT_COLORS = [
+  ['#dc2626', 'Đỏ'], ['#ea580c', 'Cam'], ['#d97706', 'Hổ phách'], ['#ca8a04', 'Vàng'],
+  ['#65a30d', 'Xanh lá nhạt'], ['#16a34a', 'Xanh lá'], ['#0f766e', 'Xanh ngọc'], ['#0891b2', 'Xanh cyan'],
+  ['#2563eb', 'Xanh dương'], ['#4f46e5', 'Chàm'], ['#7e22ce', 'Tím'], ['#db2777', 'Hồng']
+];
+
+export function normalizeRoundWeekEventColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#2563eb';
+}
+
+export function getRoundWeekEventRange(event = {}) {
+  const fallback = Math.max(0, Math.min(6, Number(event.dayIndex) || 0));
+  let startDayIndex = Number.isInteger(Number(event.startDayIndex))
+    ? Math.max(0, Math.min(6, Number(event.startDayIndex)))
+    : fallback;
+  let endDayIndex = Number.isInteger(Number(event.endDayIndex))
+    ? Math.max(0, Math.min(6, Number(event.endDayIndex)))
+    : startDayIndex;
+  if (endDayIndex < startDayIndex) [startDayIndex, endDayIndex] = [endDayIndex, startDayIndex];
+  return { startDayIndex, endDayIndex };
+}
+
+export function roundWeekEventOccursOnDay(event, day) {
+  if (!event || !day) return false;
+  if (event.activityId && event.startDate && event.endDate) {
+    return day.key >= event.startDate && day.key <= event.endDate;
+  }
+  const { startDayIndex, endDayIndex } = getRoundWeekEventRange(event);
+  return day.dayIndex >= startDayIndex && day.dayIndex <= endDayIndex;
+}
+
+export function distinguishOverlappingTimelineEvents(events = [], days = []) {
+  if (!Array.isArray(events)) return [];
+  const assigned = [];
+  return events.map(event => {
+    const occupied = new Set(assigned.filter(previous => (days || []).some(day =>
+      roundWeekEventOccursOnDay(event, day) && roundWeekEventOccursOnDay(previous, day)
+    )).map(previous => previous.displayColor));
+    const preferred = normalizeRoundWeekEventColor(event.color);
+    const displayColor = occupied.has(preferred)
+      ? (ROUND_WEEK_EVENT_COLORS.find(([color]) => !occupied.has(color))?.[0] || preferred)
+      : preferred;
+    const colored = { ...event, displayColor };
+    assigned.push(colored);
+    return colored;
+  });
+}
+
+if (typeof window !== 'undefined') {
+  window.ROUND_WEEK_EVENT_COLORS = ROUND_WEEK_EVENT_COLORS;
+  window.normalizeRoundWeekEventColor = normalizeRoundWeekEventColor;
+  window.getRoundWeekEventRange = getRoundWeekEventRange;
+  window.roundWeekEventOccursOnDay = roundWeekEventOccursOnDay;
+  window.distinguishOverlappingTimelineEvents = distinguishOverlappingTimelineEvents;
+}
+
+export function getRoundTimelineDefaultTitle(weekNum) {
+  const n = Number(weekNum);
+  if (n === 13) return 'Nộp Sơ khảo';
+  if (n === 14) return 'Bảo vệ Tốt nghiệp';
+  if (n === 15) return 'Tổng kết & Kết quả';
+  if (n > 15) return 'Mốc ' + n;
+  return 'Tuần ' + n;
+}
+
+export function resolveRoundWeekTitle(weekNum, customTitle) {
+  const n = Number(weekNum);
+  const trimmed = String(customTitle || '').trim();
+  if (trimmed && !/^Tuần\s+\d+$/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (n > 12) {
+    if (!trimmed || /^Tuần\s+\d+$/i.test(trimmed)) {
+      return getRoundTimelineDefaultTitle(n);
+    }
+  }
+  return trimmed || ('Tuần ' + n);
+}
+
+if (typeof window !== 'undefined') {
+  window.getRoundTimelineDefaultTitle = getRoundTimelineDefaultTitle;
+  window.resolveRoundWeekTitle = resolveRoundWeekTitle;
+}
+
+// --- PLANNING & ACTIVITIES DOMAIN HELPERS ---
+export const ACTIVITY_TYPES = {
+  announcement: { label: 'Thông báo', icon: '📢', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  submission: { label: 'Nộp bài', icon: '📥', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  review: { label: 'Duyệt hội đồng', icon: '📋', color: 'bg-amber-50 text-amber-800 border-amber-200' },
+  preliminary: { label: 'Sơ khảo', icon: '🔍', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  thesis: { label: 'Chấm thuyết minh', icon: '📖', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  defense: { label: 'Bảo vệ', icon: '🎓', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+  other: { label: 'Khác', icon: '📌', color: 'bg-slate-100 text-slate-700 border-slate-200' }
+};
+
+export function isActivityPublished(activity) {
+  if (!activity) return false;
+  if (activity.publicationStatus) return activity.publicationStatus === 'published';
+  return activity.visibility !== false;
+}
+
+if (typeof window !== 'undefined') {
+  window.ACTIVITY_TYPES = ACTIVITY_TYPES;
+  window.isActivityPublished = isActivityPublished;
+}

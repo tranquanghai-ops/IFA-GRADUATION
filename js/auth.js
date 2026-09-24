@@ -1,3 +1,11 @@
+
+// --- Module Bridges ---
+const loadAdminStats = () => window.loadAdminStats?.();
+const selectRound = (id) => window.selectRound?.(id);
+const loadRounds = () => window.loadRounds?.();
+const switchAdminTab = (tab) => window.switchAdminTab?.(tab);
+const initSupervisorPortal = () => window.initSupervisorPortal?.();
+const initAssessmentPortal = () => window.initAssessmentPortal?.();
 /**
  * IFA+ Graduation — Authentication & Roles Module
  */
@@ -59,19 +67,27 @@ export async function setupAuthListener() {
 
         // 2. Kích hoạt ngay view ban đầu để UI hiển thị tức thì
         const detectedPortal = getCurrentPortal();
-        let initView = 'student';
-        if (detectedPortal === 'admin') {
+        let initView = state.currentView || state.actualRole || 'student';
+        if (detectedPortal === 'admin' && (state.isAdmin || state.impersonation)) {
           initView = 'admin';
-        } else if (detectedPortal === 'supervisor') {
+        } else if (detectedPortal === 'supervisor' && (state.isSupervisor || state.isAdmin)) {
           initView = 'supervisor';
         } else if (detectedPortal === 'assessment') {
           initView = 'assessment';
         } else {
-          initView = 'student';
+          // If at root /graduation/ and user is supervisor -> default to 'supervisor'
+          if (state.actualRole === 'supervisor' && !state.impersonation) {
+            initView = 'supervisor';
+          } else if (state.actualRole === 'admin' && !state.impersonation) {
+            initView = 'admin';
+          } else {
+            initView = 'student';
+          }
         }
         await switchView(initView);
         if (initView === 'admin' && !state.impersonation && state.isAdmin) {
-          switchAdminTab('rounds');
+          if (typeof switchAdminTab === 'function') switchAdminTab('rounds');
+          else if (window.switchAdminTab) window.switchAdminTab('rounds');
         }
 
         // 3. Tải dữ liệu đợt và loại hình đồ án với timeout bảo vệ
@@ -478,12 +494,15 @@ window.switchView = async function(targetView) {
     }
 
     if (state.isAdmin) {
-      loadAdminStats();
+      if (typeof loadAdminStats === 'function') loadAdminStats();
+      else if (window.loadAdminStats) window.loadAdminStats();
     }
   } else if (targetView === 'supervisor') {
-    initSupervisorPortal();
+    if (typeof initSupervisorPortal === 'function') initSupervisorPortal();
+    else if (window.initSupervisorPortal) window.initSupervisorPortal();
   } else if (targetView === 'assessment') {
-    initAssessmentPortal();
+    if (typeof initAssessmentPortal === 'function') initAssessmentPortal();
+    else if (window.initAssessmentPortal) window.initAssessmentPortal();
   } else if (targetView === 'student') {
     const emptyCard = document.getElementById('student-empty-round');
     const targetRound = state.activeRound || (state.rounds || []).find(r => r.id === (state.impersonation?.target?.roundId || state.selectedRoundId)) || (state.rounds || [])[0];
@@ -493,7 +512,8 @@ window.switchView = async function(targetView) {
       if (emptyCard) emptyCard.classList.add('hidden');
       const rId = targetRound.id || state.selectedRoundId;
       if (rId) {
-        await selectRound(rId);
+        if (typeof selectRound === 'function') await selectRound(rId);
+        else if (window.selectRound) await window.selectRound(rId);
       }
       return;
     }

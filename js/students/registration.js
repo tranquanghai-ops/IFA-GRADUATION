@@ -1,3 +1,9 @@
+const renderRoundHeader = () => window.renderRoundHeader?.();
+
+// --- Module Bridges ---
+const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
+const normalizeOfficialAssignment = (a, r) => (typeof window !== 'undefined' && window.normalizeOfficialAssignment ? window.normalizeOfficialAssignment(a, r) : (a || r));
+const shouldSkipStudentSupervisorPreference = (rnd) => (typeof window !== 'undefined' && window.shouldSkipStudentSupervisorPreference ? window.shouldSkipStudentSupervisorPreference(rnd) : false);
 /**
  * IFA+ Graduation — Students, Eligibility & IFAA Master Module
  */

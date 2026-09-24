@@ -1,3 +1,20 @@
+
+const ACTIVITY_TYPES = (typeof window !== 'undefined' && window.ACTIVITY_TYPES) || {
+  announcement: { label: 'Thông báo', icon: '📢', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  submission: { label: 'Nộp bài', icon: '📥', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  review: { label: 'Duyệt hội đồng', icon: '📋', color: 'bg-amber-50 text-amber-800 border-amber-200' },
+  preliminary: { label: 'Sơ khảo', icon: '🔍', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  thesis: { label: 'Chấm thuyết minh', icon: '📖', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  defense: { label: 'Bảo vệ', icon: '🎓', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+  other: { label: 'Khác', icon: '📌', color: 'bg-slate-100 text-slate-700 border-slate-200' }
+};
+const isActivityPublished = (a) => (typeof window !== 'undefined' && window.isActivityPublished ? window.isActivityPublished(a) : (a && a.visibility !== false));
+
+// --- Module Bridges ---
+const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
+const normalizeOfficialAssignment = (a, r) => (typeof window !== 'undefined' && window.normalizeOfficialAssignment ? window.normalizeOfficialAssignment(a, r) : (a || r));
+const renderAdminRoundsTable = () => window.renderAdminRoundsTable?.();
+const renderAdminRoundsCards = () => window.renderAdminRoundsCards?.();
 /**
  * IFA+ Graduation — Rounds Loader & Header Module
  */
@@ -68,7 +85,7 @@ async function loadRounds() {
           const assignedStudentIds = new Set();
           effectiveAssignments.forEach(assignmentDoc => {
             const assignment = { id: assignmentDoc.id, ...assignmentDoc.data() };
-            const supervisors = getOfficialSupervisors(assignment);
+            const supervisors = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(assignment) : (window.getOfficialSupervisors ? window.getOfficialSupervisors(assignment) : []);
             const hasAssignment = supervisors.length > 0 || Boolean(
               assignment.acceptedSupervisorId || assignment.assignedSupervisorId || assignment.officialSupervisor
             );
@@ -90,7 +107,7 @@ async function loadRounds() {
     }
 
     renderRoundsDropdowns();
-    renderAdminRoundsTable();
+    if (typeof renderAdminRoundsTable === 'function') renderAdminRoundsTable(); else if (window.renderAdminRoundsTable) window.renderAdminRoundsTable();
 
     // Check ?x=SHORTCODE URL parameter
     const urlParams = new URLSearchParams(window.location.search);
@@ -158,7 +175,7 @@ async function loadRounds() {
 
     if (state.selectedRoundId) {
       await selectRound(state.selectedRoundId);
-      if (state.impersonation) updateAuthUI();
+      if (state.impersonation) { if (typeof updateAuthUI === 'function') updateAuthUI(); else if (window.updateAuthUI) window.updateAuthUI(); }
     }
   } catch (e) {
     console.error('[Rounds] Error loading rounds:', e);
@@ -269,17 +286,17 @@ export async function selectRound(roundId) {
   renderRoundHeader();
   startCountdown();
   
-  await loadRoundSupervisors(roundId);
-  await checkStudentEligibilityAndRegistration(roundId);
+  if (typeof loadRoundSupervisors === 'function') await loadRoundSupervisors(roundId); else if (window.loadRoundSupervisors) await window.loadRoundSupervisors(roundId);
+  if (typeof checkStudentEligibilityAndRegistration === 'function') await checkStudentEligibilityAndRegistration(roundId); else if (window.checkStudentEligibilityAndRegistration) await window.checkStudentEligibilityAndRegistration(roundId);
   
   if (typeof updateStudentPersonalSidebar === 'function') {
-    updateStudentPersonalSidebar();
+    if (typeof updateStudentPersonalSidebar === 'function') updateStudentPersonalSidebar(); else if (window.updateStudentPersonalSidebar) window.updateStudentPersonalSidebar();
   }
 
   if (state.isSupervisor) {
-    loadSupervisorReviewData(roundId);
+    if (typeof loadSupervisorReviewData === 'function') loadSupervisorReviewData(roundId); else if (window.loadSupervisorReviewData) window.loadSupervisorReviewData(roundId);
   }
-  await loadStudentRoundActivities(roundId);
+  if (typeof loadStudentRoundActivities === 'function') await loadStudentRoundActivities(roundId); else if (window.loadStudentRoundActivities) await window.loadStudentRoundActivities(roundId);
   renderRoundHeader();
 }
 
@@ -339,7 +356,7 @@ function renderRoundHeader() {
   }
   const assignedSupEl = document.getElementById('hero-assigned-sup');
   const effectiveAssignment = normalizeOfficialAssignment(state.myOfficialAssignment, state.myRegistration);
-  const officialList = effectiveAssignment ? getOfficialSupervisors(effectiveAssignment) : [];
+  const officialList = effectiveAssignment ? ((typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(effectiveAssignment) : (window.getOfficialSupervisors ? window.getOfficialSupervisors(effectiveAssignment) : [])) : [];
   const hasOfficialSup = officialList.length > 0 || Boolean(effectiveAssignment?.assignedSupervisorId || effectiveAssignment?.officialSupervisor || effectiveAssignment?.acceptedSupervisorName || effectiveAssignment?.supervisorName);
 
   if (assignedSupEl) {
@@ -540,3 +557,9 @@ function formatDuration(ms) {
 // --- ELIGIBILITY & REGISTRATION CHECK ---
 
 // --- SOFT DELETE & TRASH ---
+if (typeof window !== "undefined") { window.selectRound = selectRound; window.loadRounds = loadRounds; }
+
+if (typeof window !== 'undefined') {
+  window.renderRoundHeader = renderRoundHeader;
+  window.renderRoundsDropdowns = renderRoundsDropdowns;
+}

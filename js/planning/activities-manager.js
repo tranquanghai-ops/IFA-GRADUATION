@@ -1,3 +1,11 @@
+
+const roundWeekEventOccursOnDay = (e, d) => (typeof window !== 'undefined' && window.roundWeekEventOccursOnDay ? window.roundWeekEventOccursOnDay(e, d) : false);
+const distinguishOverlappingTimelineEvents = (evs, ds) => (typeof window !== 'undefined' && window.distinguishOverlappingTimelineEvents ? window.distinguishOverlappingTimelineEvents(evs, ds) : (evs || []));
+const normalizeRoundWeekEventColor = (val) => (typeof window !== 'undefined' && window.normalizeRoundWeekEventColor ? window.normalizeRoundWeekEventColor(val) : (val || '#2563eb'));
+
+// --- Module Bridges ---
+const renderAdminRoundsCards = () => window.renderAdminRoundsCards?.();
+const switchAdminTab = (tab) => window.switchAdminTab?.(tab);
 /**
  * IFA+ Graduation — Planning Activities & Milestones CRUD Submodule
  */
@@ -1560,4 +1568,9 @@ if (typeof window !== 'undefined') {
   if (typeof normalizeActivity !== 'undefined') window.normalizeActivity = normalizeActivity;
   if (typeof findNearestMilestone !== 'undefined') window.findNearestMilestone = findNearestMilestone;
   if (typeof startMilestoneCountdownTicker !== 'undefined') window.startMilestoneCountdownTicker = startMilestoneCountdownTicker;
+}
+
+if (typeof window !== "undefined") {
+  if (typeof loadStudentRoundActivities !== "undefined") window.loadStudentRoundActivities = loadStudentRoundActivities;
+  if (typeof loadAdminRoundActivities !== "undefined") window.loadAdminRoundActivities = loadAdminRoundActivities;
 }

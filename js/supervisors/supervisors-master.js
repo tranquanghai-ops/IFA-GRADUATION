@@ -929,3 +929,5 @@ if (typeof window !== 'undefined') {
   if (typeof dataUrlToCompressedBlob !== 'undefined') window.dataUrlToCompressedBlob = dataUrlToCompressedBlob;
   if (typeof renderAdminRoundSupervisorsTable !== 'undefined') window.renderAdminRoundSupervisorsTable = renderAdminRoundSupervisorsTable;
 }
+
+if (typeof window !== "undefined" && typeof loadRoundSupervisors !== "undefined") { window.loadRoundSupervisors = loadRoundSupervisors; }

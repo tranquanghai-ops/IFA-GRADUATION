@@ -1,6 +1,13 @@
+const renderSupervisorRoundTimeline = (rnd) => window.renderSupervisorRoundTimeline?.(rnd);
+const renderSupervisorPlanList = (rnd) => window.renderSupervisorPlanList?.(rnd);
 /**
  * IFA+ Graduation — Supervisor Portal Core & Data Loading
  */
+// --- Module Bridges ---
+const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
+const normalizeOfficialAssignment = (a, r) => (typeof window !== 'undefined' && window.normalizeOfficialAssignment ? window.normalizeOfficialAssignment(a, r) : (a || r));
+const isDirectSupervisorAssignment = (rnd) => (typeof window !== 'undefined' && window.isDirectSupervisorAssignment ? window.isDirectSupervisorAssignment(rnd) : false);
+
 // PHASE 3: SUPERVISOR PORTAL COMPLETE IMPLEMENTATION
 // ============================================================================
 
