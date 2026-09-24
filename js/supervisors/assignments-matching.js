@@ -955,13 +955,13 @@ window.switchAdminTab = function(tabKey) {
   // 2. Active button styling in clean sidebar
   document.querySelectorAll('.admin-tab-btn').forEach(b => {
     b.classList.remove('bg-slate-900', 'text-white', 'shadow-xs', 'font-bold');
-    b.classList.add('text-slate-600', 'hover:bg-slate-100', 'hover:text-slate-900', 'font-semibold', 'text-base');
+    b.classList.add('text-slate-600', 'hover:bg-slate-100', 'hover:text-slate-900', 'font-semibold');
   });
 
   const activeBtn = document.getElementById('atab-btn-' + tabKey);
   if (activeBtn) {
     activeBtn.classList.remove('text-slate-600', 'hover:bg-slate-100', 'hover:text-slate-900', 'font-medium');
-    activeBtn.classList.add('bg-slate-900', 'text-white', 'shadow-xs', 'font-bold', 'text-base');
+    activeBtn.classList.add('bg-slate-900', 'text-white', 'shadow-xs', 'font-bold');
   }
 
   // 3. Tab panels toggle

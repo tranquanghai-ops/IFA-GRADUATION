@@ -585,6 +585,9 @@ window.switchView = async function(targetView) {
         if (emptyCard) emptyCard.classList.add('hidden');
         if (state.selectedRoundId) checkStudentEligibilityAndRegistration(state.selectedRoundId);
         updateStudentJourneyStepper();
+        if (typeof renderStudentTimelineWeeks === 'function') {
+          setTimeout(() => renderStudentTimelineWeeks(), 50);
+        }
         updateStudentPersonalSidebar();
       }
     }

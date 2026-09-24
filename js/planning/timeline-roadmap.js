@@ -225,13 +225,13 @@ export function renderUnifiedActivityCard(act, round, options = {}) {
 
           <h3 class="text-sm sm:text-base font-black text-slate-900 tracking-tight">${escapeHtml(act.title)}</h3>
 
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 mt-1.5 font-medium">
-            <div class="flex items-center gap-1 font-mono text-[11px] text-slate-700">
-              <span>🕒</span> <span class="text-slate-500 font-sans font-normal">${act.isTentative ? 'Thời gian dự kiến:' : 'Thời gian chính thức:'}</span> ${timeStr}
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 mt-2 font-medium">
+            <div class="flex items-center gap-1.5 font-mono text-[11px] text-slate-700">
+              <span class="shrink-0">🕒</span> <span class="text-slate-500 font-sans font-normal whitespace-nowrap">${act.isTentative ? 'Dự kiến:' : 'Chính thức:'}</span> <span class="font-bold">${timeStr}</span>
             </div>
             ${!expanded && act.location ? `
-              <div class="flex items-center gap-1 text-[11px] text-slate-600">
-                <span>📍</span> ${escapeHtml(act.location)}
+              <div class="flex items-center gap-1.5 text-[11px] text-slate-600">
+                <span class="shrink-0">📍</span> <span>${escapeHtml(act.location)}</span>
               </div>
             ` : ''}
           </div>

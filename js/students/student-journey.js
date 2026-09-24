@@ -637,7 +637,18 @@ window.renderStudentTimelineWeeks = function() {
   const trackWrapper = track.parentElement;
   const gap = 12; // gap-3 = 12px
   const totalGaps = (visibleCount - 1) * gap;
-  const cardPxWidth = Math.floor((trackWrapper.offsetWidth - totalGaps) / visibleCount);
+  const rawWidth = trackWrapper?.offsetWidth || trackWrapper?.clientWidth || 0;
+  const fallbackWidth = (typeof window !== 'undefined' && window.innerWidth) ? Math.min(window.innerWidth - 64, 400) : 340;
+  const effectiveWrapperWidth = rawWidth > 120 ? rawWidth : fallbackWidth;
+  const cardPxWidth = Math.max(260, Math.floor((effectiveWrapperWidth - totalGaps) / visibleCount));
+
+  if (rawWidth <= 120 && typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      if (track.parentElement && track.parentElement.offsetWidth > 120) {
+        window.renderStudentTimelineWeeks?.();
+      }
+    });
+  }
 
   // ── Render cards into track ─────────────────────────────────────
   const stMap = {
@@ -778,4 +789,15 @@ window.renderStudentTimelineWeeks = function() {
 if (typeof window !== 'undefined') {
   window.renderSupervisorRoundTimeline = renderSupervisorRoundTimeline;
   window.renderSupervisorPlanList = renderSupervisorPlanList;
+
+  let _timelineResizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(_timelineResizeTimer);
+    _timelineResizeTimer = setTimeout(() => {
+      const sectionEl = document.getElementById('view-student');
+      if (sectionEl && !sectionEl.classList.contains('hidden') && typeof window.renderStudentTimelineWeeks === 'function') {
+        window.renderStudentTimelineWeeks();
+      }
+    }, 150);
+  });
 }

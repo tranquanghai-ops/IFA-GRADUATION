@@ -444,11 +444,11 @@ window.renderAdminRoundsCards = function() {
                 <span class="inline-flex items-center gap-1.5"><span>📌</span><strong class="text-slate-100">${phaseInfo}</strong></span>
                 <span class="inline-flex items-center gap-1.5"><span>📁</span><span class="${driveRootUrl ? 'text-emerald-300' : 'text-amber-300'}">${driveRootUrl ? `Drive đã kết nối · ${driveFoldersCount} thư mục con` : 'Chưa cấu hình Drive'}</span></span>
               </div>
-              <div class="flex flex-wrap items-center gap-2 shrink-0">
-                ${driveRootUrl ? `<a href="${escapeHtml(driveRootUrl)}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-sm"><span>↗</span><span>Thư mục Drive</span></a>` : ''}
-                <button type="button" onclick="editRoundModal('${r.id}')" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl transition">✏️ Sửa đợt</button>
-                <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-3 py-2 ${isClosed ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-amber-400 hover:bg-amber-300'} text-slate-950 font-black text-xs rounded-xl transition">${isClosed ? '↺ Mở lại' : 'Kết thúc đợt'}</button>
-                <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-bold text-xs rounded-xl transition">${isHidden ? '👁️ Hiện lại' : 'Lưu trữ'}</button>
+              <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto shrink-0 mt-3 xl:mt-0">
+                ${driveRootUrl ? `<a href="${escapeHtml(driveRootUrl)}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm text-center"><span>↗</span><span>Thư mục Drive</span></a>` : ''}
+                <button type="button" onclick="editRoundModal('${r.id}')" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl transition text-center">✏️ Sửa đợt</button>
+                <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-3 py-2 ${isClosed ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-amber-400 hover:bg-amber-300'} text-slate-950 font-black text-xs rounded-xl transition text-center">${isClosed ? '↺ Mở lại' : 'Kết thúc đợt'}</button>
+                <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-bold text-xs rounded-xl transition text-center">${isHidden ? '👁️ Hiện lại' : 'Lưu trữ'}</button>
               </div>
             </div>
           </header>
@@ -474,16 +474,15 @@ window.renderAdminRoundsCards = function() {
 
           ${renderAdminRoundTimelinePreview(r)}
 
-          <div class="px-4 py-3 bg-white flex flex-wrap items-center justify-center gap-2">
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'timeline')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-sm">📅 Kế hoạch (${actCount})</button>
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'eligible-students')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-sm">🎓 Sinh viên (${eligibleCount})</button>
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'registrations')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 transition shadow-sm">📝 Đăng ký (${regCount})</button>
-            ${directAssignment ? '' : `<button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 text-slate-800 transition shadow-sm">🎯 Xét nguyện vọng</button>`}
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review', 'assigned')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-purple-50 hover:border-purple-300 text-slate-800 transition shadow-sm">👥 ${directAssignment ? 'Phân công GVHD' : 'Kết quả phân công'}</button>
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'scoring-dashboard')" class="px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 text-slate-800 transition shadow-sm">📊 Quản lý điểm</button>
-            <span class="hidden sm:block w-px h-6 bg-slate-200 mx-1" aria-hidden="true"></span>
-            <div class="flex items-center justify-center gap-1 text-xs">
-              ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-2.5 py-1.5 text-blue-700 hover:bg-blue-50 rounded-lg font-bold transition">⭐ Đặt hiện hành</button>` : ''}
+          <div class="p-3 sm:p-4 bg-white flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'timeline')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-2xs">📅 Kế hoạch (${actCount})</button>
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'eligible-students')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-2xs">🎓 Sinh viên (${eligibleCount})</button>
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'registrations')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 transition shadow-2xs">📝 Đăng ký (${regCount})</button>
+            ${directAssignment ? '' : `<button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 text-slate-800 transition shadow-2xs">🎯 Xét nguyện vọng</button>`}
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review', 'assigned')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-purple-50 hover:border-purple-300 text-slate-800 transition shadow-2xs">👥 ${directAssignment ? 'Phân công GVHD' : 'Kết quả phân công'}</button>
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'scoring-dashboard')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 text-slate-800 transition shadow-2xs">📊 Quản lý điểm</button>
+            <div class="w-full sm:w-auto flex items-center justify-center gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t sm:border-t-0 sm:border-l border-slate-100 sm:border-slate-200 sm:pl-2 text-xs">
+              ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-2.5 py-1.5 text-blue-700 hover:bg-blue-50 rounded-lg font-bold transition">⭐ Hiện hành</button>` : ''}
               <button type="button" onclick="softDeleteRound('${r.id}')" class="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg font-semibold transition">🗑️ Thùng rác</button>
             </div>
           </div>
