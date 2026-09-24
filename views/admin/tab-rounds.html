@@ -1,0 +1,59 @@
+      <div id="atab-panel-rounds" class="hidden space-y-4">
+        <!-- COMPACT SINGLE TOOLBAR BAR (ALIGNED WITH OVERVIEW & SIDEBAR) -->
+        <div class="card-surface p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          
+          <!-- LEFT: Title + Badge + Filter Pills -->
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2 shrink-0 mr-1">
+              <span class="text-xl">🎓</span>
+              <h2 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight uppercase">Đợt tốt nghiệp</h2>
+              <span class="text-xs bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full font-bold border border-slate-200" id="admin-rounds-total-badge">0 đợt</span>
+            </div>
+
+            <!-- Filter pills -->
+            <div class="flex flex-wrap items-center gap-1.5" id="admin-rounds-filter-pills">
+              <button type="button" data-filter="all" onclick="filterAdminRounds('all')" class="round-filter-btn px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-slate-900 text-white shadow-xs transition-all">
+                Tất cả
+              </button>
+              <button type="button" data-filter="upcoming" onclick="filterAdminRounds('upcoming')" class="round-filter-btn px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">
+                Sắp mở
+              </button>
+              <button type="button" data-filter="running" onclick="filterAdminRounds('running')" class="round-filter-btn px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">
+                Đang diễn ra
+              </button>
+              <button type="button" data-filter="ended" onclick="filterAdminRounds('ended')" class="round-filter-btn px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">
+                Đã kết thúc
+              </button>
+              <button type="button" data-filter="hidden" onclick="filterAdminRounds('hidden')" class="round-filter-btn px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">
+                Đã ẩn
+              </button>
+            </div>
+          </div>
+
+          <!-- RIGHT: Search Box + Create Button -->
+          <div class="flex items-center gap-2.5">
+            <div class="relative flex-1 sm:w-64">
+              <input type="text" id="admin-rounds-search" oninput="searchAdminRounds(this.value)" placeholder="Tìm kiếm đợt..." class="w-full pl-8 pr-3 py-1.5 sm:py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <span class="absolute left-2.5 top-2 sm:top-2.5 text-slate-400 text-xs sm:text-sm">🔍</span>
+            </div>
+
+            <button type="button" onclick="openCreateRoundModal()" class="px-4 py-2 sm:py-2.5 bg-tdtu-blue hover:bg-tdtu-dark text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-1.5 shrink-0">
+              <span class="text-sm font-black">+</span>
+              <span>Tạo đợt tốt nghiệp</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- ROUNDS CARDS LIST (FULL WIDTH, 1 CARD PER ROW, 16px SPACING) -->
+        <div id="admin-rounds-cards" class="space-y-4">
+          <!-- Populated dynamically by renderAdminRoundsCards() -->
+        </div>
+
+        <!-- Hidden legacy table container kept for compatibility -->
+        <div class="hidden">
+          <table><tbody id="admin-rounds-tbody"></tbody></table>
+        </div>
+      </div>
+
+      <!-- ADMIN TAB: TIMELINE / KẾ HOẠCH ĐỢT TỐT NGHIỆP -->

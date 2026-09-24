@@ -21,7 +21,18 @@ IFA-GRADUATION/
 │   ├── student.html                # 🎓 Cổng Sinh viên (#view-student, Hero/Journey Cards, Stepper)
 │   ├── supervisor.html             # 👨‍🏫 Cổng Giảng viên HD (#view-supervisor, Duyệt nguyện vọng)
 │   ├── assessment.html             # 📝 Cổng Giảng viên Chấm thi (#view-assessment, Phiếu chấm)
-│   └── admin.html                  # ⚙️ Cổng Quản trị Viên (#view-admin, 7 Tabs quản lý)
+│   ├── admin.html                  # ⚙️ Cổng Quản trị Viên Master Layout
+│   └── admin/                      # 🗂️ Các Tab Quản trị Viên tách nhỏ
+│       ├── tab-overview.html       # 📊 Tab Tổng quan thống kê & chỉ số
+│       ├── tab-assignments.html    # 🎯 Tab Điều phối & Phân công GVHD
+│       ├── tab-rounds.html         # 🗓️ Tab Quản lý Danh sách Đợt
+│       ├── tab-timeline.html       # 📅 Tab Kế hoạch & Mốc tiến độ đợt
+│       ├── tab-supervisors.html    # 👨‍🏫 Tab Danh mục GVHD & GVHD đợt
+│       ├── tab-students.html       # 👥 Tab Danh sách SV khoa & SV đủ ĐK
+│       ├── tab-project-types.html  # 🏷️ Tab Danh mục Loại đề tài
+│       ├── tab-registrations.html  # 📋 Tab Đăng ký đề tài & Phiếu A4
+│       ├── tab-scoring.html        # 💯 Tab Quản lý Điểm & Hội đồng
+│       └── tab-settings.html       # ⚙️ Tab Cài đặt hệ thống & Thùng rác
 │
 ├── templates/                      # THÀNH PHẦN MODAL VÀ DIALOGS THEO NHÓM
 │   └── modals/
@@ -36,12 +47,12 @@ IFA-GRADUATION/
 │       ├── students/               # Modals Sinh viên & Hồ sơ
 │       │   ├── modal-add-eligible-student.html     # Modal Thêm/Import SV đủ điều kiện
 │       │   ├── modal-student-profile.html          # Modal Xem nhanh hồ sơ sinh viên
+│       │   ├── modal-student-edit-topic.html       # Modal Sửa tên đề tài SV
 │       │   └── modal-add-letter-option.html        # Modal Tùy chọn biểu mẫu
 │       │
 │       ├── supervisors/            # Modals Giảng viên Hướng dẫn & Phân công
 │       │   ├── modal-supervisor.html               # Modal Thêm/Sửa GVHD danh mục
 │       │   ├── modal-add-sup-to-round.html         # Modal Chọn GVHD tham gia đợt
-│       │   ├── modal-sup-bio.html                  # Modal Tiểu sử & Chân dung GVHD
 │       │   ├── modal-supervisor-confirm.html       # Modal Xác nhận duyệt nguyện vọng
 │       │   ├── modal-admin-inspect-sup.html        # Modal Soi chi tiết định mức GVHD
 │       │   ├── modal-admin-edit-supervisor.html    # Modal Sửa thông tin GVHD
@@ -67,49 +78,90 @@ IFA-GRADUATION/
 │       │
 │       └── shared/                 # Modals Dùng chung & Kiểm thử
 │           ├── modal-project-type.html             # Modal Quản lý Danh mục Loại đề tài
-│           ├── modal-teacher-profile.html          # Modal Xem hồ sơ giảng viên
+│           ├── modal-teacher-profile.html          # Modal Xem hồ sơ giảng viên (Shared SV/GVHD/Admin)
+│           ├── modal-topic-preview.html            # Modal Xem phiếu đăng ký đề tài A4 (Shared SV/GVHD)
 │           ├── modal-confirm.html                  # Modal Xác nhận cảnh báo hành động nguy hiểm
 │           ├── modal-activity-submissions.html     # Modal Danh sách nộp bài theo mốc
 │           ├── modal-submission-override.html      # Modal Ghi đè/Nộp bù bài cho sinh viên
 │           ├── modal-submission-history.html       # Modal Lịch sử các phiên bản nộp bài
 │           └── modal-admin-impersonate.html        # Modal Đóng vai Exact Act-As Test Mode
 │
-├── js/                             # CÁC MODULE JAVASCRIPT THEO NGHIỆP VỤ
+├── js/                             # CÁC MODULE JAVASCRIPT THEO NGHIỆP VỤ (< 1.000 dòng/file)
 │   ├── core.js                     # Khởi tạo Firebase, State toàn cục, Toast & Utilities
 │   ├── ui.js                       # Logic UI dùng chung, Theme, Format tiền tệ / ngày tháng
 │   ├── auth.js                     # Phân quyền, Router Cổng (Switch View), Session Listener
-│   ├── impersonation.js            # Chế độ đóng vai "Exact Act-As" cho kiểm thử thực tế
-│   ├── drive.js                    # Tự động hóa Google Drive API, Folder Tree & Nộp bài
-│   ├── planning.js                 # Kế hoạch 12 tuần, Mốc tiến độ, Ticker đếm ngược
+│   ├── impersonation.js            # Chế độ đóng vai "Exact Act-As" Master Bridge
+│   │   ├── impersonation-session.js   # Vòng đời phiên đóng vai & điều hướng
+│   │   ├── impersonation-settings.js  # Cấu hình hệ thống & realtime sync
+│   │   └── impersonation-modal.js    # Modal chọn nhân vật & tìm kiếm
+│   ├── drive.js                    # Tự động hóa Google Drive API Master Bridge
+│   │   ├── drive-provisioning.js      # Bridge tạo thư mục & upload
+│   │   │   ├── drive-provisioning-folders.js # Tạo cây thư mục Drive đợt
+│   │   │   ├── drive-rules-naming.js         # Mẫu tên file & quy tắc nộp
+│   │   │   └── drive-upload-panel.js         # Bộ nạp & bảng nộp bài SV
+│   │   └── drive-files.js             # Quản lý file & link download
+│   ├── planning.js                 # Kế hoạch 12 tuần, Mốc tiến độ Master Bridge
+│   │   ├── activities-manager.js      # Quản lý CRUD mốc kế hoạch & modal
+│   │   ├── submissions.js             # Quản lý nộp bài & override hạn nộp
+│   │   └── timeline-roadmap.js        # Thẻ lộ trình tuần & hoạt động
 │   │
 │   ├── rounds/                     # Subsystem Quản lý Đợt Tốt Nghiệp
-│   │   ├── rounds-dashboard.js     # Thẻ đợt Dashboard, Đặt đợt hiện hành, Soft-delete
-│   │   ├── rounds-config.js        # Cấu hình đợt 4 Tabs A-D, Save/Validate đợt
+│   │   ├── rounds-dashboard.js     # Master Bridge Dashboard
+│   │   │   ├── rounds-loader.js           # Nạp đợt, Header & Đếm ngược
+│   │   │   ├── rounds-timeline-preview.js # Lịch tuần & Preview sự kiện
+│   │   │   └── rounds-cards.js            # Thẻ đợt Admin & Workspace modal
+│   │   ├── rounds-config.js        # Master Bridge Cấu hình đợt
+│   │   │   ├── rounds-modal-timeline.js   # Soạn thảo tiến độ tuần đợt
+│   │   │   └── rounds-modal-form.js       # Form tạo/sửa đợt Tabs A-D
 │   │   └── project-types.js        # CRUD Loại đề tài (Nội thất nhà ở, Thương mại...)
 │   │
 │   ├── students/                   # Subsystem Quản lý Sinh viên & Đăng ký
 │   │   ├── students-master.js      # IFAA Student Master read-only resolver & cache
-│   │   ├── student-eligibility.js  # Danh sách SV đủ điều kiện đợt, Import/Export Excel
-│   │   ├── registration.js         # Quy trình nộp nguyện vọng, Stepper 3 bước, In PDF
-│   │   └── student-portal.js       # Giao diện Cổng SV, Hero Card, Journey Card 10 bước
+│   │   ├── student-eligibility.js  # Master Bridge SV đủ ĐK
+│   │   │   ├── student-eligibility-modal.js   # Chọn ứng viên vào đợt
+│   │   │   ├── student-eligibility-admin.js   # Bảng SV đủ ĐK & import Excel
+│   │   │   └── student-registrations-admin.js # Bảng đăng ký Admin
+│   │   ├── registration.js         # Quy trình nộp nguyện vọng, Stepper 3 bước
+│   │   └── student-portal.js       # Master Bridge Cổng SV
+│   │       ├── student-journey.js      # Stepper hành trình & thẻ tuần
+│   │       ├── student-topic-pdf.js    # Phiếu đăng ký đề tài & in PDF
+│   │       └── student-sidebar.js      # Sidebar cá nhân & hồ sơ
 │   │
 │   ├── supervisors/                # Subsystem Giảng viên Hướng dẫn & Phân công
-│   │   ├── supervisors-master.js   # Danh mục GVHD, Quản lý ảnh chân dung, Bio modal
+│   │   ├── supervisors-master.js   # Danh mục GVHD, Quản lý ảnh chân dung
 │   │   ├── supervisor-quotas.js    # Cấu hình Tab C, Tính toán hạn mức & chỉ tiêu động
-│   │   ├── assignments.js          # Ma trận phân công GVHD 1, GVHD 2, Draft & Publish
-│   │   └── supervisor-portal.js    # Cổng GVHD (#view-supervisor), Duyệt đề tài SV
+│   │   ├── assignments.js          # Master Bridge Phân công
+│   │   │   ├── assignments-matching.js # Duyệt nguyện vọng NV1-NV3
+│   │   │   ├── assignments-admin.js    # Phân công thủ công Admin & GVHD 2
+│   │   │   └── assignments-excel.js    # Import/Export Excel phân công
+│   │   └── supervisor-portal.js    # Master Bridge Cổng GVHD
+│   │       ├── supervisor-portal-core.js     # Khởi tạo cổng & chọn đợt
+│   │       ├── supervisor-portal-students.js # Danh sách SV & modal chi tiết
+│   │       └── supervisor-portal-topics.js   # Duyệt đề tài SV & xem trước
 │   │
 │   └── grading/                    # Subsystem Hội đồng & Chấm thi ĐATN
-│       ├── councils.js             # Thành lập Hội đồng, Cơ cấu Slot, Phân công SV
-│       ├── rubrics.js              # Cấu hình Tiêu chí Rubric, Trọng số & Biểu mẫu
-│       ├── preliminary-scores.js   # Điểm Sơ khảo, Điểm GVHD, Điểm TM HD/PB, Dashboard
+│       ├── councils.js             # Master Bridge Hội đồng
+│       │   ├── councils-milestone.js   # Tạo nhanh HĐ từ mốc
+│       │   ├── councils-workspace.js   # Workspace HĐ & chia phòng
+│       │   └── councils-editor.js      # CRUD Hội đồng & slot khách
+│       ├── rubrics.js              # Master Bridge Rubric
+│       │   ├── rubrics-config.js       # Cấu hình tiêu chí Rubric
+│       │   ├── rubrics-workspace.js    # Không gian chấm trực tiếp
+│       │   └── rubrics-scoring.js      # Bảng điểm & giám sát Admin
+│       ├── preliminary-scores.js   # Master Bridge Điểm Sơ khảo / GVHD / TM
+│       │   ├── preliminary-entry.js     # Nhập điểm GVHD / TM / PB
+│       │   ├── preliminary-dashboard.js # Bảng điểm sơ khảo Admin
+│       │   └── preliminary-config.js    # Cấu hình tiêu chí & phân công PB
 │       ├── defense-scores.js       # Phiếu chấm bảo vệ trực tiếp, Hiệu chỉnh điểm
-│       ├── final-scores.js         # Công thức tính điểm tổng kết, Xếp hạng & Xuất Excel
+│       ├── final-scores.js         # Master Bridge Điểm tổng kết
+│       │   ├── final-scores-ranking.js      # Trọng số, Xếp hạng & Kết quả SV
+│       │   ├── final-scores-export.js       # Xuất Excel tổng kết & HĐ
+│       │   └── final-scores-transactions.js # Transaction ghi điểm an toàn
 │       └── assessment-portal.js    # Cổng Giảng viên Chấm thi (#view-assessment)
 │
 └── scripts/                        # SCRIPTS BIÊN DỊCH VÀ KIỂM TRA
     ├── build-html.cjs              # Trình biên dịch index.template.html -> index.html
-    └── ...                         # Scripts hỗ trợ migration và testing
+    └── ...                         # Scripts hỗ trợ testing và kiểm thử
 ```
 
 ---

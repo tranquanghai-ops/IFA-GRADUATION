@@ -1,0 +1,131 @@
+      <div id="atab-panel-review" class="hidden space-y-6">
+        <!-- BREADCRUMB TO ROUNDS -->
+        <div id="round-breadcrumb-review" class="round-breadcrumb-container mb-4"></div>
+
+        <!-- Round Selector & Status Banner -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl">
+          <div class="flex items-center gap-2">
+            <label for="admin-review-round-select" class="text-xs font-bold text-slate-700">Đợt xét duyệt:</label>
+            <select id="admin-review-round-select" onchange="loadAdminReviewData(this.value)" class="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none">
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-500">Trạng thái xét:</span>
+            <span id="admin-review-status-pill" class="badge bg-indigo-100 text-indigo-900 font-black">Chưa bắt đầu</span>
+          </div>
+        </div>
+
+        <!-- Review Workflow Control Dashboard -->
+        <div class="card-surface p-6 bg-gradient-to-br from-slate-900 via-tdtu-dark to-slate-900 text-white rounded-2xl shadow-xl space-y-6">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/10 pb-4">
+            <div>
+              <span id="admin-review-workflow-kicker" class="text-xs font-bold uppercase text-amber-400 tracking-wider">BẢNG ĐIỀU KHIỂN QUY TRÌNH XÉT DUYỆT</span>
+              <h2 id="admin-review-current-title" class="text-xl sm:text-2xl font-black text-white mt-1">Đang tải tiến trình...</h2>
+              <p id="admin-review-current-desc" class="text-xs text-slate-300 mt-1">Quản lý đóng/mở vòng, theo dõi tiến độ của GVHD và chuyển vòng xét.</p>
+            </div>
+
+            <!-- Action Trigger Buttons -->
+            <div id="admin-review-actions-wrap" class="flex flex-wrap items-center gap-2">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Review Progress Stats Grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center text-xs">
+            <div class="bg-white/10 p-3.5 rounded-xl border border-white/10">
+              <span class="text-slate-400 block font-semibold">Tổng đăng ký</span>
+              <span id="adm-stat-total-reg" class="text-xl font-black text-white">0</span>
+            </div>
+            <div class="bg-white/10 p-3.5 rounded-xl border border-white/10">
+              <span class="text-slate-400 block font-semibold">Đã trúng tuyển</span>
+              <span id="adm-stat-accepted" class="text-xl font-black text-emerald-400">0</span>
+            </div>
+            <div class="bg-white/10 p-3.5 rounded-xl border border-white/10">
+              <span class="text-slate-400 block font-semibold">Chưa có GVHD</span>
+              <span id="adm-stat-unassigned" class="text-xl font-black text-amber-400">0</span>
+            </div>
+            <div class="bg-white/10 p-3.5 rounded-xl border border-white/10">
+              <span class="text-slate-400 block font-semibold">Tổng Quota đợt</span>
+              <span id="adm-stat-total-quota" class="text-xl font-black text-blue-300">0</span>
+            </div>
+            <div class="bg-white/10 p-3.5 rounded-xl border border-white/10">
+              <span class="text-slate-400 block font-semibold">Tỷ lệ lấp đầy</span>
+              <span id="adm-stat-fill-rate" class="text-xl font-black text-purple-300">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Supervisors Round Review Table -->
+        <div id="admin-review-supervisors-section" class="card-surface overflow-hidden">
+          <div class="p-4 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-sm text-slate-900">Tiến độ Xét duyệt của Giảng viên Hướng dẫn</h3>
+              <p class="text-xs text-slate-500 mt-0.5">Theo dõi số lượng ứng viên, số lượng chọn và trạng thái hoàn tất của từng GVHD.</p>
+            </div>
+            <span id="adm-sup-progress-ratio" class="badge bg-blue-100 text-blue-900 font-bold">0 / 0 GV hoàn tất</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b">
+                <tr>
+                  <th class="p-3.5">GVHD</th>
+                  <th class="p-3.5">Bộ môn</th>
+                  <th class="p-3.5 text-center">Chỉ tiêu</th>
+                  <th class="p-3.5 text-center">Đã nhận trước</th>
+                  <th class="p-3.5 text-center">Ứng viên vòng này</th>
+                  <th class="p-3.5 text-center">Đang chọn</th>
+                  <th class="p-3.5 text-center">Chỉ tiêu còn lại</th>
+                  <th class="p-3.5 text-center">Trạng thái GV</th>
+                  <th class="p-3.5 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="admin-review-supervisors-tbody" class="divide-y divide-slate-100">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Official Supervisors & Support Supervisors Management Section -->
+        <div id="admin-official-supervisors-section" class="card-surface overflow-hidden space-y-4 p-5 bg-white border border-slate-200">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="font-bold text-sm text-slate-900">👥 Danh sách phân công Giảng viên hướng dẫn</h3>
+                <span id="adm-accepted-count-tag" class="badge bg-emerald-100 text-emerald-800 font-black">0 SV</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">Hiển thị toàn bộ sinh viên đủ điều kiện. Bấm trực tiếp vào cột GVHD 1 hoặc GVHD 2 để phân công và chỉnh sửa.</p>
+              <p id="adm-assignment-status-msg" class="text-xs font-semibold mt-1 text-slate-600">--</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="exportSupervisorAssignmentsExcel()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-sm">📥 Tải danh sách Excel</button>
+              <button type="button" onclick="document.getElementById('supervisor-assignment-excel-input').click()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-sm">📤 Upload Excel phân công</button>
+              <input type="file" id="supervisor-assignment-excel-input" accept=".xlsx,.xls" onchange="handleSupervisorAssignmentExcel(event)" class="hidden">
+              <input type="text" id="admin-assigned-search" oninput="filterAdminAssignedTable(this.value)" placeholder="Tìm MSSV, họ tên, GVHD..." class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-60">
+            </div>
+          </div>
+
+          <div class="overflow-x-auto bg-white rounded-xl border border-slate-100">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
+                <tr>
+                  <th class="p-3.5 w-10">STT</th>
+                  <th class="p-3.5 w-24">MSSV</th>
+                  <th class="p-3.5">Họ và tên</th>
+                  <th class="p-3.5">Tên đề tài & Ngành</th>
+                  <th class="p-3.5">Trạng thái đăng ký</th>
+                  <th class="p-3.5">GVHD 1</th>
+                  <th class="p-3.5">GVHD 2</th>
+                </tr>
+              </thead>
+              <tbody id="admin-assigned-supervisors-tbody" class="divide-y divide-slate-100">
+                <tr><td colspan="7" class="p-8 text-center text-slate-400">Chưa có sinh viên đủ điều kiện trong đợt.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ADMIN TAB: ROUNDS MANAGEMENT -->

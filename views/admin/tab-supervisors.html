@@ -1,0 +1,70 @@
+      <div id="atab-panel-supervisors-master" class="hidden space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Danh sách Giảng viên Hướng dẫn</h2>
+            <p class="text-xs text-slate-500">Dữ liệu GVHD dùng chung qua các đợt. Quota sẽ được gán riêng theo từng đợt.</p>
+          </div>
+          <button onclick="openCreateSupervisorModal()" class="px-4 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto">
+            + Thêm GVHD mới
+          </button>
+        </div>
+
+        <div class="card-surface overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b">
+                <tr>
+                  <th class="p-3.5">Ảnh</th>
+                  <th class="p-3.5">Họ và tên</th>
+                  <th class="p-3.5">Giới tính</th>
+                  <th class="p-3.5">Email / SĐT</th>
+                  <th class="p-3.5">Bộ môn</th>
+                  <th class="p-3.5 text-center whitespace-nowrap">Loại GV</th>
+                  <th class="p-3.5">Chuyên môn</th>
+                  <th class="p-3.5 text-center whitespace-nowrap">Tối đa</th>
+                  <th class="p-3.5">Trạng thái</th>
+                  <th class="p-3.5 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="admin-supervisors-master-tbody" class="divide-y divide-slate-100">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN TAB: ROUND SUPERVISORS -->
+      <div id="atab-panel-round-supervisors" class="hidden space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl">
+          <div class="flex items-center gap-2">
+            <label for="admin-round-sup-select" class="text-xs font-bold text-slate-700">Chọn đợt cấu hình:</label>
+            <select id="admin-round-sup-select" onchange="loadAdminRoundSupervisors(this.value)" class="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none">
+            </select>
+          </div>
+
+          <button onclick="openAddSupervisorsToRoundModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto">
+            + Thêm GVHD từ kho Master
+          </button>
+        </div>
+
+        <div class="card-surface overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b">
+                <tr>
+                  <th class="p-3.5">GVHD</th>
+                  <th class="p-3.5">Bộ môn</th>
+                  <th class="p-3.5">Chỉ tiêu (Quota) đợt này</th>
+                  <th class="p-3.5">Hoạt động trong đợt</th>
+                  <th class="p-3.5 text-right">Lưu / Xóa khỏi đợt</th>
+                </tr>
+              </thead>
+              <tbody id="admin-round-supervisors-tbody" class="divide-y divide-slate-100">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      
+      <!-- ADMIN TAB: FACULTY STUDENTS (DANH SÁCH SV KHOA - DỮ LIỆU NỀN) -->

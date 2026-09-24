@@ -1,0 +1,51 @@
+      <div id="atab-panel-timeline" class="hidden space-y-5">
+        <!-- BREADCRUMB TO ROUNDS -->
+        <div id="round-breadcrumb-timeline" class="round-breadcrumb-container mb-4"></div>
+        <!-- TOP CONTROL BAR -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2">
+              <label for="admin-timeline-round-select" class="text-xs font-bold text-slate-700 whitespace-nowrap">Đợt tốt nghiệp:</label>
+              <select id="admin-timeline-round-select" onchange="loadAdminRoundActivities(this.value)" class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              </select>
+            </div>
+            <span id="admin-timeline-stats-badge" class="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold">
+              0 mốc kế hoạch
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="openCopyFromRoundModal()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition-all flex items-center gap-1.5 shadow-sm" title="Sao chép toàn bộ hoặc một số mốc từ đợt tốt nghiệp khác">
+              <span>📋 Sao chép từ Đợt khác</span>
+            </button>
+            <button type="button" id="btn-create-activity" onclick="openCreateActivityModal()" class="px-4 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
+              <span>+ Thêm mốc mới</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- TIMELINE ACTIVITIES TABLE IN ADMIN -->
+        <div class="card-surface overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 text-slate-500 font-extrabold uppercase border-b border-slate-200 text-[10px] tracking-wider">
+                <tr>
+                  <th class="px-2 py-3 text-center w-10">#</th>
+                  <th class="px-2 py-3">Mốc kế hoạch</th>
+                  <th class="px-2 py-3 whitespace-nowrap">Thời gian</th>
+                  <th class="px-2 py-3">Địa điểm</th>
+                  <th class="px-2 py-3 text-center whitespace-nowrap w-24">Trạng thái</th>
+                  <th class="px-2 py-3 text-center whitespace-nowrap w-16">Hiển thị</th>
+                  <th class="px-2 py-3 text-center whitespace-nowrap w-16">Nộp bài</th>
+                  <th class="px-2 py-3 text-right whitespace-nowrap w-36 pr-3">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="admin-timeline-activities-tbody" class="divide-y divide-slate-100">
+                <tr><td colspan="8" class="p-8 text-center text-slate-400">Đang tải kế hoạch...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN TAB: SUPERVISORS MASTER -->

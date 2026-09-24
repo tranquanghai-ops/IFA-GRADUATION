@@ -1,0 +1,30 @@
+      <div id="atab-panel-project-types" class="hidden space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Danh mục Loại hình Đồ án Tốt nghiệp</h2>
+            <p class="text-xs text-slate-500">Các loại hình đồ án hiển thị cho sinh viên lựa chọn khi đăng ký.</p>
+          </div>
+          <button onclick="openAddProjectTypeModal()" class="px-4 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-xl shadow-sm transition-all">
+            + Thêm loại hình
+          </button>
+        </div>
+
+        <div class="card-surface overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b">
+                <tr>
+                  <th class="p-3.5">Thứ tự</th>
+                  <th class="p-3.5">Tên loại hình</th>
+                  <th class="p-3.5">Trạng thái</th>
+                  <th class="p-3.5 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="admin-project-types-tbody" class="divide-y divide-slate-100">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN TAB: REGISTRATIONS -->
