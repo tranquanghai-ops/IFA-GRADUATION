@@ -347,28 +347,15 @@ service cloud.firestore {
       allow create, update: if admin() || (student()
         && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
         && request.resource.data.studentId == studentId
-        && request.resource.data.email == email()
-        && request.resource.data.currentClass is string
-        && request.resource.data.currentClass.size() > 0
-        && request.resource.data.currentClass.size() <= 50
-        && request.resource.data.personalEmail is string
-        && request.resource.data.personalEmail.size() > 3
-        && request.resource.data.personalEmail.size() <= 120
-        && request.resource.data.phone is string
-        && request.resource.data.phone.size() > 0
-        && request.resource.data.phone.size() <= 20
-        && request.resource.data.permanentAddress is string
-        && request.resource.data.permanentAddress.size() > 0
-        && request.resource.data.permanentAddress.size() <= 250
-        && request.resource.data.temporaryAddress is string
-        && request.resource.data.temporaryAddress.size() > 0
-        && request.resource.data.temporaryAddress.size() <= 250
-        && request.resource.data.address is string
-        && request.resource.data.address.size() > 0
-        && request.resource.data.address.size() <= 250
-        && request.resource.data.updatedAt is timestamp
-        && request.resource.data.updatedBy is string
-        && request.resource.data.updatedBy == email()
+        && request.resource.data.email.lower() == email().lower()
+        && (!request.resource.data.keys().hasAll(['currentClass']) || (request.resource.data.currentClass is string && request.resource.data.currentClass.size() <= 50))
+        && (!request.resource.data.keys().hasAll(['personalEmail']) || (request.resource.data.personalEmail is string && request.resource.data.personalEmail.size() <= 120))
+        && (!request.resource.data.keys().hasAll(['phone']) || (request.resource.data.phone is string && request.resource.data.phone.size() <= 30))
+        && (!request.resource.data.keys().hasAll(['permanentAddress']) || (request.resource.data.permanentAddress is string && request.resource.data.permanentAddress.size() <= 250))
+        && (!request.resource.data.keys().hasAll(['temporaryAddress']) || (request.resource.data.temporaryAddress is string && request.resource.data.temporaryAddress.size() <= 250))
+        && (!request.resource.data.keys().hasAll(['address']) || (request.resource.data.address is string && request.resource.data.address.size() <= 250))
+        && (!request.resource.data.keys().hasAll(['updatedAt']) || request.resource.data.updatedAt is timestamp)
+        && (!request.resource.data.keys().hasAll(['updatedBy']) || (request.resource.data.updatedBy is string && request.resource.data.updatedBy.lower() == email().lower()))
         && request.resource.data.keys().hasOnly([
           'studentId', 'email', 'currentClass', 'personalEmail', 'phone',
           'permanentAddress', 'temporaryAddress', 'address', 'updatedAt', 'updatedBy'
@@ -457,17 +444,17 @@ service cloud.firestore {
           || (student()
             && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
           && request.resource.data.studentId == studentId
-          && request.resource.data.email == email()
+          && request.resource.data.email.lower() == email().lower()
           && request.resource.data.status == 'submitted'
           && request.resource.data.topicTitle is string
           && request.resource.data.topicTitle.size() > 0
           && request.resource.data.topicTitle.size() <= 250
           && request.resource.data.projectType is string
-          && (!request.resource.data.keys().hasAll(['topicApprovalStatus']) || request.resource.data.topicApprovalStatus == 'pending')
+          && (!request.resource.data.keys().hasAll(['topicApprovalStatus']) || request.resource.data.topicApprovalStatus in ['pending', 'approved', 'rejected'])
           && (!request.resource.data.keys().hasAll(['projectTypes']) || (request.resource.data.projectTypes is list && request.resource.data.projectTypes.size() >= 1 && request.resource.data.projectTypes.size() <= 3))
           && (!request.resource.data.keys().hasAll(['currentClass']) || (request.resource.data.currentClass is string && request.resource.data.currentClass.size() <= 50))
           && (!request.resource.data.keys().hasAll(['personalEmail']) || (request.resource.data.personalEmail is string && request.resource.data.personalEmail.size() <= 120))
-          && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 20))
+          && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 30))
           && (!request.resource.data.keys().hasAll(['studentPermanentAddress']) || (request.resource.data.studentPermanentAddress is string && request.resource.data.studentPermanentAddress.size() <= 250))
           && (!request.resource.data.keys().hasAll(['studentTemporaryAddress']) || (request.resource.data.studentTemporaryAddress is string && request.resource.data.studentTemporaryAddress.size() <= 250))
           && (!request.resource.data.keys().hasAll(['studentAddress']) || (request.resource.data.studentAddress is string && request.resource.data.studentAddress.size() <= 250))
@@ -481,7 +468,6 @@ service cloud.firestore {
               && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.supervisorAssignmentMode == 'direct_assignment')
             || (exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId))
               && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.assignmentStatus == 'published'))
-          && !request.resource.data.keys().hasAny(['acceptedSupervisorId', 'acceptedSupervisorName', 'officialSupervisors', 'assignmentStatus'])
           && (
             (exists(/databases/$(database)/documents/graduationRounds/$(roundId)/eligibleStudents/$(studentId))
              && get(/databases/$(database)/documents/graduationRounds/$(roundId)/eligibleStudents/$(studentId)).data.eligible == true)
@@ -490,7 +476,8 @@ service cloud.firestore {
              && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['eligibilityFinalized'])
                  || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.eligibilityFinalized == false))
           )
-          && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status == 'open'
+          && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized']
+              || !get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status']))
           && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['openAt']) 
               || request.time >= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.openAt)
           && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt']) 
@@ -517,10 +504,10 @@ service cloud.firestore {
             && request.resource.data.topicTitle == resource.data.topicTitle
             && request.resource.data.studentId == resource.data.studentId)
           || (student()
-            && email().matches('^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
-            && resource.data.email == email()
+            && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
+            && resource.data.email.lower() == email().lower()
             && request.resource.data.studentId == studentId
-            && request.resource.data.email == email()
+            && request.resource.data.email.lower() == email().lower()
             && request.resource.data.status == resource.data.status
             && (!resource.data.keys().hasAll(['eligibilityStatus']) || request.resource.data.eligibilityStatus == resource.data.eligibilityStatus)
             && request.resource.data.topicTitle is string
@@ -530,7 +517,7 @@ service cloud.firestore {
             && (!request.resource.data.keys().hasAll(['projectTypes']) || (request.resource.data.projectTypes is list && request.resource.data.projectTypes.size() >= 1 && request.resource.data.projectTypes.size() <= 3))
             && (!request.resource.data.keys().hasAll(['currentClass']) || (request.resource.data.currentClass is string && request.resource.data.currentClass.size() <= 50))
             && (!request.resource.data.keys().hasAll(['personalEmail']) || (request.resource.data.personalEmail is string && request.resource.data.personalEmail.size() <= 120))
-            && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 20))
+            && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 30))
             && (!request.resource.data.keys().hasAll(['studentPermanentAddress']) || (request.resource.data.studentPermanentAddress is string && request.resource.data.studentPermanentAddress.size() <= 250))
             && (!request.resource.data.keys().hasAll(['studentTemporaryAddress']) || (request.resource.data.studentTemporaryAddress is string && request.resource.data.studentTemporaryAddress.size() <= 250))
             && (!request.resource.data.keys().hasAll(['studentAddress']) || (request.resource.data.studentAddress is string && request.resource.data.studentAddress.size() <= 250))
@@ -550,8 +537,8 @@ service cloud.firestore {
             && (request.resource.data.preferences.size() > 0
               || (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['supervisorAssignmentMode'])
                 && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.supervisorAssignmentMode == 'direct_assignment'))
-            && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status == 'open'
-            && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.allowStudentEdit == true
+            && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized']
+                || !get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status']))
             && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt']) 
                 || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt));
 

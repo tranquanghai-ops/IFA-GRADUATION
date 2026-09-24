@@ -2921,7 +2921,7 @@ window.submitRegistration = async function() {
       ? window.resolveStudentName(mssv, actor?.displayName || state.user?.displayName || '')
       : (actor?.displayName || state.user?.displayName || mssv);
     const studentName = resolvedName || mssv;
-    const studentEmail = actor?.email || state.user?.email || `${mssv}@student.tdtu.edu.vn`;
+    const studentEmail = String(actor?.email || state.user?.email || `${mssv}@student.tdtu.edu.vn`).toLowerCase().trim();
 
     const previous = state.myRegistration || null;
     const titleChanged = !previous || String(previous.topicTitle || '').trim() !== topicTitle;
@@ -2963,13 +2963,6 @@ window.submitRegistration = async function() {
       reviewStatus: directAssignment && primaryPublishedSupervisor ? 'manually_assigned' : (directAssignment ? 'direct_assignment_pending' : 'waiting'),
       eligibilityStatus: eligibilityStatus
     };
-    if (primaryPublishedSupervisor) {
-      payload.assignmentStatus = 'published';
-      payload.officialSupervisors = publishedSupervisors;
-      payload.acceptedSupervisorId = primaryPublishedSupervisor.supervisorId || '';
-      payload.acceptedSupervisorName = primaryPublishedSupervisor.supervisorName || '';
-      payload.acceptedRank = 'manual';
-    }
 
     await setDoc(doc(db, 'graduationStudentProfiles', mssv), {
       studentId: mssv,
