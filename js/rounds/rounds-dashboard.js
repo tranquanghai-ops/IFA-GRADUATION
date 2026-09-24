@@ -970,6 +970,9 @@ window.openStudentTimelineDay = function(weekNumber, dateKey, roundId = null) {
 };
 
 function renderAdminRoundTimelinePreview(round) {
+  if (typeof renderUnifiedRoundTimeline === 'function') {
+    return renderUnifiedRoundTimeline(round, { role: 'admin', isAdmin: true });
+  }
   const weeks = getRoundTimelineWeeksWithActivities(round, false);
   rememberRoundTimelineEvents(round.id, weeks);
   const visibleWeeks = weeks.filter(week => week.visible).length;

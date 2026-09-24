@@ -1934,6 +1934,173 @@ window.loadStudentRoundActivities = async function(roundId) {
   }
 };
 
+// ============================================================================
+// UNIFIED TIMELINE & PLAN RENDERING (ADMIN / SUPERVISOR / STUDENT SHARED)
+// ============================================================================
+
+export function renderUnifiedTimelineWeekCard(week, round, options = {}) {
+  const role = options.role || (state.currentRole || 'student');
+  const isAdmin = role === 'admin' || Boolean(options.isAdmin);
+  const canEdit = options.canEdit !== undefined ? options.canEdit : isAdmin;
+  const canToggleVisibility = options.canToggleVisibility !== undefined ? options.canToggleVisibility : isAdmin;
+  const roundId = round?.id || state.selectedRoundId || '';
+
+  const statusStyles = {
+    completed: { card: 'bg-emerald-50 border-emerald-300', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300', label: 'Đã qua', icon: '✓', icon_bg: 'bg-emerald-600 text-white' },
+    ongoing: { card: 'bg-blue-50 border-blue-400 ring-2 ring-blue-200', badge: 'bg-blue-600 text-white border-blue-600', label: 'Đang diễn ra', icon: '●', icon_bg: 'bg-blue-600 text-white' },
+    upcoming: { card: 'bg-slate-50 border-slate-200', badge: 'bg-white text-slate-500 border-slate-200', label: 'Chưa tới', icon: null, icon_bg: 'bg-slate-200 text-slate-600' }
+  };
+
+  const style = statusStyles[week.status] || statusStyles.upcoming;
+  const resolvedTitle = (typeof resolveRoundWeekTitle === 'function')
+    ? resolveRoundWeekTitle(week.week, week.title)
+    : (week.title || `Tuần ${week.week}`);
+
+  const circleContent = style.icon || (week.week > 12 ? (week.week === 13 ? '📄' : week.week === 14 ? '🎓' : '📌') : week.week);
+  const onClickAttr = canEdit
+    ? ` role="button" tabindex="0" onclick="openRoundWeekEditor('${roundId}', ${week.week})" class="ifa-timeline-card relative min-w-[290px] rounded-2xl border p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}"`
+    : ` class="ifa-timeline-card relative min-w-[290px] rounded-2xl border p-3 flex flex-col items-center text-center transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}"`;
+
+  const visibilityButton = canToggleVisibility
+    ? `<button type="button" onclick="toggleRoundTimelineWeekVisibility('${roundId}', ${week.week}, event)" class="px-1.5 py-0.5 rounded-md bg-white hover:bg-slate-100 border border-slate-200 text-[9px] font-bold shadow-xs transition cursor-pointer ${week.visible ? 'text-slate-600 hover:text-slate-900' : 'text-blue-700 hover:text-blue-900'}">${week.visible ? 'Ẩn' : 'Hiện'}</button>`
+    : '';
+
+  const daysHtml = (typeof renderTimelineWeekDays === 'function')
+    ? renderTimelineWeekDays(week.days, week.events, week.week, roundId)
+    : '';
+
+  const eventsHtml = (typeof renderTimelineWeekEvents === 'function')
+    ? renderTimelineWeekEvents(week.events, week.week, roundId)
+    : '';
+
+  return `
+    <div${onClickAttr}>
+      <div class="flex items-center justify-between gap-1 w-full mb-1">
+        <span class="font-black text-xs text-slate-900 whitespace-nowrap">${escapeHtml(resolvedTitle)}</span>
+        ${week.milestone ? `<span class="px-1.5 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px] leading-tight text-center truncate max-w-[100px]" title="${escapeHtml(week.milestone)}">🚩 ${escapeHtml(week.milestone)}</span>` : ''}
+        <div class="flex items-center gap-1 shrink-0">
+          <span class="px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${week.visible ? style.badge : 'bg-slate-200 text-slate-600 border-slate-300'}">${week.visible ? style.label : 'Đang ẩn'}</span>
+          ${visibilityButton}
+        </div>
+      </div>
+      <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black my-1 ${style.icon_bg}">${circleContent}</span>
+      <span class="font-mono font-bold text-[11px] text-slate-700">${week.dateText || ''}</span>
+      ${daysHtml}
+      ${eventsHtml}
+      ${week.note ? `<span class="text-[9px] text-slate-500 mt-1 line-clamp-1">${escapeHtml(week.note)}</span>` : ''}
+    </div>`;
+}
+
+export function renderUnifiedRoundTimeline(round, options = {}) {
+  if (!round) return '';
+  const role = options.role || (state.currentRole || 'student');
+  const isAdmin = role === 'admin' || Boolean(options.isAdmin);
+
+  const allWeeks = (typeof getRoundTimelineWeeksWithActivities === 'function')
+    ? getRoundTimelineWeeksWithActivities(round, !isAdmin)
+    : [];
+
+  if (typeof rememberRoundTimelineEvents === 'function') {
+    rememberRoundTimelineEvents(round.id, allWeeks);
+  }
+
+  const weeks = isAdmin ? allWeeks : allWeeks.filter(w => w.visible);
+  if (!weeks.length && !isAdmin) return '';
+
+  const visibleWeeks = allWeeks.filter(w => w.visible).length;
+  const hiddenWeeks = allWeeks.length - visibleWeeks;
+  const current = allWeeks.find(week => week.status === 'ongoing');
+  const completed = allWeeks.filter(week => week.status === 'completed').length;
+  const currentTitle = current && typeof resolveRoundWeekTitle === 'function' ? resolveRoundWeekTitle(current.week, current.title) : null;
+
+  const introCards = [
+    { icon: '📝', title: 'Đăng ký đề tài', subtitle: 'Đề tài ĐATN' },
+    { icon: '👨‍🏫', title: 'Phân công GVHD', subtitle: (typeof isDirectSupervisorAssignment === 'function' && isDirectSupervisorAssignment(round)) ? 'Khoa phân công' : 'Xét nguyện vọng' }
+  ].map(card => {
+    const editClick = isAdmin ? ` role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}')" class="ifa-timeline-card min-w-[215px] rounded-2xl border border-slate-200 bg-white p-3 flex flex-col items-center justify-center text-center hover:border-blue-400 hover:shadow-md cursor-pointer transition"` : ` class="ifa-timeline-card min-w-[215px] rounded-2xl border border-slate-200 bg-slate-50 p-3 flex flex-col items-center justify-center text-center"`;
+    return `
+      <div${editClick}>
+        <span class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-lg mb-2">${card.icon}</span>
+        <span class="font-black text-xs text-slate-900">${card.title}</span>
+        <span class="text-[10px] text-slate-500 mt-1">${card.subtitle}</span>
+      </div>`;
+  }).join('');
+
+  const weekCards = weeks.map(week => renderUnifiedTimelineWeekCard(week, round, {
+    role,
+    isAdmin,
+    canEdit: isAdmin,
+    canToggleVisibility: isAdmin
+  })).join('');
+
+  const hasCustomSokhao = allWeeks.some(w => w.week >= 13 && typeof resolveRoundWeekTitle === 'function' && resolveRoundWeekTitle(w.week, w.title).toLowerCase().includes('sơ khảo')) || allWeeks.length >= 13;
+  const hasCustomBaove = allWeeks.some(w => w.week >= 14 && typeof resolveRoundWeekTitle === 'function' && resolveRoundWeekTitle(w.week, w.title).toLowerCase().includes('bảo vệ')) || allWeeks.length >= 14;
+  const hasCustomKetqua = allWeeks.some(w => w.week >= 15 && typeof resolveRoundWeekTitle === 'function' && resolveRoundWeekTitle(w.week, w.title).toLowerCase().includes('kết quả')) || allWeeks.length >= 15;
+
+  const stageCard = (icon, title, note) => `<div class="ifa-timeline-card min-w-[215px] rounded-2xl border border-slate-200 bg-slate-50 p-3 flex flex-col items-center justify-center text-center"><span class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-lg mb-2">${icon}</span><span class="font-black text-xs text-slate-900">${title}</span><span class="text-[10px] text-slate-500 mt-1">${note}</span></div>`;
+
+  const outroCards = (!isAdmin) ? `${!hasCustomSokhao ? stageCard('📄', 'Nộp Sơ khảo', 'Sau giai đoạn thực hiện') : ''}${!hasCustomBaove ? stageCard('🎓', 'Bảo vệ Tốt nghiệp', 'Theo lịch của Khoa') : ''}${!hasCustomKetqua ? stageCard('🏆', 'Kết quả', 'Sau bảo vệ tốt nghiệp') : ''}` : '';
+
+  const headerRight = isAdmin
+    ? `<div class="flex items-center gap-2">
+        <button type="button" onclick="openRoundWeekEditor('${round.id}')" class="px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] transition cursor-pointer">＋ Thêm / sửa mốc</button>
+      </div>`
+    : `<span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700">${current ? `Đang diễn ra: ${escapeHtml(currentTitle)}` : `Đã qua ${completed}/${allWeeks.length} tuần`}</span>`;
+
+  return `
+    <section class="px-4 py-3.5 bg-white border-b border-slate-200">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-lg">🗓️</span>
+          <div>
+            <div class="font-black text-sm text-slate-900">Lộ trình đồ án tốt nghiệp & tiến độ thực hiện</div>
+            <div class="text-[10px] text-slate-500">Kế hoạch ${allWeeks.length} tuần · ${visibleWeeks} tuần hiển thị${hiddenWeeks ? ` · ${hiddenWeeks} tuần đang ẩn` : ''}</div>
+          </div>
+        </div>
+        ${headerRight}
+      </div>
+      <div class="flex gap-3 overflow-x-auto pb-2 snap-x">${introCards}${weekCards}${outroCards}</div>
+    </section>`;
+}
+
+export function renderUnifiedPlanList(round, options = {}) {
+  const role = options.role || (state.currentRole || 'supervisor');
+  const isStudent = role === 'student';
+  const prefix = options.prefix || (isStudent ? 'stu' : 'sup');
+  const container = options.container || (typeof options.containerId === 'string' ? document.getElementById(options.containerId) : null);
+
+  const activities = (Array.isArray(round?.activities) ? round.activities : [])
+    .map((activity, index) => (typeof normalizeActivity === 'function' ? normalizeActivity(activity, round.id, index) : activity))
+    .filter(activity => (typeof isActivityPublished === 'function' ? isActivityPublished(activity) : true))
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  if (!activities.length) {
+    const emptyHtml = '<div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500">Khoa chưa công bố mốc kế hoạch cho đợt này.</div>';
+    if (container) container.innerHTML = emptyHtml;
+    return emptyHtml;
+  }
+
+  const nearest = (typeof findNearestMilestone === 'function') ? findNearestMilestone(activities) : null;
+  const html = activities.map(activity => {
+    const isNearest = Boolean(nearest && nearest.act && nearest.act.id === activity.id);
+    return renderUnifiedActivityCard(activity, round, {
+      isStudent,
+      isNearest,
+      nearestType: nearest?.type || 'ongoing',
+      nearestTargetMs: nearest?.targetMs || null,
+      prefix
+    });
+  }).join('');
+
+  if (container) {
+    container.innerHTML = html;
+    if (typeof startMilestoneCountdownTicker === 'function') {
+      startMilestoneCountdownTicker();
+    }
+  }
+  return html;
+}
+
 // --- SUBMODULE WINDOW BRIDGE ---
 if (typeof window !== 'undefined') {
   if (typeof getActivityStatus !== 'undefined') window.getActivityStatus = getActivityStatus;
@@ -1949,7 +2116,11 @@ if (typeof window !== 'undefined') {
   if (typeof findNearestMilestone !== 'undefined') window.findNearestMilestone = findNearestMilestone;
   if (typeof startMilestoneCountdownTicker !== 'undefined') window.startMilestoneCountdownTicker = startMilestoneCountdownTicker;
   if (typeof renderUnifiedActivityCard !== 'undefined') window.renderUnifiedActivityCard = renderUnifiedActivityCard;
+  if (typeof renderUnifiedTimelineWeekCard !== 'undefined') window.renderUnifiedTimelineWeekCard = renderUnifiedTimelineWeekCard;
+  if (typeof renderUnifiedRoundTimeline !== 'undefined') window.renderUnifiedRoundTimeline = renderUnifiedRoundTimeline;
+  if (typeof renderUnifiedPlanList !== 'undefined') window.renderUnifiedPlanList = renderUnifiedPlanList;
   if (typeof renderActivityCard !== 'undefined') window.renderActivityCard = renderActivityCard;
   if (typeof pad !== 'undefined') window.pad = pad;
   if (typeof fmtPart !== 'undefined') window.fmtPart = fmtPart;
 }
+

@@ -291,6 +291,12 @@ function _getTimelineVisibleCount() {
 function renderSupervisorRoundTimeline(round) {
   const container = document.getElementById('supervisor-round-timeline');
   if (!container) return;
+  if (typeof renderUnifiedRoundTimeline === 'function') {
+    const html = renderUnifiedRoundTimeline(round, { role: 'supervisor' });
+    container.innerHTML = html;
+    container.classList.toggle('hidden', !html);
+    return;
+  }
   const allWeeks = getRoundTimelineWeeksWithActivities(round, true);
   const weeks = allWeeks.filter(week => week.visible);
   rememberRoundTimelineEvents(round.id, weeks);
@@ -323,6 +329,10 @@ function renderSupervisorPlanList(round) {
   const container = document.getElementById('supervisor-plan-list');
   if (!section || !container) return;
   section.classList.remove('hidden');
+  if (typeof renderUnifiedPlanList === 'function') {
+    renderUnifiedPlanList(round, { role: 'supervisor', container, prefix: 'sup' });
+    return;
+  }
   const activities = (Array.isArray(round.activities) ? round.activities : [])
     .map((activity, index) => normalizeActivity(activity, round.id, index))
     .filter(activity => isActivityPublished(activity))
