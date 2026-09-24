@@ -1983,15 +1983,13 @@ async function checkStudentEligibilityAndRegistration(roundId) {
       const assignmentDoc = await getDoc(doc(db, 'graduationRounds', roundId, 'officialAssignments', mssv));
       let assignment = assignmentDoc.exists() ? { id: assignmentDoc.id, ...assignmentDoc.data() } : null;
 
-      // If not found in officialAssignments or not yet published, check assignmentDrafts
-      if (!assignment || assignment.assignmentStatus !== 'published') {
+      // Draft assignments are administrative data, never a student result (including act-as).
+      if (state.isAdmin && !state.impersonation && (!assignment || assignment.assignmentStatus !== 'published')) {
         try {
           const draftDoc = await getDoc(doc(db, 'graduationRounds', roundId, 'assignmentDrafts', mssv));
           if (draftDoc.exists()) {
             const draftData = { id: draftDoc.id, ...draftDoc.data() };
-            if (!assignment || state.impersonation || state.isAdmin) {
-              assignment = draftData;
-            }
+            assignment = draftData;
           }
         } catch (draftErr) {}
       }
@@ -2010,10 +2008,9 @@ async function checkStudentEligibilityAndRegistration(roundId) {
       const reviewStatus = state.activeRound?.reviewStatus;
 
       const publishedSupervisors = getOfficialSupervisors(state.myRegistration);
-      const isSimOrAdmin = Boolean(state.impersonation || state.isAdmin);
-      const hasPublishedAssignment = (state.myRegistration?.assignmentStatus === 'published' || isSimOrAdmin) && publishedSupervisors.length > 0;
+      const hasPublishedAssignment = state.myRegistration?.assignmentStatus === 'published' && publishedSupervisors.length > 0;
 
-      // 1. Only an actually published assignment (or simulation test) may be shown as the official result.
+      // 1. Only an actually published assignment may be shown as the official result.
       if (hasPublishedAssignment) {
         if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
         if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
@@ -2053,7 +2050,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
     } else {
       if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
       if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
-      if (state.myOfficialAssignment?.assignmentStatus === 'published' || (state.impersonation && state.myOfficialAssignment)) {
+      if (state.myOfficialAssignment?.assignmentStatus === 'published') {
         renderStudentOfficialResult(normalizeOfficialAssignment(state.myOfficialAssignment, null));
         if (officialResultCard) officialResultCard.classList.add('hidden');
       } else if (officialResultCard) {
@@ -2914,7 +2911,7 @@ window.submitRegistration = async function() {
       temporaryAddress: officialFormFields.studentTemporaryAddress,
       address: officialFormFields.studentTemporaryAddress,
       updatedAt: serverTimestamp(),
-      updatedBy: state.user?.email || studentEmail
+      updatedBy: actor?.email || studentEmail
     }, { merge: true });
     await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload, { merge: true });
     
@@ -14657,53 +14654,39 @@ async function persistActivityCouncilChanges(targetRound) {
   }
 }
 
-// --- STUDENT TIMELINE RENDERING HELPER ---
-function renderStudentCouncilTimelineInfo(act) {
+// --- COUNCIL MEMBERSHIP NOTICE FOR THE EFFECTIVE TEACHER ---
+function renderEffectiveCouncilMembershipNotice(act) {
   if (!act || !act.councilEnabled) return '';
-
+  const actor = getEffectiveActor();
+  if (!actor.isSupervisor || actor.isStudent || !actor.email) return '';
   const councils = act.councils || [];
-  const assignments = act.councilStudentAssignments || [];
-
-  // Determine current student ID (logged in or viewed in preview)
-  const studentMssv = state.studentMssv || state.user?.email?.split('@')[0];
-  const asgn = studentMssv ? assignments.find(a => a.studentId === studentMssv) : null;
-  const council = asgn && asgn.councilId ? councils.find(c => c.id === asgn.councilId) : null;
-
-  // Check if current user is a Supervisor in any of the councils in this activity
-  let memberBannerHtml = '';
-  const userEmail = state.user?.email?.toLowerCase();
-  if (userEmail) {
-    for (const c of councils) {
-      const members = Object.values(c.membersBySlot || {});
-      const myMembership = members.find(m => m.memberEmail && m.memberEmail.toLowerCase() === userEmail);
-      if (myMembership) {
-        const slotObj = (act.councilStructure?.slots || []).find(s => s.key === myMembership.slotKey);
-        memberBannerHtml = `
+  const userEmail = actor.email.toLowerCase().trim();
+  for (const c of councils) {
+    const members = Object.values(c.membersBySlot || {});
+    const myMembership = members.find(m => String(m.memberEmail || '').toLowerCase().trim() === userEmail);
+    if (myMembership) {
+      const slotObj = (act.councilStructure?.slots || []).find(s => s.key === myMembership.slotKey);
+      return `
           <div class="mt-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
             <span class="font-bold text-blue-900 text-xs flex items-center gap-1.5">
-              <span>🏛️</span> Thầy/Cô được phân công: <strong>${c.name}</strong> (${slotObj?.name || slotObj?.label || 'Thành viên'})
+              <span>🏛️</span> Thầy/Cô được phân công: <strong>${escapeHtml(c.name || c.councilName || 'Hội đồng')}</strong> (${escapeHtml(slotObj?.name || slotObj?.label || 'Thành viên')})
             </span>
             <div class="flex items-center justify-between gap-2 pt-1">
-              <p class="text-[11px] text-blue-700">📍 Phòng: ${c.room || 'Đang cập nhật'} • 📅 Ngày: ${c.date || '--'} (${c.startTime || '--'} – ${c.endTime || '--'})</p>
+              <p class="text-[11px] text-blue-700">📍 Phòng: ${escapeHtml(c.room || 'Đang cập nhật')} • 📅 Ngày: ${escapeHtml(c.date || '--')} (${escapeHtml(c.startTime || '--')} – ${escapeHtml(c.endTime || '--')})</p>
               <button type="button" onclick="openCouncilWorkspace('${act.roundId || ''}', '${act.id}', '${c.id}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors shrink-0">
                 🏛️ Vào phòng Hội đồng & Chấm điểm
               </button>
             </div>
           </div>
         `;
-        break;
-      }
     }
   }
+  return '';
+}
 
-  // Student-facing council assignment info is intentionally hidden (product decision):
-  // students never see council names, members, or "Chưa phân công" placeholder.
-  // Council members (teachers) still see their own assignment banner to access scoring.
-  if (!council) {
-    return memberBannerHtml;
-  }
-
-  return memberBannerHtml;
+// Student timeline never exposes teacher-only council membership or scoring links.
+function renderStudentCouncilTimelineInfo(act) {
+  return '';
 }
 
 
@@ -15290,7 +15273,7 @@ function renderCouncilStudentList() {
     return;
   }
 
-  const myScorerId = state.user?.uid || state.user?.email;
+  const myScorerId = getEffectiveActor().uid || getEffectiveActor().email;
   const scoringEnabled = Boolean(act.scoringConfig?.enabled);
 
   container.innerHTML = councilStudents.map((asgn) => {
@@ -15737,7 +15720,7 @@ function renderScoringSection() {
   container.classList.remove('hidden');
 
   const sid = state.activeCouncilSelectedStudentId;
-  const myScorerId = state.user?.uid || state.user?.email;
+  const myScorerId = getEffectiveActor().uid || getEffectiveActor().email;
   const scoreKey = `${activityId}_${councilId}_${sid}_${myScorerId}`;
   const savedScore = state.councilScores?.[scoreKey];
   const draft = state.councilLocalDrafts?.[sid];
@@ -16029,9 +16012,10 @@ window.saveCurrentScore = async function(isCompleted) {
     if (!confirmed) return;
   }
 
-  const scorerId = state.user?.uid || state.user?.email;
-  const scorerEmail = (state.user?.email || '').toLowerCase().trim();
-  const scorerName = state.user?.displayName || auth.roleName || 'Thành viên Hội đồng';
+  const effectiveScorer = getEffectiveActor();
+  const scorerId = effectiveScorer.uid || effectiveScorer.email;
+  const scorerEmail = (effectiveScorer.email || '').toLowerCase().trim();
+  const scorerName = effectiveScorer.displayName || auth.roleName || 'Thành viên Hội đồng';
   const scoreKey = `${activityId}_${councilId}_${sid}_${scorerId}`;
 
   let selectedLetterCode = undefined;
@@ -16116,7 +16100,7 @@ window.reopenCurrentScore = async function() {
   if (!sid) return;
 
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
-  const scorerId = state.user?.uid || state.user?.email;
+  const scorerId = getEffectiveActor().uid || getEffectiveActor().email;
   const scoreKey = `${activityId}_${councilId}_${sid}_${scorerId}`;
 
   const existing = state.councilScores?.[scoreKey];
@@ -16162,7 +16146,7 @@ function renderScorersProgress() {
 
   const slots = act.councilStructure?.slots || [];
   const membersBySlot = council.membersBySlot || {};
-  const myUserId = state.user?.uid || state.user?.email;
+  const myUserId = getEffectiveActor().uid || getEffectiveActor().email;
 
   const reqSlots = getRequiredScorers(council, act);
   const guestSlots = getGuestScorers(council, act);
@@ -16192,7 +16176,7 @@ function renderScorersProgress() {
     // Before 'ended': Only see score value if Admin or own score. Chair CANNOT see others.
     // Once 'ended' or 'finalized': Chair sees all scores in their own council!
     const isCouncilEnded = (council.status === 'ended' || council.status === 'finalized' || council.status === 'completed');
-    const isOwnScore = (scorerId && (scorerId === myUserId || (assigned?.memberEmail && assigned.memberEmail.toLowerCase() === (state.user?.email || '').toLowerCase())));
+    const isOwnScore = (scorerId && (scorerId === myUserId || (assigned?.memberEmail && assigned.memberEmail.toLowerCase() === (getEffectiveActor().email || '').toLowerCase())));
     const canSeeValue = (auth.isAdmin || isOwnScore || (isCouncilEnded && auth.isChair));
 
     let statusPill = '<span class="text-slate-400 font-mono text-xs">— Chưa chấm</span>';
@@ -16511,8 +16495,9 @@ window.renderSupervisorPreliminaryList = function() {
   const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
   if (!targetRound) return;
 
-  const myScorerId = state.user?.uid || state.user?.email;
-  const isAuthorized = state.isAdmin || (targetRound.preliminaryConfig?.scorerIds || []).includes(myScorerId) || (targetRound.preliminaryConfig?.scorerIds || []).includes(state.user?.email);
+  const actor = getEffectiveActor();
+  const myScorerId = actor.uid || actor.email;
+  const isAuthorized = actor.isAdmin || (targetRound.preliminaryConfig?.scorerIds || []).includes(myScorerId) || (targetRound.preliminaryConfig?.scorerIds || []).includes(actor.email);
 
   if (!isAuthorized) {
     container.innerHTML = '<div class="col-span-full p-8 text-center text-slate-400">Thầy/Cô chưa được phân quyền chấm Sơ khảo trong Đợt này.</div>';
@@ -16606,7 +16591,8 @@ window.renderSupervisorReviewerList = function() {
   const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
   if (!targetRound) return;
 
-  const myUserId = state.user?.uid || state.user?.email;
+  const actor = getEffectiveActor();
+  const myUserId = actor.uid || actor.email;
   const assignments = targetRound.reviewerAssignments || {};
 
   const allStudents = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
@@ -16615,7 +16601,7 @@ window.renderSupervisorReviewerList = function() {
 
   const assignedStudents = allStudents.filter(s => {
     const sid = s.mssv || s.studentId;
-    return state.isAdmin || assignments[sid] === myUserId || assignments[sid] === state.user?.email;
+    return actor.isAdmin || assignments[sid] === myUserId || assignments[sid] === actor.email;
   });
 
   const countBadge = document.getElementById('sup-reviewer-count-badge');
@@ -16695,7 +16681,7 @@ window.openScoreEntryModal = function(type, studentId) {
   btnDraft.disabled = false;
   timeEl.textContent = '';
 
-  const myScorerId = state.user?.uid || state.user?.email;
+  const myScorerId = getEffectiveActor().uid || getEffectiveActor().email;
 
   if (type === 'preliminary') {
     titleEl.textContent = 'Đánh giá Điểm Sơ khảo';
@@ -16789,9 +16775,10 @@ window.saveScoreEntry = async function(isCompleted) {
     if (!confirmed) return;
   }
 
-  const myScorerId = state.user?.uid || state.user?.email;
-  const myScorerEmail = (state.user?.email || '').toLowerCase().trim();
-  const myScorerName = state.user?.displayName || 'Giảng viên';
+  const effectiveScorer = getEffectiveActor();
+  const myScorerId = effectiveScorer.uid || effectiveScorer.email;
+  const myScorerEmail = (effectiveScorer.email || '').toLowerCase().trim();
+  const myScorerName = effectiveScorer.displayName || 'Giảng viên';
 
   const roundId = targetRound.id;
   const now = new Date().toISOString();
@@ -17782,7 +17769,7 @@ window.finalizeCouncilSession = async function() {
 
   council.status = 'finalized';
   council.finalizedAt = new Date().toISOString();
-  council.finalizedBy = state.user?.email || 'admin';
+  council.finalizedBy = getEffectiveActor().email || 'admin';
 
   await persistActivityCouncilChanges(targetRound);
   renderCouncilWorkspaceFull();
@@ -18051,8 +18038,8 @@ window.saveScoreCalibration = async function() {
       {
         originalValue: oldVal,
         newValue: newVal,
-        adjustedById: state.user?.uid || state.user?.email,
-        adjustedByName: state.user?.displayName || (auth.isAdmin ? 'Quản trị viên' : 'Chủ tịch HĐ'),
+        adjustedById: getEffectiveActor().uid || getEffectiveActor().email,
+        adjustedByName: getEffectiveActor().displayName || (auth.isAdmin ? 'Quản trị viên' : 'Chủ tịch HĐ'),
         reason,
         timestamp: new Date().toISOString()
       }
@@ -20020,7 +20007,7 @@ window.renderStudentSubmissionPanel = function(act, round) {
     (state.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
     (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
       studentId: userMssv,
-      studentName: state.user?.displayName || (userMssv ? userMssv : 'Sinh viên')
+      studentName: getEffectiveActor().displayName || (userMssv ? userMssv : 'Sinh viên')
     };
 
   const cfg = act.submissionConfig || {};
@@ -20219,7 +20206,7 @@ window.checkStudentFileSubmission = function(actId) {
     (state.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
     (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
       studentId: userMssv,
-      studentName: state.user?.displayName || (userMssv ? userMssv : 'Sinh viên')
+      studentName: getEffectiveActor().displayName || (userMssv ? userMssv : 'Sinh viên')
     };
 
   const valRes = validateFileSubmission(files, targetStudent, act, round);
@@ -20265,7 +20252,7 @@ window.submitStudentFiles = async function(actId) {
     (state.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
     (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
       studentId: userMssv,
-      studentName: state.user?.displayName || (userMssv ? userMssv : 'Sinh viên')
+      studentName: getEffectiveActor().displayName || (userMssv ? userMssv : 'Sinh viên')
     };
 
   // Client-side Validation
@@ -20349,7 +20336,7 @@ window.submitStudentFiles = async function(actId) {
       submittedAt: new Date().toISOString(),
       isLate: valRes.isLate,
       status: 'submitted',
-      submittedBy: state.user?.email || userMssv
+      submittedBy: getEffectiveActor().email || userMssv
     };
 
     if (!round.activitySubmissions) round.activitySubmissions = {};
@@ -22137,7 +22124,7 @@ window.updateStudentJourneyStepper = function() {
   const reg = state.myRegistration;
   const effectiveAssignment = normalizeOfficialAssignment(state.myOfficialAssignment, reg);
   const officialList = effectiveAssignment ? getOfficialSupervisors(effectiveAssignment) : [];
-  const hasOfficialSup = (state.myOfficialAssignment?.assignmentStatus === 'published' || state.impersonation || state.isAdmin)
+  const hasOfficialSup = (state.myOfficialAssignment?.assignmentStatus === 'published')
     ? (officialList.length > 0 || Boolean(effectiveAssignment?.assignedSupervisorId || effectiveAssignment?.officialSupervisor || effectiveAssignment?.acceptedSupervisorName))
     : (officialList.length > 0 || Boolean(reg?.assignedSupervisorId || reg?.officialSupervisor));
 
@@ -22427,7 +22414,7 @@ function renderSupervisorPlanList(round) {
     return `<details class="group rounded-2xl border p-4 ${status === 'ongoing' ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200 bg-white'}">
       <summary class="cursor-pointer list-none"><div class="flex items-start gap-3"><span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${status === 'ongoing' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}">${status === 'past' ? '✓' : '📌'}</span><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2 text-[10px] font-bold"><span class="rounded-full border px-2 py-0.5 ${meta.color}">${meta.icon} ${meta.label}</span><span class="text-slate-500">${status === 'ongoing' ? 'Đang diễn ra' : status === 'past' ? 'Đã kết thúc' : 'Sắp tới'}</span>${activity.isTentative ? '<span class="text-amber-700">Dự kiến</span>' : ''}</div><h3 class="mt-1 text-sm font-black text-slate-900">${escapeHtml(activity.title)}</h3><p class="mt-1 text-[11px] text-slate-600">🕒 ${escapeHtml(fmtActivityTime(activity.startAt, activity.endAt))}</p></div><span class="text-[11px] font-bold text-blue-700 group-open:hidden">Xem chi tiết ▼</span><span class="hidden text-[11px] font-bold text-blue-700 group-open:block">Thu gọn ▲</span></div></summary>
       <div class="ml-10 mt-3 border-t border-slate-100 pt-3 text-xs text-slate-700">${activity.location ? `<p>📍 ${escapeHtml(activity.location)}</p>` : ''}${description ? `<div class="rich-rendered-content mt-2 leading-relaxed">${description}</div>` : ''}</div>
-    </details>`;
+    </details>${renderEffectiveCouncilMembershipNotice(activity)}`;
   }).join('');
 }
 
@@ -23982,7 +23969,7 @@ window.saveStudentSelfProfile = async function() {
       temporaryAddress,
       address: temporaryAddress,
       updatedAt: serverTimestamp(),
-      updatedBy: state.user?.email || identity.email
+      updatedBy: getEffectiveActor().email || identity.email
     };
     await setDoc(doc(db, 'graduationStudentProfiles', identity.mssv), payload, { merge: true });
     if (state.myRegistration && state.selectedRoundId) {
