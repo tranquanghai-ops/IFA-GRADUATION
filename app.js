@@ -1830,24 +1830,28 @@ function renderRoundHeader() {
     }
   }
 
-  // Render one or two published supervisors with contact details.
+  // Render one or two published supervisors with contact details (Horizontal compact layout: Image left, text right).
   const supervisorCard = document.getElementById('hero-supervisor-info-card');
   if (supervisorCard) {
     const profiles = hasOfficialSup ? resolveStudentSupervisorProfiles(officialList, effectiveAssignment).slice(0, 2) : [];
     supervisorCard.innerHTML = profiles.length
-      ? `<div class="grid ${profiles.length > 1 ? 'grid-cols-2 gap-3' : 'grid-cols-1'}">${profiles.map(profile => {
+      ? `<div class="space-y-2.5">${profiles.map(profile => {
         const fallback = getSupervisorAvatarSvgDataUri(profile.name);
         const avatar = profile.photoUrl || fallback;
         const phoneHref = String(profile.phone || '').replace(/[^\d+]/g, '');
-        return `<div class="min-w-0 flex flex-col items-center text-center">
-          <span class="mb-2 rounded-full bg-amber-400 px-2.5 py-0.5 text-xs font-black text-slate-950">${profile.label}</span>
-          <img src="${escapeHtml(avatar)}" data-fallback="${escapeHtml(fallback)}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="${escapeHtml(profile.name)}" class="${profiles.length > 1 ? 'h-16 w-16' : 'h-20 w-20'} rounded-2xl border-2 border-white/40 object-cover shadow-sm">
-          <strong class="mt-2 w-full break-words ${profiles.length > 1 ? 'text-xs' : 'text-base'} leading-snug text-white">${escapeHtml(profile.name)}</strong>
-          ${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}" class="mt-1 w-full break-all text-[11px] text-blue-100 hover:underline">✉️ ${escapeHtml(profile.email)}</a>` : ''}
-          ${profile.phone ? `<a href="tel:${escapeHtml(phoneHref)}" class="mt-1 text-xs font-bold text-emerald-200 hover:underline">📞 ${escapeHtml(profile.phone)}</a>` : ''}
+        return `<div class="flex items-center gap-3 min-w-0">
+          <img src="${escapeHtml(avatar)}" data-fallback="${escapeHtml(fallback)}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="${escapeHtml(profile.name)}" class="w-13 h-13 sm:w-14 sm:h-14 rounded-xl border-2 border-white/30 object-cover shrink-0 shadow-2xs bg-white/10">
+          <div class="min-w-0 flex-1 space-y-0.5 text-left">
+            <div class="flex items-center gap-1.5">
+              <span class="rounded-md bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 uppercase tracking-wide">${escapeHtml(profile.label)}</span>
+            </div>
+            <h4 class="text-xs sm:text-sm font-black text-white truncate leading-snug" title="${escapeHtml(profile.name)}">${escapeHtml(profile.name)}</h4>
+            ${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}" class="truncate flex items-center gap-1 text-[11px] text-blue-100 hover:underline" title="${escapeHtml(profile.email)}"><span>✉️</span><span class="truncate">${escapeHtml(profile.email)}</span></a>` : ''}
+            ${profile.phone ? `<a href="tel:${escapeHtml(phoneHref)}" class="flex items-center gap-1 text-[11px] font-bold text-emerald-300 hover:underline" title="${escapeHtml(profile.phone)}"><span>📞</span><span>${escapeHtml(profile.phone)}</span></a>` : ''}
+          </div>
         </div>`;
       }).join('')}</div>`
-      : '<div class="flex min-h-20 flex-col items-center justify-center text-center"><span class="rounded-full bg-white/15 px-3 py-1 text-xs font-black text-white">GVHD</span><span class="mt-2 text-sm text-blue-100">Chưa phân công</span></div>';
+      : '<div class="flex items-center gap-3 text-left"><div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center text-xl shrink-0">👨‍🏫</div><div class="min-w-0"><span class="rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-black text-white uppercase">GVHD</span><p class="mt-0.5 text-xs text-blue-100 font-bold">Chưa phân công</p></div></div>';
   }
 
   // Tinh giản banner sinh viên theo yêu cầu: ẩn các badge và thông tin trùng lặp
