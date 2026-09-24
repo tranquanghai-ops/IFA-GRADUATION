@@ -870,7 +870,7 @@ export async function setupAuthListener() {
         try {
           await Promise.race([
             loadInitialData(),
-            new Promise(r => setTimeout(r, 3500))
+            new Promise(r => setTimeout(r, 10000))
           ]);
         } catch (loadErr) {
           console.warn('[IFA-Graduation] Initial data loading notice:', loadErr);
