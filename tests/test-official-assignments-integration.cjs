@@ -1,9 +1,21 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const path = require('node:path');
 
-const app = fs.readFileSync('app.js', 'utf8');
-const rules = fs.readFileSync('firestore.rules', 'utf8');
-const html = fs.readFileSync('index.html', 'utf8');
+const root = path.resolve(__dirname, '..');
+function loadFullAppSource(dir) {
+  let code = fs.readFileSync(path.join(dir, 'app.js'), 'utf8');
+  const jsDir = path.join(dir, 'js');
+  if (fs.existsSync(jsDir)) {
+    for (const f of fs.readdirSync(jsDir).filter(x => x.endsWith('.js')).sort()) {
+      code += '\n' + fs.readFileSync(path.join(jsDir, f), 'utf8');
+    }
+  }
+  return code;
+}
+const app = loadFullAppSource(root);
+const rules = fs.readFileSync(path.join(root, 'firestore.rules'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
 const tests = [];
 function test(name, fn) { tests.push({ name, fn }); }

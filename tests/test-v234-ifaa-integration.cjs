@@ -25,7 +25,17 @@ function test(num, title, fn) {
 
 const graduationDir = path.resolve(__dirname, '..');
 const ifaaDir = 'C:\\Users\\quang\\.gemini\\antigravity\\scratch\\IFAA';
-const appJs = fs.readFileSync(path.join(graduationDir, 'app.js'), 'utf8');
+function loadFullAppSource(dir) {
+  let code = fs.readFileSync(path.join(dir, 'app.js'), 'utf8');
+  const jsDir = path.join(dir, 'js');
+  if (fs.existsSync(jsDir)) {
+    for (const f of fs.readdirSync(jsDir).filter(x => x.endsWith('.js')).sort()) {
+      code += '\n' + fs.readFileSync(path.join(jsDir, f), 'utf8');
+    }
+  }
+  return code;
+}
+const appJs = loadFullAppSource(graduationDir);
 const indexHtml = fs.readFileSync(path.join(graduationDir, 'index.html'), 'utf8');
 
 // Mock sample IFAA student dataset

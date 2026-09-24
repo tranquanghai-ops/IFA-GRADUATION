@@ -376,8 +376,8 @@ service cloud.firestore {
 
       // Danh sách sinh viên đủ điều kiện
       match /eligibleStudents/{studentId} {
-        allow get: if admin() || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$'));
-        allow list: if admin();
+        allow get: if admin() || staff() || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$'));
+        allow list: if admin() || staff();
         allow create, update, delete: if admin();
       }
 
@@ -389,12 +389,10 @@ service cloud.firestore {
           || (resource.data.assignmentStatus == 'published'
             && (
               (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$'))
-              || (staff() && email() in resource.data.supervisorEmails)
+              || staff()
+              || (signedIn() && (email() in resource.data.supervisorEmails || email().lower() in resource.data.supervisorEmails))
             ));
-        allow list: if admin()
-          || (staff()
-            && resource.data.assignmentStatus == 'published'
-            && email() in resource.data.supervisorEmails);
+        allow list: if admin() || staff();
         allow create: if admin()
           && request.resource.data.studentId == studentId
           && request.resource.data.assignmentStatus == 'published'
@@ -436,7 +434,8 @@ service cloud.firestore {
         // Đọc: Admin, hoặc GVHD có trong đợt, hoặc chính SV đăng ký
         allow get: if admin() 
           || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$'))
-          || (staff() && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(email())));
+          || staff()
+          || (signedIn() && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(email())));
         allow list: if admin() || staff();
 
         // Tạo mới: Admin cấp cao / Chủ sở hữu HOẶC Sinh viên chính chủ đủ điều kiện

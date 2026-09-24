@@ -115,6 +115,40 @@ body {
   border-bottom: 0 !important;
 }
 
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #topic-preview-paper, #topic-preview-paper * {
+    visibility: visible !important;
+  }
+  #modal-supervisor-topic-preview {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+  #topic-preview-paper {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    min-height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #fff !important;
+    font-family: 'Times New Roman', Times, serif !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 15mm 15mm 15mm 15mm;
+  }
+}
+
 /* Stepper styles */
 .stepper-item.active .stepper-circle {
   background-color: #1a3c5e;

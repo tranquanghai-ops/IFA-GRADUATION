@@ -4,7 +4,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+function loadFullAppSource(dir) {
+  let code = fs.readFileSync(path.join(dir, 'app.js'), 'utf8');
+  const jsDir = path.join(dir, 'js');
+  if (fs.existsSync(jsDir)) {
+    for (const f of fs.readdirSync(jsDir).filter(x => x.endsWith('.js')).sort()) {
+      code += '\n' + fs.readFileSync(path.join(jsDir, f), 'utf8');
+    }
+  }
+  return code;
+}
+const app = loadFullAppSource(root);
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
 
@@ -226,14 +236,14 @@ test('official topic form captures student-owned class data and unlocks PDF afte
   assert.match(app, /window\.downloadOfficialTopicRegistrationPdf = function/);
   assert.match(app, /reg\.topicApprovalStatus !== 'approved'/);
   assert.match(app, /PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC/);
-  assert.match(app, /text: 'HỌ VÀ TÊN : ', bold: true/);
-  assert.match(app, /text: 'LỚP : ', bold: true/);
+  assert.match(app, /text: 'HỌ VÀ TÊN: ', bold: true/);
+  assert.match(app, /text: 'LỚP: ', bold: true/);
   assert.match(app, /text: 'EMAIL: ', bold: true/);
   assert.match(app, /text: 'ĐIỆN THOẠI: ', bold: true/);
-  assert.match(app, /text: 'ĐỊA CHỈ : ', bold: true/);
+  assert.match(app, /text: 'ĐỊA CHỈ: ', bold: true/);
   assert.match(app, /text: 'Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN', bold: true, fontSize: 12/);
   assert.match(app, /text: 'NGƯỜI ĐĂNG KÝ', bold: true, fontSize: 12/);
-  assert.match(app, /text: identity\.fullName, bold: true/);
+  assert.match(app, /text: identity\.fullName \|\| '', bold: false/);
   assert.doesNotMatch(app, /Đã xác nhận tên đề tài trên hệ thống/);
 });
 
@@ -272,4 +282,15 @@ test('timeline supports customizable names for week 13 onwards without forcing T
   assert.match(app, /hasCustomSokhaoWeek/);
   assert.match(app, /hasCustomBaoveWeek/);
   assert.match(app, /hasCustomKetquaWeek/);
+});
+
+test('topic registration paper alignment and unified milestone countdown with no student copy link', () => {
+  assert.match(html, /id="topic-preview-paper"/);
+  assert.match(html, /id="topic-preview-doc-sup-name"/);
+  assert.match(html, /id="topic-preview-doc-sign-student"/);
+  assert.match(app, /export function findNearestMilestone/);
+  assert.match(app, /export function formatCountdownText/);
+  assert.match(app, /export function renderUnifiedActivityCard/);
+  assert.match(app, /milestone-countdown-badge/);
+  assert.match(app, /!isStudent \? `/);
 });

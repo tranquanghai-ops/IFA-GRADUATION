@@ -1129,53 +1129,56 @@
 
               <!-- Student Profile Form Lines -->
               <div style="margin-bottom:16px;line-height:1.8;">
-                <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
+                <table style="width:100%;border-collapse:collapse;margin-bottom:6px;table-layout:fixed;">
+                  <colgroup>
+                    <col style="width: 100px;">
+                    <col style="width: 32%;">
+                    <col style="width: 80px;">
+                    <col style="width: auto;">
+                  </colgroup>
                   <tr>
-                    <td style="width:15%;white-space:nowrap;">HỌ VÀ TÊN:</td>
-                    <td style="width:45%;font-weight:bold;border-bottom:1px dotted #64748b;" id="topic-preview-doc-name">--</td>
-                    <td style="width:10%;padding-left:12px;white-space:nowrap;">MSSV:</td>
-                    <td style="width:30%;font-weight:bold;border-bottom:1px dotted #64748b;" id="topic-preview-doc-mssv">--</td>
+                    <td style="white-space:nowrap;padding-right:6px;font-weight:bold;">HỌ VÀ TÊN:</td>
+                    <td id="topic-preview-doc-name">--</td>
+                    <td style="white-space:nowrap;padding-left:12px;padding-right:6px;font-weight:bold;">MSSV:</td>
+                    <td id="topic-preview-doc-mssv">--</td>
+                  </tr>
+                  <tr>
+                    <td style="white-space:nowrap;padding-right:6px;font-weight:bold;padding-top:4px;">LỚP:</td>
+                    <td style="padding-top:4px;" id="topic-preview-doc-class">--</td>
+                    <td style="white-space:nowrap;padding-left:12px;padding-right:6px;font-weight:bold;padding-top:4px;">NGÀNH:</td>
+                    <td style="padding-top:4px;" id="topic-preview-doc-major">--</td>
                   </tr>
                 </table>
 
                 <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
                   <tr>
-                    <td style="width:10%;white-space:nowrap;">LỚP:</td>
-                    <td style="width:50%;font-weight:bold;border-bottom:1px dotted #64748b;" id="topic-preview-doc-class">--</td>
-                    <td style="width:12%;padding-left:12px;white-space:nowrap;">NGÀNH:</td>
-                    <td style="width:28%;font-weight:bold;border-bottom:1px dotted #64748b;" id="topic-preview-doc-major">--</td>
+                    <td style="width:1%;white-space:nowrap;padding-right:6px;">EMAIL:</td>
+                    <td id="topic-preview-doc-email">--</td>
                   </tr>
                 </table>
 
                 <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
                   <tr>
-                    <td style="width:12%;white-space:nowrap;">EMAIL:</td>
-                    <td style="width:88%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-email">--</td>
+                    <td style="width:1%;white-space:nowrap;padding-right:6px;">ĐIỆN THOẠI:</td>
+                    <td id="topic-preview-doc-phone">--</td>
                   </tr>
                 </table>
 
                 <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
                   <tr>
-                    <td style="width:18%;white-space:nowrap;">ĐIỆN THOẠI:</td>
-                    <td style="width:82%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-phone">--</td>
-                  </tr>
-                </table>
-
-                <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
-                  <tr>
-                    <td style="width:24%;white-space:nowrap;">ĐỊA CHỈ TẠM TRÚ:</td>
-                    <td style="width:76%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-address">--</td>
+                    <td style="width:1%;white-space:nowrap;padding-right:6px;">ĐỊA CHỈ:</td>
+                    <td id="topic-preview-doc-address">--</td>
                   </tr>
                 </table>
 
                 <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
                   <tr>
-                    <td style="width:14%;white-space:nowrap;">MÔN HỌC:</td>
-                    <td style="width:36%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-course">--</td>
-                    <td style="width:18%;padding-left:8px;white-space:nowrap;">MÃ MÔN HỌC:</td>
-                    <td style="width:16%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-code">--</td>
-                    <td style="width:10%;padding-left:8px;white-space:nowrap;">NHÓM:</td>
-                    <td style="width:6%;border-bottom:1px dotted #64748b;" id="topic-preview-doc-group">--</td>
+                    <td style="width:1%;white-space:nowrap;padding-right:6px;">MÔN HỌC:</td>
+                    <td id="topic-preview-doc-course">--</td>
+                    <td style="width:1%;white-space:nowrap;padding-left:16px;padding-right:6px;">MÃ MÔN HỌC:</td>
+                    <td style="width:18%;" id="topic-preview-doc-code">--</td>
+                    <td style="width:1%;white-space:nowrap;padding-left:16px;padding-right:6px;">NHÓM:</td>
+                    <td style="width:8%;" id="topic-preview-doc-group">--</td>
                   </tr>
                 </table>
 
@@ -1184,11 +1187,9 @@
                 </div>
 
                 <!-- TÊN ĐỀ TÀI -->
-                <div style="margin-bottom:14px;">
-                  <div style="font-weight:bold;margin-bottom:4px;">TÊN ĐỀ TÀI :</div>
-                  <div id="topic-preview-doc-title" style="font-weight:bold;font-size:13pt;text-transform:uppercase;padding:8px 12px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;line-height:1.4;">
-                    --
-                  </div>
+                <div style="margin-bottom:14px;line-height:1.5;">
+                  <span style="font-weight:bold;margin-right:6px;">TÊN ĐỀ TÀI :</span>
+                  <span id="topic-preview-doc-title" style="font-weight:bold;font-size:13pt;">--</span>
                 </div>
 
                 <!-- MÔ TẢ CHI TIẾT -->
@@ -1196,7 +1197,7 @@
                   <div style="font-weight:bold;text-align:center;margin-bottom:8px;">
                     MÔ TẢ CHI TIẾT ĐỊNH HƯỚNG THIẾT KẾ CỦA ĐỀ TÀI :
                   </div>
-                  <div id="topic-preview-doc-description" style="text-align:justify;padding:10px 14px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;min-height:90px;white-space:pre-wrap;line-height:1.5;">
+                  <div id="topic-preview-doc-description" style="text-align:justify;min-height:80px;white-space:pre-wrap;line-height:1.5;">
                     --
                   </div>
                 </div>
@@ -1214,10 +1215,6 @@
                       <div id="topic-preview-doc-sup-status" style="margin-top:6px;font-size:11pt;font-style:italic;color:#047857;">
                         (Đã duyệt đề tài)
                       </div>
-                      <div style="height:55px;"></div>
-                      <div id="topic-preview-doc-sup-name" style="font-weight:bold;font-size:12pt;">
-                        --
-                      </div>
                     </td>
                     <td style="width:45%;vertical-align:top;">
                       <div id="topic-preview-doc-date" style="font-style:italic;font-size:11pt;">
@@ -1225,7 +1222,19 @@
                       </div>
                       <div style="font-weight:bold;font-size:11.5pt;margin-top:3px;">NGƯỜI ĐĂNG KÝ</div>
                       <div style="font-style:italic;font-size:10pt;">(ký và ghi rõ họ tên)</div>
-                      <div style="height:45px;"></div>
+                    </td>
+                  </tr>
+                  <tr style="height:65px;">
+                    <td></td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td style="vertical-align:bottom;">
+                      <div id="topic-preview-doc-sup-name" style="font-weight:bold;font-size:12pt;">
+                        --
+                      </div>
+                    </td>
+                    <td style="vertical-align:bottom;">
                       <div id="topic-preview-doc-sign-student" style="font-weight:bold;font-size:12pt;">
                         --
                       </div>
