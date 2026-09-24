@@ -22391,18 +22391,49 @@ function _getTimelineVisibleCount() {
 function renderSupervisorRoundTimeline(round) {
   const container = document.getElementById('supervisor-round-timeline');
   if (!container) return;
-  const weeks = getRoundTimelineWeeksWithActivities(round, true).filter(week => week.visible);
+  const allWeeks = getRoundTimelineWeeksWithActivities(round, true);
+  const weeks = allWeeks.filter(week => week.visible);
   rememberRoundTimelineEvents(round.id, weeks);
   container.classList.toggle('hidden', weeks.length === 0);
   if (!weeks.length) return;
-  container.innerHTML = `<div class="mb-3 flex items-center gap-2"><span class="text-xl">🗓️</span><div><h2 class="text-sm font-black text-slate-900">Lộ trình đồ án tốt nghiệp & tiến độ thực hiện</h2><p class="text-[11px] text-slate-500">Kế hoạch ${weeks.length} tuần · Chọn sự kiện để xem chi tiết</p></div></div>
-    <div class="flex gap-3 overflow-x-auto pb-2 snap-x">${weeks.map(week => `<div class="min-w-[290px] max-w-[290px] min-h-[208px] snap-start rounded-2xl border p-3 ${week.status === 'ongoing' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-slate-50'}">
+  const current = allWeeks.find(week => week.status === 'ongoing');
+  const completed = allWeeks.filter(week => week.status === 'completed').length;
+  const stageCard = (icon, title, note) => `<div class="min-w-[290px] max-w-[290px] min-h-[208px] snap-start rounded-2xl border border-slate-200 bg-slate-50 p-4 flex flex-col items-center justify-center text-center"><span class="mb-2 text-2xl">${icon}</span><strong class="text-xs text-slate-900">${title}</strong><span class="mt-1 text-[10px] text-slate-500">${note}</span></div>`;
+  container.innerHTML = `<div class="mb-3 flex flex-wrap items-center justify-between gap-2"><div class="flex items-center gap-2"><span class="text-xl">🗓️</span><div><h2 class="text-sm font-black text-slate-900">Lộ trình đồ án tốt nghiệp & tiến độ thực hiện</h2><p class="text-[11px] text-slate-500">Kế hoạch ${allWeeks.length} tuần · Chọn sự kiện để xem chi tiết</p></div></div><span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700">${current ? `Đang diễn ra: Tuần ${current.week}/${allWeeks.length}` : `Đã qua ${completed}/${allWeeks.length} tuần`}</span></div>
+    <div class="flex gap-3 overflow-x-auto pb-2 snap-x">${stageCard('📝', 'Đăng ký đề tài', 'Sinh viên đăng ký đề tài')}${stageCard('👨‍🏫', 'Phân công GVHD', isDirectSupervisorAssignment(round) ? 'Khoa phân công' : 'Xét nguyện vọng')}${weeks.map(week => `<div class="min-w-[290px] max-w-[290px] min-h-[208px] snap-start rounded-2xl border p-3 ${week.status === 'ongoing' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-slate-50'}">
       <div class="flex items-center justify-between"><strong class="text-xs text-slate-900">${escapeHtml(week.title)}</strong><span class="text-[10px] font-bold text-slate-500">${week.status === 'ongoing' ? 'Đang diễn ra' : week.status === 'completed' ? 'Đã qua' : 'Chưa tới'}</span></div>
+      <div class="mx-auto my-2 flex h-9 w-9 items-center justify-center rounded-full text-xs font-black ${week.status === 'ongoing' ? 'bg-blue-600 text-white' : week.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">${week.status === 'completed' ? '✓' : week.status === 'ongoing' ? '●' : week.week}</div>
       <p class="mt-2 text-center font-mono text-[11px] font-bold text-slate-700">${week.dateText}</p>
       ${renderTimelineWeekDays(week.days, week.events, week.week, round.id)}
       ${renderTimelineWeekEvents(week.events, week.week, round.id)}
       ${week.note ? `<p class="mt-2 text-[10px] text-slate-600">${escapeHtml(week.note)}</p>` : ''}
-    </div>`).join('')}</div>`;
+    </div>`).join('')}${stageCard('📄', 'Nộp Sơ khảo', 'Sau giai đoạn thực hiện')}${stageCard('🎓', 'Bảo vệ Tốt nghiệp', 'Theo lịch của Khoa')}${stageCard('🏆', 'Kết quả', 'Sau bảo vệ tốt nghiệp')}</div>`;
+}
+
+function renderSupervisorPlanList(round) {
+  const section = document.getElementById('supervisor-plan-section');
+  const container = document.getElementById('supervisor-plan-list');
+  if (!section || !container) return;
+  section.classList.remove('hidden');
+  const activities = (Array.isArray(round.activities) ? round.activities : [])
+    .map((activity, index) => normalizeActivity(activity, round.id, index))
+    .filter(activity => isActivityPublished(activity))
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  if (!activities.length) {
+    container.innerHTML = '<div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500">Khoa chưa công bố mốc kế hoạch cho đợt này.</div>';
+    return;
+  }
+  container.innerHTML = activities.map(activity => {
+    const status = getActivityStatus(activity);
+    const meta = ACTIVITY_TYPES[activity.activityType] || ACTIVITY_TYPES.other;
+    const description = activity.descriptionHtml
+      ? sanitizeRichHtml(activity.descriptionHtml)
+      : escapeHtml(activity.description || '').replace(/\n/g, '<br>');
+    return `<details class="group rounded-2xl border p-4 ${status === 'ongoing' ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200 bg-white'}">
+      <summary class="cursor-pointer list-none"><div class="flex items-start gap-3"><span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${status === 'ongoing' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}">${status === 'past' ? '✓' : '📌'}</span><div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2 text-[10px] font-bold"><span class="rounded-full border px-2 py-0.5 ${meta.color}">${meta.icon} ${meta.label}</span><span class="text-slate-500">${status === 'ongoing' ? 'Đang diễn ra' : status === 'past' ? 'Đã kết thúc' : 'Sắp tới'}</span>${activity.isTentative ? '<span class="text-amber-700">Dự kiến</span>' : ''}</div><h3 class="mt-1 text-sm font-black text-slate-900">${escapeHtml(activity.title)}</h3><p class="mt-1 text-[11px] text-slate-600">🕒 ${escapeHtml(fmtActivityTime(activity.startAt, activity.endAt))}</p></div><span class="text-[11px] font-bold text-blue-700 group-open:hidden">Xem chi tiết ▼</span><span class="hidden text-[11px] font-bold text-blue-700 group-open:block">Thu gọn ▲</span></div></summary>
+      <div class="ml-10 mt-3 border-t border-slate-100 pt-3 text-xs text-slate-700">${activity.location ? `<p>📍 ${escapeHtml(activity.location)}</p>` : ''}${description ? `<div class="rich-rendered-content mt-2 leading-relaxed">${description}</div>` : ''}</div>
+    </details>`;
+  }).join('');
 }
 
 let studentRegistrationCtaOriginalPosition = null;
@@ -23707,6 +23738,7 @@ window.loadSupervisorPortalData = async function(roundId) {
 
   if (!hasSupervisorDuties) {
     document.getElementById('supervisor-round-timeline')?.classList.add('hidden');
+    document.getElementById('supervisor-plan-section')?.classList.add('hidden');
     if (notAssignedAlert) notAssignedAlert.classList.remove('hidden');
     if (subTabsContainer) subTabsContainer.classList.add('hidden');
     if (assignedPanel) assignedPanel.classList.add('hidden');
@@ -23716,6 +23748,7 @@ window.loadSupervisorPortalData = async function(roundId) {
     if (acceptedPanel) acceptedPanel.classList.add('hidden');
   } else {
     renderSupervisorRoundTimeline(round);
+    renderSupervisorPlanList(round);
     if (notAssignedAlert) notAssignedAlert.classList.add('hidden');
     if (subTabsContainer) subTabsContainer.classList.remove('hidden');
 
