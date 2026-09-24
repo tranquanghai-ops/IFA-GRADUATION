@@ -95,7 +95,7 @@ body {
 
 /* Keep every stage and week in the shared journey the same height. */
 .ifa-timeline-card {
-  min-height: 326px;
+  min-height: 0;
   height: auto;
   align-self: stretch;
 }

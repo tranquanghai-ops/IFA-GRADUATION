@@ -389,6 +389,36 @@ window.showInputDialog = function(title, message, { defaultValue = '', placehold
   });
 };
 
+// Modal overlays are siblings in the document, but can open from another modal.
+// Give each newly opened overlay the next layer so every nested workflow remains usable.
+let modalLayerCounter = 1000;
+const visibleModalLayers = new WeakSet();
+function updateModalLayer(element) {
+  if (!(element instanceof HTMLElement) || !element.matches('.fixed[id^="modal-"], .fixed[id$="-modal"], .fixed[id$="-dialog"]')) return;
+  if (element.classList.contains('hidden')) {
+    visibleModalLayers.delete(element);
+    return;
+  }
+  if (visibleModalLayers.has(element)) return;
+  element.style.zIndex = String(++modalLayerCounter);
+  visibleModalLayers.add(element);
+}
+function watchModalLayers() {
+  document.querySelectorAll('.fixed[id^="modal-"], .fixed[id$="-modal"], .fixed[id$="-dialog"]').forEach(updateModalLayer);
+  new MutationObserver(mutations => {
+    for (const mutation of mutations) {
+      if (mutation.type === 'attributes') updateModalLayer(mutation.target);
+      else for (const node of mutation.addedNodes) {
+        if (!(node instanceof HTMLElement)) continue;
+        updateModalLayer(node);
+        node.querySelectorAll('.fixed[id^="modal-"], .fixed[id$="-modal"], .fixed[id$="-dialog"]').forEach(updateModalLayer);
+      }
+    }
+  }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchModalLayers, { once: true });
+else watchModalLayers();
+
 async function copyLinkWithFallback(link, label) {
   try {
     if (!navigator.clipboard?.writeText) throw new Error('Clipboard không khả dụng');
@@ -3948,6 +3978,18 @@ const ROUND_WEEK_EVENT_COLORS = [
   ['#2563eb', 'Xanh dương'], ['#4f46e5', 'Chàm'], ['#7e22ce', 'Tím'], ['#db2777', 'Hồng']
 ];
 
+function setActivityFormColor(value) {
+  const selected = normalizeRoundWeekEventColor(value);
+  const input = document.getElementById('activity-form-color');
+  const options = document.getElementById('activity-form-color-options');
+  if (input) input.value = selected;
+  if (!options) return;
+  options.innerHTML = ROUND_WEEK_EVENT_COLORS.map(([color, label]) =>
+    `<button type="button" data-color="${color}" aria-label="${label}" title="${label}" aria-pressed="${color === selected}" onclick="setActivityFormColor('${color}')" class="h-7 w-7 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-110 ${color === selected ? 'ring-2 ring-slate-800 ring-offset-2' : ''}" style="background-color:${color}"></button>`
+  ).join('');
+}
+window.setActivityFormColor = setActivityFormColor;
+
 function getRoundWeekEditingEventId(weekNumber) {
   return state.roundWeekEditingEvents?.[weekNumber] || '';
 }
@@ -3991,6 +4033,22 @@ function roundWeekEventOccursOnDay(event, day) {
   }
   const { startDayIndex, endDayIndex } = getRoundWeekEventRange(event);
   return day.dayIndex >= startDayIndex && day.dayIndex <= endDayIndex;
+}
+
+function distinguishOverlappingTimelineEvents(events, days) {
+  const assigned = [];
+  return events.map(event => {
+    const occupied = new Set(assigned.filter(previous => days.some(day =>
+      roundWeekEventOccursOnDay(event, day) && roundWeekEventOccursOnDay(previous, day)
+    )).map(previous => previous.displayColor));
+    const preferred = normalizeRoundWeekEventColor(event.color);
+    const displayColor = occupied.has(preferred)
+      ? (ROUND_WEEK_EVENT_COLORS.find(([color]) => !occupied.has(color))?.[0] || preferred)
+      : preferred;
+    const colored = { ...event, displayColor };
+    assigned.push(colored);
+    return colored;
+  });
 }
 
 function renderRoundWeekDayPicker(weekNumber) {
@@ -11166,6 +11224,7 @@ export function normalizeActivity(a, roundId, idx = 0) {
     roundId: String(a.roundId || roundId).trim(),
     title,
     activityType: a.activityType || 'other',
+    color: normalizeRoundWeekEventColor(a.color),
     description: a.description || '',
     descriptionHtml: a.descriptionHtml || a.description || '',
     startAt: a.startAt || '',
@@ -11414,6 +11473,7 @@ window.openCreateActivityModal = function() {
   if (typeof toggleActivitySubmissionConfig === 'function') toggleActivitySubmissionConfig(false);
   if (typeof resetActivitySubmissionForm === 'function') resetActivitySubmissionForm();
   document.getElementById('activity-form-type').value = 'review';
+  setActivityFormColor('#dc2626');
 
   // Clear date/time
   clearActivityDateTime('start');
@@ -11468,6 +11528,7 @@ window.editActivityModal = function(actId) {
   document.getElementById('activity-form-title').value = act.title || '';
   document.getElementById('activity-form-type').value = act.activityType || 'other';
   document.getElementById('activity-form-location').value = act.location || '';
+  setActivityFormColor(act.color);
 
   // Dates
   const startParts = isoToVietnameseDateTime(act.startAt);
@@ -11562,6 +11623,7 @@ window.copyActivityModal = function(actId) {
   document.getElementById('activity-form-title').value = act.title ? `${act.title} (Bản sao)` : '';
   document.getElementById('activity-form-type').value = act.activityType || 'other';
   document.getElementById('activity-form-location').value = act.location || '';
+  setActivityFormColor(act.color);
 
   // Dates
   const startParts = isoToVietnameseDateTime(act.startAt);
@@ -12089,6 +12151,7 @@ window.saveActivity = async function(e) {
       roundId,
       title,
       activityType,
+      color: normalizeRoundWeekEventColor(document.getElementById('activity-form-color')?.value),
       location,
       startAt,
       endAt,
@@ -21407,12 +21470,14 @@ function getRoundTimelineWeeksWithActivities(round, publishedOnly = true) {
       const last = toDateKey(activity.endAt || activity.startAt);
       return { id: `activity-${activity.id}`, activityId: activity.id, activity,
         title: String(activity.title || '').trim(), startDate: first <= last ? first : last,
-        endDate: first <= last ? last : first, color: '#dc2626' };
+        endDate: first <= last ? last : first, color: normalizeRoundWeekEventColor(activity.color) };
     }).filter(event => event.title && event.startDate && event.endDate);
   weeks.forEach(week => {
     const first = week.days[0]?.key;
     const last = week.days[6]?.key;
-    week.events = [...week.events, ...activities.filter(event => event.startDate <= last && event.endDate >= first)];
+    week.events = distinguishOverlappingTimelineEvents(
+      [...week.events, ...activities.filter(event => event.startDate <= last && event.endDate >= first)], week.days
+    );
   });
   return weeks;
 }
@@ -21428,13 +21493,17 @@ function renderTimelineWeekDays(days = [], events = [], weekNumber = null, round
     const dayEvents = events.filter(event => roundWeekEventOccursOnDay(event, day));
     const titles = dayEvents.map(event => escapeHtml(event.title)).join(' · ');
     const isToday = day.date instanceof Date && day.date.toDateString() === new Date().toDateString();
-    const eventColor = dayEvents.length ? normalizeRoundWeekEventColor(dayEvents[0].color) : '';
+    const eventColors = [...new Set(dayEvents.map(event => normalizeRoundWeekEventColor(event.displayColor || event.color)))];
+    const eventColor = eventColors[0] || '';
     const dayClass = dayEvents.length ? '' : (isToday ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' : 'bg-white/70 border-slate-200 text-slate-500');
-    const dayStyle = eventColor ? ` style="background-color:${eventColor}18;border-color:${eventColor};color:${eventColor}"` : '';
+    const slices = eventColors.map((color, index) => `${color}38 ${index * 100 / eventColors.length}% ${(index + 1) * 100 / eventColors.length}%`).join(',');
+    const dayStyle = eventColors.length > 1
+      ? ` style="background:linear-gradient(90deg,${slices});border-color:${eventColor};color:#1e293b"`
+      : (eventColor ? ` style="background-color:${eventColor}18;border-color:${eventColor};color:${eventColor}"` : '');
     const clickable = weekNumber !== null && dayEvents.length;
     const tag = clickable ? 'button' : 'span';
     const click = clickable ? ` type="button" onclick="event.stopPropagation(); openStudentTimelineDay(${weekNumber}, '${day.key}', ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" aria-label="Xem ${dayEvents.length} sự kiện ngày ${day.label}"` : '';
-    return `<${tag}${click} title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border text-center ${studentCalendar ? 'min-h-[52px] px-1 py-1.5' : 'px-0.5 py-0.5'} ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md' : ''}"${dayStyle}><b class="block ${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none">${day.shortName}</b><b class="block ${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none mt-1">${day.label}</b>${dayEvents.length ? `<i class="block ${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none not-italic">●</i>` : ''}</${tag}>`;
+    return `<${tag}${click} title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border text-center ${studentCalendar ? 'min-h-[52px] px-1 py-1.5' : 'px-0.5 py-0.5'} ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md' : ''}"${dayStyle}><b class="block ${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none">${day.shortName}</b><b class="block ${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none mt-1">${day.label}</b>${dayEvents.length ? `<span class="flex justify-center gap-0.5">${eventColors.map(color => `<i class="${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none not-italic" style="color:${color}">●</i>`).join('')}</span>` : ''}</${tag}>`;
   }).join('')}</div>`;
 }
 
@@ -21454,7 +21523,7 @@ function renderTimelineWeekEvents(events = [], weekNumber = null, roundId = null
     return date ? `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}` : '';
   };
   return `<div class="mt-2 w-full space-y-1 text-left">${events.map((event, eventIndex) => {
-    const color = normalizeRoundWeekEventColor(event.color);
+    const color = normalizeRoundWeekEventColor(event.displayColor || event.color);
     const startValue = event.startDate || event.date || '';
     const endValue = event.endDate || startValue;
     const startDate = parseEventDate(startValue);
@@ -22565,7 +22634,7 @@ window.renderStudentTimelineWeeks = function() {
       const endDate = toLocalDateKey(activity.endAt || activity.startAt);
       return { id: `activity-${activity.id}`, activityId: activity.id, activity,
         title: String(activity.title || '').trim(), startDate: startDate <= endDate ? startDate : endDate,
-        endDate: startDate <= endDate ? endDate : startDate, color: '#dc2626' };
+        endDate: startDate <= endDate ? endDate : startDate, color: normalizeRoundWeekEventColor(activity.color) };
     }).filter(event => event.title && event.startDate && event.endDate);
 
   // ── Build the full unified card array (17 cards) ──────────────
@@ -22622,7 +22691,9 @@ window.renderStudentTimelineWeeks = function() {
     })).filter(event => event.title);
     const firstDay = w.days[0]?.key;
     const lastDay = w.days[6]?.key;
-    const events = [...manualEvents, ...activityEvents.filter(event => event.startDate <= lastDay && event.endDate >= firstDay)];
+    const events = distinguishOverlappingTimelineEvents(
+      [...manualEvents, ...activityEvents.filter(event => event.startDate <= lastDay && event.endDate >= firstDay)], w.days
+    );
     allCards.push({
       type: 'week',
       num: w.num,
