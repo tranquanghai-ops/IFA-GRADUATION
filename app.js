@@ -1462,12 +1462,14 @@ async function loadRounds() {
     if (state.isAdmin && !state.impersonation) {
       await Promise.all(state.rounds.filter(r => !r.deleted).map(async round => {
         try {
-          const [officialSnap, draftSnap, eligibleSnap, supervisorsSnap] = await Promise.all([
+          const [officialSnap, draftSnap, eligibleSnap, supervisorsSnap, activitiesSnap] = await Promise.all([
             getDocs(collection(db, 'graduationRounds', round.id, 'officialAssignments')),
             getDocs(collection(db, 'graduationRounds', round.id, 'assignmentDrafts')),
             getDocs(collection(db, 'graduationRounds', round.id, 'eligibleStudents')),
-            getDocs(collection(db, 'graduationRounds', round.id, 'supervisors'))
+            getDocs(collection(db, 'graduationRounds', round.id, 'supervisors')),
+            Array.isArray(round.activities) ? Promise.resolve(null) : getDocs(collection(db, 'graduationRounds', round.id, 'activities'))
           ]);
+          if (activitiesSnap) round.activities = activitiesSnap.docs.map(activityDoc => ({ id: activityDoc.id, ...activityDoc.data() }));
           const effectiveAssignments = new Map();
           officialSnap.docs.forEach(assignmentDoc => effectiveAssignments.set(assignmentDoc.id, assignmentDoc));
           draftSnap.docs.forEach(assignmentDoc => effectiveAssignments.set(assignmentDoc.id, assignmentDoc));
@@ -1594,7 +1596,18 @@ async function refreshRoundCardMetrics(roundId) {
     round.supervisorsCount = supervisorsSnap.size;
     round.assignedCount = assignedStudentIds.size;
     round.officialAssignmentsCount = officialSnap.size;
-    if (state.activeRound?.id === roundId) Object.assign(state.activeRound, round);
+    // The round card may still hold the pre-publication review state. Only copy
+    // counters here; never overwrite the freshly fetched review status.
+    if (state.activeRound?.id === roundId && state.activeRound !== round) {
+      Object.assign(state.activeRound, {
+        eligibleCount: round.eligibleCount,
+        eligibleStudentsCount: round.eligibleStudentsCount,
+        supervisorCount: round.supervisorCount,
+        supervisorsCount: round.supervisorsCount,
+        assignedCount: round.assignedCount,
+        officialAssignmentsCount: round.officialAssignmentsCount
+      });
+    }
     renderAdminRoundsCards();
   } catch (error) {
     console.warn(`[Rounds] Could not refresh live metrics for ${roundId}:`, error);
@@ -7978,6 +7991,8 @@ window.loadAdminReviewData = async function(roundId) {
     const roundDoc = await getDoc(doc(db, 'graduationRounds', roundId));
     if (roundDoc.exists()) {
       const data = roundDoc.data();
+      const cachedRound = (state.rounds || []).find(item => item.id === roundId);
+      if (cachedRound) Object.assign(cachedRound, data);
       state.activeRound = {
         id: roundDoc.id,
         ...data,
@@ -11196,6 +11211,7 @@ window.loadAdminRoundActivities = async function(roundId) {
   const normalized = list.map((a, idx) => normalizeActivity(a, roundId, idx)).sort((a, b) => (a.order || 0) - (b.order || 0));
   targetRound.activities = normalized;
   state.roundActivities = normalized;
+  renderAdminRoundsCards();
 
   // Calculate stats
   let ongoingCount = 0, upcomingCount = 0, pastCount = 0;
@@ -21370,7 +21386,37 @@ function getRoundWeekSchedule(round) {
   });
 }
 
-function renderTimelineWeekDays(days = [], events = [], weekNumber = null) {
+function getRoundTimelineWeeksWithActivities(round, publishedOnly = true) {
+  const weeks = getRoundWeekSchedule(round);
+  const pad = value => String(value).padStart(2, '0');
+  const toDateKey = value => {
+    if (!value) return '';
+    const date = new Date(value?.toDate ? value.toDate() : value);
+    return isNaN(date.getTime()) ? '' : `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  };
+  const activities = (Array.isArray(round?.activities) ? round.activities : [])
+    .filter(activity => (!publishedOnly || isActivityPublished(activity)) && (activity.startAt || activity.endAt))
+    .map(activity => {
+      const first = toDateKey(activity.startAt || activity.endAt);
+      const last = toDateKey(activity.endAt || activity.startAt);
+      return { id: `activity-${activity.id}`, activityId: activity.id, activity,
+        title: String(activity.title || '').trim(), startDate: first <= last ? first : last,
+        endDate: first <= last ? last : first, color: '#dc2626' };
+    }).filter(event => event.title && event.startDate && event.endDate);
+  weeks.forEach(week => {
+    const first = week.days[0]?.key;
+    const last = week.days[6]?.key;
+    week.events = [...week.events, ...activities.filter(event => event.startDate <= last && event.endDate >= first)];
+  });
+  return weeks;
+}
+
+function rememberRoundTimelineEvents(roundId, weeks) {
+  if (!state.roundTimelineEventMap) state.roundTimelineEventMap = new Map();
+  state.roundTimelineEventMap.set(roundId, new Map(weeks.map(week => [week.week, week.events])));
+}
+
+function renderTimelineWeekDays(days = [], events = [], weekNumber = null, roundId = null) {
   const studentCalendar = weekNumber !== null;
   return `<div class="grid grid-cols-7 ${studentCalendar ? 'gap-1.5' : 'gap-1'} w-full mt-2 pt-2 border-t border-slate-200/80">${days.map(day => {
     const dayEvents = events.filter(event => roundWeekEventOccursOnDay(event, day));
@@ -21381,12 +21427,12 @@ function renderTimelineWeekDays(days = [], events = [], weekNumber = null) {
     const dayStyle = eventColor ? ` style="background-color:${eventColor}18;border-color:${eventColor};color:${eventColor}"` : '';
     const clickable = weekNumber !== null && dayEvents.length;
     const tag = clickable ? 'button' : 'span';
-    const click = clickable ? ` type="button" onclick="openStudentTimelineDay(${weekNumber}, '${day.key}')" aria-label="Xem ${dayEvents.length} sự kiện ngày ${day.label}"` : '';
+    const click = clickable ? ` type="button" onclick="event.stopPropagation(); openStudentTimelineDay(${weekNumber}, '${day.key}', ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" aria-label="Xem ${dayEvents.length} sự kiện ngày ${day.label}"` : '';
     return `<${tag}${click} title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border text-center ${studentCalendar ? 'min-h-[48px] px-1 py-1.5' : 'px-0.5 py-0.5'} ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md' : ''}"${dayStyle}><b class="block ${studentCalendar ? 'text-[10px]' : 'text-[8px]'} leading-none">${day.shortName}</b><b class="block ${studentCalendar ? 'text-[10px]' : 'text-[8px]'} leading-none mt-1">${day.label}</b>${dayEvents.length ? `<i class="block ${studentCalendar ? 'text-[10px]' : 'text-[8px]'} leading-none not-italic">●</i>` : ''}</${tag}>`;
   }).join('')}</div>`;
 }
 
-function renderTimelineWeekEvents(events = [], weekNumber = null) {
+function renderTimelineWeekEvents(events = [], weekNumber = null, roundId = null) {
   if (!events.length) return '';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -21412,7 +21458,7 @@ function renderTimelineWeekEvents(events = [], weekNumber = null) {
       ? ''
       : (dayCount > 0 ? `Còn ${dayCount} ngày` : (endDate >= today ? (dayCount === 0 ? 'Hôm nay' : 'Đang diễn ra') : 'Đã diễn ra'));
     const dateLabel = startValue === endValue ? shortDate(startValue) : `${shortDate(startValue)}–${shortDate(endValue)}`;
-    return `<button type="button" onclick="openStudentTimelineEvent(${weekNumber}, ${eventIndex})" title="Xem chi tiết sự kiện" class="flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-[9px] leading-tight hover:shadow-sm" style="background-color:${color}18;border-color:${color}66;color:${color}">
+    return `<button type="button" onclick="event.stopPropagation(); openStudentTimelineEvent(${weekNumber}, ${eventIndex}, ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" title="Xem chi tiết sự kiện" class="flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-[9px] leading-tight hover:shadow-sm" style="background-color:${color}18;border-color:${color}66;color:${color}">
       <span class="shrink-0">📌 ${escapeHtml(dateLabel)}</span><span class="min-w-0 flex-1 truncate font-black">${escapeHtml(event.title)}</span>${countdown ? `<span class="shrink-0 font-bold opacity-80">${countdown}</span>` : ''}
     </button>`;
   }).join('')}</div>`;
@@ -21422,8 +21468,9 @@ window.closeStudentTimelineEvent = function() {
   document.getElementById('student-timeline-event-dialog')?.remove();
 };
 
-window.openStudentTimelineEvent = function(weekNumber, eventIndex) {
-  const event = state.studentTimelineEventMap?.get(Number(weekNumber))?.[Number(eventIndex)];
+window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = null) {
+  const eventMap = roundId ? state.roundTimelineEventMap?.get(roundId) : state.studentTimelineEventMap;
+  const event = eventMap?.get(Number(weekNumber))?.[Number(eventIndex)];
   if (!event) return;
   window.closeStudentTimelineEvent();
   const activity = event.activity;
@@ -21443,14 +21490,15 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex) {
   dialog.querySelector('button')?.focus();
 };
 
-window.openStudentTimelineDay = function(weekNumber, dateKey) {
-  const events = state.studentTimelineEventMap?.get(Number(weekNumber)) || [];
+window.openStudentTimelineDay = function(weekNumber, dateKey, roundId = null) {
+  const eventMap = roundId ? state.roundTimelineEventMap?.get(roundId) : state.studentTimelineEventMap;
+  const events = eventMap?.get(Number(weekNumber)) || [];
   const date = new Date(`${dateKey}T00:00:00`);
   const dayIndex = (date.getDay() + 6) % 7;
   const matches = events.map((event, index) => ({ event, index }))
     .filter(item => roundWeekEventOccursOnDay(item.event, { key: dateKey, dayIndex }));
   if (matches.length === 1) {
-    window.openStudentTimelineEvent(weekNumber, matches[0].index);
+    window.openStudentTimelineEvent(weekNumber, matches[0].index, roundId);
     return;
   }
   if (matches.length < 2) return;
@@ -21459,12 +21507,13 @@ window.openStudentTimelineDay = function(weekNumber, dateKey) {
   dialog.id = 'student-timeline-event-dialog';
   dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
-  dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Sự kiện trong ngày" class="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><div class="flex items-center justify-between gap-2"><h3 class="text-lg font-black text-slate-900">Sự kiện ngày ${escapeHtml(dateKey)}</h3><button type="button" onclick="closeStudentTimelineEvent()" class="rounded-lg bg-slate-100 px-3 py-1.5 text-lg" aria-label="Đóng">×</button></div><div class="mt-4 space-y-2">${matches.map(item => `<button type="button" onclick="openStudentTimelineEvent(${weekNumber}, ${item.index})" class="block w-full rounded-xl border border-slate-200 p-3 text-left text-sm font-bold text-blue-800 hover:bg-blue-50">${escapeHtml(item.event.title)}</button>`).join('')}</div></div>`;
+  dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Sự kiện trong ngày" class="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><div class="flex items-center justify-between gap-2"><h3 class="text-lg font-black text-slate-900">Sự kiện ngày ${escapeHtml(dateKey)}</h3><button type="button" onclick="closeStudentTimelineEvent()" class="rounded-lg bg-slate-100 px-3 py-1.5 text-lg" aria-label="Đóng">×</button></div><div class="mt-4 space-y-2">${matches.map(item => `<button type="button" onclick="openStudentTimelineEvent(${weekNumber}, ${item.index}, ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" class="block w-full rounded-xl border border-slate-200 p-3 text-left text-sm font-bold text-blue-800 hover:bg-blue-50">${escapeHtml(item.event.title)}</button>`).join('')}</div></div>`;
   document.body.appendChild(dialog);
 };
 
 function renderAdminRoundTimelinePreview(round) {
-  const weeks = getRoundWeekSchedule(round);
+  const weeks = getRoundTimelineWeeksWithActivities(round, false);
+  rememberRoundTimelineEvents(round.id, weeks);
   const visibleWeeks = weeks.filter(week => week.visible).length;
   const hiddenWeeks = weeks.length - visibleWeeks;
   const statusStyles = {
@@ -21486,14 +21535,15 @@ function renderAdminRoundTimelinePreview(round) {
   const weekCards = weeks.map(week => {
     const style = statusStyles[week.status] || statusStyles.upcoming;
     return `
-      <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}', ${week.week})" class="relative min-w-[215px] h-[184px] rounded-2xl border p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}">
+      <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}', ${week.week})" class="relative min-w-[290px] min-h-[208px] rounded-2xl border p-3 pb-7 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}">
         <div class="flex items-center justify-between w-full mb-1">
           <span class="font-black text-xs text-slate-900">Tuần ${week.week}</span>
           <span class="px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${week.visible ? style.badge : 'bg-slate-200 text-slate-600 border-slate-300'}">${week.visible ? style.label : 'Đang ẩn'}</span>
         </div>
         <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black my-1 ${week.status === 'ongoing' ? 'bg-blue-600 text-white' : week.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">${style.icon || week.week}</span>
         <span class="font-mono font-bold text-[11px] text-slate-700">${week.dateText}</span>
-        ${renderTimelineWeekDays(week.days, week.events)}
+        ${renderTimelineWeekDays(week.days, week.events, week.week, round.id)}
+        ${renderTimelineWeekEvents(week.events, week.week, round.id)}
         ${week.milestone ? `<span class="mt-1 px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px]">🚩 ${escapeHtml(week.milestone)}</span>` : ''}
         ${week.note ? `<span class="text-[9px] text-slate-500 mt-1 line-clamp-1">${escapeHtml(week.note)}</span>` : ''}
         <button type="button" onclick="toggleRoundTimelineWeekVisibility('${round.id}', ${week.week}, event)" class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-white/90 border border-slate-200 text-[9px] font-bold ${week.visible ? 'text-slate-600' : 'text-blue-700'}">${week.visible ? 'Ẩn' : 'Hiện'}</button>
@@ -22055,6 +22105,7 @@ window.startStudentRegistration = function() {
   const ctaCard = document.getElementById('registration-cta-card');
   const flowContainer = document.getElementById('registration-flow-container');
   if (ctaCard) ctaCard.classList.add('hidden');
+  positionStudentRegistrationCta();
   if (flowContainer) {
     flowContainer.classList.remove('hidden');
     flowContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -22077,9 +22128,11 @@ window.cancelRegistrationEdit = function() {
   } else {
     if (ctaCard) ctaCard.classList.remove('hidden');
   }
+  positionStudentRegistrationCta();
 };
 
 window.updateStudentJourneyStepper = function() {
+  positionStudentRegistrationCta();
   const container = document.getElementById('journey-steps-list');
   if (!container) return;
 
@@ -22335,6 +22388,39 @@ function _getTimelineVisibleCount() {
   return 3;
 }
 
+function renderSupervisorRoundTimeline(round) {
+  const container = document.getElementById('supervisor-round-timeline');
+  if (!container) return;
+  const weeks = getRoundTimelineWeeksWithActivities(round, true).filter(week => week.visible);
+  rememberRoundTimelineEvents(round.id, weeks);
+  container.classList.toggle('hidden', weeks.length === 0);
+  if (!weeks.length) return;
+  container.innerHTML = `<div class="mb-3 flex items-center gap-2"><span class="text-xl">🗓️</span><div><h2 class="text-sm font-black text-slate-900">Lộ trình đồ án tốt nghiệp & tiến độ thực hiện</h2><p class="text-[11px] text-slate-500">Kế hoạch ${weeks.length} tuần · Chọn sự kiện để xem chi tiết</p></div></div>
+    <div class="flex gap-3 overflow-x-auto pb-2 snap-x">${weeks.map(week => `<div class="min-w-[290px] max-w-[290px] min-h-[208px] snap-start rounded-2xl border p-3 ${week.status === 'ongoing' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-slate-50'}">
+      <div class="flex items-center justify-between"><strong class="text-xs text-slate-900">${escapeHtml(week.title)}</strong><span class="text-[10px] font-bold text-slate-500">${week.status === 'ongoing' ? 'Đang diễn ra' : week.status === 'completed' ? 'Đã qua' : 'Chưa tới'}</span></div>
+      <p class="mt-2 text-center font-mono text-[11px] font-bold text-slate-700">${week.dateText}</p>
+      ${renderTimelineWeekDays(week.days, week.events, week.week, round.id)}
+      ${renderTimelineWeekEvents(week.events, week.week, round.id)}
+      ${week.note ? `<p class="mt-2 text-[10px] text-slate-600">${escapeHtml(week.note)}</p>` : ''}
+    </div>`).join('')}</div>`;
+}
+
+let studentRegistrationCtaOriginalPosition = null;
+function positionStudentRegistrationCta() {
+  const cta = document.getElementById('registration-cta-card');
+  const journey = document.getElementById('student-journey-card');
+  if (!cta || !journey) return;
+  if (!studentRegistrationCtaOriginalPosition) {
+    studentRegistrationCtaOriginalPosition = document.createComment('registration-cta-original-position');
+    cta.parentNode?.insertBefore(studentRegistrationCtaOriginalPosition, cta);
+  }
+  if (!state.myRegistration && !cta.classList.contains('hidden')) {
+    journey.parentNode?.insertBefore(cta, journey);
+  } else if (studentRegistrationCtaOriginalPosition.parentNode) {
+    studentRegistrationCtaOriginalPosition.parentNode.insertBefore(cta, studentRegistrationCtaOriginalPosition.nextSibling);
+  }
+}
+
 window.renderStudentTimelineWeeks = function() {
   // NEW: target the card slider track (old grid is kept hidden for compat)
   const track = document.getElementById('timeline-cards-track');
@@ -22343,6 +22429,7 @@ window.renderStudentTimelineWeeks = function() {
   if (!track) return;
 
   const round = state.activeRound || (state.rounds || []).find(r => r.id === state.selectedRoundId) || (state.rounds || [])[0];
+  positionStudentRegistrationCta();
   const durationWeeks = parseInt(round?.durationWeeks, 10) || 12;
 
   // ── Date helpers ──────────────────────────────────────────────
@@ -23619,6 +23706,7 @@ window.loadSupervisorPortalData = async function(roundId) {
   const hasSupervisorDuties = actor.isAdmin || Boolean(roundSupervisor) || totalAssignedCount > 0;
 
   if (!hasSupervisorDuties) {
+    document.getElementById('supervisor-round-timeline')?.classList.add('hidden');
     if (notAssignedAlert) notAssignedAlert.classList.remove('hidden');
     if (subTabsContainer) subTabsContainer.classList.add('hidden');
     if (assignedPanel) assignedPanel.classList.add('hidden');
@@ -23627,6 +23715,7 @@ window.loadSupervisorPortalData = async function(roundId) {
     const acceptedPanel = document.getElementById('sup-panel-accepted');
     if (acceptedPanel) acceptedPanel.classList.add('hidden');
   } else {
+    renderSupervisorRoundTimeline(round);
     if (notAssignedAlert) notAssignedAlert.classList.add('hidden');
     if (subTabsContainer) subTabsContainer.classList.remove('hidden');
 
