@@ -4197,6 +4197,29 @@ window.refreshRoundWeekDayPickers = function() {
   for (let week = 1; week <= duration; week++) renderRoundWeekDayPicker(week);
 };
 
+function getRoundTimelineDefaultTitle(weekNum) {
+  const n = Number(weekNum);
+  if (n === 13) return 'Nộp Sơ khảo';
+  if (n === 14) return 'Bảo vệ Tốt nghiệp';
+  if (n === 15) return 'Tổng kết & Kết quả';
+  if (n > 15) return `Mốc ${n}`;
+  return `Tuần ${n}`;
+}
+
+function resolveRoundWeekTitle(weekNum, customTitle) {
+  const n = Number(weekNum);
+  const trimmed = String(customTitle || '').trim();
+  if (trimmed && !/^Tuần\s+\d+$/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (n > 12) {
+    if (!trimmed || /^Tuần\s+\d+$/i.test(trimmed)) {
+      return getRoundTimelineDefaultTitle(n);
+    }
+  }
+  return trimmed || `Tuần ${n}`;
+}
+
 function renderRoundWeeklyContentEditor(durationWeeks) {
   const grid = document.getElementById('round-weekly-content-grid');
   if (!grid) return;
@@ -4204,22 +4227,27 @@ function renderRoundWeeklyContentEditor(durationWeeks) {
   const defaultMilestones = { 4: 'Duyệt đợt 1', 8: 'Duyệt đợt 2', 12: 'Duyệt đợt 3' };
   grid.innerHTML = Array.from({ length: durationWeeks }, (_, i) => {
     const n = i + 1;
-    const defMilestone = defaultMilestones[n] || '';
+    const defMilestone = defaultMilestones[n] || (n === 13 ? 'Sơ khảo' : '');
+    const isPostWeek12 = n > 12;
+    const defaultTitle = getRoundTimelineDefaultTitle(n);
     return `
       <div data-round-week-card="${n}" class="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
         <div class="flex items-center justify-between">
-          <span class="font-black text-xs text-slate-800">Tuần ${n}</span>
+          <span class="font-black text-xs text-slate-800">${isPostWeek12 ? `Mốc ${n}: ${defaultTitle}` : `Tuần ${n}`}</span>
           <div class="flex items-center gap-2">
             <label class="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 cursor-pointer">
               <input type="checkbox" id="round-week-${n}-visible" checked class="rounded text-emerald-600">
               Hiển thị cho SV
             </label>
-            ${n > 12 ? `<button type="button" onclick="removeRoundTimelineWeek(${n})" title="Xóa tuần này" class="rounded-md border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] font-black text-rose-600 hover:bg-rose-100">× Xóa</button>` : ''}
+            ${n > 12 ? `<button type="button" onclick="removeRoundTimelineWeek(${n})" title="Xóa mốc này" class="rounded-md border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] font-black text-rose-600 hover:bg-rose-100">× Xóa</button>` : ''}
           </div>
         </div>
-        <input type="text" id="round-week-${n}-title" placeholder="Tiêu đề tuần ${n}"
-               class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
-        <textarea id="round-week-${n}-note" rows="2" placeholder="Ghi chú nội dung tuần ${n} (tuỳ chọn)"
+        <div>
+          <label class="block text-[10px] font-bold text-slate-500 mb-0.5">${isPostWeek12 ? 'Tên giai đoạn / mốc (đổi tên tùy ý)' : 'Tiêu đề tuần'}</label>
+          <input type="text" id="round-week-${n}-title" placeholder="${defaultTitle}" value="${isPostWeek12 ? defaultTitle : `Tuần ${n}`}"
+                 class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none">
+        </div>
+        <textarea id="round-week-${n}-note" rows="2" placeholder="Ghi chú nội dung ${isPostWeek12 ? defaultTitle : `tuần ${n}`} (tuỳ chọn)"
                   class="w-full p-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-400 focus:outline-none resize-none"></textarea>
         <select id="round-week-${n}-milestone"
                 onchange="toggleRoundWeekCustomMilestone(${n})"
@@ -4228,7 +4256,7 @@ function renderRoundWeeklyContentEditor(durationWeeks) {
           <option value="Duyệt đợt 1" ${defMilestone === 'Duyệt đợt 1' ? 'selected' : ''}>🚩 Duyệt đợt 1</option>
           <option value="Duyệt đợt 2" ${defMilestone === 'Duyệt đợt 2' ? 'selected' : ''}>🚩 Duyệt đợt 2</option>
           <option value="Duyệt đợt 3" ${defMilestone === 'Duyệt đợt 3' ? 'selected' : ''}>🚩 Duyệt đợt 3</option>
-          <option value="Sơ khảo">📋 Sơ khảo</option>
+          <option value="Sơ khảo" ${defMilestone === 'Sơ khảo' ? 'selected' : ''}>📋 Sơ khảo</option>
           <option value="Khác">📌 Khác</option>
         </select>
         <input type="text" id="round-week-${n}-milestone-custom" placeholder="Tên mốc tùy chỉnh"
@@ -4256,8 +4284,9 @@ function renderRoundWeeklyContentEditor(durationWeeks) {
 function readRoundWeeklyContentDraft(durationWeeks) {
   return Array.from({ length: durationWeeks }, (_, index) => {
     const week = index + 1;
+    const rawTitle = document.getElementById(`round-week-${week}-title`)?.value?.trim() || '';
     return {
-      title: document.getElementById(`round-week-${week}-title`)?.value || '',
+      title: resolveRoundWeekTitle(week, rawTitle),
       note: document.getElementById(`round-week-${week}-note`)?.value || '',
       milestone: document.getElementById(`round-week-${week}-milestone`)?.value || '',
       customMilestone: document.getElementById(`round-week-${week}-milestone-custom`)?.value || '',
@@ -4277,7 +4306,7 @@ function restoreRoundWeeklyContentDraft(drafts = []) {
     const milestoneEl = document.getElementById(`round-week-${week}-milestone`);
     const customEl = document.getElementById(`round-week-${week}-milestone-custom`);
     const visibleEl = document.getElementById(`round-week-${week}-visible`);
-    if (titleEl) titleEl.value = draft.title || `Tuần ${week}`;
+    if (titleEl) titleEl.value = resolveRoundWeekTitle(week, draft.title);
     if (noteEl) noteEl.value = draft.note || '';
     if (milestoneEl) milestoneEl.value = draft.milestone || '';
     if (customEl) customEl.value = draft.customMilestone || '';
@@ -4299,7 +4328,8 @@ window.addRoundTimelineWeek = function() {
   const nextDuration = currentDuration + 1;
   if (durationInput) durationInput.value = String(nextDuration);
   renderRoundWeeklyContentEditor(nextDuration);
-  restoreRoundWeeklyContentDraft([...drafts, { title: `Tuần ${nextDuration}`, note: '', milestone: '', customMilestone: '', visible: true, events: [] }]);
+  const defaultTitle = getRoundTimelineDefaultTitle(nextDuration);
+  restoreRoundWeeklyContentDraft([...drafts, { title: defaultTitle, note: '', milestone: '', customMilestone: '', visible: true, events: [] }]);
   document.querySelector(`[data-round-week-card="${nextDuration}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 };
 
@@ -4321,7 +4351,7 @@ window.resizeRoundTimelineWeeks = function(value) {
   const drafts = readRoundWeeklyContentDraft(currentDuration).slice(0, requestedDuration);
   while (drafts.length < requestedDuration) {
     const week = drafts.length + 1;
-    drafts.push({ title: `Tuần ${week}`, note: '', milestone: '', customMilestone: '', visible: true, events: [] });
+    drafts.push({ title: getRoundTimelineDefaultTitle(week), note: '', milestone: '', customMilestone: '', visible: true, events: [] });
   }
   const durationInput = document.getElementById('round-form-duration-weeks');
   if (durationInput) durationInput.value = String(requestedDuration);
@@ -5854,7 +5884,7 @@ window.saveRound = async function(e) {
     const customMilestone = document.getElementById(`round-week-${n}-milestone-custom`)?.value?.trim() || '';
     return {
       week: n,
-      title: document.getElementById(`round-week-${n}-title`)?.value?.trim() || `Tuần ${n}`,
+      title: resolveRoundWeekTitle(n, document.getElementById(`round-week-${n}-title`)?.value?.trim()),
       note: document.getElementById(`round-week-${n}-note`)?.value?.trim() || '',
       milestone: milestoneSelect === 'Khác' ? (customMilestone || 'Mốc khác') : milestoneSelect,
       visible: document.getElementById(`round-week-${n}-visible`)?.checked !== false,
@@ -21440,9 +21470,9 @@ function getRoundWeekSchedule(round) {
     })).filter(event => event.title);
     return {
       week,
-      title: config.title || `Tuần ${week}`,
+      title: resolveRoundWeekTitle(week, config.title),
       note: config.note || '',
-      milestone: config.milestone || defaultMilestones[week] || '',
+      milestone: config.milestone || (week <= 12 ? (defaultMilestones[week] || '') : ''),
       visible: config.visible !== false,
       status,
       dateText: `${formatDate(start)} – ${formatDate(end)}`,
@@ -21606,14 +21636,16 @@ function renderAdminRoundTimelinePreview(round) {
 
   const weekCards = weeks.map(week => {
     const style = statusStyles[week.status] || statusStyles.upcoming;
+    const resolvedTitle = resolveRoundWeekTitle(week.week, week.title);
+    const circleContent = style.icon || (week.week > 12 ? (week.week === 13 ? '📄' : week.week === 14 ? '🎓' : '📌') : week.week);
     return `
       <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}', ${week.week})" class="ifa-timeline-card relative min-w-[290px] rounded-2xl border p-3 pb-7 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}">
         <div class="flex items-center justify-between gap-1 w-full mb-1">
-          <span class="font-black text-xs text-slate-900 whitespace-nowrap">Tuần ${week.week}</span>
+          <span class="font-black text-xs text-slate-900 whitespace-nowrap">${escapeHtml(resolvedTitle)}</span>
           ${week.milestone ? `<span class="px-1.5 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px] leading-tight text-center">🚩 ${escapeHtml(week.milestone)}</span>` : ''}
           <span class="px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${week.visible ? style.badge : 'bg-slate-200 text-slate-600 border-slate-300'}">${week.visible ? style.label : 'Đang ẩn'}</span>
         </div>
-        <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black my-1 ${week.status === 'ongoing' ? 'bg-blue-600 text-white' : week.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">${style.icon || week.week}</span>
+        <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black my-1 ${week.status === 'ongoing' ? 'bg-blue-600 text-white' : week.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">${circleContent}</span>
         <span class="font-mono font-bold text-[11px] text-slate-700">${week.dateText}</span>
         ${renderTimelineWeekDays(week.days, week.events, week.week, round.id)}
         ${renderTimelineWeekEvents(week.events, week.week, round.id)}
@@ -22470,16 +22502,24 @@ function renderSupervisorRoundTimeline(round) {
   if (!weeks.length) return;
   const current = allWeeks.find(week => week.status === 'ongoing');
   const completed = allWeeks.filter(week => week.status === 'completed').length;
+  const currentTitle = current ? resolveRoundWeekTitle(current.week, current.title) : null;
+  const hasCustomSokhao = allWeeks.some(w => w.week >= 13 && resolveRoundWeekTitle(w.week, w.title).toLowerCase().includes('sơ khảo')) || allWeeks.length >= 13;
+  const hasCustomBaove = allWeeks.some(w => w.week >= 14 && resolveRoundWeekTitle(w.week, w.title).toLowerCase().includes('bảo vệ')) || allWeeks.length >= 14;
+  const hasCustomKetqua = allWeeks.some(w => w.week >= 15 && resolveRoundWeekTitle(w.week, w.title).toLowerCase().includes('kết quả')) || allWeeks.length >= 15;
   const stageCard = (icon, title, note) => `<div class="ifa-timeline-card min-w-[290px] max-w-[290px] snap-start rounded-2xl border border-slate-200 bg-slate-50 p-4 flex flex-col items-center justify-center text-center"><span class="mb-2 text-2xl">${icon}</span><strong class="text-xs text-slate-900">${title}</strong><span class="mt-1 text-[10px] text-slate-500">${note}</span></div>`;
-  container.innerHTML = `<div class="mb-3 flex flex-wrap items-center justify-between gap-2"><div class="flex items-center gap-2"><span class="text-xl">🗓️</span><div><h2 class="text-sm font-black text-slate-900">Lộ trình đồ án tốt nghiệp & tiến độ thực hiện</h2><p class="text-[11px] text-slate-500">Kế hoạch ${allWeeks.length} tuần · Chọn sự kiện để xem chi tiết</p></div></div><span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700">${current ? `Đang diễn ra: Tuần ${current.week}/${allWeeks.length}` : `Đã qua ${completed}/${allWeeks.length} tuần`}</span></div>
-    <div class="flex gap-3 overflow-x-auto pb-2 snap-x">${stageCard('📝', 'Đăng ký đề tài', 'Sinh viên đăng ký đề tài')}${stageCard('👨‍🏫', 'Phân công GVHD', isDirectSupervisorAssignment(round) ? 'Khoa phân công' : 'Xét nguyện vọng')}${weeks.map(week => `<div class="ifa-timeline-card min-w-[290px] max-w-[290px] snap-start rounded-2xl border p-3 ${week.status === 'ongoing' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-slate-50'}">
-      <div class="flex items-center justify-between gap-1"><strong class="text-xs text-slate-900 whitespace-nowrap">${escapeHtml(week.title)}</strong>${week.milestone ? `<span class="rounded-md bg-amber-500 px-1.5 py-0.5 text-center text-[9px] font-black leading-tight text-white">🚩 ${escapeHtml(week.milestone)}</span>` : ''}<span class="text-[10px] font-bold text-slate-500 whitespace-nowrap">${week.status === 'ongoing' ? 'Đang diễn ra' : week.status === 'completed' ? 'Đã qua' : 'Chưa tới'}</span></div>
-      <div class="mx-auto my-2 flex h-9 w-9 items-center justify-center rounded-full text-xs font-black ${week.status === 'ongoing' ? 'bg-blue-600 text-white' : week.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">${week.status === 'completed' ? '✓' : week.status === 'ongoing' ? '●' : week.week}</div>
+  container.innerHTML = `<div class="mb-3 flex flex-wrap items-center justify-between gap-2"><div class="flex items-center gap-2"><span class="text-xl">🗓️</span><div><h2 class="text-sm font-black text-slate-900">Lộ trình đồ án tốt nghiệp & tiến độ thực hiện</h2><p class="text-[11px] text-slate-500">Kế hoạch ${allWeeks.length} tuần · Chọn sự kiện để xem chi tiết</p></div></div><span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700">${current ? `Đang diễn ra: ${escapeHtml(currentTitle)}` : `Đã qua ${completed}/${allWeeks.length} tuần`}</span></div>
+    <div class="flex gap-3 overflow-x-auto pb-2 snap-x">${stageCard('📝', 'Đăng ký đề tài', 'Sinh viên đăng ký đề tài')}${stageCard('👨‍🏫', 'Phân công GVHD', isDirectSupervisorAssignment(round) ? 'Khoa phân công' : 'Xét nguyện vọng')}${weeks.map(week => {
+      const resolvedTitle = resolveRoundWeekTitle(week.week, week.title);
+      const circleContent = week.status === 'completed' ? '✓' : week.status === 'ongoing' ? '●' : (week.week > 12 ? (week.week === 13 ? '📄' : week.week === 14 ? '🎓' : '📌') : week.week);
+      return `<div class="ifa-timeline-card min-w-[290px] max-w-[290px] snap-start rounded-2xl border p-3 ${week.status === 'ongoing' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-slate-50'}">
+      <div class="flex items-center justify-between gap-1"><strong class="text-xs text-slate-900 whitespace-nowrap">${escapeHtml(resolvedTitle)}</strong>${week.milestone ? `<span class="rounded-md bg-amber-500 px-1.5 py-0.5 text-center text-[9px] font-black leading-tight text-white">🚩 ${escapeHtml(week.milestone)}</span>` : ''}<span class="text-[10px] font-bold text-slate-500 whitespace-nowrap">${week.status === 'ongoing' ? 'Đang diễn ra' : week.status === 'completed' ? 'Đã qua' : 'Chưa tới'}</span></div>
+      <div class="mx-auto my-2 flex h-9 w-9 items-center justify-center rounded-full text-xs font-black ${week.status === 'ongoing' ? 'bg-blue-600 text-white' : week.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">${circleContent}</div>
       <p class="mt-2 text-center font-mono text-[11px] font-bold text-slate-700">${week.dateText}</p>
       ${renderTimelineWeekDays(week.days, week.events, week.week, round.id)}
       ${renderTimelineWeekEvents(week.events, week.week, round.id)}
       ${week.note ? `<p class="mt-2 text-[10px] text-slate-600">${escapeHtml(week.note)}</p>` : ''}
-    </div>`).join('')}${stageCard('📄', 'Nộp Sơ khảo', 'Sau giai đoạn thực hiện')}${stageCard('🎓', 'Bảo vệ Tốt nghiệp', 'Theo lịch của Khoa')}${stageCard('🏆', 'Kết quả', 'Sau bảo vệ tốt nghiệp')}</div>`;
+    </div>`;
+    }).join('')}${!hasCustomSokhao ? stageCard('📄', 'Nộp Sơ khảo', 'Sau giai đoạn thực hiện') : ''}${!hasCustomBaove ? stageCard('🎓', 'Bảo vệ Tốt nghiệp', 'Theo lịch của Khoa') : ''}${!hasCustomKetqua ? stageCard('🏆', 'Kết quả', 'Sau bảo vệ tốt nghiệp') : ''}</div>`;
 }
 
 function renderSupervisorPlanList(round) {
@@ -22594,8 +22634,9 @@ window.renderStudentTimelineWeeks = function() {
   }
   if (badgeEl) {
     if (currentWeekNum) {
+      const activeTitle = resolveRoundWeekTitle(currentWeekNum, (weeklyConfig.find(c => c.week === currentWeekNum) || {}).title);
       badgeEl.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1.5 animate-pulse';
-      badgeEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-600 inline-block"></span> Đang diễn ra: Tuần ${currentWeekNum}/${durationWeeks}`;
+      badgeEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-600 inline-block"></span> Đang diễn ra: ${escapeHtml(activeTitle)}`;
     } else if (firstWeekStart && now < firstWeekStart) {
       badgeEl.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200';
       badgeEl.textContent = `Sắp bắt đầu (${fmtShortDate(firstWeekStart)})`;
@@ -22691,12 +22732,13 @@ window.renderStudentTimelineWeeks = function() {
     const events = distinguishOverlappingTimelineEvents(
       [...manualEvents, ...activityEvents.filter(event => event.startDate <= lastDay && event.endDate >= firstDay)], w.days
     );
+    const resolvedTitle = resolveRoundWeekTitle(w.num, cfg.title);
     allCards.push({
       type: 'week',
       num: w.num,
       dateText: w.dateText,
       status: w.status,
-      title: cfg.title || `Tuần ${w.num}`,
+      title: resolvedTitle,
       subtitle: cfg.note || '',
       milestone,
       days: w.days,
@@ -22705,39 +22747,50 @@ window.renderStudentTimelineWeeks = function() {
   });
   state.studentTimelineEventMap = new Map(allCards.filter(card => card.type === 'week').map(card => [card.num, card.events]));
 
-  // Card N – Sơ khảo
+  const hasCustomSokhaoWeek = weeks.some(w => w.num >= 13 && resolveRoundWeekTitle(w.num, (weeklyConfig.find(c => c.week === w.num) || {}).title).toLowerCase().includes('sơ khảo')) || durationWeeks >= 13;
+  const hasCustomBaoveWeek = weeks.some(w => w.num >= 14 && resolveRoundWeekTitle(w.num, (weeklyConfig.find(c => c.week === w.num) || {}).title).toLowerCase().includes('bảo vệ')) || durationWeeks >= 14;
+  const hasCustomKetquaWeek = weeks.some(w => w.num >= 15 && resolveRoundWeekTitle(w.num, (weeklyConfig.find(c => c.week === w.num) || {}).title).toLowerCase().includes('kết quả')) || durationWeeks >= 15;
+
   const afterWeeks = lastWeekEnd ? now > lastWeekEnd : false;
-  allCards.push({
-    type: 'milestone',
-    id: 'sokhao',
-    icon: '📄',
-    title: 'Nộp Sơ khảo',
-    subtitle: 'Nộp hồ sơ Sơ khảo',
-    status: afterWeeks ? 'completed' : 'upcoming',
-    note: afterWeeks ? '✓ Đã nộp' : 'Sau 12 tuần',
-  });
 
-  // Card N+1 – Bảo vệ TN
-  allCards.push({
-    type: 'milestone',
-    id: 'baove',
-    icon: '🎓',
-    title: 'Bảo vệ Tốt nghiệp',
-    subtitle: 'Trình bày & Hội đồng chấm',
-    status: afterWeeks ? 'completed' : 'upcoming',
-    note: afterWeeks ? '✓ Đã bảo vệ' : 'Lịch do Khoa thông báo',
-  });
+  // Card N – Sơ khảo (only show if not covered in weekly cards)
+  if (!hasCustomSokhaoWeek) {
+    allCards.push({
+      type: 'milestone',
+      id: 'sokhao',
+      icon: '📄',
+      title: 'Nộp Sơ khảo',
+      subtitle: 'Nộp hồ sơ Sơ khảo',
+      status: afterWeeks ? 'completed' : 'upcoming',
+      note: afterWeeks ? '✓ Đã nộp' : 'Sau 12 tuần',
+    });
+  }
 
-  // Card N+2 – Kết quả
-  allCards.push({
-    type: 'milestone',
-    id: 'ketqua',
-    icon: '🏆',
-    title: 'Kết quả',
-    subtitle: 'Điểm tổng kết chính thức',
-    status: afterWeeks ? 'completed' : 'upcoming',
-    note: afterWeeks ? '✓ Đã công bố' : 'Sau bảo vệ TN',
-  });
+  // Card N+1 – Bảo vệ TN (only show if not covered in weekly cards)
+  if (!hasCustomBaoveWeek) {
+    allCards.push({
+      type: 'milestone',
+      id: 'baove',
+      icon: '🎓',
+      title: 'Bảo vệ Tốt nghiệp',
+      subtitle: 'Trình bày & Hội đồng chấm',
+      status: afterWeeks ? 'completed' : 'upcoming',
+      note: afterWeeks ? '✓ Đã bảo vệ' : 'Lịch do Khoa thông báo',
+    });
+  }
+
+  // Card N+2 – Kết quả (only show if not covered in weekly cards)
+  if (!hasCustomKetquaWeek) {
+    allCards.push({
+      type: 'milestone',
+      id: 'ketqua',
+      icon: '🏆',
+      title: 'Kết quả',
+      subtitle: 'Điểm tổng kết chính thức',
+      status: afterWeeks ? 'completed' : 'upcoming',
+      note: afterWeeks ? '✓ Đã công bố' : 'Sau bảo vệ TN',
+    });
+  }
 
   // ── Compute card pixel width ────────────────────────────────────
   const visibleCount = _getTimelineVisibleCount();
@@ -22786,15 +22839,16 @@ window.renderStudentTimelineWeeks = function() {
       const noteHtml = card.subtitle
         ? `<p class="text-[10px] text-slate-500 mt-1 leading-tight line-clamp-2">${card.subtitle}</p>`
         : '';
+      const circleContent = card.status === 'completed' ? '✓' : (card.status === 'ongoing' || card.status === 'active') ? '●' : (card.num > 12 ? (card.num === 13 ? '📄' : card.num === 14 ? '🎓' : '📌') : card.num);
       return `<div class="ifa-timeline-card flex-shrink-0 rounded-2xl border ${st.card} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all ${isActive ? 'shadow-md' : ''}"
                    style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
         <div class="flex items-center justify-between gap-1 w-full mb-1.5">
-          <span class="font-black text-sm text-inherit whitespace-nowrap">Tuần ${card.num}</span>
+          <span class="font-black text-sm text-inherit whitespace-nowrap">${escapeHtml(card.title)}</span>
           ${milestoneHtml}
           <span class="text-[10px] px-1.5 py-0.5 rounded-full border ${st.badge} font-bold whitespace-nowrap leading-none">${st.label}</span>
         </div>
         <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${st.icon_bg} my-1">
-          ${card.status === 'completed' ? '✓' : (card.status === 'ongoing' || card.status === 'active') ? '●' : card.num}
+          ${circleContent}
         </div>
         <span class="text-[13px] font-mono font-bold text-slate-700 tracking-tight">${card.dateText}</span>
         ${renderTimelineWeekDays(card.days, card.events, card.num)}

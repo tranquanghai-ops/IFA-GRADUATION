@@ -265,5 +265,13 @@ test('deleting student cascades all registration and assignment data and isolate
   assert.match(app, /const isStudentEligible = \(stId\) =>/);
 });
 
-
-
+test('timeline supports customizable names for week 13 onwards without forcing Tuần 13', () => {
+  assert.match(app, /function getRoundTimelineDefaultTitle/);
+  assert.match(app, /function resolveRoundWeekTitle/);
+  assert.match(app, /Nộp Sơ khảo/);
+  assert.match(app, /Bảo vệ Tốt nghiệp/);
+  assert.match(app, /Tổng kết & Kết quả/);
+  assert.match(app, /hasCustomSokhaoWeek/);
+  assert.match(app, /hasCustomBaoveWeek/);
+  assert.match(app, /hasCustomKetquaWeek/);
+});
