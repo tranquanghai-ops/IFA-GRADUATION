@@ -210,24 +210,23 @@
         <!-- 1. CURRENT ROUND HERO CARD -->
         <div id="student-hero-card" class="card-surface px-5 py-4 sm:px-6 sm:py-5 bg-gradient-to-r from-slate-900 via-tdtu-blue to-tdtu-dark text-white shadow-xl relative overflow-hidden rounded-2xl border border-white/10">
           <div class="relative z-10 min-h-[132px]">
-            <div class="space-y-2 lg:pr-[350px]">
+            <div class="space-y-3 lg:pr-[430px]">
               <div class="flex flex-wrap items-center gap-2">
                 <span id="round-status-badge" class="hidden badge badge-open font-bold">Đang mở đăng ký</span>
                 <span id="round-mode-badge" class="hidden badge badge-info"></span>
                 <span id="hero-student-state-badge" class="hidden badge bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-400/30">Đủ điều kiện</span>
               </div>
-              <h1 id="round-title-display" class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white leading-tight lg:whitespace-nowrap">
+              <h1 id="round-title-display" class="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white leading-tight">
                 Đồ án Tốt nghiệp
               </h1>
-              <div id="hero-registered-topic-wrap" class="hidden mt-1.5 p-2.5 bg-white/10 border border-white/15 rounded-xl text-xs backdrop-blur-sm shadow-2xs max-w-3xl lg:mr-[430px]">
-                <div class="flex items-center gap-1.5 text-amber-300 font-black text-[10px] uppercase tracking-wider">
+              <div id="hero-registered-topic-wrap" class="hidden mt-2 p-4 bg-white/10 border border-white/15 rounded-xl backdrop-blur-sm shadow-2xs w-full">
+                <div class="flex items-center gap-1.5 text-amber-300 font-black text-xs uppercase tracking-wider">
                   <span>📋</span> <span>Đề tài đã đăng ký:</span>
                 </div>
-                <div id="hero-registered-topic-name" class="font-bold text-white text-xs sm:text-sm mt-0.5 leading-snug break-words">--</div>
-                <div id="hero-registered-topic-meta" class="text-[11px] text-blue-200 mt-0.5 font-medium flex items-center gap-2 flex-wrap"></div>
+                <div id="hero-registered-topic-name" class="font-bold text-white text-base sm:text-lg mt-1 leading-snug break-words">--</div>
+                <div id="hero-registered-topic-meta" class="text-xs text-blue-200 mt-1 font-medium flex items-center gap-2 flex-wrap"></div>
                 <button id="hero-download-topic-form-btn" type="button" onclick="downloadOfficialTopicRegistrationPdf()" class="hidden mt-2 px-3 py-1.5 bg-white text-tdtu-blue rounded-lg text-[11px] font-black shadow-sm hover:bg-blue-50">⬇ Tải phiếu đăng ký PDF</button>
               </div>
-              <p id="round-academic-year" class="text-xs sm:text-sm text-blue-200 font-medium lg:mr-[430px]">Năm học 2026-2027</p>
               <p id="round-time-range" class="hidden text-xs text-slate-300 flex items-center gap-1.5 pt-0.5 lg:mr-[430px]">
                 <span>📅 Thời gian: --</span>
               </p>
@@ -257,23 +256,8 @@
             </div>
 
             <!-- Supervisor Info Widget (Enlarged and Comfortable) -->
-            <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/20 shadow-sm flex items-center gap-3 min-w-[280px] sm:min-w-[300px] lg:w-[320px] max-w-[340px] lg:absolute lg:right-0 lg:top-0 mt-3 lg:mt-0">
-              <img id="hero-sup-card-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E" class="w-12 h-12 rounded-xl object-cover border-2 border-white/30 shrink-0 bg-white/10 shadow-xs" alt="GVHD Avatar">
-              <div class="min-w-0 flex-1 space-y-0.5">
-                <div class="flex items-center gap-1.5">
-                  <span id="hero-sup-card-role" class="badge bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 uppercase tracking-wide">GVHD</span>
-                  <span id="hero-sup-card-status" class="text-[10px] text-blue-200 font-bold">Chưa phân công</span>
-                </div>
-                <h4 id="hero-sup-card-name" class="text-xs sm:text-sm font-black text-white truncate">Chưa phân công GVHD</h4>
-                <div class="text-[11px] text-blue-100 flex flex-col gap-0.5 pt-0.5">
-                  <a id="hero-sup-card-email-link" href="#" class="hover:underline truncate flex items-center gap-1 text-blue-200" title="Email GVHD">
-                    <span>✉️</span> <span id="hero-sup-card-email">--</span>
-                  </a>
-                  <a id="hero-sup-card-phone-link" href="#" class="hover:underline flex items-center gap-1 text-emerald-300 font-medium" title="Số điện thoại GVHD">
-                    <span>📞</span> <span id="hero-sup-card-phone">--</span>
-                  </a>
-                </div>
-              </div>
+            <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-sm min-w-[300px] lg:w-[410px] lg:absolute lg:right-0 lg:top-0 mt-3 lg:mt-0">
+              <div class="min-h-20 flex items-center justify-center text-sm text-blue-100">Đang tải thông tin GVHD...</div>
               <!-- Hidden placeholders for countdown to preserve script references without errors -->
               <span id="countdown-label" class="hidden"></span>
               <span id="countdown-value" class="hidden"></span>
@@ -289,14 +273,14 @@
         </div>
 
         <!-- 2. UNIFIED DATN JOURNEY & WEEKLY CARD SLIDER -->
-        <div id="student-journey-card" class="card-surface p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div id="student-journey-card" class="card-surface p-5 sm:p-6 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <!-- Card Header -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div class="flex items-center gap-2.5">
               <span class="text-2xl p-2 rounded-xl bg-blue-50 border border-blue-100 text-blue-700">🗓️</span>
               <div>
-                <h2 class="text-sm font-black text-slate-900 uppercase tracking-wide">Lộ trình Đồ án Tốt nghiệp & Tiến độ thực hiện</h2>
-                <p id="timeline-weeks-dates-range" class="text-[11px] text-slate-500">Quy trình từ Đăng ký đề tài, Phân công GVHD, 12 tuần thực hiện đến Bảo vệ & Kết quả</p>
+                <h2 class="text-base sm:text-lg font-black text-slate-900 uppercase tracking-wide">Lộ trình Đồ án Tốt nghiệp & Tiến độ thực hiện</h2>
+                <p id="timeline-weeks-dates-range" class="text-xs sm:text-sm text-slate-500">Quy trình từ Đăng ký đề tài, Phân công GVHD, 12 tuần thực hiện đến Bảo vệ & Kết quả</p>
               </div>
             </div>
             <div class="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
@@ -433,14 +417,14 @@
             <!-- MODULE 3: ĐĂNG KÝ ĐỀ TÀI & CHỌN GVHD -->
 
             <!-- 3A: REGISTRATION CTA HERO CARD (WHEN UNREGISTERED & OPEN) -->
-            <div id="registration-cta-card" class="hidden card-surface p-6 bg-gradient-to-br from-blue-50 via-white to-blue-50/50 border-2 border-blue-200 rounded-2xl shadow-sm text-center space-y-4">
-              <div class="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto text-2xl font-black shadow-md">
+            <div id="registration-cta-card" class="hidden card-surface p-7 sm:p-9 bg-gradient-to-br from-blue-50 via-white to-blue-50/50 border-2 border-blue-200 rounded-2xl shadow-sm text-center space-y-5">
+              <div class="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto text-3xl font-black shadow-md">
                 ✍️
               </div>
               <div>
                 <span class="badge bg-blue-100 text-blue-800 font-bold text-xs mb-1">ĐỢT ĐANG MỞ ĐĂNG KÝ</span>
-                <h2 id="registration-cta-title" class="text-lg sm:text-xl font-black text-slate-900 mt-1">Đăng ký Đề tài & Chọn Giảng viên hướng dẫn</h2>
-                <p id="registration-cta-description" class="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                <h2 id="registration-cta-title" class="text-xl sm:text-2xl font-black text-slate-900 mt-1">Đăng ký Đề tài & Chọn Giảng viên hướng dẫn</h2>
+                <p id="registration-cta-description" class="text-sm text-slate-600 max-w-xl mx-auto mt-2 leading-relaxed">
                   Vui lòng hoàn thành điền tên đề tài dự kiến, chọn loại hình đồ án và đăng ký các nguyện vọng GVHD theo quy định của Khoa.
                 </p>
               </div>

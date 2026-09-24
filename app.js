@@ -1535,6 +1535,22 @@ async function loadRounds() {
       }
     }
 
+    // A student lands in a round where their MSSV is on the official roster.
+    // Keep explicit deep links and admin simulation targets authoritative.
+    if (!targetRound && state.currentView === 'student' && state.isStudent && !state.impersonation && state.studentMssv) {
+      const eligibleMatches = await Promise.all(state.rounds.filter(r => !r.deleted).map(async round => {
+        try {
+          const eligibleDoc = await getDoc(doc(db, 'graduationRounds', round.id, 'eligibleStudents', state.studentMssv));
+          return eligibleDoc.exists() && eligibleDoc.data().eligible !== false ? round : null;
+        } catch (error) {
+          console.warn(`[Rounds] Could not check student roster in ${round.id}:`, error);
+          return null;
+        }
+      }));
+      const matchedRounds = eligibleMatches.filter(Boolean);
+      targetRound = matchedRounds.find(round => round.isActive === true) || matchedRounds[0] || null;
+    }
+
     // If no direct link, ONLY use the ACTIVE round
     if (!targetRound) {
       targetRound = state.rounds.find(r => !r.deleted && r.isActive === true);
@@ -1636,11 +1652,7 @@ function renderRoundsDropdowns() {
 
   if (selectActive) {
     selectActive.innerHTML = optionsHtml;
-    if (validRounds.length > 1) {
-      document.getElementById('multi-round-selector-wrap')?.classList.remove('hidden');
-    } else {
-      document.getElementById('multi-round-selector-wrap')?.classList.add('hidden');
-    }
+    document.getElementById('multi-round-selector-wrap')?.classList.add('hidden');
   }
   if (selectAdminSup) selectAdminSup.innerHTML = optionsHtml;
   if (selectAdminStudent) selectAdminStudent.innerHTML = optionsHtml;
@@ -1678,6 +1690,35 @@ export async function selectRound(roundId) {
   await loadStudentRoundActivities(roundId);
 }
 
+function resolveStudentSupervisorProfiles(officialList = [], effectiveAssignment = null) {
+  const fallbackName = effectiveAssignment?.acceptedSupervisorName || effectiveAssignment?.supervisorName || effectiveAssignment?.officialSupervisor?.name || '';
+  const assigned = officialList.length ? officialList : (fallbackName ? [{
+    supervisorId: effectiveAssignment.acceptedSupervisorId || effectiveAssignment.assignedSupervisorId || '',
+    supervisorName: fallbackName,
+    role: 'primary'
+  }] : []);
+  return [...assigned].sort((a, b) => (a.role === 'primary' ? -1 : 1) - (b.role === 'primary' ? -1 : 1)).map((item, index) => {
+    const id = String(item.supervisorId || item.id || '').trim();
+    const itemEmail = String(item.supervisorEmail || item.email || '').trim().toLowerCase();
+    const itemName = String(item.supervisorName || item.name || '').trim().toLowerCase();
+    const profiles = [...(state.roundSupervisors || []), ...(state.supervisorsMaster || [])];
+    const profile = profiles.find(s => id && (s.id === id || s.supervisorId === id))
+      || profiles.find(s => itemEmail && String(s.email || '').trim().toLowerCase() === itemEmail)
+      || profiles.find(s => itemName && String(s.name || s.supervisorName || '').trim().toLowerCase() === itemName)
+      || {};
+    const master = (state.supervisorsMaster || []).find(s =>
+      (id && (s.id === id || s.supervisorId === id)) ||
+      (itemEmail && String(s.email || '').trim().toLowerCase() === itemEmail)) || {};
+    return {
+      label: assigned.length > 1 ? `GVHD ${index + 1}` : 'GVHD',
+      name: item.supervisorName || item.name || profile.name || master.name || 'Giảng viên hướng dẫn',
+      email: item.supervisorEmail || item.email || profile.email || master.email || effectiveAssignment?.supervisorEmail || '',
+      phone: item.phone || item.phoneNumber || profile.phone || profile.phoneNumber || profile.mobile || master.phone || master.phoneNumber || master.mobile || effectiveAssignment?.supervisorPhone || '',
+      photoUrl: item.photoUrl || profile.photoUrl || master.photoUrl || ''
+    };
+  });
+}
+
 function renderRoundHeader() {
   const round = state.activeRound;
   if (!round) return;
@@ -1692,8 +1733,6 @@ function renderRoundHeader() {
 
   const titleDisplay = document.getElementById('round-title-display');
   if (titleDisplay) titleDisplay.textContent = round.title;
-  const yearDisplay = document.getElementById('round-academic-year');
-  if (yearDisplay) yearDisplay.textContent = `Năm học ${round.academicYear || ''}`;
 
   // Hero Card Quick Metrics
   const milestonesCountEl = document.getElementById('hero-milestones-count');
@@ -1708,7 +1747,7 @@ function renderRoundHeader() {
   const assignedSupEl = document.getElementById('hero-assigned-sup');
   const effectiveAssignment = normalizeOfficialAssignment(state.myOfficialAssignment, state.myRegistration);
   const officialList = effectiveAssignment ? getOfficialSupervisors(effectiveAssignment) : [];
-  const hasOfficialSup = officialList.length > 0 || Boolean(effectiveAssignment?.assignedSupervisorId || effectiveAssignment?.officialSupervisor || effectiveAssignment?.acceptedSupervisorName);
+  const hasOfficialSup = officialList.length > 0 || Boolean(effectiveAssignment?.assignedSupervisorId || effectiveAssignment?.officialSupervisor || effectiveAssignment?.acceptedSupervisorName || effectiveAssignment?.supervisorName);
 
   if (assignedSupEl) {
     if (officialList.length > 0) {
@@ -1721,72 +1760,24 @@ function renderRoundHeader() {
     }
   }
 
-  // Populate Supervisor Info Card in Student Hero
-  const supCardAvatar = document.getElementById('hero-sup-card-avatar');
-  const supCardRole = document.getElementById('hero-sup-card-role');
-  const supCardStatus = document.getElementById('hero-sup-card-status');
-  const supCardName = document.getElementById('hero-sup-card-name');
-  const supCardEmail = document.getElementById('hero-sup-card-email');
-  const supCardEmailLink = document.getElementById('hero-sup-card-email-link');
-  const supCardPhone = document.getElementById('hero-sup-card-phone');
-  const supCardPhoneLink = document.getElementById('hero-sup-card-phone-link');
-
-  if (hasOfficialSup) {
-    const primary = officialList.find(s => s.role === 'primary') || officialList[0] || {};
-    const supId = primary.supervisorId || effectiveAssignment?.assignedSupervisorId || effectiveAssignment?.acceptedSupervisorId;
-    const sup = (state.roundSupervisors || []).find(s => s.id === supId || s.supervisorId === supId)
-      || (state.supervisorsMaster || []).find(s => s.id === supId)
-      || primary;
-
-    const supName = primary.supervisorName || sup?.name || effectiveAssignment?.acceptedSupervisorName || 'Giảng viên Hướng dẫn';
-    const escapedSupName = escapeHtml(supName);
-    const supEmail = sup?.email || primary.email || effectiveAssignment?.supervisorEmail || '';
-    const supPhone = sup?.phone || primary.phone || effectiveAssignment?.supervisorPhone || '';
-    const avatarSrc = (sup?.photoUrl && sup.photoUrl.trim()) ? sup.photoUrl : getSupervisorAvatarSvgDataUri(supName);
-
-    if (supCardAvatar) {
-      supCardAvatar.src = avatarSrc;
-      supCardAvatar.onerror = function() { this.onerror = null; this.src = getSupervisorAvatarSvgDataUri(escapedSupName); };
-      supCardAvatar.alt = escapedSupName;
-    }
-    if (supCardRole) supCardRole.textContent = primary.role === 'secondary' ? 'GVHD 2' : 'GVHD';
-    if (supCardStatus) {
-      supCardStatus.textContent = 'Đã phân công';
-      supCardStatus.className = 'text-[10px] text-emerald-300 font-bold';
-    }
-    if (supCardName) {
-      supCardName.textContent = supName;
-      supCardName.title = supName;
-    }
-    if (supCardEmail) supCardEmail.textContent = supEmail || '--';
-    if (supCardEmailLink) {
-      supCardEmailLink.href = supEmail ? `mailto:${supEmail}` : '#';
-      supCardEmailLink.classList.toggle('pointer-events-none', !supEmail);
-    }
-    if (supCardPhone) supCardPhone.textContent = supPhone || '--';
-    if (supCardPhoneLink) {
-      supCardPhoneLink.href = supPhone ? `tel:${supPhone}` : '#';
-      supCardPhoneLink.classList.toggle('pointer-events-none', !supPhone);
-    }
-  } else {
-    const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
-    if (supCardAvatar) {
-      supCardAvatar.src = defaultAvatar;
-      supCardAvatar.alt = 'Chưa phân công';
-    }
-    if (supCardRole) supCardRole.textContent = 'GVHD';
-    if (supCardStatus) {
-      supCardStatus.textContent = 'Chưa phân công';
-      supCardStatus.className = 'text-[10px] text-blue-200 font-bold';
-    }
-    if (supCardName) {
-      supCardName.textContent = 'Chưa phân công GVHD';
-      supCardName.title = 'Chưa phân công GVHD';
-    }
-    if (supCardEmail) supCardEmail.textContent = '--';
-    if (supCardEmailLink) { supCardEmailLink.href = '#'; supCardEmailLink.classList.add('pointer-events-none'); }
-    if (supCardPhone) supCardPhone.textContent = '--';
-    if (supCardPhoneLink) { supCardPhoneLink.href = '#'; supCardPhoneLink.classList.add('pointer-events-none'); }
+  // Render one or two published supervisors with contact details.
+  const supervisorCard = document.getElementById('hero-supervisor-info-card');
+  if (supervisorCard) {
+    const profiles = hasOfficialSup ? resolveStudentSupervisorProfiles(officialList, effectiveAssignment).slice(0, 2) : [];
+    supervisorCard.innerHTML = profiles.length
+      ? `<div class="grid ${profiles.length > 1 ? 'grid-cols-2 gap-3' : 'grid-cols-1'}">${profiles.map(profile => {
+        const fallback = getSupervisorAvatarSvgDataUri(profile.name);
+        const avatar = profile.photoUrl || fallback;
+        const phoneHref = String(profile.phone || '').replace(/[^\d+]/g, '');
+        return `<div class="min-w-0 flex flex-col items-center text-center">
+          <span class="mb-2 rounded-full bg-amber-400 px-2.5 py-0.5 text-xs font-black text-slate-950">${profile.label}</span>
+          <img src="${escapeHtml(avatar)}" data-fallback="${escapeHtml(fallback)}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="${escapeHtml(profile.name)}" class="${profiles.length > 1 ? 'h-16 w-16' : 'h-20 w-20'} rounded-2xl border-2 border-white/40 object-cover shadow-sm">
+          <strong class="mt-2 w-full break-words ${profiles.length > 1 ? 'text-xs' : 'text-base'} leading-snug text-white">${escapeHtml(profile.name)}</strong>
+          ${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}" class="mt-1 w-full break-all text-[11px] text-blue-100 hover:underline">✉️ ${escapeHtml(profile.email)}</a>` : ''}
+          ${profile.phone ? `<a href="tel:${escapeHtml(phoneHref)}" class="mt-1 text-xs font-bold text-emerald-200 hover:underline">📞 ${escapeHtml(profile.phone)}</a>` : ''}
+        </div>`;
+      }).join('')}</div>`
+      : '<div class="flex min-h-20 flex-col items-center justify-center text-center"><span class="rounded-full bg-white/15 px-3 py-1 text-xs font-black text-white">GVHD</span><span class="mt-2 text-sm text-blue-100">Chưa phân công</span></div>';
   }
 
   // Tinh giản banner sinh viên theo yêu cầu: ẩn các badge và thông tin trùng lặp
@@ -1809,7 +1800,11 @@ function renderRoundHeader() {
   // Banner bỏ ghi chú 3 nguyện vọng theo yêu cầu
   document.getElementById('round-mode-badge')?.classList.add('hidden');
 
-  const fmtDate = d => d ? new Date(d).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '--';
+  const fmtDate = value => {
+    if (!value) return '';
+    const date = value?.toDate ? value.toDate() : new Date(value);
+    return isNaN(date.getTime()) ? '' : date.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
   const openStr = round.openAtDate ? fmtDate(round.openAtDate) : '--';
   const closeStr = round.closeAtDate ? fmtDate(round.closeAtDate) : '--';
   if (timeRangeEl) timeRangeEl.innerHTML = `<span>📅 Thời gian: ${openStr} — ${closeStr}</span>`;
@@ -1830,11 +1825,11 @@ function renderRoundHeader() {
       topicWrap.classList.remove('hidden');
       if (topicNameEl) topicNameEl.textContent = registeredTopic;
       if (topicMetaEl) {
-        const typeStr = reg?.projectType ? `🏷️ Loại hình: ${reg.projectType}` : '';
-        const timeStr = reg?.submittedAt ? `🕒 Đã đăng ký: ${fmtDate(reg.submittedAt)}` : '';
+        const submittedAt = fmtDate(reg?.submittedAt);
+        const timeStr = submittedAt ? `🕒 Đã đăng ký: ${submittedAt}` : '';
         const versionStr = reg?.topicTitleVersion ? `📝 Lần ${reg.topicTitleVersion}` : '';
         const approvalText = reg?.topicApprovalStatus === 'approved' ? '✓ GVHD đã duyệt' : reg?.topicApprovalStatus === 'rejected' ? '✕ GVHD yêu cầu chỉnh sửa' : '⌛ Chờ GVHD duyệt';
-        topicMetaEl.innerHTML = [typeStr, versionStr, approvalText, timeStr].filter(Boolean).map(s => `<span>${escapeHtml(s)}</span>`).join('<span class="text-white/30">•</span>');
+        topicMetaEl.innerHTML = [versionStr, approvalText, timeStr].filter(Boolean).map(s => `<span>${escapeHtml(s)}</span>`).join('<span class="text-white/30">•</span>');
       }
       if (topicDownloadBtn) topicDownloadBtn.classList.toggle('hidden', reg?.topicApprovalStatus !== 'approved');
     } else {
@@ -21428,7 +21423,7 @@ function renderTimelineWeekDays(days = [], events = [], weekNumber = null, round
     const clickable = weekNumber !== null && dayEvents.length;
     const tag = clickable ? 'button' : 'span';
     const click = clickable ? ` type="button" onclick="event.stopPropagation(); openStudentTimelineDay(${weekNumber}, '${day.key}', ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" aria-label="Xem ${dayEvents.length} sự kiện ngày ${day.label}"` : '';
-    return `<${tag}${click} title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border text-center ${studentCalendar ? 'min-h-[48px] px-1 py-1.5' : 'px-0.5 py-0.5'} ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md' : ''}"${dayStyle}><b class="block ${studentCalendar ? 'text-[10px]' : 'text-[8px]'} leading-none">${day.shortName}</b><b class="block ${studentCalendar ? 'text-[10px]' : 'text-[8px]'} leading-none mt-1">${day.label}</b>${dayEvents.length ? `<i class="block ${studentCalendar ? 'text-[10px]' : 'text-[8px]'} leading-none not-italic">●</i>` : ''}</${tag}>`;
+    return `<${tag}${click} title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border text-center ${studentCalendar ? 'min-h-[52px] px-1 py-1.5' : 'px-0.5 py-0.5'} ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md' : ''}"${dayStyle}><b class="block ${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none">${day.shortName}</b><b class="block ${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none mt-1">${day.label}</b>${dayEvents.length ? `<i class="block ${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none not-italic">●</i>` : ''}</${tag}>`;
   }).join('')}</div>`;
 }
 
@@ -21458,7 +21453,7 @@ function renderTimelineWeekEvents(events = [], weekNumber = null, roundId = null
       ? ''
       : (dayCount > 0 ? `Còn ${dayCount} ngày` : (endDate >= today ? (dayCount === 0 ? 'Hôm nay' : 'Đang diễn ra') : 'Đã diễn ra'));
     const dateLabel = startValue === endValue ? shortDate(startValue) : `${shortDate(startValue)}–${shortDate(endValue)}`;
-    return `<button type="button" onclick="event.stopPropagation(); openStudentTimelineEvent(${weekNumber}, ${eventIndex}, ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" title="Xem chi tiết sự kiện" class="flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-[9px] leading-tight hover:shadow-sm" style="background-color:${color}18;border-color:${color}66;color:${color}">
+    return `<button type="button" onclick="event.stopPropagation(); openStudentTimelineEvent(${weekNumber}, ${eventIndex}, ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" title="Xem chi tiết sự kiện" class="flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-[11px] leading-tight hover:shadow-sm" style="background-color:${color}18;border-color:${color}66;color:${color}">
       <span class="shrink-0">📌 ${escapeHtml(dateLabel)}</span><span class="min-w-0 flex-1 truncate font-black">${escapeHtml(event.title)}</span>${countdown ? `<span class="shrink-0 font-bold opacity-80">${countdown}</span>` : ''}
     </button>`;
   }).join('')}</div>`;
@@ -22583,12 +22578,7 @@ window.renderStudentTimelineWeeks = function() {
   } else if (directAssign || round?.status === 'reviewing') {
     gvhdStatus = 'active';
   }
-  const primarySupervisor = officialSups.find(item => item.role === 'primary') || officialSups[0] || {};
-  const primarySupervisorId = primarySupervisor.supervisorId || effectiveAssignment?.acceptedSupervisorId || effectiveAssignment?.assignedSupervisorId;
-  const primarySupervisorProfile = (state.roundSupervisors || []).find(s => s.id === primarySupervisorId || s.supervisorId === primarySupervisorId)
-    || (state.supervisorsMaster || []).find(s => s.id === primarySupervisorId)
-    || {};
-  const primarySupervisorName = primarySupervisor.supervisorName || primarySupervisorProfile.name || effectiveAssignment?.acceptedSupervisorName || 'GVHD đã phân công';
+  const supervisorProfiles = hasGVHD ? resolveStudentSupervisorProfiles(officialSups, effectiveAssignment).slice(0, 2) : [];
   allCards.push({
     type: 'milestone',
     id: 'gvhd',
@@ -22599,11 +22589,7 @@ window.renderStudentTimelineWeeks = function() {
       : (directAssign ? 'Khoa đang phân công' : 'Chờ kết quả xét'),
     status: gvhdStatus,
     note: hasGVHD ? '✓ Đã phân công' : (gvhdStatus === 'active' ? 'Đang xử lý' : 'Chưa phân công'),
-    supervisor: hasGVHD ? {
-      name: primarySupervisorName,
-      photoUrl: primarySupervisorProfile.photoUrl || primarySupervisor.photoUrl || '',
-      email: primarySupervisorProfile.email || primarySupervisor.email || effectiveAssignment?.supervisorEmail || ''
-    } : null,
+    supervisors: supervisorProfiles,
   });
 
   // Cards 2–13 – 12 weekly cards (or durationWeeks)
@@ -22729,8 +22715,8 @@ window.renderStudentTimelineWeeks = function() {
       return `<div class="flex-shrink-0 rounded-2xl border ${st.card} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all ${isActive ? 'shadow-md' : ''}"
                    style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
         <div class="flex items-center justify-between w-full mb-1.5">
-          <span class="font-black text-xs text-inherit">Tuần ${card.num}</span>
-          <span class="text-[9px] px-1.5 py-0.5 rounded-full border ${st.badge} font-bold whitespace-nowrap leading-none">${st.label}</span>
+          <span class="font-black text-sm text-inherit">Tuần ${card.num}</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded-full border ${st.badge} font-bold whitespace-nowrap leading-none">${st.label}</span>
         </div>
         <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${st.icon_bg} my-1">
           ${card.status === 'completed' ? '✓' : (card.status === 'ongoing' || card.status === 'active') ? '●' : card.num}
@@ -22747,24 +22733,28 @@ window.renderStudentTimelineWeeks = function() {
       const cardBg = isGvhdCompleted ? 'bg-emerald-50 border-emerald-300' : (card.status === 'completed' ? 'bg-emerald-50 border-emerald-300' : card.status === 'active' ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-300' : 'bg-slate-50 border-slate-200');
       const iconBg = card.status === 'completed' ? 'bg-emerald-600 text-white' : card.status === 'active' ? 'bg-blue-600 text-white animate-pulse' : 'bg-slate-200 text-slate-500';
       const noteColor = card.status === 'completed' ? 'text-emerald-700 font-bold' : card.status === 'active' ? 'text-blue-700 font-bold' : 'text-slate-400';
-      const supervisorInfo = card.id === 'gvhd' && card.supervisor
-        ? `<div class="flex flex-col items-center text-center w-full"><img src="${card.supervisor.photoUrl || getSupervisorAvatarSvgDataUri(card.supervisor.name)}" onerror="this.onerror=null;this.src=getSupervisorAvatarSvgDataUri('${escapeHtml(card.supervisor.name)}');" class="w-16 h-16 rounded-2xl object-cover border-2 border-emerald-300 shadow-sm"><b class="mt-2 block max-w-full truncate text-[11px] text-emerald-950">${escapeHtml(card.supervisor.name)}</b>${card.supervisor.email ? `<small class="mt-0.5 block max-w-full truncate text-[9px] text-emerald-700">${escapeHtml(card.supervisor.email)}</small>` : ''}</div>`
+      const supervisorInfo = card.id === 'gvhd' && card.supervisors?.length
+        ? `<div class="grid w-full ${card.supervisors.length > 1 ? 'grid-cols-2 gap-2' : 'grid-cols-1'}">${card.supervisors.map(profile => {
+          const fallback = getSupervisorAvatarSvgDataUri(profile.name);
+          const avatar = profile.photoUrl || fallback;
+          const phoneHref = String(profile.phone || '').replace(/[^\d+]/g, '');
+          return `<div class="min-w-0 flex flex-col items-center text-center"><span class="mb-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-emerald-900">${profile.label}</span><img src="${escapeHtml(avatar)}" data-fallback="${escapeHtml(fallback)}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="${escapeHtml(profile.name)}" class="${card.supervisors.length > 1 ? 'h-16 w-16' : 'h-24 w-24'} rounded-2xl border-2 border-emerald-300 object-cover shadow-sm"><b class="mt-2 block w-full break-words text-xs text-emerald-950">${escapeHtml(profile.name)}</b>${profile.email ? `<small class="mt-1 block w-full break-all text-[10px] text-emerald-700">${escapeHtml(profile.email)}</small>` : ''}${profile.phone ? `<a href="tel:${escapeHtml(phoneHref)}" class="mt-1 text-[11px] font-bold text-emerald-800 hover:underline">📞 ${escapeHtml(profile.phone)}</a>` : ''}</div>`;
+        }).join('')}</div>`
         : '';
-      if (card.id === 'gvhd' && card.supervisor) {
+      if (card.id === 'gvhd' && card.supervisors?.length) {
         return `<div class="flex-shrink-0 rounded-2xl border ${cardBg} flex flex-col items-center justify-center text-center p-4 shadow-xs relative overflow-hidden transition-all"
                      style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
           ${supervisorInfo}
-          <span class="mt-2 text-[9px] ${noteColor}">${card.note}</span>
         </div>`;
       }
       return `<div class="flex-shrink-0 rounded-2xl border ${cardBg} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all"
                    style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
-        <div class="w-9 h-9 rounded-full flex items-center justify-center text-lg ${iconBg} mb-1.5 shadow-xs">
+        <div class="w-12 h-12 rounded-full flex items-center justify-center text-xl ${iconBg} mb-2 shadow-xs">
           ${card.icon}
         </div>
-        <span class="font-black text-[11px] text-slate-900 leading-tight">${card.title}</span>
-        ${card.subtitle ? `<span class="text-[10px] text-slate-500 mt-0.5 leading-tight line-clamp-2">${card.subtitle}</span>` : ''}
-        <span class="mt-1.5 text-[9px] ${noteColor}">${card.note}</span>
+        <span class="font-black text-sm text-slate-900 leading-tight">${card.title}</span>
+        ${card.subtitle ? `<span class="text-xs text-slate-600 mt-1 leading-snug line-clamp-3">${escapeHtml(card.subtitle)}</span>` : ''}
+        <span class="mt-2 text-[11px] ${noteColor}">${card.note}</span>
         ${supervisorInfo}
       </div>`;
     }
