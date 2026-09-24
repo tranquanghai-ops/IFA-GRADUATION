@@ -277,20 +277,24 @@ window.showToast = function(message, type = 'info', duration = 3500) {
     warning: '⚠️',
     info: 'ℹ️'
   };
-  const bgColors = {
-    success: 'bg-emerald-600 text-white border-emerald-500',
-    error: 'bg-rose-600 text-white border-rose-500',
-    warning: 'bg-amber-500 text-slate-900 border-amber-400',
-    info: 'bg-slate-900 text-white border-slate-800'
+  const colors = {
+    success: 'border-emerald-500 text-emerald-700 bg-emerald-50',
+    error: 'border-rose-500 text-rose-700 bg-rose-50',
+    warning: 'border-amber-500 text-amber-700 bg-amber-50',
+    info: 'border-blue-500 text-blue-700 bg-blue-50'
   };
+  const labels = { success: 'Thành công', error: 'Có lỗi xảy ra', warning: 'Cần chú ý', info: 'Thông báo' };
 
   const toast = document.createElement('div');
-  toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-xl text-xs font-semibold transform transition-all duration-200 translate-y-2 opacity-0 ${bgColors[type] || bgColors.info}`;
+  toast.className = `pointer-events-auto flex items-start gap-3 rounded-xl border border-l-4 bg-white px-4 py-3 shadow-xl text-xs transform transition-all duration-200 translate-y-2 opacity-0 ${colors[type] || colors.info}`;
   toast.innerHTML = `
-    <span class="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0 font-bold">${icons[type] || 'ℹ️'}</span>
-    <span class="flex-1 leading-snug">${message}</span>
-    <button type="button" class="text-white/60 hover:text-white font-bold ml-1">✕</button>
+    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-current/10 font-black" data-icon></span>
+    <span class="min-w-0 flex-1"><strong class="block font-black" data-title></strong><span class="mt-0.5 block break-words leading-snug text-slate-700" data-message></span></span>
+    <button type="button" class="ml-1 text-slate-400 hover:text-slate-700 font-bold" aria-label="Đóng thông báo">✕</button>
   `;
+  toast.querySelector('[data-icon]').textContent = icons[type] || icons.info;
+  toast.querySelector('[data-title]').textContent = labels[type] || labels.info;
+  toast.querySelector('[data-message]').textContent = String(message);
 
   const closeBtn = toast.querySelector('button');
   const removeToast = () => {
@@ -313,7 +317,7 @@ window.showConfirm = function(title, message, { confirmText = 'Xác nhận', can
   return new Promise((resolve) => {
     const modal = document.getElementById('modal-confirm');
     if (!modal) {
-      resolve(true);
+      resolve(false);
       return;
     }
     const titleEl = document.getElementById('modal-confirm-title');
@@ -350,6 +354,50 @@ window.showConfirm = function(title, message, { confirmText = 'Xác nhận', can
     modal.classList.remove('hidden');
   });
 };
+
+window.showInputDialog = function(title, message, { defaultValue = '', placeholder = '', confirmText = 'Xác nhận', required = false } = {}) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 z-[10000] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4';
+    overlay.innerHTML = `<div role="dialog" aria-modal="true" aria-labelledby="app-input-title" class="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <div class="border-b border-slate-100 bg-slate-50 px-5 py-4"><h3 id="app-input-title" class="text-base font-black text-slate-900"></h3><p class="mt-1 text-xs leading-relaxed text-slate-600"></p></div>
+      <div class="p-5"><input type="text" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></div>
+      <div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-3"><button type="button" data-cancel class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">Hủy</button><button type="button" data-confirm class="rounded-xl bg-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800"></button></div>
+    </div>`;
+    overlay.querySelector('h3').textContent = title;
+    overlay.querySelector('p').textContent = message;
+    const input = overlay.querySelector('input');
+    input.value = defaultValue;
+    input.placeholder = placeholder;
+    const confirmButton = overlay.querySelector('[data-confirm]');
+    confirmButton.textContent = confirmText;
+    const close = value => { document.removeEventListener('keydown', onKeyDown); overlay.remove(); resolve(value); };
+    const onKeyDown = event => {
+      if (event.key === 'Escape') close(null);
+      if (event.key === 'Enter' && document.activeElement === input) confirmButton.click();
+    };
+    confirmButton.onclick = () => {
+      const value = input.value.trim();
+      if (required && !value) { input.focus(); input.classList.add('border-rose-500'); return; }
+      close(value);
+    };
+    overlay.querySelector('[data-cancel]').onclick = () => close(null);
+    document.addEventListener('keydown', onKeyDown);
+    document.body.appendChild(overlay);
+    input.focus();
+    input.select();
+  });
+};
+
+async function copyLinkWithFallback(link, label) {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('Clipboard không khả dụng');
+    await navigator.clipboard.writeText(link);
+    showToast(`Đã sao chép ${label}.`, 'success');
+  } catch (_) {
+    await showInputDialog('Sao chép liên kết', 'Chọn và sao chép liên kết bên dưới:', { defaultValue: link, confirmText: 'Đóng' });
+  }
+}
 
 // Safe Vietnamese slug generator
 window.slugify = function(text) {
@@ -591,19 +639,11 @@ export const fmtDateRange24h = (d1, d2) => {
   return `${d1Str} ${t1Str} → ${d2Str} ${t2Str}`;
 };
 
-window.copyRoundLink = function(roundId, shortCode) {
+window.copyRoundLink = async function(roundId, shortCode) {
   const r = (state.rounds || []).find(x => x.id === roundId);
   const code = r?.slug || r?.shortCode || shortCode || roundId;
   const link = `${window.location.origin}${window.location.pathname}?x=${encodeURIComponent(code)}`;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(link).then(() => {
-      showToast('Đã sao chép link đợt: ' + link, 'success');
-    }).catch(() => {
-      prompt('Link đợt tốt nghiệp:', link);
-    });
-  } else {
-    prompt('Link đợt tốt nghiệp:', link);
-  }
+  await copyLinkWithFallback(link, 'liên kết đợt tốt nghiệp');
 };
 
 // --- STATE MANAGEMENT ---
@@ -6224,7 +6264,7 @@ window.seedSampleSupervisors = async function(force = false) {
       state.supervisorsMaster.push({ id: docRef.id, ...payload });
     }
     renderAdminSupervisorsMasterTable();
-    if (force) alert('Đã thêm thành công ' + toAdd.length + ' Giảng viên Hướng dẫn mẫu!');
+    if (force) showToast('Đã thêm thành công ' + toAdd.length + ' Giảng viên Hướng dẫn mẫu!', 'success');
   } catch (err) {
     console.error('Lỗi nạp GVHD mẫu:', err);
     if (force) showToast('Lỗi nạp GVHD mẫu: ' + err.message, 'error');
@@ -7447,7 +7487,7 @@ window.handleExcelFileUpload = function(event) {
 
       parseAndValidateExcel(rawRows);
     } catch (err) {
-      alert('Không đọc được file Excel: ' + err.message);
+      showToast('Không đọc được file Excel: ' + err.message, 'error');
     }
   };
   reader.readAsArrayBuffer(file);
@@ -9095,7 +9135,7 @@ window.onSettingsActAsStartClick = onSettingsActAsStartClick;
 window.onToggleAdminImpersonation = async function(enabled) {
   const isOwner = isSystemOwner();
   if (!isOwner) {
-    alert('Chỉ Chủ sở hữu hệ thống (tranquanghai@tdtu.edu.vn) có quyền cấu hình tính năng này.');
+    showToast('Chỉ Chủ sở hữu hệ thống (tranquanghai@tdtu.edu.vn) có quyền cấu hình tính năng này.', 'warning');
     const toggle = document.getElementById('toggle-admin-impersonation');
     if (toggle) toggle.checked = state.allowImpersonation;
     return;
@@ -9140,7 +9180,7 @@ window.onToggleAdminImpersonation = async function(enabled) {
   } catch (e) {
     hideLoading();
     console.error('[SystemSettings] Toggle error:', e);
-    alert('Lỗi cập nhật thiết lập: ' + e.message);
+    showToast('Lỗi cập nhật thiết lập: ' + e.message, 'error');
     const toggle = document.getElementById('toggle-admin-impersonation');
     if (toggle) toggle.checked = state.allowImpersonation;
   }
@@ -9255,11 +9295,11 @@ window.applyImpersonationActor = applyImpersonationActor;
 
 window.startImpersonating = async function(target) {
   if (!state.allowImpersonation) {
-    alert('Tính năng đóng vai hiện đang bị tắt trong Cài đặt hệ thống.');
+    showToast('Tính năng đóng vai hiện đang bị tắt trong Cài đặt hệ thống.', 'warning');
     return;
   }
   if (!state.realIsAdmin) {
-    alert('Chỉ Quản trị viên mới có quyền sử dụng tính năng này.');
+    showToast('Chỉ Quản trị viên mới có quyền sử dụng tính năng này.', 'warning');
     return;
   }
 
@@ -9696,7 +9736,7 @@ window.gatherRoundCandidates = gatherRoundCandidates;
 
 window.openAdminImpersonateModal = function() {
   if (!state.allowImpersonation || !state.realIsAdmin) {
-    alert('Tính năng đóng vai chưa được bật trong Cài đặt hệ thống hoặc bạn không có quyền.');
+    showToast('Tính năng đóng vai chưa được bật trong Cài đặt hệ thống hoặc bạn không có quyền.', 'warning');
     return;
   }
 
@@ -9940,7 +9980,7 @@ document.getElementById('btn-login-main')?.addEventListener('click', async () =>
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
   } catch (err) {
-    alert('Đăng nhập Google thất bại: ' + err.message);
+    showToast('Đăng nhập Google thất bại: ' + err.message, 'error');
   }
 });
 
@@ -9949,7 +9989,7 @@ document.getElementById('btn-header-login')?.addEventListener('click', async () 
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
   } catch (err) {
-    alert('Đăng nhập Google thất bại: ' + err.message);
+    showToast('Đăng nhập Google thất bại: ' + err.message, 'error');
   }
 });
 
@@ -10930,8 +10970,8 @@ window.setRichFontSize = function(size) {
   document.getElementById('activity-editor')?.focus();
 };
 
-window.insertRichLink = function() {
-  const url = prompt('Nhập địa chỉ liên kết (URL):', 'https://');
+window.insertRichLink = async function() {
+  const url = await showInputDialog('Chèn liên kết', 'Nhập địa chỉ liên kết (URL):', { defaultValue: 'https://', required: true });
   if (!url || !url.trim()) return;
   const cleanUrl = url.trim();
   if (/^javascript:/i.test(cleanUrl)) {
@@ -12233,19 +12273,11 @@ window.moveActivity = async function(actId, direction) {
 };
 
 // 9. COPY ACTIVITY LINK
-window.copyActivityLink = function(roundId, activitySlug) {
+window.copyActivityLink = async function(roundId, activitySlug) {
   const r = (state.rounds || []).find(x => x.id === roundId);
   const rCode = r?.slug || r?.shortCode || roundId;
   const link = `${window.location.origin}${window.location.pathname}?x=${encodeURIComponent(rCode)}&a=${encodeURIComponent(activitySlug)}`;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(link).then(() => {
-      showToast('✓ Đã sao chép liên kết mốc: ' + link, 'success');
-    }).catch(() => {
-      prompt('Link mốc kế hoạch:', link);
-    });
-  } else {
-    prompt('Link mốc kế hoạch:', link);
-  }
+  await copyLinkWithFallback(link, 'liên kết mốc kế hoạch');
 };
 
 // 10. STUDENT TIMELINE RENDERING
@@ -13435,7 +13467,7 @@ window.saveMilestoneQuickCouncil = function() {
 window.deleteCouncilFromMilestone = async function(councilId) {
   const council = (state._currentActivityCouncils || []).find(c => c.id === councilId);
   if (!council) return;
-  const ok = confirm(`Bạn có chắc chắn muốn xóa "${council.name}" khỏi mốc này?`);
+  const ok = await showConfirm('Xóa hội đồng', `Bạn có chắc chắn muốn xóa "${council.name}" khỏi mốc này?`, { confirmText: 'Xóa hội đồng' });
   if (!ok) return;
 
   state._currentActivityCouncils = (state._currentActivityCouncils || []).filter(c => c.id !== councilId);
@@ -13608,13 +13640,13 @@ window.saveCouncilGuestMember = function() {
   showToast(`Đã thêm khách mời "${gName}" (${gEmail}) vào "${council.name}"!`, 'success');
 };
 
-window.removeCouncilMemberFromMilestone = function(councilId, slotKey) {
+window.removeCouncilMemberFromMilestone = async function(councilId, slotKey) {
   const council = (state._currentActivityCouncils || []).find(c => c.id === councilId);
   if (!council || !council.membersBySlot) return;
 
   const mem = council.membersBySlot[slotKey];
   const name = mem?.memberName || mem?.name || slotKey;
-  if (!confirm(`Bạn có chắc muốn xóa thành viên "${name}" khỏi "${council.name}"?`)) return;
+  if (!await showConfirm('Xóa thành viên', `Bạn có chắc muốn xóa thành viên "${name}" khỏi "${council.name}"?`, { confirmText: 'Xóa thành viên' })) return;
 
   delete council.membersBySlot[slotKey];
   renderActivityCouncilsInModal();
@@ -14622,21 +14654,13 @@ window.deleteGuestSlot = async function(slotKey) {
 };
 
 // --- LINK COPIERS ---
-window.copyCouncilLink = function(activitySlug, councilSlug) {
+window.copyCouncilLink = async function(activitySlug, councilSlug) {
   const { roundId } = state.activeCouncilManagement;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const rCode = targetRound?.slug || targetRound?.shortCode || roundId;
   const link = `${window.location.origin}${window.location.pathname}?x=${encodeURIComponent(rCode)}&a=${encodeURIComponent(activitySlug)}&c=${encodeURIComponent(councilSlug)}`;
 
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(link).then(() => {
-      showToast('✓ Đã sao chép liên kết trực tiếp Hội đồng: ' + link, 'success');
-    }).catch(() => {
-      prompt('Liên kết Hội đồng:', link);
-    });
-  } else {
-    prompt('Liên kết Hội đồng:', link);
-  }
+  await copyLinkWithFallback(link, 'liên kết hội đồng');
 };
 
 // --- PERSISTENCE HELPER ---
@@ -14879,8 +14903,8 @@ window.renderActivityLetterOptions = function() {
   }).join('');
 };
 
-window.resetDefaultLetterOptions = function() {
-  if (!confirm('Thao tác sẽ thay thế danh sách mức điểm chữ hiện tại bằng bộ mặc định đầy đủ 13 mức (A++ → D-). Bạn có muốn tiếp tục?')) {
+window.resetDefaultLetterOptions = async function() {
+  if (!await showConfirm('Khôi phục thang điểm chữ', 'Thao tác sẽ thay thế danh sách mức điểm chữ hiện tại bằng bộ mặc định đầy đủ 13 mức (A++ → D-). Bạn có muốn tiếp tục?', { confirmText: 'Khôi phục' })) {
     return;
   }
   state._currentActivityLetterOptions = JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE));
@@ -21508,7 +21532,7 @@ function renderAdminRoundTimelinePreview(round) {
     { icon: '📝', title: 'Đăng ký đề tài', subtitle: 'Đề tài ĐATN' },
     { icon: '👨‍🏫', title: 'Phân công GVHD', subtitle: isDirectSupervisorAssignment(round) ? 'Khoa phân công' : 'Xét nguyện vọng' }
   ].map(card => `
-    <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}')" class="min-w-[215px] h-[142px] rounded-2xl border border-slate-200 bg-white p-3 flex flex-col items-center justify-center text-center hover:border-blue-400 hover:shadow-md cursor-pointer transition">
+    <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}')" class="ifa-timeline-card min-w-[215px] rounded-2xl border border-slate-200 bg-white p-3 flex flex-col items-center justify-center text-center hover:border-blue-400 hover:shadow-md cursor-pointer transition">
       <span class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-lg mb-2">${card.icon}</span>
       <span class="font-black text-xs text-slate-900">${card.title}</span>
       <span class="text-[10px] text-slate-500 mt-1">${card.subtitle}</span>
@@ -21517,16 +21541,16 @@ function renderAdminRoundTimelinePreview(round) {
   const weekCards = weeks.map(week => {
     const style = statusStyles[week.status] || statusStyles.upcoming;
     return `
-      <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}', ${week.week})" class="relative min-w-[290px] min-h-[208px] rounded-2xl border p-3 pb-7 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}">
-        <div class="flex items-center justify-between w-full mb-1">
-          <span class="font-black text-xs text-slate-900">Tuần ${week.week}</span>
+      <div role="button" tabindex="0" onclick="openRoundWeekEditor('${round.id}', ${week.week})" class="ifa-timeline-card relative min-w-[290px] rounded-2xl border p-3 pb-7 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}">
+        <div class="flex items-center justify-between gap-1 w-full mb-1">
+          <span class="font-black text-xs text-slate-900 whitespace-nowrap">Tuần ${week.week}</span>
+          ${week.milestone ? `<span class="px-1.5 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px] leading-tight text-center">🚩 ${escapeHtml(week.milestone)}</span>` : ''}
           <span class="px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${week.visible ? style.badge : 'bg-slate-200 text-slate-600 border-slate-300'}">${week.visible ? style.label : 'Đang ẩn'}</span>
         </div>
         <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black my-1 ${week.status === 'ongoing' ? 'bg-blue-600 text-white' : week.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">${style.icon || week.week}</span>
         <span class="font-mono font-bold text-[11px] text-slate-700">${week.dateText}</span>
         ${renderTimelineWeekDays(week.days, week.events, week.week, round.id)}
         ${renderTimelineWeekEvents(week.events, week.week, round.id)}
-        ${week.milestone ? `<span class="mt-1 px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px]">🚩 ${escapeHtml(week.milestone)}</span>` : ''}
         ${week.note ? `<span class="text-[9px] text-slate-500 mt-1 line-clamp-1">${escapeHtml(week.note)}</span>` : ''}
         <button type="button" onclick="toggleRoundTimelineWeekVisibility('${round.id}', ${week.week}, event)" class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-white/90 border border-slate-200 text-[9px] font-bold ${week.visible ? 'text-slate-600' : 'text-blue-700'}">${week.visible ? 'Ẩn' : 'Hiện'}</button>
       </div>`;
@@ -22380,10 +22404,10 @@ function renderSupervisorRoundTimeline(round) {
   if (!weeks.length) return;
   const current = allWeeks.find(week => week.status === 'ongoing');
   const completed = allWeeks.filter(week => week.status === 'completed').length;
-  const stageCard = (icon, title, note) => `<div class="min-w-[290px] max-w-[290px] min-h-[208px] snap-start rounded-2xl border border-slate-200 bg-slate-50 p-4 flex flex-col items-center justify-center text-center"><span class="mb-2 text-2xl">${icon}</span><strong class="text-xs text-slate-900">${title}</strong><span class="mt-1 text-[10px] text-slate-500">${note}</span></div>`;
+  const stageCard = (icon, title, note) => `<div class="ifa-timeline-card min-w-[290px] max-w-[290px] snap-start rounded-2xl border border-slate-200 bg-slate-50 p-4 flex flex-col items-center justify-center text-center"><span class="mb-2 text-2xl">${icon}</span><strong class="text-xs text-slate-900">${title}</strong><span class="mt-1 text-[10px] text-slate-500">${note}</span></div>`;
   container.innerHTML = `<div class="mb-3 flex flex-wrap items-center justify-between gap-2"><div class="flex items-center gap-2"><span class="text-xl">🗓️</span><div><h2 class="text-sm font-black text-slate-900">Lộ trình đồ án tốt nghiệp & tiến độ thực hiện</h2><p class="text-[11px] text-slate-500">Kế hoạch ${allWeeks.length} tuần · Chọn sự kiện để xem chi tiết</p></div></div><span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700">${current ? `Đang diễn ra: Tuần ${current.week}/${allWeeks.length}` : `Đã qua ${completed}/${allWeeks.length} tuần`}</span></div>
-    <div class="flex gap-3 overflow-x-auto pb-2 snap-x">${stageCard('📝', 'Đăng ký đề tài', 'Sinh viên đăng ký đề tài')}${stageCard('👨‍🏫', 'Phân công GVHD', isDirectSupervisorAssignment(round) ? 'Khoa phân công' : 'Xét nguyện vọng')}${weeks.map(week => `<div class="min-w-[290px] max-w-[290px] min-h-[208px] snap-start rounded-2xl border p-3 ${week.status === 'ongoing' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-slate-50'}">
-      <div class="flex items-center justify-between"><strong class="text-xs text-slate-900">${escapeHtml(week.title)}</strong><span class="text-[10px] font-bold text-slate-500">${week.status === 'ongoing' ? 'Đang diễn ra' : week.status === 'completed' ? 'Đã qua' : 'Chưa tới'}</span></div>
+    <div class="flex gap-3 overflow-x-auto pb-2 snap-x">${stageCard('📝', 'Đăng ký đề tài', 'Sinh viên đăng ký đề tài')}${stageCard('👨‍🏫', 'Phân công GVHD', isDirectSupervisorAssignment(round) ? 'Khoa phân công' : 'Xét nguyện vọng')}${weeks.map(week => `<div class="ifa-timeline-card min-w-[290px] max-w-[290px] snap-start rounded-2xl border p-3 ${week.status === 'ongoing' ? 'border-blue-400 bg-blue-50' : 'border-slate-200 bg-slate-50'}">
+      <div class="flex items-center justify-between gap-1"><strong class="text-xs text-slate-900 whitespace-nowrap">${escapeHtml(week.title)}</strong>${week.milestone ? `<span class="rounded-md bg-amber-500 px-1.5 py-0.5 text-center text-[9px] font-black leading-tight text-white">🚩 ${escapeHtml(week.milestone)}</span>` : ''}<span class="text-[10px] font-bold text-slate-500 whitespace-nowrap">${week.status === 'ongoing' ? 'Đang diễn ra' : week.status === 'completed' ? 'Đã qua' : 'Chưa tới'}</span></div>
       <div class="mx-auto my-2 flex h-9 w-9 items-center justify-center rounded-full text-xs font-black ${week.status === 'ongoing' ? 'bg-blue-600 text-white' : week.status === 'completed' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}">${week.status === 'completed' ? '✓' : week.status === 'ongoing' ? '●' : week.week}</div>
       <p class="mt-2 text-center font-mono text-[11px] font-bold text-slate-700">${week.dateText}</p>
       ${renderTimelineWeekDays(week.days, week.events, week.week, round.id)}
@@ -22688,21 +22712,17 @@ window.renderStudentTimelineWeeks = function() {
 
     if (card.type === 'week') {
       // Weekly card
-      const hasMilestone = !!card.milestone;
-      const milestoneHtml = hasMilestone
-        ? `<div class="mt-2 pt-2 border-t border-slate-200 w-full">
-             <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px] uppercase tracking-wide">
-               🚩 ${card.milestone}
-             </span>
-           </div>`
+      const milestoneHtml = card.milestone
+        ? `<span class="min-w-0 rounded-md bg-amber-500 px-1.5 py-0.5 text-center text-[9px] font-black leading-tight text-white">🚩 ${escapeHtml(card.milestone)}</span>`
         : '';
       const noteHtml = card.subtitle
         ? `<p class="text-[10px] text-slate-500 mt-1 leading-tight line-clamp-2">${card.subtitle}</p>`
         : '';
-      return `<div class="flex-shrink-0 rounded-2xl border ${st.card} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all ${isActive ? 'shadow-md' : ''}"
+      return `<div class="ifa-timeline-card flex-shrink-0 rounded-2xl border ${st.card} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all ${isActive ? 'shadow-md' : ''}"
                    style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
-        <div class="flex items-center justify-between w-full mb-1.5">
-          <span class="font-black text-sm text-inherit">Tuần ${card.num}</span>
+        <div class="flex items-center justify-between gap-1 w-full mb-1.5">
+          <span class="font-black text-sm text-inherit whitespace-nowrap">Tuần ${card.num}</span>
+          ${milestoneHtml}
           <span class="text-[10px] px-1.5 py-0.5 rounded-full border ${st.badge} font-bold whitespace-nowrap leading-none">${st.label}</span>
         </div>
         <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${st.icon_bg} my-1">
@@ -22711,7 +22731,6 @@ window.renderStudentTimelineWeeks = function() {
         <span class="text-[13px] font-mono font-bold text-slate-700 tracking-tight">${card.dateText}</span>
         ${renderTimelineWeekDays(card.days, card.events, card.num)}
         ${renderTimelineWeekEvents(card.events, card.num)}
-        ${milestoneHtml}
         ${noteHtml}
       </div>`;
     } else {
@@ -22729,12 +22748,12 @@ window.renderStudentTimelineWeeks = function() {
         }).join('')}</div>`
         : '';
       if (card.id === 'gvhd' && card.supervisors?.length) {
-        return `<div class="flex-shrink-0 rounded-2xl border ${cardBg} flex flex-col items-center justify-center text-center p-4 shadow-xs relative overflow-hidden transition-all"
+        return `<div class="ifa-timeline-card flex-shrink-0 rounded-2xl border ${cardBg} flex flex-col items-center justify-center text-center p-4 shadow-xs relative overflow-hidden transition-all"
                      style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
           ${supervisorInfo}
         </div>`;
       }
-      return `<div class="flex-shrink-0 rounded-2xl border ${cardBg} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all"
+      return `<div class="ifa-timeline-card flex-shrink-0 rounded-2xl border ${cardBg} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all"
                    style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
         <div class="w-12 h-12 rounded-full flex items-center justify-center text-xl ${iconBg} mb-2 shadow-xs">
           ${card.icon}
@@ -22926,11 +22945,11 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
   const dottedText = '........................................................................................................................';
   const descriptionText = String(reg.topicDescription || '').trim();
   const estimatedDescriptionLines = Math.max(1, Math.ceil(descriptionText.length / 88));
-  const descriptionDotLines = Array.from({ length: Math.max(0, 8 - estimatedDescriptionLines) }, () => ({
+  const descriptionDotLines = Array.from({ length: descriptionText ? 0 : Math.max(0, 8 - estimatedDescriptionLines) }, () => ({
     text: dottedText, fontSize: 12, lineHeight: 1, margin: [0, 0, 0, 6]
   }));
   const estimatedTopicLines = Math.max(1, Math.ceil(String(reg.topicTitle || '').trim().length / 70));
-  const topicDotLines = Array.from({ length: Math.max(0, 3 - estimatedTopicLines) }, () => ({
+  const topicDotLines = Array.from({ length: String(reg.topicTitle || '').trim() ? 0 : Math.max(0, 3 - estimatedTopicLines) }, () => ({
     text: dottedText, bold: true, fontSize: 12, lineHeight: 1, margin: [28, 0, 0, 5]
   }));
   const fieldRow = (leftLabel, leftValue, rightLabel, rightValue) => ({
@@ -24016,12 +24035,13 @@ window.reviewStudentTopicTitle = async function(studentId, decision) {
 
   let note = '';
   if (decision === 'rejected') {
-    note = window.prompt('Nhập lý do hoặc nội dung cần sinh viên chỉnh sửa:', registration.topicApprovalNote || '') || '';
+    note = await showInputDialog('Yêu cầu chỉnh sửa đề tài', 'Nhập lý do hoặc nội dung cần sinh viên chỉnh sửa:', { defaultValue: registration.topicApprovalNote || '', confirmText: 'Gửi yêu cầu', required: true });
+    if (note === null) return;
     if (!note.trim()) {
       showToast('Vui lòng nhập lý do khi không duyệt tên đề tài.', 'warning');
       return;
     }
-  } else if (!window.confirm(`Duyệt tên đề tài “${registration.topicTitle}”?`)) {
+  } else if (!await showConfirm('Duyệt tên đề tài', `Duyệt tên đề tài “${registration.topicTitle}”?`, { confirmText: 'Duyệt đề tài', danger: false })) {
     return;
   }
 
@@ -24098,7 +24118,13 @@ window.openTopicRegistrationPreviewModal = function(studentId) {
   const yyyy = approvedDate.getFullYear();
 
   // Header info
-  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '--'; };
+  const setEl = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const filled = Boolean(String(val || '').trim() && String(val).trim() !== '--');
+    el.textContent = filled ? val : (id === 'topic-preview-doc-round' ? '' : '--');
+    if (el.tagName === 'TD') el.classList.toggle('has-value', filled);
+  };
   setEl('topic-preview-student-name', fullName);
   setEl('topic-preview-mssv', studentId);
   setEl('topic-preview-round-name', roundLabel);

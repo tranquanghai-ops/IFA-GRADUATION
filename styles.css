@@ -93,6 +93,28 @@ body {
   border-color: #cbd5e1;
 }
 
+/* Keep every stage and week in the shared journey the same height. */
+.ifa-timeline-card {
+  min-height: 326px;
+  height: auto;
+  align-self: stretch;
+}
+
+/* The official form preview retains real A4 proportions at any viewport width. */
+.topic-preview-scroll {
+  overflow: auto;
+}
+.topic-preview-a4 {
+  box-sizing: border-box;
+  width: 210mm;
+  min-width: 210mm;
+  min-height: 297mm;
+  padding: 18mm 16mm;
+}
+.topic-preview-a4 td.has-value {
+  border-bottom: 0 !important;
+}
+
 /* Stepper styles */
 .stepper-item.active .stepper-circle {
   background-color: #1a3c5e;
