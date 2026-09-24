@@ -201,6 +201,7 @@
 <!-- PARTIAL:templates/modals/supervisors/modal-add-sup-to-round.html -->
 <!-- PARTIAL:templates/modals/shared/modal-project-type.html -->
 <!-- PARTIAL:templates/modals/students/modal-student-profile.html -->
+<!-- PARTIAL:templates/modals/students/modal-student-edit-topic.html -->
 <!-- PARTIAL:templates/modals/shared/modal-teacher-profile.html -->
 <!-- PARTIAL:templates/modals/supervisors/modal-sup-bio.html -->
 <!-- PARTIAL:templates/modals/supervisors/modal-supervisor-confirm.html -->
@@ -235,35 +236,7 @@
 <!-- PARTIAL:templates/modals/shared/modal-submission-history.html -->
 <!-- PARTIAL:templates/modals/shared/modal-admin-impersonate.html -->
 
-            <span class="absolute left-2.5 top-2 text-slate-400">🔍</span>
-          </div>
-
-        </div>
-
-        <div class="flex items-center justify-between text-[11px] text-slate-500">
-          <span>Tìm thấy: <strong id="impersonate-candidate-count" class="text-slate-900 font-bold">0</strong> người dùng thực tế</span>
-          <span class="text-amber-800 font-bold flex items-center gap-1">⚡ Toàn quyền thao tác (Real Actions)</span>
-        </div>
-      </div>
-
-      <!-- Candidate list container -->
-      <div id="impersonate-candidates-list" class="p-4 flex-1 overflow-y-auto space-y-2">
-        <div class="text-center py-8 text-slate-400">Đang tải danh sách người dùng...</div>
-      </div>
-
-      <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div class="text-[11px] text-slate-500">
-          💡 Chọn đúng 1 người dùng để đóng vai. Thao tác được thực hiện theo quyền của nhân vật và lưu dấu Quản trị viên thực hiện trong nhật ký kiểm toán.
-        </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <button type="button" onclick="closeAdminImpersonateModal()" class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer">Hủy</button>
-          <button type="button" id="btn-confirm-impersonate" onclick="confirmImpersonateSelectedCandidate()" disabled class="px-5 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-slate-950 font-black rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
-            <span>🎭</span> <span id="btn-confirm-impersonate-text">Bắt đầu đóng vai</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+  </main>
 
 </body>
 </html>

@@ -32,14 +32,36 @@
 
             <!-- Row: Registered Topic (Left) & Supervisor Card (Right) -->
             <div class="mt-3 flex flex-col lg:flex-row gap-3 items-stretch">
-              <!-- Topic Card -->
-              <div id="hero-registered-topic-wrap" class="hidden flex-1 min-w-0 p-3.5 sm:p-4 bg-white/10 border border-white/15 rounded-2xl backdrop-blur-sm shadow-2xs">
-                <div class="flex items-center gap-1.5 text-amber-300 font-black text-xs uppercase tracking-wider">
-                  <span>📋</span> <span>Đề tài đã đăng ký:</span>
+              <!-- Topic Card on Hero Banner -->
+              <div id="hero-registered-topic-wrap" class="hidden flex-1 min-w-0 p-4 bg-white/10 border border-white/15 rounded-2xl backdrop-blur-md shadow-sm space-y-2.5">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide bg-emerald-400 text-emerald-950 uppercase shadow-2xs">
+                      ✓ Đã đăng ký thành công
+                    </span>
+                    <span id="hero-topic-approval-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide bg-amber-400 text-slate-950 shadow-2xs">
+                      ⏳ Chờ GVHD duyệt
+                    </span>
+                  </div>
+                  <span id="hero-topic-version-badge" class="text-[11px] text-blue-200 font-bold">Lần 1</span>
                 </div>
-                <div id="hero-registered-topic-name" class="font-bold text-white text-base sm:text-lg mt-1 leading-snug break-words">--</div>
-                <div id="hero-registered-topic-meta" class="text-xs text-blue-200 mt-1 font-medium flex items-center gap-2 flex-wrap"></div>
-                <button id="hero-download-topic-form-btn" type="button" onclick="downloadOfficialTopicRegistrationPdf()" class="hidden mt-2 px-3 py-1.5 bg-white text-tdtu-blue rounded-lg text-[11px] font-black shadow-sm hover:bg-blue-50">⬇ Tải phiếu đăng ký PDF</button>
+
+                <div>
+                  <span class="text-[11px] text-amber-300 font-bold uppercase tracking-wider block">Đề tài tốt nghiệp:</span>
+                  <h3 id="hero-registered-topic-name" class="font-black text-white text-base sm:text-lg leading-snug break-words mt-0.5">--</h3>
+                </div>
+
+                <div id="hero-registered-topic-meta" class="text-xs text-blue-200 font-medium flex items-center gap-2 flex-wrap"></div>
+                <div id="hero-registered-topic-review-note" class="hidden p-2.5 bg-rose-500/20 border border-rose-400/40 rounded-xl text-xs text-rose-200 font-medium"></div>
+
+                <div class="flex items-center gap-2 pt-1 flex-wrap">
+                  <button id="btn-hero-edit-topic" type="button" onclick="openEditTopicTitleModal()" class="px-3.5 py-1.5 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white rounded-xl text-xs font-bold transition-all border border-white/20 shadow-xs flex items-center gap-1.5 cursor-pointer">
+                    <span>✏️</span> <span>Sửa tên đề tài</span>
+                  </button>
+                  <button id="hero-download-topic-form-btn" type="button" onclick="downloadOfficialTopicRegistrationPdf()" class="hidden px-3.5 py-1.5 bg-emerald-400 hover:bg-emerald-300 active:bg-emerald-500 text-slate-950 rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
+                    <span>📄</span> <span>Tải phiếu ĐK (PDF)</span>
+                  </button>
+                </div>
               </div>
 
               <!-- Supervisor Info Widget (Compact Horizontal Card) -->
@@ -251,45 +273,18 @@
               </div>
             </div>
 
-            <!-- 3B: ALREADY REGISTERED STATUS CARD -->
-            <div id="already-registered-card" class="hidden card-surface bg-emerald-50/70 border border-emerald-200 p-5 sm:p-6 rounded-2xl shadow-sm">
-              <div id="reg-card-eligibility-banner" class="hidden mb-4"></div>
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 pb-4 border-b border-emerald-200/80">
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-xl font-bold shadow-md">
-                    ✓
-                  </div>
-                  <div>
-                    <span class="badge bg-emerald-200 text-emerald-800 font-bold mb-1">ĐÃ ĐĂNG KÝ THÀNH CÔNG</span>
-                    <h2 class="text-lg font-extrabold text-slate-900" id="reg-card-topic">Thiết kế nội thất...</h2>
-                    <p class="text-xs text-slate-500" id="reg-card-time">Thời gian nộp: --/--/---- --:--</p>
-                  </div>
-                </div>
-                <button id="btn-edit-existing-reg" onclick="enableEditRegistration()" class="hidden px-4 py-2 bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto cursor-pointer">
-                  ✏️ Chỉnh sửa đăng ký
-                </button>
-                <button id="btn-download-official-topic-form" onclick="downloadOfficialTopicRegistrationPdf()" class="hidden px-4 py-2 bg-tdtu-blue text-white hover:bg-tdtu-dark font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto cursor-pointer">
-                  ⬇ Tải phiếu PDF
-                </button>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span class="font-semibold text-slate-500 block">Loại hình đồ án:</span>
-                  <span id="reg-card-type" class="font-bold text-slate-800 text-sm">--</span>
-                </div>
-                <div>
-                  <span class="font-semibold text-slate-500 block">Trạng thái hồ sơ:</span>
-                  <span id="reg-card-status" class="font-bold text-emerald-700 text-sm">Đã ghi nhận (Chờ xét duyệt)</span>
-                  <p id="reg-card-topic-review-note" class="hidden mt-1 text-xs text-rose-700 font-medium"></p>
-                </div>
-              </div>
-
-              <div id="reg-card-preferences-section" class="mt-4 pt-3 border-t border-emerald-100">
-                <span class="font-bold text-slate-700 text-xs block mb-2">Nguyện vọng đã chọn:</span>
-                <div id="reg-card-preferences-list" class="space-y-2">
-                  <!-- Populated dynamically -->
-                </div>
+            <!-- 3B: HIDDEN BACKWARD-COMPATIBLE PLACEHOLDERS -->
+            <div id="already-registered-card" class="hidden">
+              <div id="reg-card-eligibility-banner" class="hidden"></div>
+              <h2 id="reg-card-topic" class="hidden"></h2>
+              <p id="reg-card-time" class="hidden"></p>
+              <button id="btn-edit-existing-reg" class="hidden"></button>
+              <button id="btn-download-official-topic-form" class="hidden"></button>
+              <span id="reg-card-type" class="hidden"></span>
+              <span id="reg-card-status" class="hidden"></span>
+              <p id="reg-card-topic-review-note" class="hidden"></p>
+              <div id="reg-card-preferences-section" class="hidden">
+                <div id="reg-card-preferences-list" class="hidden"></div>
               </div>
             </div>
 

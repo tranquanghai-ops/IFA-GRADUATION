@@ -95,6 +95,7 @@ const template = `${header}
 <!-- PARTIAL:templates/modals/supervisors/modal-add-sup-to-round.html -->
 <!-- PARTIAL:templates/modals/shared/modal-project-type.html -->
 <!-- PARTIAL:templates/modals/students/modal-student-profile.html -->
+<!-- PARTIAL:templates/modals/students/modal-student-edit-topic.html -->
 <!-- PARTIAL:templates/modals/shared/modal-teacher-profile.html -->
 <!-- PARTIAL:templates/modals/supervisors/modal-sup-bio.html -->
 <!-- PARTIAL:templates/modals/supervisors/modal-supervisor-confirm.html -->

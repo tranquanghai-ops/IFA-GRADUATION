@@ -1,0 +1,59 @@
+  <div id="modal-student-edit-topic" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col">
+      <!-- Modal Header -->
+      <div class="p-4 border-b border-slate-200 bg-gradient-to-r from-slate-900 to-tdtu-blue text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">✏️</span>
+          <div>
+            <h4 class="font-black text-sm text-white uppercase tracking-tight">Chỉnh sửa Tên đề tài ĐATN</h4>
+            <p class="text-[11px] text-blue-200">Gửi tên đề tài mới để Giảng viên hướng dẫn xét duyệt</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeEditTopicTitleModal()" class="text-slate-300 hover:text-white font-bold p-1 text-base cursor-pointer">✕</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-5 space-y-4">
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-start gap-2">
+          <span class="text-base shrink-0">ℹ️</span>
+          <div class="space-y-0.5 leading-relaxed">
+            <p class="font-bold">Lưu ý khi đổi tên đề tài:</p>
+            <p class="text-[11px] text-amber-800">
+              Nếu đề tài đã được GVHD duyệt trước đó, sau khi lưu tên mới, hệ thống sẽ chuyển trạng thái sang <strong>Chờ GVHD duyệt lại</strong>. Phiếu đăng ký PDF sẽ được mở khóa lại sau khi GVHD xác nhận.
+            </p>
+          </div>
+        </div>
+
+        <div class="space-y-1.5 text-left">
+          <label for="input-edit-topic-title" class="block font-bold text-slate-700 text-xs">
+            Tên đề tài mới <span class="text-rose-500">*</span>
+          </label>
+          <textarea id="input-edit-topic-title" rows="3" class="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-2xs" placeholder="Thiết kế nội thất..."></textarea>
+          <p class="text-[11px] text-slate-500 italic">
+            💡 Tên đề tài <strong>BẮT BUỘC</strong> phải bắt đầu bằng cụm từ <strong>"Thiết kế nội thất"</strong>.
+          </p>
+        </div>
+
+        <div class="space-y-1 text-left bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px]">
+          <div class="flex justify-between text-slate-500">
+            <span>Phiên bản hiện tại:</span>
+            <span id="edit-topic-current-version" class="font-bold text-slate-800">Lần 1</span>
+          </div>
+          <div class="flex justify-between text-slate-500">
+            <span>Phiên bản sau khi sửa:</span>
+            <span id="edit-topic-next-version" class="font-bold text-blue-700">Lần 2</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="closeEditTopicTitleModal()" class="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer">
+          Hủy
+        </button>
+        <button id="btn-submit-edit-topic" type="button" onclick="submitUpdatedTopicTitle()" class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
+          <span>🚀 Gửi GVHD duyệt lại</span>
+        </button>
+      </div>
+    </div>
+  </div>
