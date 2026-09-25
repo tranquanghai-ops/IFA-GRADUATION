@@ -455,21 +455,21 @@ window.loadSupervisorPortalData = async function(roundId) {
   // A supervisor in the roster is participating in the round even before a
   // student is assigned. Show the normal empty list instead of an access-like
   // warning in that case.
-  const hasSupervisorDuties = actor.isAdmin || Boolean(roundSupervisor) || totalAssignedCount > 0;
+  // Always render timeline and plan list for the selected round so supervisor can see roadmap & plan
+  renderSupervisorRoundTimeline(round);
+  renderSupervisorPlanList(round);
 
   if (!hasSupervisorDuties) {
-    document.getElementById('supervisor-round-timeline')?.classList.add('hidden');
-    document.getElementById('supervisor-plan-section')?.classList.add('hidden');
-    if (notAssignedAlert) notAssignedAlert.classList.remove('hidden');
-    if (subTabsContainer) subTabsContainer.classList.add('hidden');
-    if (assignedPanel) assignedPanel.classList.add('hidden');
+    if (notAssignedAlert) notAssignedAlert.classList.add('hidden');
+    if (subTabsContainer) subTabsContainer.classList.remove('hidden');
+    if (assignedPanel) assignedPanel.classList.remove('hidden');
     const reviewPanel = document.getElementById('sup-panel-review');
     if (reviewPanel) reviewPanel.classList.add('hidden');
     const acceptedPanel = document.getElementById('sup-panel-accepted');
     if (acceptedPanel) acceptedPanel.classList.add('hidden');
+    switchSupervisorTab('assigned');
+    renderSupervisorAssignedStudents();
   } else {
-    renderSupervisorRoundTimeline(round);
-    renderSupervisorPlanList(round);
     if (notAssignedAlert) notAssignedAlert.classList.add('hidden');
     if (subTabsContainer) subTabsContainer.classList.remove('hidden');
 

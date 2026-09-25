@@ -301,5 +301,5 @@ test('topic registration paper alignment and unified milestone countdown with no
   assert.match(app, /export function formatCountdownText/);
   assert.match(app, /export function renderUnifiedActivityCard/);
   assert.match(app, /milestone-countdown-badge/);
-  assert.match(app, /!isStudent \? `/);
+  assert.match(app, /milestone-toggle-btn/);
 });

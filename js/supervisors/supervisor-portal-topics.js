@@ -27,6 +27,12 @@ window.reviewStudentTopicTitle = async function(studentId, decision) {
       showToast('Vui lòng nhập lý do khi không duyệt tên đề tài.', 'warning');
       return;
     }
+  } else if (decision === 'cancel' || decision === 'pending') {
+    if (!await showConfirm('Hủy duyệt tên đề tài', `Bạn có chắc chắn muốn hủy trạng thái đã duyệt của đề tài “${registration.topicTitle}” để chuyển về chờ duyệt?`, { confirmText: 'Hủy duyệt đề tài', danger: true })) {
+      return;
+    }
+    decision = 'pending';
+    note = 'Đã hủy duyệt đề tài';
   } else if (!await showConfirm('Duyệt tên đề tài', `Duyệt tên đề tài “${registration.topicTitle}”?`, { confirmText: 'Duyệt đề tài', danger: false })) {
     return;
   }
@@ -57,7 +63,7 @@ window.reviewStudentTopicTitle = async function(studentId, decision) {
     registration.topicApprovalNote = note.trim();
     registration.topicTitleHistory = history;
     renderSupervisorAssignedStudents();
-    showToast(decision === 'approved' ? 'Đã duyệt tên đề tài.' : 'Đã gửi yêu cầu sinh viên chỉnh sửa tên đề tài.', 'success');
+    showToast(decision === 'approved' ? 'Đã duyệt tên đề tài.' : (decision === 'rejected' ? 'Đã gửi yêu cầu sinh viên chỉnh sửa tên đề tài.' : 'Đã hủy trạng thái duyệt tên đề tài.'), 'success');
   } catch (err) {
     console.error('Topic title review failed:', err);
     showToast('Không thể lưu quyết định duyệt: ' + err.message, 'error');
@@ -159,6 +165,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null) {
   const footerNoteEl = document.getElementById('topic-preview-footer-note');
   const btnApprove = document.getElementById('btn-topic-preview-approve');
   const btnReject = document.getElementById('btn-topic-preview-reject');
+  const btnCancelApproval = document.getElementById('btn-topic-preview-cancel-approval');
   const btnStudentEdit = document.getElementById('btn-topic-preview-student-edit');
 
   // Role-based button visibility
@@ -181,6 +188,13 @@ window.openTopicRegistrationPreviewModal = function(studentId = null) {
         : `Tên đề tài đã được GVHD phê duyệt${st.topicReviewedAt ? ' lúc ' + fmtIsoToVietnameseDateTime(st.topicReviewedAt) : ''}.`;
     }
     if (btnApprove) btnApprove.classList.add('hidden');
+    if (btnCancelApproval) {
+      if (isStudentViewer) {
+        btnCancelApproval.classList.add('hidden');
+      } else {
+        btnCancelApproval.classList.remove('hidden');
+      }
+    }
     if (btnReject) {
       if (isStudentViewer) {
         btnReject.classList.add('hidden');
@@ -190,6 +204,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null) {
       }
     }
   } else if (status === 'rejected') {
+    if (btnCancelApproval) btnCancelApproval.classList.add('hidden');
     if (badgeEl) {
       badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300';
       badgeEl.textContent = '✕ Yêu cầu chỉnh sửa';
@@ -213,6 +228,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null) {
     }
     if (btnReject) btnReject.classList.add('hidden');
   } else {
+    if (btnCancelApproval) btnCancelApproval.classList.add('hidden');
     if (badgeEl) {
       badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300';
       badgeEl.textContent = '⌛ Chờ duyệt tên đề tài';
@@ -248,6 +264,12 @@ window.openTopicRegistrationPreviewModal = function(studentId = null) {
   if (btnApprove && !isStudentViewer) {
     btnApprove.onclick = async () => {
       await window.reviewStudentTopicTitle(studentId, 'approved');
+      window.openTopicRegistrationPreviewModal(studentId);
+    };
+  }
+  if (btnCancelApproval && !isStudentViewer) {
+    btnCancelApproval.onclick = async () => {
+      await window.reviewStudentTopicTitle(studentId, 'cancel');
       window.openTopicRegistrationPreviewModal(studentId);
     };
   }

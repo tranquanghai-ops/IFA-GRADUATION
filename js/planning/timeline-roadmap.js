@@ -194,15 +194,17 @@ export function renderUnifiedActivityCard(act, round, options = {}) {
     `;
   }
 
+  const locationRaw = String(act.location || 'Ngành thông báo sau').trim();
+  const locationText = locationRaw.toLowerCase().startsWith('địa điểm') ? locationRaw : `Địa điểm: ${locationRaw}`;
+
   const pfx = prefix ? `${prefix}-` : '';
   const headerAttrs = `id="milestone-header-${pfx}${act.id}" role="button" tabindex="0" aria-expanded="${expanded ? 'true' : 'false'}" aria-controls="milestone-body-${pfx}${act.id}" onclick="toggleUnifiedMilestoneCard('${roundId}', '${act.id}', '${prefix}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleUnifiedMilestoneCard('${roundId}', '${act.id}', '${prefix}');}"`;
 
   return `
-    <div id="activity-card-${pfx}${act.slug || act.id}" data-activity-id="${act.id}" class="flex items-start gap-3.5 p-4 rounded-2xl border ${cardBorder} transition-all duration-300 relative">
-      ${markerHtml}
-      <div class="flex-1 min-w-0">
+    <div id="activity-card-${pfx}${act.slug || act.id}" data-activity-id="${act.id}" class="p-4 rounded-2xl border ${cardBorder} transition-all duration-300 relative">
+      <div class="w-full">
         <div ${headerAttrs} class="cursor-pointer select-none rounded-xl -mx-1 px-1 py-0.5 hover:bg-slate-900/[.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-tdtu-blue">
-          <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
             <div class="flex flex-wrap items-center gap-1.5">
               ${statusPill}
               <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${typeMeta.color}">
@@ -212,37 +214,33 @@ export function renderUnifiedActivityCard(act, round, options = {}) {
               ${countdownBadge}
             </div>
             <div class="flex items-center gap-1.5">
-              ${!isStudent ? `
-                <button type="button" onclick="event.stopPropagation();copyActivityLink('${roundId}', '${act.slug}')" class="text-[11px] font-semibold text-slate-400 hover:text-tdtu-blue flex items-center gap-1 transition-colors" title="Sao chép link mốc này">
-                  <span>🔗 Link</span>
-                </button>
-              ` : ''}
               <span id="milestone-toggle-btn-${pfx}${act.id}" class="text-[11px] font-bold text-slate-500 hover:text-tdtu-blue flex items-center gap-1 transition-colors shrink-0" aria-hidden="true">
                 <span>${expanded ? '▲ Thu gọn' : '▼ Xem chi tiết'}</span>
               </span>
             </div>
           </div>
 
-          <h3 class="text-sm sm:text-base font-black text-slate-900 tracking-tight">${escapeHtml(act.title)}</h3>
+          <div class="flex items-center gap-2.5 mt-1">
+            <div class="hidden sm:flex shrink-0">${markerHtml}</div>
+            <h3 class="text-sm sm:text-base font-black text-slate-900 tracking-tight">${escapeHtml(act.title)}</h3>
+          </div>
 
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 mt-2 font-medium">
-            <div class="flex items-center gap-1.5 font-mono text-[11px] text-slate-700">
-              <span class="shrink-0">🕒</span> <span class="text-slate-500 font-sans font-normal whitespace-nowrap">${act.isTentative ? 'Dự kiến:' : 'Chính thức:'}</span> <span class="font-bold">${timeStr}</span>
+          <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs sm:text-sm text-slate-700 mt-2.5 font-medium">
+            <div class="flex items-center gap-1.5 font-mono text-xs sm:text-sm text-slate-800">
+              <span class="shrink-0 text-sm">🕒</span> <span class="text-slate-500 font-sans font-normal whitespace-nowrap">${act.isTentative ? 'Dự kiến:' : 'Chính thức:'}</span> <span class="font-bold text-slate-900">${timeStr}</span>
             </div>
-            ${!expanded && act.location ? `
-              <div class="flex items-center gap-1.5 text-[11px] text-slate-600">
-                <span class="shrink-0">📍</span> <span>${escapeHtml(act.location)}</span>
+            ${!expanded ? `
+              <div class="flex items-center gap-1.5 text-xs sm:text-sm text-slate-700">
+                <span class="shrink-0 text-sm">📍</span> <span class="font-medium text-slate-800">${escapeHtml(locationText)}</span>
               </div>
             ` : ''}
           </div>
         </div>
 
         <div id="milestone-body-${pfx}${act.id}" class="${expanded ? '' : 'hidden'}">
-          ${act.location ? `
-            <div class="flex items-center gap-1 text-[11px] text-slate-600 mt-1.5">
-              <span>📍</span> ${escapeHtml(act.location)}
-            </div>
-          ` : ''}
+          <div class="flex items-center gap-1.5 text-xs sm:text-sm text-slate-700 mt-2">
+            <span class="shrink-0 text-sm">📍</span> <span class="font-medium text-slate-800">${escapeHtml(locationText)}</span>
+          </div>
 
           ${descriptionRender}
 

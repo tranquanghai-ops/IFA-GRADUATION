@@ -155,14 +155,16 @@ window.renderSupervisorAssignedStudents = function() {
               <span class="text-xs text-slate-500 font-medium truncate">Lớp: ${className}</span>
             </div>
             <h3 class="text-sm sm:text-base font-black text-slate-900 leading-snug truncate">${name}</h3>
-            <p class="text-xs text-slate-600 mt-1 flex items-center gap-2 flex-wrap">
-              <strong class="text-slate-700">Đề tài:</strong>
-              <span class="font-semibold text-slate-900">${topicTitle}</span>
-            </p>
-            <div class="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] text-slate-500">
+            
+            <div class="mt-1.5 flex flex-wrap items-center gap-2">
+              <span class="text-xs font-bold text-slate-500 shrink-0">Đề tài:</span>
+              <span class="text-sm sm:text-base font-black text-slate-900 leading-snug">${escapeHtml(topicTitle)}</span>
               ${hasRegistration ? topicApprovalBadge : ''}
-              ${hasRegistration ? `<span>Phiên bản ${topicVersion}</span><span>•</span>` : ''}
-              <span>Loại hình: <b class="text-slate-700">${projectType}</b></span>
+              ${hasRegistration ? `<button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-tdtu-blue border border-slate-200 shadow-2xs transition cursor-pointer" title="Bấm để xem lại phiếu đăng ký đề tài PDF">📄 Phiên bản ${topicVersion}</button>` : ''}
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2.5 mt-1.5 text-xs text-slate-500">
+              <span>Loại hình: <b class="text-slate-700">${escapeHtml(projectType)}</b></span>
               <span>•</span>
               <span>${submissionStatusStr}</span>
             </div>
@@ -171,19 +173,19 @@ window.renderSupervisorAssignedStudents = function() {
 
         <!-- Right: Guidance actions only; scoring belongs to the Assessment portal. -->
         <div class="flex flex-wrap items-center justify-between lg:justify-end gap-2.5 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 shrink-0">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}')" class="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer" title="Xem thông tin chi tiết">
-              📋 Xem hồ sơ
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}', 'profile')" class="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem hồ sơ chi tiết sinh viên và đề tài">
+              <span>📋</span> <span>Xem hồ sơ</span>
             </button>
-            <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}', 'progress')" class="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer" title="Xem tiến độ và mốc kế hoạch">
-              📅 Tiến độ
+            <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}', 'progress')" class="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem tiến độ và mốc kế hoạch">
+              <span>📅</span> <span>Tiến độ</span>
             </button>
             ${hasRegistration ? (
               topicApprovalStatus === 'approved'
-                ? `<button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký và trạng thái đã duyệt">
+                ? `<button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký và trạng thái đã duyệt (cho phép hủy duyệt nếu bấm nhầm)">
                     <span>✓</span> <span>Đã duyệt đề tài</span>
                   </button>`
-                : `<button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký và duyệt tên đề tài">
+                : `<button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký và duyệt tên đề tài">
                     <span>📝</span> <span>Duyệt đề tài</span>
                   </button>`
             ) : ''}
@@ -311,9 +313,38 @@ window.switchSupervisorTab = function(tabName) {
   }
 };
 
+window.switchSupervisorDetailModalTab = function(tabKey = 'profile') {
+  const tabProfileBtn = document.getElementById('tab-btn-dtl-profile');
+  const tabProgressBtn = document.getElementById('tab-btn-dtl-progress');
+  const contentProfile = document.getElementById('dtl-tab-content-profile');
+  const contentProgress = document.getElementById('dtl-tab-content-progress');
+
+  if (tabKey === 'progress') {
+    if (tabProfileBtn) {
+      tabProfileBtn.className = 'px-3.5 py-1.5 rounded-xl font-bold text-xs text-slate-600 hover:bg-white/60 transition cursor-pointer';
+    }
+    if (tabProgressBtn) {
+      tabProgressBtn.className = 'px-3.5 py-1.5 rounded-xl font-bold text-xs bg-white text-tdtu-blue shadow-xs border border-blue-200 transition cursor-pointer';
+    }
+    if (contentProfile) contentProfile.classList.add('hidden');
+    if (contentProgress) contentProgress.classList.remove('hidden');
+  } else {
+    if (tabProfileBtn) {
+      tabProfileBtn.className = 'px-3.5 py-1.5 rounded-xl font-bold text-xs bg-white text-tdtu-blue shadow-xs border border-blue-200 transition cursor-pointer';
+    }
+    if (tabProgressBtn) {
+      tabProgressBtn.className = 'px-3.5 py-1.5 rounded-xl font-bold text-xs text-slate-600 hover:bg-white/60 transition cursor-pointer';
+    }
+    if (contentProfile) contentProfile.classList.remove('hidden');
+    if (contentProgress) contentProgress.classList.add('hidden');
+  }
+};
+
 window.openSupervisorStudentDetailModal = function(studentId, focusSection = null) {
   const modal = document.getElementById('supervisor-student-detail-modal');
   if (!modal) return;
+
+  window.switchSupervisorDetailModalTab(focusSection === 'progress' ? 'progress' : 'profile');
 
   const round = state.activeRound;
   const st = (state.supervisorAssignedStudents || []).find(s => (s.studentId || s.id) === studentId) ||
