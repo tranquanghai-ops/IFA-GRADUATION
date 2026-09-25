@@ -5,6 +5,8 @@ const getRoundTimelineDefaultTitle = (w) => (typeof window !== 'undefined' && wi
 const roundWeekEventOccursOnDay = (e, d) => (typeof window !== 'undefined' && window.roundWeekEventOccursOnDay ? window.roundWeekEventOccursOnDay(e, d) : false);
 const distinguishOverlappingTimelineEvents = (evs, ds) => (typeof window !== 'undefined' && window.distinguishOverlappingTimelineEvents ? window.distinguishOverlappingTimelineEvents(evs, ds) : (evs || []));
 const normalizeRoundWeekEventColor = (val) => (typeof window !== 'undefined' && window.normalizeRoundWeekEventColor ? window.normalizeRoundWeekEventColor(val) : (val || '#2563eb'));
+const renderRoundWeekDayPicker = (w) => (typeof window !== 'undefined' && window.renderRoundWeekDayPicker ? window.renderRoundWeekDayPicker(w) : undefined);
+const renderRoundWeeklyContentEditor = (d) => (typeof window !== 'undefined' && window.renderRoundWeeklyContentEditor ? window.renderRoundWeeklyContentEditor(d) : undefined);
 
 // --- Module Bridges ---
 const getSupervisorAssignmentMode = (rnd) => (typeof window !== 'undefined' && window.getSupervisorAssignmentMode ? window.getSupervisorAssignmentMode(rnd) : 'student_preference');

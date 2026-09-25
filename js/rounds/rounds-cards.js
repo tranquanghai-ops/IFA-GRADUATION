@@ -423,15 +423,17 @@ window.renderAdminRoundsCards = function() {
       return `
         <article class="card-surface rounded-2xl overflow-hidden border ${isCurrentActive ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'} shadow-sm hover:shadow-lg transition-all w-full">
           <header class="relative bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white p-4 sm:p-5">
-            <div class="absolute left-4 top-4 flex flex-col gap-1" aria-label="Sắp xếp thứ tự đợt">
-              <button type="button" onclick="moveAdminRoundCard('${r.id}', '${filtered[cardIndex - 1]?.id || ''}')" ${cardIndex === 0 ? 'disabled' : ''} title="Đưa đợt lên trên" aria-label="Đưa ${escapeHtml(r.title || 'đợt')} lên trên" class="h-5 w-7 rounded border border-white/25 bg-white/10 text-[10px] leading-none hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed">▲</button>
-              <button type="button" onclick="moveAdminRoundCard('${r.id}', '${filtered[cardIndex + 1]?.id || ''}')" ${cardIndex === filtered.length - 1 ? 'disabled' : ''} title="Đưa đợt xuống dưới" aria-label="Đưa ${escapeHtml(r.title || 'đợt')} xuống dưới" class="h-5 w-7 rounded border border-white/25 bg-white/10 text-[10px] leading-none hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed">▼</button>
+            <div class="absolute right-4 top-4 flex items-center gap-1 z-10" aria-label="Sắp xếp thứ tự đợt">
+              <button type="button" onclick="moveAdminRoundCard('${r.id}', '${filtered[cardIndex - 1]?.id || ''}')" ${cardIndex === 0 ? 'disabled' : ''} title="Đưa đợt lên trên" aria-label="Đưa ${escapeHtml(r.title || 'đợt')} lên trên" class="h-6 w-7 rounded-lg border border-white/25 bg-white/10 text-xs leading-none hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer">▲</button>
+              <button type="button" onclick="moveAdminRoundCard('${r.id}', '${filtered[cardIndex + 1]?.id || ''}')" ${cardIndex === filtered.length - 1 ? 'disabled' : ''} title="Đưa đợt xuống dưới" aria-label="Đưa ${escapeHtml(r.title || 'đợt')} xuống dưới" class="h-6 w-7 rounded-lg border border-white/25 bg-white/10 text-xs leading-none hover:bg-white/25 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer">▼</button>
             </div>
-            <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Bấm để sao chép liên kết đợt" class="block w-full pl-11 text-left group mb-3">
-              <h3 class="text-lg sm:text-xl xl:text-2xl font-black tracking-tight leading-tight lg:whitespace-nowrap group-hover:text-blue-200 transition-colors">${escapeHtml(r.title || '')}</h3>
+            <button type="button" onclick="copyRoundLink('${r.id}', '${shortCode}')" title="Bấm để sao chép liên kết đợt" class="block w-full text-left group mb-2.5 pr-20">
+              <h3 class="text-lg sm:text-xl xl:text-2xl font-black tracking-tight leading-tight lg:whitespace-nowrap group-hover:text-blue-200 transition-colors inline-flex flex-wrap items-center gap-2">
+                <span>${escapeHtml(r.title || '')}</span>
+                <span class="font-mono text-xs px-2.5 py-0.5 rounded-full bg-white/15 text-amber-300 font-bold border border-white/15">NH ${escapeHtml(r.academicYear || '—')}</span>
+              </h3>
             </button>
             <div class="flex flex-wrap items-center gap-2 mb-2.5">
-              <span class="font-mono text-[11px] px-2.5 py-1 rounded-full bg-white/10 text-amber-300 font-bold border border-white/10">NH ${escapeHtml(r.academicYear || '—')}</span>
               ${statusBadgeHtml}
               <span class="inline-flex items-center gap-2 whitespace-nowrap">
                 ${activeBadgeHtml}
@@ -446,27 +448,27 @@ window.renderAdminRoundsCards = function() {
               </div>
               <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto shrink-0 mt-3 xl:mt-0">
                 ${driveRootUrl ? `<a href="${escapeHtml(driveRootUrl)}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm text-center"><span>↗</span><span>Thư mục Drive</span></a>` : ''}
-                <button type="button" onclick="editRoundModal('${r.id}')" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl transition text-center">✏️ Sửa đợt</button>
-                <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-3 py-2 ${isClosed ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-amber-400 hover:bg-amber-300'} text-slate-950 font-black text-xs rounded-xl transition text-center">${isClosed ? '↺ Mở lại' : 'Kết thúc đợt'}</button>
-                <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-bold text-xs rounded-xl transition text-center">${isHidden ? '👁️ Hiện lại' : 'Lưu trữ'}</button>
+                <button type="button" onclick="editRoundModal('${r.id}')" class="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl transition text-center cursor-pointer">✏️ Sửa đợt</button>
+                <button type="button" onclick="toggleRoundCloseStatus('${r.id}')" class="px-3 py-2 ${isClosed ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-amber-400 hover:bg-amber-300'} text-slate-950 font-black text-xs rounded-xl transition text-center cursor-pointer">${isClosed ? '↺ Mở lại' : 'Kết thúc đợt'}</button>
+                <button type="button" onclick="toggleRoundHiddenStatus('${r.id}')" class="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-bold text-xs rounded-xl transition text-center cursor-pointer">${isHidden ? '👁️ Hiện lại' : 'Lưu trữ'}</button>
               </div>
             </div>
           </header>
 
           <div class="grid grid-cols-2 lg:grid-cols-4 bg-slate-50/80 divide-x divide-y lg:divide-y-0 divide-slate-200 border-b border-slate-200">
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'eligible-students')" class="px-3 py-2.5 text-center hover:bg-blue-50 transition group">
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'eligible-students')" class="px-3 py-2.5 text-center hover:bg-blue-50 transition group cursor-pointer">
               <div class="text-[10px] font-bold text-slate-400 group-hover:text-blue-700 uppercase tracking-wider">Tổng sinh viên ↗</div>
               <div class="text-xl font-black text-slate-950 mt-0.5">${eligibleCount}</div>
             </button>
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review', 'assigned')" class="px-3 py-2.5 text-center hover:bg-emerald-50 transition group">
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review', 'assigned')" class="px-3 py-2.5 text-center hover:bg-emerald-50 transition group cursor-pointer">
               <div class="text-[10px] font-bold text-slate-400 group-hover:text-emerald-700 uppercase tracking-wider">Đã phân GVHD ↗</div>
               <div class="text-xl font-black text-emerald-600 mt-0.5">${assignedCount === null ? '—' : assignedCount} ${unassignedCount === null ? '<span class="text-[10px] font-normal text-slate-400">chưa tổng hợp</span>' : `<span class="text-[10px] font-normal text-slate-500">(${unassignedCount} chưa)</span>`}</div>
             </button>
-            <button type="button" onclick="editRoundModal('${r.id}', 'supervisors')" class="px-3 py-2.5 text-center hover:bg-indigo-50 transition group">
+            <button type="button" onclick="editRoundModal('${r.id}', 'supervisors')" class="px-3 py-2.5 text-center hover:bg-indigo-50 transition group cursor-pointer">
               <div class="text-[10px] font-bold text-slate-400 group-hover:text-indigo-700 uppercase tracking-wider">GVHD tham gia ↗</div>
               <div class="text-xl font-black text-indigo-700 mt-0.5">${supCount}</div>
             </button>
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'timeline')" class="px-3 py-2.5 text-center hover:bg-purple-50 transition group">
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'timeline')" class="px-3 py-2.5 text-center hover:bg-purple-50 transition group cursor-pointer">
               <div class="text-[10px] font-bold text-slate-400 group-hover:text-purple-700 uppercase tracking-wider">Mốc kế hoạch ↗</div>
               <div class="text-xl font-black text-purple-700 mt-0.5">${actCount}</div>
             </button>
@@ -475,15 +477,15 @@ window.renderAdminRoundsCards = function() {
           ${renderAdminRoundTimelinePreview(r)}
 
           <div class="p-3 sm:p-4 bg-white flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'timeline')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-2xs">📅 Kế hoạch (${actCount})</button>
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'eligible-students')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-2xs">🎓 Sinh viên (${eligibleCount})</button>
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'registrations')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 transition shadow-2xs">📝 Đăng ký (${regCount})</button>
-            ${directAssignment ? '' : `<button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 text-slate-800 transition shadow-2xs">🎯 Xét nguyện vọng</button>`}
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review', 'assigned')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-purple-50 hover:border-purple-300 text-slate-800 transition shadow-2xs">👥 ${directAssignment ? 'Phân công GVHD' : 'Kết quả phân công'}</button>
-            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'scoring-dashboard')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 text-slate-800 transition shadow-2xs">📊 Quản lý điểm</button>
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'timeline')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-2xs cursor-pointer">📅 Kế hoạch (${actCount})</button>
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'eligible-students')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 text-slate-800 transition shadow-2xs cursor-pointer">🎓 Sinh viên (${eligibleCount})</button>
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'registrations')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 transition shadow-2xs cursor-pointer">📝 Đăng ký (${regCount})</button>
+            ${directAssignment ? '' : `<button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 text-slate-800 transition shadow-2xs cursor-pointer">🎯 Xét nguyện vọng</button>`}
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review', 'assigned')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-purple-50 hover:border-purple-300 text-slate-800 transition shadow-2xs cursor-pointer">👥 ${directAssignment ? 'Phân công GVHD' : 'Kết quả phân công'}</button>
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'scoring-dashboard')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 text-slate-800 transition shadow-2xs cursor-pointer">📊 Quản lý điểm</button>
             <div class="w-full sm:w-auto flex items-center justify-center gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t sm:border-t-0 sm:border-l border-slate-100 sm:border-slate-200 sm:pl-2 text-xs">
-              ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-2.5 py-1.5 text-blue-700 hover:bg-blue-50 rounded-lg font-bold transition">⭐ Hiện hành</button>` : ''}
-              <button type="button" onclick="softDeleteRound('${r.id}')" class="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg font-semibold transition">🗑️ Thùng rác</button>
+              ${!isCurrentActive ? `<button type="button" onclick="setActiveRound('${r.id}')" class="px-2.5 py-1.5 text-blue-700 hover:bg-blue-50 rounded-lg font-bold transition cursor-pointer">⭐ Hiện hành</button>` : ''}
+              <button type="button" onclick="softDeleteRound('${r.id}')" class="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-lg font-semibold transition cursor-pointer">🗑️ Thùng rác</button>
             </div>
           </div>
         </article>
@@ -526,7 +528,9 @@ window.navigateToRoundAction = async function(roundId, actionKey, subSection = n
     if (el) el.value = roundId;
   });
 
-  window.switchAdminTab(actionKey);
+  if (typeof window.switchAdminTab === 'function') {
+    await window.switchAdminTab(actionKey);
+  }
 
   if (actionKey === 'review' && subSection === 'assigned') {
     setTimeout(() => {

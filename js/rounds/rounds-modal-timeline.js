@@ -565,4 +565,12 @@ window.resetWeeklyContentToDefault = function() {
   renderRoundWeeklyContentEditor(durationWeeks);
 };
 
-// Open Create Round Modal
+if (typeof window !== 'undefined') {
+  window.renderRoundWeekDayPicker = renderRoundWeekDayPicker;
+  window.renderRoundWeeklyContentEditor = renderRoundWeeklyContentEditor;
+  window.normalizeRoundWeekEventColor = normalizeRoundWeekEventColor;
+  window.roundWeekEventOccursOnDay = roundWeekEventOccursOnDay;
+  window.distinguishOverlappingTimelineEvents = distinguishOverlappingTimelineEvents;
+  window.getRoundTimelineDefaultTitle = getRoundTimelineDefaultTitle;
+  window.resolveRoundWeekTitle = resolveRoundWeekTitle;
+}

@@ -944,7 +944,7 @@ window.toggleAdminRoundsAccordion = function(forceOpen) {
   }
 };
 
-window.switchAdminTab = function(tabKey) {
+window.switchAdminTab = async function(tabKey) {
   state.currentAdminTab = tabKey;
 
   // 1. Always bind currentRoundId to state.selectedRoundId
@@ -982,19 +982,19 @@ window.switchAdminTab = function(tabKey) {
   const roundId = state.selectedRoundId;
   if (tabKey === 'overview') loadAdminStats();
   else if (tabKey === 'faculty-students') openFacultyStudentsTab();
-  else if (tabKey === 'review') { if (roundId) loadAdminReviewData(roundId); }
+  else if (tabKey === 'review') { if (roundId) await loadAdminReviewData(roundId); }
   else if (tabKey === 'rounds') {
     if (typeof renderAdminRoundsCards === 'function') renderAdminRoundsCards();
     renderAdminRoundsTable();
   }
-  else if (tabKey === 'supervisors-master') loadAdminSupervisorsMaster();
-  else if (tabKey === 'round-supervisors' && roundId) loadAdminRoundSupervisors(roundId);
+  else if (tabKey === 'supervisors-master') await loadAdminSupervisorsMaster();
+  else if (tabKey === 'round-supervisors' && roundId) await loadAdminRoundSupervisors(roundId);
   else if (tabKey === 'eligible-students' && roundId) {
     const sel = document.getElementById('admin-round-student-select');
     if (sel && sel.value !== roundId) sel.value = roundId;
-    loadAdminEligibleStudents(roundId);
+    await loadAdminEligibleStudents(roundId);
   }
-  else if (tabKey === 'registrations' && roundId) loadAdminRegistrations(roundId);
+  else if (tabKey === 'registrations' && roundId) await loadAdminRegistrations(roundId);
   else if (tabKey === 'preview-student') preparePreviewStudentDropdown();
   else if (tabKey === 'trash') renderAdminTrashTable();
   else if (tabKey === 'scoring-dashboard') loadAdminScoringDashboard();
@@ -1003,7 +1003,7 @@ window.switchAdminTab = function(tabKey) {
     if (roundId) {
       const sel = document.getElementById('admin-timeline-round-select');
       if (sel) sel.value = roundId;
-      loadAdminRoundActivities(roundId);
+      await loadAdminRoundActivities(roundId);
     }
   }
 };

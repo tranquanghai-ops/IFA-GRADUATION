@@ -112,6 +112,7 @@ function rememberRoundTimelineEvents(roundId, weeks) {
 }
 
 function renderTimelineWeekDays(days = [], events = [], weekNumber = null, roundId = null) {
+  const isAdmin = state.isAdmin && !state.impersonation;
   return `<div class="grid grid-cols-7 gap-1.5 w-full mt-2.5 pt-2 border-t border-slate-200/80">${days.map(day => {
     const dayEvents = events.filter(event => roundWeekEventOccursOnDay(event, day));
     const titles = dayEvents.map(event => escapeHtml(event.title)).join(' · ');
@@ -123,10 +124,10 @@ function renderTimelineWeekDays(days = [], events = [], weekNumber = null, round
     const dayStyle = eventColors.length > 1
       ? ` style="background:linear-gradient(90deg,${slices});border-color:${eventColor};color:#1e293b"`
       : (eventColor ? ` style="background-color:${eventColor}18;border-color:${eventColor};color:${eventColor}"` : '');
-    const clickable = weekNumber !== null && dayEvents.length;
+    const clickable = weekNumber !== null && (dayEvents.length > 0 || isAdmin);
     const tag = clickable ? 'button' : 'span';
-    const click = clickable ? ` type="button" onclick="event.stopPropagation(); openStudentTimelineDay(${weekNumber}, '${day.key}', ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" aria-label="Xem ${dayEvents.length} sự kiện ngày ${day.label}"` : '';
-    return `<${tag}${click} title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 flex flex-col items-center justify-center rounded-lg border text-center py-1.5 px-0.5 min-h-[48px] ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md' : ''}"${dayStyle}><span class="block text-[10px] font-bold leading-none text-slate-500">${day.shortName}</span><span class="block text-[10.5px] font-bold leading-none mt-1 text-slate-800 whitespace-nowrap tracking-tight">${day.label}</span>${dayEvents.length ? `<span class="flex justify-center gap-0.5 mt-0.5">${eventColors.map(color => `<i class="text-[9px] leading-none not-italic" style="color:${color}">●</i>`).join('')}</span>` : ''}</${tag}>`;
+    const click = clickable ? ` type="button" onclick="event.stopPropagation(); ${isAdmin ? `openAdminTimelineDayAction(${weekNumber}, '${day.key}', '${escapeHtml(roundId || '')}')` : `openStudentTimelineDay(${weekNumber}, '${day.key}', ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})`}" aria-label="Ngày ${day.label}"` : '';
+    return `<${tag}${click} title="${isAdmin ? (dayEvents.length ? `${titles} (Bấm để xem/sửa/thêm sự kiện)` : `${day.shortName} ${day.label} (Bấm để thêm sự kiện nhanh)`) : (titles || `${day.shortName} ${day.label}`)}" class="min-w-0 flex flex-col items-center justify-center rounded-lg border text-center py-1.5 px-0.5 min-h-[48px] ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md hover:border-blue-400 transition' : ''}"${dayStyle}><span class="block text-[10px] font-bold leading-none text-slate-500">${day.shortName}</span><span class="block text-[10.5px] font-bold leading-none mt-1 text-slate-800 whitespace-nowrap tracking-tight">${day.label}</span>${dayEvents.length ? `<span class="flex justify-center gap-0.5 mt-0.5">${eventColors.map(color => `<i class="text-[9px] leading-none not-italic" style="color:${color}">●</i>`).join('')}</span>` : (isAdmin ? '<span class="text-[8px] text-slate-300 leading-none mt-0.5 opacity-40 hover:opacity-100">+</span>' : '')}</${tag}>`;
   }).join('')}</div>`;
 }
 
@@ -145,6 +146,7 @@ function renderTimelineWeekEvents(events = [], weekNumber = null, roundId = null
     const date = parseEventDate(value);
     return date ? `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}` : '';
   };
+  const isAdmin = state.isAdmin && !state.impersonation;
   return `<div class="mt-2 w-full space-y-1 text-left">${events.map((event, eventIndex) => {
     const color = normalizeRoundWeekEventColor(event.displayColor || event.color);
     const startValue = event.startDate || event.date || '';
@@ -156,7 +158,10 @@ function renderTimelineWeekEvents(events = [], weekNumber = null, roundId = null
       ? ''
       : (dayCount > 0 ? `Còn ${dayCount} ngày` : (endDate >= today ? (dayCount === 0 ? 'Hôm nay' : 'Đang diễn ra') : 'Đã diễn ra'));
     const dateLabel = startValue === endValue ? shortDate(startValue) : `${shortDate(startValue)}–${shortDate(endValue)}`;
-    return `<button type="button" onclick="event.stopPropagation(); openStudentTimelineEvent(${weekNumber}, ${eventIndex}, ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" title="Xem chi tiết sự kiện" class="flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-[11px] leading-tight hover:shadow-sm" style="background-color:${color}18;border-color:${color}66;color:${color}">
+    const clickHandler = isAdmin
+      ? (event.activityId ? `editActivityModal('${escapeHtml(event.activityId)}')` : `openAdminTimelineEventEditor('${escapeHtml(roundId || '')}', ${weekNumber}, '${escapeHtml(event.id || String(eventIndex))}')`)
+      : `openStudentTimelineEvent(${weekNumber}, ${eventIndex}, ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})`;
+    return `<button type="button" onclick="event.stopPropagation(); ${clickHandler}" title="${isAdmin ? 'Bấm để chỉnh sửa sự kiện' : 'Xem chi tiết sự kiện'}" class="flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-[11px] leading-tight hover:shadow-sm cursor-pointer transition" style="background-color:${color}18;border-color:${color}66;color:${color}">
       <span class="shrink-0">📌 ${escapeHtml(dateLabel)}</span><span class="min-w-0 flex-1 truncate font-black">${escapeHtml(event.title)}</span>${countdown ? `<span class="shrink-0 font-bold opacity-80">${countdown}</span>` : ''}
     </button>`;
   }).join('')}</div>`;
@@ -206,6 +211,358 @@ window.openStudentTimelineDay = function(weekNumber, dateKey, roundId = null) {
   dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
   dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Sự kiện trong ngày" class="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><div class="flex items-center justify-between gap-2"><h3 class="text-lg font-black text-slate-900">Sự kiện ngày ${escapeHtml(dateKey)}</h3><button type="button" onclick="closeStudentTimelineEvent()" class="rounded-lg bg-slate-100 px-3 py-1.5 text-lg" aria-label="Đóng">×</button></div><div class="mt-4 space-y-2">${matches.map(item => `<button type="button" onclick="openStudentTimelineEvent(${weekNumber}, ${item.index}, ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" class="block w-full rounded-xl border border-slate-200 p-3 text-left text-sm font-bold text-blue-800 hover:bg-blue-50">${escapeHtml(item.event.title)}</button>`).join('')}</div></div>`;
+  document.body.appendChild(dialog);
+};
+
+// --- ADMIN INTERACTIVE TIMELINE EVENT HANDLERS ---
+const TIMELINE_PALETTE_COLORS = [
+  ['#dc2626', 'Đỏ'],
+  ['#ea580c', 'Cam'],
+  ['#d97706', 'Vàng đậm'],
+  ['#16a34a', 'Xanh lá'],
+  ['#0d9488', 'Xanh mòng két'],
+  ['#0284c7', 'Xanh da trời'],
+  ['#2563eb', 'Xanh dương'],
+  ['#4f46e5', 'Chàm'],
+  ['#7c3aed', 'Tím'],
+  ['#c026d3', 'Hồng cánh sen'],
+  ['#db2777', 'Hồng'],
+  ['#475569', 'Xám đá']
+];
+
+window.openAdminTimelineEventEditor = function(roundId, weekNumber, eventId) {
+  const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  if (!round) return;
+  const weeklyConfig = Array.isArray(round.timelineWeeksConfig) ? round.timelineWeeksConfig : [];
+  const weekConfig = weeklyConfig.find(item => Number(item.week) === Number(weekNumber));
+  const events = Array.isArray(weekConfig?.events) ? weekConfig.events : [];
+  const event = events.find(e => String(e.id) === String(eventId)) || events[Number(eventId)];
+  if (!event) return;
+
+  window.closeStudentTimelineEvent();
+  const color = normalizeRoundWeekEventColor(event.color || '#dc2626');
+  const startDate = event.startDate || event.date || '';
+  const endDate = event.endDate || event.startDate || event.date || '';
+
+  const dialog = document.createElement('div');
+  dialog.id = 'student-timeline-event-dialog';
+  dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
+  dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
+
+  dialog.innerHTML = `
+    <div role="dialog" aria-modal="true" aria-label="Chỉnh sửa sự kiện" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">Chỉnh sửa sự kiện Tuần ${weekNumber}</span>
+          <h3 class="text-base font-black text-slate-900">${escapeHtml(event.title || 'Sự kiện')}</h3>
+        </div>
+        <button type="button" onclick="closeStudentTimelineEvent()" class="rounded-lg bg-slate-100 p-1.5 text-slate-500 hover:text-slate-800 text-base" aria-label="Đóng">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Tên sự kiện / Hạn nộp <span class="text-rose-500">*</span></label>
+          <input type="text" id="admin-evt-title" value="${escapeHtml(event.title || '')}" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Ngày bắt đầu</label>
+            <input type="date" id="admin-evt-start-date" value="${startDate}" class="w-full p-2 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Ngày kết thúc</label>
+            <input type="date" id="admin-evt-end-date" value="${endDate}" class="w-full p-2 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1.5">Màu sự kiện</label>
+          <input type="hidden" id="admin-evt-color" value="${color}">
+          <div class="grid grid-cols-6 gap-2" id="admin-evt-palette">
+            ${TIMELINE_PALETTE_COLORS.map(([c, label]) => `
+              <button type="button" onclick="selectAdminEvtPaletteColor('${c}')" title="${label}" class="h-6 rounded-lg border transition ${c === color ? 'ring-2 ring-blue-600 scale-110' : 'opacity-80 hover:opacity-100'}" style="background-color:${c};border-color:${c}"></button>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-100 gap-2">
+        <button type="button" onclick="deleteAdminTimelineEvent('${escapeHtml(roundId)}', ${weekNumber}, '${escapeHtml(event.id || String(eventId))}')" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer">
+          <span>🗑️ Xóa sự kiện</span>
+        </button>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeStudentTimelineEvent()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition cursor-pointer">Hủy</button>
+          <button type="button" onclick="saveAdminTimelineEventEdit('${escapeHtml(roundId)}', ${weekNumber}, '${escapeHtml(event.id || String(eventId))}')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-sm transition cursor-pointer">💾 Lưu thay đổi</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(dialog);
+};
+
+window.selectAdminEvtPaletteColor = function(color) {
+  const input = document.getElementById('admin-evt-color');
+  if (input) input.value = color;
+  document.querySelectorAll('#admin-evt-palette button').forEach(btn => {
+    btn.classList.toggle('ring-2', btn.style.backgroundColor === color || btn.getAttribute('style')?.includes(color));
+    btn.classList.toggle('ring-blue-600', btn.style.backgroundColor === color || btn.getAttribute('style')?.includes(color));
+    btn.classList.toggle('scale-110', btn.style.backgroundColor === color || btn.getAttribute('style')?.includes(color));
+  });
+};
+
+window.saveAdminTimelineEventEdit = async function(roundId, weekNumber, eventId) {
+  const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  if (!round) return;
+  const title = document.getElementById('admin-evt-title')?.value?.trim();
+  const startDate = document.getElementById('admin-evt-start-date')?.value?.trim() || '';
+  const endDate = document.getElementById('admin-evt-end-date')?.value?.trim() || startDate;
+  const color = document.getElementById('admin-evt-color')?.value?.trim() || '#dc2626';
+
+  if (!title) {
+    showToast('Vui lòng nhập tên sự kiện!', 'warning');
+    return;
+  }
+
+  const durationWeeks = parseInt(round.durationWeeks, 10) || 12;
+  const weeklyConfig = Array.isArray(round.timelineWeeksConfig) ? [...round.timelineWeeksConfig] : [];
+  let weekIndex = weeklyConfig.findIndex(item => Number(item.week) === Number(weekNumber));
+  if (weekIndex === -1) {
+    weeklyConfig.push({ week: weekNumber, title: `Tuần ${weekNumber}`, note: '', milestone: '', visible: true, events: [] });
+    weekIndex = weeklyConfig.length - 1;
+  }
+
+  const weekObj = { ...weeklyConfig[weekIndex] };
+  const events = Array.isArray(weekObj.events) ? [...weekObj.events] : [];
+  const eventIdx = events.findIndex(e => String(e.id) === String(eventId));
+
+  const updatedEvt = {
+    id: eventId || `evt-${Date.now()}`,
+    title,
+    startDate,
+    endDate,
+    date: startDate,
+    color: normalizeRoundWeekEventColor(color)
+  };
+
+  if (eventIdx >= 0) {
+    events[eventIdx] = { ...events[eventIdx], ...updatedEvt };
+  } else {
+    events.push(updatedEvt);
+  }
+  weekObj.events = events;
+  weeklyConfig[weekIndex] = weekObj;
+
+  try {
+    await updateDoc(doc(db, 'graduationRounds', roundId), {
+      timelineWeeksConfig: weeklyConfig,
+      updatedAt: serverTimestamp()
+    });
+    round.timelineWeeksConfig = weeklyConfig;
+    if (state.activeRound && state.activeRound.id === roundId) state.activeRound.timelineWeeksConfig = weeklyConfig;
+    window.closeStudentTimelineEvent();
+    if (typeof renderAdminRoundsCards === 'function') renderAdminRoundsCards();
+    if (typeof renderStudentTimelineWeeks === 'function') renderStudentTimelineWeeks();
+    showToast('✓ Đã cập nhật sự kiện thành công!', 'success');
+  } catch (err) {
+    console.error('Lỗi lưu sự kiện:', err);
+    showToast('Lỗi lưu sự kiện: ' + err.message, 'error');
+  }
+};
+
+window.deleteAdminTimelineEvent = async function(roundId, weekNumber, eventId) {
+  if (!(await showConfirm('Xóa sự kiện', 'Bạn có chắc chắn muốn xóa sự kiện này khỏi lịch tuần?', { confirmText: 'Xóa sự kiện', danger: true }))) return;
+
+  const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  if (!round) return;
+  const weeklyConfig = Array.isArray(round.timelineWeeksConfig) ? [...round.timelineWeeksConfig] : [];
+  const weekIndex = weeklyConfig.findIndex(item => Number(item.week) === Number(weekNumber));
+  if (weekIndex === -1) return;
+
+  const weekObj = { ...weeklyConfig[weekIndex] };
+  weekObj.events = (Array.isArray(weekObj.events) ? weekObj.events : []).filter(e => String(e.id) !== String(eventId));
+  weeklyConfig[weekIndex] = weekObj;
+
+  try {
+    await updateDoc(doc(db, 'graduationRounds', roundId), {
+      timelineWeeksConfig: weeklyConfig,
+      updatedAt: serverTimestamp()
+    });
+    round.timelineWeeksConfig = weeklyConfig;
+    if (state.activeRound && state.activeRound.id === roundId) state.activeRound.timelineWeeksConfig = weeklyConfig;
+    window.closeStudentTimelineEvent();
+    if (typeof renderAdminRoundsCards === 'function') renderAdminRoundsCards();
+    if (typeof renderStudentTimelineWeeks === 'function') renderStudentTimelineWeeks();
+    showToast('✓ Đã xóa sự kiện thành công!', 'info');
+  } catch (err) {
+    console.error('Lỗi xóa sự kiện:', err);
+    showToast('Lỗi xóa sự kiện: ' + err.message, 'error');
+  }
+};
+
+window.openAdminTimelineQuickCreateEvent = function(roundId, weekNumber, dateKey) {
+  const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  if (!round) return;
+  window.closeStudentTimelineEvent();
+
+  const dialog = document.createElement('div');
+  dialog.id = 'student-timeline-event-dialog';
+  dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
+  dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
+
+  dialog.innerHTML = `
+    <div role="dialog" aria-modal="true" aria-label="Thêm sự kiện nhanh" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">Thêm sự kiện nhanh · Tuần ${weekNumber}</span>
+          <h3 class="text-base font-black text-slate-900">📅 Ngày ${escapeHtml(dateKey)}</h3>
+        </div>
+        <button type="button" onclick="closeStudentTimelineEvent()" class="rounded-lg bg-slate-100 p-1.5 text-slate-500 hover:text-slate-800 text-base" aria-label="Đóng">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="font-bold text-slate-700 block mb-1">Tên sự kiện / Mốc nộp bài <span class="text-rose-500">*</span></label>
+          <input type="text" id="admin-quick-title" placeholder="Ví dụ: Hạn nộp Phiếu đăng ký đề tài, Nộp thuyết minh..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none" autofocus>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Ngày bắt đầu</label>
+            <input type="date" id="admin-quick-start-date" value="${dateKey}" class="w-full p-2 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="font-bold text-slate-700 block mb-1">Ngày kết thúc</label>
+            <input type="date" id="admin-quick-end-date" value="${dateKey}" class="w-full p-2 border border-slate-300 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="font-bold text-slate-700 block mb-1.5">Màu sự kiện</label>
+          <input type="hidden" id="admin-evt-color" value="#dc2626">
+          <div class="grid grid-cols-6 gap-2" id="admin-evt-palette">
+            ${TIMELINE_PALETTE_COLORS.map(([c, label]) => `
+              <button type="button" onclick="selectAdminEvtPaletteColor('${c}')" title="${label}" class="h-6 rounded-lg border transition ${c === '#dc2626' ? 'ring-2 ring-blue-600 scale-110' : 'opacity-80 hover:opacity-100'}" style="background-color:${c};border-color:${c}"></button>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end pt-3 border-t border-slate-100 gap-2">
+        <button type="button" onclick="closeStudentTimelineEvent()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition cursor-pointer">Hủy</button>
+        <button type="button" onclick="saveAdminTimelineQuickCreateEvent('${escapeHtml(roundId)}', ${weekNumber})" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-sm transition cursor-pointer">＋ Tạo sự kiện</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(dialog);
+};
+
+window.saveAdminTimelineQuickCreateEvent = async function(roundId, weekNumber) {
+  const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  if (!round) return;
+  const title = document.getElementById('admin-quick-title')?.value?.trim();
+  const startDate = document.getElementById('admin-quick-start-date')?.value?.trim() || '';
+  const endDate = document.getElementById('admin-quick-end-date')?.value?.trim() || startDate;
+  const color = document.getElementById('admin-evt-color')?.value?.trim() || '#dc2626';
+
+  if (!title) {
+    showToast('Vui lòng nhập tên sự kiện!', 'warning');
+    return;
+  }
+
+  const durationWeeks = parseInt(round.durationWeeks, 10) || 12;
+  const weeklyConfig = Array.isArray(round.timelineWeeksConfig) ? [...round.timelineWeeksConfig] : [];
+  let weekIndex = weeklyConfig.findIndex(item => Number(item.week) === Number(weekNumber));
+  if (weekIndex === -1) {
+    weeklyConfig.push({ week: weekNumber, title: `Tuần ${weekNumber}`, note: '', milestone: '', visible: true, events: [] });
+    weekIndex = weeklyConfig.length - 1;
+  }
+
+  const weekObj = { ...weeklyConfig[weekIndex] };
+  const events = Array.isArray(weekObj.events) ? [...weekObj.events] : [];
+
+  const newEvt = {
+    id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    title,
+    startDate,
+    endDate,
+    date: startDate,
+    color: normalizeRoundWeekEventColor(color)
+  };
+
+  events.push(newEvt);
+  weekObj.events = events;
+  weeklyConfig[weekIndex] = weekObj;
+
+  try {
+    await updateDoc(doc(db, 'graduationRounds', roundId), {
+      timelineWeeksConfig: weeklyConfig,
+      updatedAt: serverTimestamp()
+    });
+    round.timelineWeeksConfig = weeklyConfig;
+    if (state.activeRound && state.activeRound.id === roundId) state.activeRound.timelineWeeksConfig = weeklyConfig;
+    window.closeStudentTimelineEvent();
+    if (typeof renderAdminRoundsCards === 'function') renderAdminRoundsCards();
+    if (typeof renderStudentTimelineWeeks === 'function') renderStudentTimelineWeeks();
+    showToast('✓ Đã tạo sự kiện mới thành công!', 'success');
+  } catch (err) {
+    console.error('Lỗi tạo sự kiện:', err);
+    showToast('Lỗi tạo sự kiện: ' + err.message, 'error');
+  }
+};
+
+window.openAdminTimelineDayAction = function(weekNumber, dateKey, roundId) {
+  const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  if (!round) return;
+  const eventMap = roundId ? state.roundTimelineEventMap?.get(roundId) : state.studentTimelineEventMap;
+  const events = eventMap?.get(Number(weekNumber)) || [];
+  const date = new Date(`${dateKey}T00:00:00`);
+  const dayIndex = (date.getDay() + 6) % 7;
+  const matches = events.filter(event => roundWeekEventOccursOnDay(event, { key: dateKey, dayIndex }));
+
+  if (matches.length === 0) {
+    window.openAdminTimelineQuickCreateEvent(roundId, weekNumber, dateKey);
+    return;
+  }
+
+  window.closeStudentTimelineEvent();
+  const dialog = document.createElement('div');
+  dialog.id = 'student-timeline-event-dialog';
+  dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
+  dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
+
+  dialog.innerHTML = `
+    <div role="dialog" aria-modal="true" aria-label="Sự kiện ngày" class="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">Tuần ${weekNumber}</span>
+          <h3 class="text-base font-black text-slate-900">Sự kiện ngày ${escapeHtml(dateKey)}</h3>
+        </div>
+        <button type="button" onclick="closeStudentTimelineEvent()" class="rounded-lg bg-slate-100 p-1.5 text-slate-500 hover:text-slate-800 text-base" aria-label="Đóng">✕</button>
+      </div>
+
+      <div class="space-y-2">
+        ${matches.map(event => {
+          const color = normalizeRoundWeekEventColor(event.displayColor || event.color);
+          const clickHandler = event.activityId
+            ? `editActivityModal('${escapeHtml(event.activityId)}')`
+            : `openAdminTimelineEventEditor('${escapeHtml(roundId)}', ${weekNumber}, '${escapeHtml(event.id)}')`;
+          return `
+            <div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 transition">
+              <span class="font-bold text-xs text-slate-900 truncate" style="color:${color}">📌 ${escapeHtml(event.title)}</span>
+              <button type="button" onclick="${clickHandler}" class="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-300 font-bold text-xs shadow-2xs cursor-pointer">✏️ Sửa</button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <div class="pt-2 border-t border-slate-100">
+        <button type="button" onclick="openAdminTimelineQuickCreateEvent('${escapeHtml(roundId)}', ${weekNumber}, '${escapeHtml(dateKey)}')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer">
+          <span>＋ Thêm sự kiện khác vào ngày này</span>
+        </button>
+      </div>
+    </div>
+  `;
   document.body.appendChild(dialog);
 };
 
