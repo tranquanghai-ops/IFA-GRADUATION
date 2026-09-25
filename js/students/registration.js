@@ -4,7 +4,21 @@ const renderRoundHeader = () => window.renderRoundHeader?.();
 const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
 const normalizeOfficialAssignment = (a, r) => (typeof window !== 'undefined' && window.normalizeOfficialAssignment ? window.normalizeOfficialAssignment(a, r) : (a || r));
 const shouldSkipStudentSupervisorPreference = (rnd) => (typeof window !== 'undefined' && window.shouldSkipStudentSupervisorPreference ? window.shouldSkipStudentSupervisorPreference(rnd) : false);
-const loadStudentSelfProfile = (mssv) => (typeof window !== 'undefined' && window.loadStudentSelfProfile ? window.loadStudentSelfProfile(mssv) : Promise.resolve(null));
+async function loadStudentSelfProfile(mssv) {
+  if (typeof window !== 'undefined' && window.loadStudentSelfProfile && window.loadStudentSelfProfile !== loadStudentSelfProfile) {
+    return window.loadStudentSelfProfile(mssv);
+  }
+  if (!mssv) return null;
+  try {
+    const snap = await getDoc(doc(db, 'graduationStudentProfiles', mssv));
+    state.studentSelfProfile = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  } catch (err) {
+    state.studentSelfProfile = null;
+  }
+  return state.studentSelfProfile;
+}
+if (typeof window !== 'undefined') window.loadStudentSelfProfile = loadStudentSelfProfile;
+
 const populateRegistrationStudentForm = () => window.populateRegistrationStudentForm?.();
 const collectOfficialFormFields = () => (typeof window !== 'undefined' && window.collectOfficialFormFields ? window.collectOfficialFormFields() : {});
 const validateOfficialFormFields = (f) => (typeof window !== 'undefined' && window.validateOfficialFormFields ? window.validateOfficialFormFields(f) : true);
