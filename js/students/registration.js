@@ -334,15 +334,8 @@ function renderStudentExistingRegistration(reg) {
     } else if (directAssignment && getOfficialSupervisors(reg).length > 0) {
       const assignment = getOfficialSupervisors(reg).find(item => item.role === 'primary') || getOfficialSupervisors(reg)[0];
       const assignedName = assignment?.supervisorName || reg.acceptedSupervisorName || 'Giảng viên hướng dẫn';
-      bannerEl.className = 'mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs flex items-start gap-2.5';
-      bannerEl.innerHTML = `
-        <span class="text-base">✓</span>
-        <div>
-          <span class="font-bold block">GVHD đã được Khoa phân công: ${escapeHtml(assignedName)}</span>
-          <p class="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">Bạn có thể tiếp tục đăng ký và nộp đề tài theo kế hoạch của đợt.</p>
-        </div>
-      `;
-      bannerEl.classList.remove('hidden');
+      bannerEl.className = 'hidden';
+      bannerEl.innerHTML = '';
       if (statusEl) {
         statusEl.textContent = `Đã phân công GVHD: ${assignedName}`;
         statusEl.className = 'font-bold text-emerald-700 text-sm';
@@ -362,17 +355,8 @@ function renderStudentExistingRegistration(reg) {
         statusEl.className = 'font-bold text-blue-700 text-sm';
       }
     } else {
-      bannerEl.className = 'mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs flex items-start gap-2.5';
-      bannerEl.innerHTML = `
-        <span class="text-base">✓</span>
-        <div>
-          <span class="font-bold block">Trạng thái điều kiện: Đủ điều kiện làm ĐATN</span>
-          <p class="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">
-            Hồ sơ của bạn đã được xác nhận đủ điều kiện và đang tham gia quy trình xét duyệt của GVHD.
-          </p>
-        </div>
-      `;
-      bannerEl.classList.remove('hidden');
+      bannerEl.className = 'hidden';
+      bannerEl.innerHTML = '';
       if (statusEl) {
         statusEl.textContent = 'Đã ghi nhận (Đủ điều kiện)';
         statusEl.className = 'font-bold text-emerald-700 text-sm';

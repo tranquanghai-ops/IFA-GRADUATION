@@ -20,6 +20,17 @@
       "package-lock.json",
       "index.template.html"
     ],
+    "headers": [
+      {
+        "source": "**/*.@(js|html|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ],
     "rewrites": [
       {
         "source": "**",

@@ -71,7 +71,7 @@ window.reviewStudentTopicTitle = async function(studentId, decision) {
 };
 
 
-window.openTopicRegistrationPreviewModal = function(studentId = null) {
+window.openTopicRegistrationPreviewModal = function(studentId = null, startInEditMode = false) {
   const modal = document.getElementById('modal-supervisor-topic-preview');
   if (!modal) return;
 
@@ -80,15 +80,27 @@ window.openTopicRegistrationPreviewModal = function(studentId = null) {
   let identity = null;
   let isStudentViewer = false;
 
-  if (!studentId || (typeof studentId === 'string' && studentId === state.myRegistration?.studentId && state.currentRole === 'student')) {
+  const isCurrentStudentRole = Boolean(
+    state.currentRole === 'student' ||
+    state.currentView === 'student' ||
+    state.role === 'student' ||
+    state.isStudent ||
+    state.impersonation?.target?.type === 'student'
+  );
+
+  if (!studentId || (typeof studentId === 'string' && (studentId === state.myRegistration?.studentId || studentId === state.studentMssv))) {
     st = state.myRegistration;
     identity = (typeof getRegistrationStudentIdentity === 'function') ? getRegistrationStudentIdentity() : null;
-    studentId = identity?.mssv || st?.studentId || st?.mssv;
-    isStudentViewer = true;
+    studentId = identity?.mssv || st?.studentId || st?.mssv || state.studentMssv;
+    isStudentViewer = isCurrentStudentRole;
   } else {
     st = (state.supervisorAssignedStudents || []).find(s => (s.studentId || s.id) === studentId) ||
       (typeof findStudentInRound === 'function' ? findStudentInRound(studentId) : null);
-    isStudentViewer = (state.currentRole === 'student') && (!state.isAdmin);
+    isStudentViewer = isCurrentStudentRole && !state.isAdmin;
+  }
+
+  if (!st && studentId) {
+    st = (typeof findStudentInRound === 'function' ? findStudentInRound(studentId) : null);
   }
 
   if (!st) {
@@ -493,6 +505,9 @@ window.saveTopicPreviewEdits = async function() {
 
     if (typeof renderRoundHeader === 'function' && state.activeRound) {
       renderRoundHeader(state.activeRound);
+    }
+    if (typeof renderStudentExistingRegistration === 'function' && state.myRegistration) {
+      renderStudentExistingRegistration(state.myRegistration);
     }
     if (typeof renderStudentTimelineWeeks === 'function') {
       renderStudentTimelineWeeks();
