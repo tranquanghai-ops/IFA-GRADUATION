@@ -827,8 +827,9 @@ window.submitRegistration = async function() {
 // ============================================================================
 
 window.openEditTopicTitleModal = function() {
-  if (typeof closeTopicRegistrationPreviewModal === 'function') {
-    closeTopicRegistrationPreviewModal();
+  if (typeof openTopicRegistrationPreviewModal === 'function') {
+    openTopicRegistrationPreviewModal(null, true);
+    return;
   }
   if (typeof enableEditRegistration === 'function') {
     enableEditRegistration();

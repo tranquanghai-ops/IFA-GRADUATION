@@ -260,6 +260,10 @@ window.openTopicRegistrationPreviewModal = function(studentId = null) {
     }
   }
 
+  modal._currentStudentId = studentId;
+  modal._currentRegistration = st;
+  modal._isStudentViewer = isStudentViewer;
+
   // Bind actions
   if (btnApprove && !isStudentViewer) {
     btnApprove.onclick = async () => {
@@ -287,7 +291,221 @@ window.openTopicRegistrationPreviewModal = function(studentId = null) {
     };
   }
 
+  // Handle start in edit mode if requested
+  window.toggleTopicPreviewEditMode(Boolean(startInEditMode && isStudentViewer));
+
   modal.classList.remove('hidden');
+};
+
+window.toggleTopicPreviewEditMode = function(isEdit = true) {
+  const modal = document.getElementById('modal-supervisor-topic-preview');
+  if (!modal) return;
+  const isStudent = Boolean(modal._isStudentViewer);
+  if (isEdit && !isStudent) return;
+
+  const titleTextEl = document.getElementById('topic-preview-doc-title');
+  const titleEditWrap = document.getElementById('topic-preview-doc-title-edit-wrap');
+  const titleInput = document.getElementById('topic-preview-edit-title');
+
+  const descTextEl = document.getElementById('topic-preview-doc-description');
+  const descEditWrap = document.getElementById('topic-preview-doc-desc-edit-wrap');
+  const descInput = document.getElementById('topic-preview-edit-description');
+
+  const btnEdit = document.getElementById('btn-topic-preview-student-edit');
+  const btnSave = document.getElementById('btn-topic-preview-save-edit');
+  const btnCancel = document.getElementById('btn-topic-preview-cancel-edit');
+  const btnPdf = document.getElementById('btn-topic-preview-download-pdf');
+
+  const footerSave = document.getElementById('btn-topic-preview-footer-save');
+  const footerCancel = document.getElementById('btn-topic-preview-footer-cancel-edit');
+  const footerClose = document.getElementById('btn-topic-preview-close');
+  const footerNote = document.getElementById('topic-preview-footer-note');
+
+  if (isEdit) {
+    if (titleTextEl) titleTextEl.classList.add('hidden');
+    if (titleEditWrap) titleEditWrap.classList.remove('hidden');
+    if (titleInput) {
+      const currentTitle = modal._currentRegistration?.topicTitle || (titleTextEl?.textContent !== '--' ? titleTextEl?.textContent : '') || '';
+      titleInput.value = currentTitle;
+      setTimeout(() => titleInput.focus(), 100);
+    }
+
+    if (descTextEl) descTextEl.classList.add('hidden');
+    if (descEditWrap) descEditWrap.classList.remove('hidden');
+    if (descInput) {
+      const currentDesc = modal._currentRegistration?.topicDescription || (descTextEl?.textContent !== '--' ? descTextEl?.textContent : '') || '';
+      descInput.value = currentDesc;
+    }
+
+    if (btnEdit) btnEdit.classList.add('hidden');
+    if (btnSave) btnSave.classList.remove('hidden');
+    if (btnCancel) btnCancel.classList.remove('hidden');
+    if (btnPdf) btnPdf.classList.add('hidden');
+
+    if (footerSave) footerSave.classList.remove('hidden');
+    if (footerCancel) footerCancel.classList.remove('hidden');
+    if (footerClose) footerClose.classList.add('hidden');
+
+    if (footerNote) {
+      footerNote.textContent = '✏️ Chế độ sửa: Chỉ mở khóa chỉnh sửa Tên đề tài và Mô tả định hướng thiết kế. Các thông tin hành chính khác được bảo lưu.';
+    }
+  } else {
+    if (titleTextEl) titleTextEl.classList.remove('hidden');
+    if (titleEditWrap) titleEditWrap.classList.add('hidden');
+
+    if (descTextEl) descTextEl.classList.remove('hidden');
+    if (descEditWrap) descEditWrap.classList.add('hidden');
+
+    if (btnEdit) btnEdit.classList.toggle('hidden', !isStudent);
+    if (btnSave) btnSave.classList.add('hidden');
+    if (btnCancel) btnCancel.classList.add('hidden');
+    if (btnPdf) btnPdf.classList.remove('hidden');
+
+    if (footerSave) footerSave.classList.add('hidden');
+    if (footerCancel) footerCancel.classList.add('hidden');
+    if (footerClose) footerClose.classList.remove('hidden');
+
+    const st = modal._currentRegistration || {};
+    const status = st?.topicApprovalStatus || 'pending';
+    if (footerNote) {
+      if (status === 'approved') {
+        footerNote.textContent = `Tên đề tài của bạn đã được GVHD phê duyệt${st.topicReviewedAt ? ' lúc ' + fmtIsoToVietnameseDateTime(st.topicReviewedAt) : ''}.`;
+      } else if (status === 'rejected') {
+        footerNote.textContent = `GVHD yêu cầu chỉnh sửa: "${st.topicApprovalNote || ''}". Vui lòng sửa lại tên đề tài.`;
+      } else {
+        footerNote.textContent = 'Phiếu đăng ký đang chờ GVHD xem xét & ký duyệt chính thức.';
+      }
+    }
+  }
+};
+
+window.saveTopicPreviewEdits = async function() {
+  if (!checkImpersonationWriteGuard('Chỉnh sửa phiếu đăng ký')) return;
+
+  const modal = document.getElementById('modal-supervisor-topic-preview');
+  const roundId = state.selectedRoundId || state.activeRound?.id;
+  const reg = state.myRegistration || modal?._currentRegistration;
+  const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
+  const mssv = modal?._currentStudentId || state.studentMssv || reg?.studentId || reg?.mssv;
+
+  if (!reg || !roundId || !mssv) {
+    showToast('Không xác định được thông tin sinh viên hoặc đợt tốt nghiệp.', 'error');
+    return;
+  }
+
+  const titleInput = document.getElementById('topic-preview-edit-title');
+  const descInput = document.getElementById('topic-preview-edit-description');
+  const newTitle = (titleInput?.value || '').trim();
+  const newDesc = (descInput?.value || '').trim();
+
+  if (!newTitle) {
+    showToast('Vui lòng nhập tên đề tài.', 'warning');
+    titleInput?.focus();
+    return;
+  }
+
+  if (!newTitle.toLowerCase().startsWith('thiết kế nội thất')) {
+    showToast('Tên đề tài BẮT BUỘC phải bắt đầu bằng cụm từ "Thiết kế nội thất".', 'error');
+    titleInput?.focus();
+    return;
+  }
+
+  if (newTitle.length < 10) {
+    showToast('Tên đề tài quá ngắn. Vui lòng nhập đầy đủ tên đề tài.', 'warning');
+    titleInput?.focus();
+    return;
+  }
+
+  if (!newDesc) {
+    showToast('Vui lòng nhập mô tả chi tiết định hướng thiết kế.', 'warning');
+    descInput?.focus();
+    return;
+  }
+
+  const btnSaveTop = document.getElementById('btn-topic-preview-save-edit');
+  const btnSaveBottom = document.getElementById('btn-topic-preview-footer-save');
+  if (btnSaveTop) { btnSaveTop.disabled = true; btnSaveTop.textContent = '⏳ Đang lưu...'; }
+  if (btnSaveBottom) { btnSaveBottom.disabled = true; btnSaveBottom.textContent = '⏳ Đang lưu...'; }
+
+  try {
+    const wasApproved = (reg.topicApprovalStatus === 'approved' || reg.approvalStatus === 'approved');
+    const currentVersion = Number(reg.topicTitleVersion || 1);
+    const nextVersion = wasApproved ? (currentVersion + 1) : currentVersion;
+    const previousHistory = Array.isArray(reg.topicTitleHistory) ? reg.topicTitleHistory : [];
+
+    const historyEntry = {
+      version: nextVersion,
+      title: newTitle,
+      topicDescription: newDesc,
+      submittedAt: new Date().toISOString(),
+      status: 'pending'
+    };
+    const topicTitleHistory = wasApproved || previousHistory.length === 0
+      ? previousHistory.concat([historyEntry])
+      : previousHistory.slice(0, -1).concat([historyEntry]);
+
+    const updatePayload = {
+      topicTitle: newTitle,
+      topicDescription: newDesc,
+      topicTitleVersion: nextVersion,
+      topicTitleHistory: topicTitleHistory,
+      topicApprovalStatus: 'pending',
+      topicApprovalNote: '',
+      submittedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      updatedBy: actor?.email || state.user?.email || mssv
+    };
+
+    await updateDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), updatePayload);
+    await setDoc(doc(db, 'graduationStudentProfiles', mssv), {
+      topicDescription: newDesc,
+      updatedAt: serverTimestamp()
+    }, { merge: true }).catch(() => {});
+
+    state.myRegistration = {
+      ...reg,
+      ...updatePayload,
+      submittedAt: new Date(),
+      updatedAt: new Date()
+    };
+    if (modal) modal._currentRegistration = state.myRegistration;
+
+    // Update DOM paper fields
+    const titleTextEl = document.getElementById('topic-preview-doc-title');
+    const descTextEl = document.getElementById('topic-preview-doc-description');
+    const versionEl = document.getElementById('topic-preview-doc-version');
+    const badgeEl = document.getElementById('topic-preview-status-badge');
+    const docSupStatusEl = document.getElementById('topic-preview-doc-sup-status');
+
+    if (titleTextEl) titleTextEl.textContent = newTitle;
+    if (descTextEl) descTextEl.textContent = newDesc;
+    if (versionEl) versionEl.textContent = `Đăng ký đề tài chính thức lần thứ : ${nextVersion}`;
+    if (badgeEl) {
+      badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300';
+      badgeEl.textContent = '⌛ Chờ duyệt tên đề tài';
+    }
+    if (docSupStatusEl) {
+      docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-amber-700 italic';
+      docSupStatusEl.textContent = '(Chờ GVHD xem xét & ký duyệt)';
+    }
+
+    window.toggleTopicPreviewEditMode(false);
+
+    if (typeof renderRoundHeader === 'function' && state.activeRound) {
+      renderRoundHeader(state.activeRound);
+    }
+    if (typeof renderStudentTimelineWeeks === 'function') {
+      renderStudentTimelineWeeks();
+    }
+
+    showToast(`🎉 Đã cập nhật phiếu đăng ký (Lần ${nextVersion}) và chuyển GVHD duyệt lại!`, 'success');
+  } catch (err) {
+    console.error('Lỗi khi lưu phiếu đăng ký:', err);
+    showToast('Lỗi khi lưu phiếu đăng ký: ' + err.message, 'error');
+  } finally {
+    if (btnSaveTop) { btnSaveTop.disabled = false; btnSaveTop.innerHTML = '<span>💾</span> <span>Lưu & Gửi duyệt lại</span>'; }
+    if (btnSaveBottom) { btnSaveBottom.disabled = false; btnSaveBottom.innerHTML = '<span>💾</span> <span>Lưu & Gửi GVHD duyệt lại</span>'; }
+  }
 };
 
 window.closeTopicRegistrationPreviewModal = function() {

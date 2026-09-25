@@ -249,8 +249,8 @@
                   <button id="btn-hero-preview-topic-form" type="button" onclick="openTopicRegistrationPreviewModal()" class="px-3.5 py-1.5 bg-white/20 hover:bg-white/30 active:bg-white/35 text-white rounded-xl text-xs font-bold transition-all border border-white/25 shadow-xs flex items-center gap-1.5 cursor-pointer" title="Xem trước tờ phiếu đăng ký chuẩn A4">
                     <span>👁️</span> <span>Xem phiếu ĐK</span>
                   </button>
-                  <button id="btn-hero-edit-topic" type="button" onclick="openEditTopicTitleModal()" class="px-3.5 py-1.5 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white rounded-xl text-xs font-bold transition-all border border-white/20 shadow-xs flex items-center gap-1.5 cursor-pointer">
-                    <span>✏️</span> <span>Sửa tên đề tài</span>
+                  <button id="btn-hero-edit-topic" type="button" onclick="openTopicRegistrationPreviewModal(null, true)" class="px-3.5 py-1.5 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white rounded-xl text-xs font-bold transition-all border border-white/20 shadow-xs flex items-center gap-1.5 cursor-pointer">
+                    <span>✏️</span> <span>Sửa đề tài</span>
                   </button>
                   <button id="hero-download-topic-form-btn" type="button" onclick="downloadOfficialTopicRegistrationPdf()" class="hidden px-3.5 py-1.5 bg-emerald-400 hover:bg-emerald-300 active:bg-emerald-500 text-slate-950 rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
                     <span>📄</span> <span>Tải phiếu ĐK (PDF)</span>
@@ -5913,8 +5913,14 @@
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <button type="button" id="btn-topic-preview-student-edit" onclick="closeTopicRegistrationPreviewModal(); openEditTopicTitleModal();" class="hidden px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Chỉnh sửa tên đề tài">
+        <button type="button" id="btn-topic-preview-student-edit" onclick="toggleTopicPreviewEditMode(true)" class="hidden px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Chỉnh sửa tên đề tài và mô tả">
           <span>✏️</span> <span>Sửa đề tài</span>
+        </button>
+        <button type="button" id="btn-topic-preview-save-edit" onclick="saveTopicPreviewEdits()" class="hidden px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md transition flex items-center gap-1.5 cursor-pointer" title="Lưu thay đổi">
+          <span>💾</span> <span>Lưu & Gửi duyệt lại</span>
+        </button>
+        <button type="button" id="btn-topic-preview-cancel-edit" onclick="toggleTopicPreviewEditMode(false)" class="hidden px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Hủy sửa">
+          <span>✕</span> <span>Hủy sửa</span>
         </button>
         <button type="button" id="btn-topic-preview-download-pdf" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Tải file PDF chính thức">
           <span>🖨️</span> <span>Tải PDF / In</span>
@@ -6015,6 +6021,12 @@
           <div style="margin-bottom:14px;line-height:1.5;">
             <span style="font-weight:bold;margin-right:6px;">TÊN ĐỀ TÀI :</span>
             <span id="topic-preview-doc-title" style="font-weight:bold;font-size:13pt;">--</span>
+            <div id="topic-preview-doc-title-edit-wrap" class="hidden mt-1.5">
+              <textarea id="topic-preview-edit-title" rows="2" class="w-full p-2.5 bg-amber-50/70 border-2 border-amber-400 rounded-lg text-[13pt] font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" style="font-family:'Times New Roman',Times,serif;line-height:1.4;" placeholder="Thiết kế nội thất..."></textarea>
+              <div class="text-[10pt] text-amber-900 font-normal italic mt-0.5">
+                💡 Tên đề tài <strong>BẮT BUỘC</strong> phải bắt đầu bằng cụm từ <strong>"Thiết kế nội thất"</strong>.
+              </div>
+            </div>
           </div>
 
           <!-- MÔ TẢ CHI TIẾT -->
@@ -6024,6 +6036,9 @@
             </div>
             <div id="topic-preview-doc-description" style="text-align:justify;min-height:80px;white-space:pre-wrap;line-height:1.5;">
               --
+            </div>
+            <div id="topic-preview-doc-desc-edit-wrap" class="hidden mt-1">
+              <textarea id="topic-preview-edit-description" rows="5" class="w-full p-2.5 bg-amber-50/70 border-2 border-amber-400 rounded-lg text-[13pt] text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-justify shadow-inner" style="font-family:'Times New Roman',Times,serif;line-height:1.4;" placeholder="Trình bày mục tiêu, đối tượng, không gian và định hướng thiết kế chính..."></textarea>
             </div>
           </div>
 
@@ -6077,7 +6092,13 @@
         <span>📌</span> <span id="topic-preview-footer-note">GVHD xem xét nội dung phiếu đăng ký và xác nhận duyệt hoặc yêu cầu chỉnh sửa.</span>
       </div>
       <div class="flex items-center gap-2 shrink-0 flex-wrap">
-        <button type="button" onclick="closeTopicRegistrationPreviewModal()" class="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs rounded-xl transition cursor-pointer">
+        <button type="button" id="btn-topic-preview-footer-cancel-edit" onclick="toggleTopicPreviewEditMode(false)" class="hidden px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs rounded-xl transition cursor-pointer">
+          Hủy sửa
+        </button>
+        <button type="button" id="btn-topic-preview-footer-save" onclick="saveTopicPreviewEdits()" class="hidden px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-1.5 cursor-pointer">
+          <span>💾</span> <span>Lưu & Gửi GVHD duyệt lại</span>
+        </button>
+        <button type="button" id="btn-topic-preview-close" onclick="closeTopicRegistrationPreviewModal()" class="px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs rounded-xl transition cursor-pointer">
           Đóng
         </button>
         <button type="button" id="btn-topic-preview-cancel-approval" class="hidden px-4 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer">
