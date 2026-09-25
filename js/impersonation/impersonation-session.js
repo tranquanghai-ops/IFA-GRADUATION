@@ -4,6 +4,11 @@ const selectRound = (id) => window.selectRound?.(id);
 const switchAdminTab = (tab) => window.switchAdminTab?.(tab);
 const initSupervisorPortal = () => window.initSupervisorPortal?.();
 const initAssessmentPortal = () => window.initAssessmentPortal?.();
+const closeAdminImpersonateModal = () => {
+  const modal = document.getElementById('modal-admin-impersonate');
+  if (modal) modal.classList.add('hidden');
+  window.closeAdminImpersonateModal?.();
+};
 /**
  * IFA+ Graduation — Impersonation Session Lifecycle & Routing
  */
@@ -310,35 +315,25 @@ window.startImpersonating = async function(target) {
     showToast(`⚡ Bắt đầu đóng vai: ${target.name} (${target.roleLabel || target.type}) — Chế độ thao tác thực tế.`, 'info', 4000);
   }
 
-  // Navigate to corresponding portal
+  // Navigate to corresponding portal via SPA view switcher
   if (target.type === 'student') {
-    if (window.location.pathname.includes('/admin') || window.location.pathname.includes('/supervisor') || window.location.pathname.includes('/assessment')) {
-      window.location.href = '/';
-    } else {
-      await switchView('student');
-      const rId = target.roundId || state.selectedRoundId;
-      if (rId && typeof selectRound === 'function') {
-        await selectRound(rId);
-      }
+    await switchView('student');
+    const rId = target.roundId || state.selectedRoundId;
+    if (rId && typeof selectRound === 'function') {
+      await selectRound(rId);
     }
   } else if (target.type === 'supervisor') {
-    if (!window.location.pathname.includes('/supervisor')) {
-      window.location.href = '/supervisor/';
-    } else {
-      await switchView('supervisor');
-      if (typeof initSupervisorPortal === 'function') {
-        initSupervisorPortal();
-      }
+    await switchView('supervisor');
+    if (typeof initSupervisorPortal === 'function') {
+      await initSupervisorPortal();
     }
   } else if (target.type === 'reviewer' || target.type === 'council' || target.type === 'preliminary') {
-    if (!window.location.pathname.includes('/assessment')) {
-      window.location.href = '/assessment/';
-    } else {
-      await switchView('assessment');
-      if (typeof initAssessmentPortal === 'function') {
-        initAssessmentPortal();
-      }
+    await switchView('assessment');
+    if (typeof initAssessmentPortal === 'function') {
+      await initAssessmentPortal();
     }
+  } else {
+    await switchView('student');
   }
 };
 
@@ -364,14 +359,9 @@ window.exitImpersonation = async function() {
   updateAuthUI();
   window.updateSettingsActAsSessionUI?.();
 
-  const currentPortal = getCurrentPortal();
-  if (currentPortal === 'admin' || state.currentView === 'admin') {
-    await switchView('admin');
-    if (typeof switchAdminTab === 'function') {
-      switchAdminTab(state.currentAdminTab || 'rounds');
-    }
-  } else {
-    window.location.href = '/admin/';
+  await switchView('admin');
+  if (typeof switchAdminTab === 'function') {
+    switchAdminTab(state.currentAdminTab || 'rounds');
   }
 
   if (typeof showToast === 'function') {
@@ -379,20 +369,30 @@ window.exitImpersonation = async function() {
   }
 };
 
-window.goToCurrentRolePortal = function() {
+window.goToCurrentRolePortal = async function() {
   if (!state.impersonation) {
-    switchView('admin');
+    await switchView('admin');
     return;
   }
   const type = state.impersonation.target?.type;
   if (type === 'student') {
-    window.location.href = '/';
+    await switchView('student');
+    const rId = state.impersonation.target?.roundId || state.selectedRoundId;
+    if (rId && typeof selectRound === 'function') {
+      await selectRound(rId);
+    }
   } else if (type === 'supervisor') {
-    window.location.href = '/supervisor/';
+    await switchView('supervisor');
+    if (typeof initSupervisorPortal === 'function') {
+      await initSupervisorPortal();
+    }
   } else if (type === 'reviewer' || type === 'council' || type === 'preliminary') {
-    window.location.href = '/assessment/';
+    await switchView('assessment');
+    if (typeof initAssessmentPortal === 'function') {
+      await initAssessmentPortal();
+    }
   } else {
-    window.location.href = '/';
+    await switchView('student');
   }
 };
 

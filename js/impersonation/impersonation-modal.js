@@ -348,10 +348,11 @@ window.openAdminImpersonateModal = function() {
   gatherAndRenderImpersonateCandidates();
 };
 
-window.closeAdminImpersonateModal = function() {
+export function closeAdminImpersonateModal() {
   const modal = document.getElementById('modal-admin-impersonate');
   if (modal) modal.classList.add('hidden');
-};
+}
+window.closeAdminImpersonateModal = closeAdminImpersonateModal;
 
 window.onImpersonateFiltersChange = function() {
   state.selectedImpersonateCandidate = null;
