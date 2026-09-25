@@ -415,3 +415,19 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
   const safeId = String(identity.mssv || 'sinh-vien').replace(/[^0-9A-Za-z_-]/g, '');
   window.pdfMake.createPdf(docDefinition).download(`Phieu-dang-ky-de-tai-${safeId}-lan-${version}.pdf`);
 };
+
+export {
+  loadStudentSelfProfile,
+  getRegistrationStudentIdentity,
+  populateRegistrationStudentForm,
+  collectOfficialFormFields,
+  validateOfficialFormFields
+};
+
+if (typeof window !== 'undefined') {
+  window.loadStudentSelfProfile = loadStudentSelfProfile;
+  window.getRegistrationStudentIdentity = getRegistrationStudentIdentity;
+  window.populateRegistrationStudentForm = populateRegistrationStudentForm;
+  window.collectOfficialFormFields = collectOfficialFormFields;
+  window.validateOfficialFormFields = validateOfficialFormFields;
+}

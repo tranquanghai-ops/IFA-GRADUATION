@@ -3,9 +3,39 @@
  */
 window.loadAdminRegistrations = async function(roundId) {
   try {
-    const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'registrations'));
-    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    state.currentAdminRegistrations = list;
+    const [regSnap, elSnap] = await Promise.all([
+      getDocs(collection(db, 'graduationRounds', roundId, 'registrations')),
+      getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents'))
+    ]);
+    const regs = regSnap.docs.map(d => ({ id: d.id, ...d.data(), isRegistered: true, registrationStatus: 'registered' }));
+    const regMssvSet = new Set(regs.map(r => String(r.studentId || r.mssv || r.id).trim().toUpperCase()));
+
+    const unregs = elSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(el => {
+        const sid = String(el.studentId || el.mssv || el.id).trim().toUpperCase();
+        return sid && !regMssvSet.has(sid);
+      })
+      .map(el => {
+        const sid = String(el.studentId || el.mssv || el.id).trim();
+        return {
+          id: sid,
+          studentId: sid,
+          studentName: resolveStudentName(sid, el.fullName || el.name || el.studentName || ''),
+          email: el.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
+          topicTitle: '',
+          projectType: '',
+          preferences: [],
+          isRegistered: false,
+          registrationStatus: 'unregistered',
+          eligibilityStatus: el.eligible !== false ? 'eligible' : 'not_eligible',
+          reviewStatus: 'unregistered',
+          submittedAt: null
+        };
+      });
+
+    const combined = [...regs, ...unregs];
+    state.currentAdminRegistrations = combined;
     filterAdminRegistrationsTable();
   } catch (e) {
     console.error('Error loading registrations:', e);
@@ -13,16 +43,28 @@ window.loadAdminRegistrations = async function(roundId) {
 };
 
 window.filterAdminRegistrationsTable = function() {
-  const filter = document.getElementById('admin-reg-filter-status')?.value || 'all';
+  const typeFilter = document.getElementById('admin-reg-filter-type')?.value || 'all';
+  const statusFilter = document.getElementById('admin-reg-filter-status')?.value || 'all';
   const list = state.currentAdminRegistrations || [];
+
   let filtered = list;
-  if (filter === 'eligible') {
-    filtered = list.filter(r => r.eligibilityStatus === 'eligible' || (!r.eligibilityStatus && r.status === 'submitted'));
-  } else if (filter === 'pending') {
-    filtered = list.filter(r => r.eligibilityStatus === 'pending');
-  } else if (filter === 'not_eligible') {
-    filtered = list.filter(r => r.eligibilityStatus === 'not_eligible');
+
+  // Filter by registration status
+  if (typeFilter === 'registered') {
+    filtered = filtered.filter(r => r.isRegistered);
+  } else if (typeFilter === 'unregistered') {
+    filtered = filtered.filter(r => !r.isRegistered);
   }
+
+  // Filter by eligibility
+  if (statusFilter === 'eligible') {
+    filtered = filtered.filter(r => r.eligibilityStatus === 'eligible' || (!r.eligibilityStatus && r.status === 'submitted'));
+  } else if (statusFilter === 'pending') {
+    filtered = filtered.filter(r => r.eligibilityStatus === 'pending');
+  } else if (statusFilter === 'not_eligible') {
+    filtered = filtered.filter(r => r.eligibilityStatus === 'not_eligible');
+  }
+
   renderAdminRegistrationsTable(filtered);
 };
 
@@ -31,13 +73,18 @@ function renderAdminRegistrationsTable(list) {
   if (!tbody) return;
 
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" class="p-6 text-center text-slate-400">Không có nguyện vọng đăng ký nào phù hợp bộ lọc.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="p-6 text-center text-slate-400 font-medium">Không có sinh viên nào phù hợp bộ lọc.</td></tr>';
     return;
   }
 
   tbody.innerHTML = list.map(r => {
     const getSupName = rank => (r.preferences || []).find(p => p.rank === rank)?.supervisorName || '--';
     const subDate = r.submittedAt ? (r.submittedAt.toDate ? r.submittedAt.toDate() : new Date(r.submittedAt)) : null;
+
+    const isReg = Boolean(r.isRegistered);
+    const regBadge = isReg
+      ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">✓ Đã đăng ký</span>'
+      : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">⏳ Chưa đăng ký</span>';
 
     let elBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Đủ ĐK</span>';
     if (r.eligibilityStatus === 'pending') {
@@ -46,25 +93,30 @@ function renderAdminRegistrationsTable(list) {
       elBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300" title="Không có trong danh sách đủ điều kiện">Không đủ ĐK</span>';
     }
 
-    let reviewBadge = '<span class="text-slate-500 font-semibold text-xs">Chờ duyệt</span>';
-    if (r.reviewStatus === 'accepted') {
-      reviewBadge = '<span class="text-emerald-700 font-bold text-xs">✓ Đã tiếp nhận</span>';
-    } else if (r.reviewStatus === 'rejected') {
-      reviewBadge = '<span class="text-rose-600 font-bold text-xs">Chuyển NV sau</span>';
+    let reviewBadge = '<span class="text-slate-400 font-medium text-xs">Chưa nộp</span>';
+    if (isReg) {
+      if (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') {
+        reviewBadge = '<span class="text-emerald-700 font-bold text-xs">✓ Đã tiếp nhận</span>';
+      } else if (r.reviewStatus === 'rejected') {
+        reviewBadge = '<span class="text-rose-600 font-bold text-xs">Chuyển NV sau</span>';
+      } else {
+        reviewBadge = '<span class="text-slate-600 font-semibold text-xs">Chờ duyệt</span>';
+      }
     }
 
     return `
-      <tr class="hover:bg-slate-50">
-        <td class="p-3.5 font-mono font-bold text-slate-900">${r.studentId}</td>
-        <td class="p-3.5 font-semibold text-slate-800">${r.studentName || '--'}</td>
-        <td class="p-3.5 max-w-[200px] truncate font-bold text-blue-900" title="${r.topicTitle}">${r.topicTitle || '--'}</td>
-        <td class="p-3.5 text-slate-600">${r.projectType || '--'}</td>
-        <td class="p-3.5 font-bold text-slate-700">${getSupName(1)}</td>
-        <td class="p-3.5 text-slate-600">${getSupName(2)}</td>
-        <td class="p-3.5 text-slate-600">${getSupName(3)}</td>
+      <tr class="hover:bg-slate-50 transition-colors">
+        <td class="p-3.5 font-mono font-bold text-slate-900">${escapeHtml(r.studentId)}</td>
+        <td class="p-3.5 font-semibold text-slate-800">${escapeHtml(r.studentName || '--')}</td>
+        <td class="p-3.5 text-center whitespace-nowrap">${regBadge}</td>
+        <td class="p-3.5 max-w-[220px] truncate font-bold ${isReg ? 'text-blue-900' : 'text-slate-400 italic'}" title="${escapeHtml(r.topicTitle || '')}">${escapeHtml(r.topicTitle || (isReg ? '--' : '(Chưa đăng ký đề tài)'))}</td>
+        <td class="p-3.5 text-slate-600">${escapeHtml(r.projectType || '--')}</td>
+        <td class="p-3.5 font-bold text-slate-700">${escapeHtml(getSupName(1))}</td>
+        <td class="p-3.5 text-slate-600">${escapeHtml(getSupName(2))}</td>
+        <td class="p-3.5 text-slate-600">${escapeHtml(getSupName(3))}</td>
         <td class="p-3.5 text-center">${elBadge}</td>
-        <td class="p-3.5">${reviewBadge}</td>
-        <td class="p-3.5 text-[11px] text-slate-400">${subDate ? subDate.toLocaleString('vi-VN') : '--'}</td>
+        <td class="p-3.5 whitespace-nowrap">${reviewBadge}</td>
+        <td class="p-3.5 text-[11px] text-slate-400 whitespace-nowrap">${subDate ? subDate.toLocaleString('vi-VN') : '--'}</td>
       </tr>
     `;
   }).join('');
@@ -74,47 +126,47 @@ window.exportRegistrationsCSV = function() {
   const roundId = document.getElementById('admin-round-reg-select')?.value;
   if (!roundId) return;
 
-  getDocs(collection(db, 'graduationRounds', roundId, 'registrations')).then(snap => {
-    const list = snap.docs.map(d => d.data());
-    if (list.length === 0) {
-      showToast('Không có dữ liệu đăng ký để xuất.', 'warning');
-      return;
-    }
+  const list = state.currentAdminRegistrations || [];
+  if (list.length === 0) {
+    showToast('Không có dữ liệu đăng ký để xuất.', 'warning');
+    return;
+  }
 
-    const headers = ['MSSV', 'Họ và tên', 'Email', 'Tên đề tài', 'Loại hình đồ án', 'Nguyện vọng 1', 'Nguyện vọng 2', 'Nguyện vọng 3', 'Điều kiện', 'Trạng thái xét', 'Thời gian nộp'];
-    const rows = list.map(r => {
-      const getSup = rank => (r.preferences || []).find(p => p.rank === rank)?.supervisorName || '';
-      const dt = r.submittedAt ? (r.submittedAt.toDate ? r.submittedAt.toDate() : new Date(r.submittedAt)).toLocaleString('vi-VN') : '';
-      let elText = 'Đủ điều kiện';
-      if (r.eligibilityStatus === 'pending') elText = 'Chờ xét';
-      else if (r.eligibilityStatus === 'not_eligible') elText = 'Không đủ điều kiện';
+  const headers = ['MSSV', 'Họ và tên', 'Trạng thái ĐK', 'Email', 'Tên đề tài', 'Loại hình đồ án', 'Nguyện vọng 1', 'Nguyện vọng 2', 'Nguyện vọng 3', 'Điều kiện', 'Trạng thái xét', 'Thời gian nộp'];
+  const rows = list.map(r => {
+    const getSup = rank => (r.preferences || []).find(p => p.rank === rank)?.supervisorName || '';
+    const dt = r.submittedAt ? (r.submittedAt.toDate ? r.submittedAt.toDate() : new Date(r.submittedAt)).toLocaleString('vi-VN') : '';
+    let elText = 'Đủ điều kiện';
+    if (r.eligibilityStatus === 'pending') elText = 'Chờ xét';
+    else if (r.eligibilityStatus === 'not_eligible') elText = 'Không đủ điều kiện';
 
-      return [
-        r.studentId || '',
-        r.studentName || '',
-        r.email || '',
-        `"${(r.topicTitle || '').replace(/"/g, '""')}"`,
-        `"${(r.projectType || '').replace(/"/g, '""')}"`,
-        `"${getSup(1)}"`,
-        `"${getSup(2)}"`,
-        `"${getSup(3)}"`,
-        `"${elText}"`,
-        `"${r.reviewStatus || 'Chờ duyệt'}"`,
-        dt
-      ];
-    });
-
-    const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `DS_DangKy_DATN_${roundId}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    return [
+      r.studentId || '',
+      r.studentName || '',
+      r.isRegistered ? 'Đã đăng ký' : 'Chưa đăng ký',
+      r.email || '',
+      `"${(r.topicTitle || '').replace(/"/g, '""')}"`,
+      `"${(r.projectType || '').replace(/"/g, '""')}"`,
+      `"${getSup(1)}"`,
+      `"${getSup(2)}"`,
+      `"${getSup(3)}"`,
+      `"${elText}"`,
+      `"${r.reviewStatus || 'Chờ duyệt'}"`,
+      dt
+    ];
   });
+
+  const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `DS_DangKy_DATN_${roundId}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
+
 
 window.applyOfficialEligibilityToRegistrations = async function() {
   const roundId = document.getElementById('admin-round-reg-select')?.value;

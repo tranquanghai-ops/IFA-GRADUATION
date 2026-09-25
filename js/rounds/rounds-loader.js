@@ -71,12 +71,13 @@ async function loadRounds() {
     if (state.isAdmin && !state.impersonation) {
       await Promise.all(state.rounds.filter(r => !r.deleted).map(async round => {
         try {
-          const [officialSnap, draftSnap, eligibleSnap, supervisorsSnap, activitiesSnap] = await Promise.all([
+          const [officialSnap, draftSnap, eligibleSnap, supervisorsSnap, activitiesSnap, registrationsSnap] = await Promise.all([
             getDocs(collection(db, 'graduationRounds', round.id, 'officialAssignments')),
             getDocs(collection(db, 'graduationRounds', round.id, 'assignmentDrafts')),
             getDocs(collection(db, 'graduationRounds', round.id, 'eligibleStudents')),
             getDocs(collection(db, 'graduationRounds', round.id, 'supervisors')),
-            Array.isArray(round.activities) ? Promise.resolve(null) : getDocs(collection(db, 'graduationRounds', round.id, 'activities'))
+            Array.isArray(round.activities) ? Promise.resolve(null) : getDocs(collection(db, 'graduationRounds', round.id, 'activities')),
+            getDocs(collection(db, 'graduationRounds', round.id, 'registrations'))
           ]);
           if (activitiesSnap) round.activities = activitiesSnap.docs.map(activityDoc => ({ id: activityDoc.id, ...activityDoc.data() }));
           const effectiveAssignments = new Map();
@@ -98,6 +99,7 @@ async function loadRounds() {
           // stored on the round document after manual add/remove operations.
           round.eligibleCount = eligibleSnap.size;
           round.eligibleStudentsCount = eligibleSnap.size;
+          round.registrationsCount = registrationsSnap ? registrationsSnap.size : 0;
           round.supervisorCount = supervisorsSnap.size;
           round.supervisorsCount = supervisorsSnap.size;
         } catch (error) {
@@ -196,11 +198,12 @@ async function refreshRoundCardMetrics(roundId) {
   if (!round) return;
 
   try {
-    const [eligibleSnap, supervisorsSnap, officialSnap, draftSnap] = await Promise.all([
+    const [eligibleSnap, supervisorsSnap, officialSnap, draftSnap, registrationsSnap] = await Promise.all([
       getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents')),
       getDocs(collection(db, 'graduationRounds', roundId, 'supervisors')),
       getDocs(collection(db, 'graduationRounds', roundId, 'officialAssignments')),
-      getDocs(collection(db, 'graduationRounds', roundId, 'assignmentDrafts'))
+      getDocs(collection(db, 'graduationRounds', roundId, 'assignmentDrafts')),
+      getDocs(collection(db, 'graduationRounds', roundId, 'registrations'))
     ]);
     const effectiveAssignments = new Map();
     officialSnap.docs.forEach(assignmentDoc => effectiveAssignments.set(assignmentDoc.id, assignmentDoc));
@@ -217,6 +220,7 @@ async function refreshRoundCardMetrics(roundId) {
 
     round.eligibleCount = eligibleSnap.size;
     round.eligibleStudentsCount = eligibleSnap.size;
+    round.registrationsCount = registrationsSnap ? registrationsSnap.size : 0;
     round.supervisorCount = supervisorsSnap.size;
     round.supervisorsCount = supervisorsSnap.size;
     round.assignedCount = assignedStudentIds.size;
@@ -227,6 +231,7 @@ async function refreshRoundCardMetrics(roundId) {
       Object.assign(state.activeRound, {
         eligibleCount: round.eligibleCount,
         eligibleStudentsCount: round.eligibleStudentsCount,
+        registrationsCount: round.registrationsCount,
         supervisorCount: round.supervisorCount,
         supervisorsCount: round.supervisorsCount,
         assignedCount: round.assignedCount,

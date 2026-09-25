@@ -9,9 +9,17 @@
               </select>
             </div>
             <div class="flex items-center gap-2">
-              <label for="admin-reg-filter-status" class="text-xs font-bold text-slate-700">Lọc điều kiện:</label>
+              <label for="admin-reg-filter-type" class="text-xs font-bold text-slate-700">Trạng thái:</label>
+              <select id="admin-reg-filter-type" onchange="filterAdminRegistrationsTable()" class="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none">
+                <option value="all">Tất cả sinh viên</option>
+                <option value="registered">✓ Đã đăng ký</option>
+                <option value="unregistered">⏳ Chưa đăng ký</option>
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <label for="admin-reg-filter-status" class="text-xs font-bold text-slate-700">Điều kiện:</label>
               <select id="admin-reg-filter-status" onchange="filterAdminRegistrationsTable()" class="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none">
-                <option value="all">Tất cả nguyện vọng</option>
+                <option value="all">Tất cả điều kiện</option>
                 <option value="eligible">Đủ điều kiện</option>
                 <option value="pending">Chờ xét (Pre-eligibility)</option>
                 <option value="not_eligible">Không đủ điều kiện</option>
@@ -23,7 +31,7 @@
             <button type="button" id="btn-apply-official-eligibility" onclick="applyOfficialEligibilityToRegistrations()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5" title="Đối chiếu danh sách đủ điều kiện của đợt với các nguyện vọng đang chờ xét (không xóa dữ liệu đăng ký)">
               <span>⚖️ Áp dụng DS đủ điều kiện</span>
             </button>
-            <button onclick="exportRegistrationsCSV()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all">
+            <button onclick="exportRegistrationsCSV()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer">
               📄 Xuất CSV / Excel
             </button>
           </div>
@@ -36,6 +44,7 @@
                 <tr>
                   <th class="p-3.5">MSSV</th>
                   <th class="p-3.5">Họ và tên</th>
+                  <th class="p-3.5 text-center">Trạng thái ĐK</th>
                   <th class="p-3.5">Đề tài</th>
                   <th class="p-3.5">Loại hình</th>
                   <th class="p-3.5">Nguyện vọng 1</th>
