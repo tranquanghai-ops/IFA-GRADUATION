@@ -259,8 +259,7 @@ export function applyImpersonationActor(target) {
   if (lockTargetName) lockTargetName.textContent = `${target.name} (${target.email || mssv})`;
   if (lockTargetRole) lockTargetRole.textContent = target.roleLabel || target.type;
 
-  if (typeof updateSettingsActAsSessionUI === 'function') updateSettingsActAsSessionUI();
-  else window.updateSettingsActAsSessionUI?.();
+  window.updateSettingsActAsSessionUI?.();
 }
 window.applyImpersonationActor = applyImpersonationActor;
 
@@ -363,8 +362,7 @@ window.exitImpersonation = async function() {
   }
 
   updateAuthUI();
-  if (typeof updateSettingsActAsSessionUI === 'function') updateSettingsActAsSessionUI();
-  else window.updateSettingsActAsSessionUI?.();
+  window.updateSettingsActAsSessionUI?.();
 
   const currentPortal = getCurrentPortal();
   if (currentPortal === 'admin' || state.currentView === 'admin') {
