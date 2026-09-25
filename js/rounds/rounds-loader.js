@@ -333,6 +333,7 @@ function resolveStudentSupervisorProfiles(officialList = [], effectiveAssignment
     };
   });
 }
+if (typeof window !== 'undefined') window.resolveStudentSupervisorProfiles = resolveStudentSupervisorProfiles;
 
 function renderRoundHeader() {
   const round = state.activeRound;

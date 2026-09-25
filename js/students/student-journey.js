@@ -27,6 +27,7 @@ const normalizeRoundWeekEventColor = (val) => (typeof window !== 'undefined' && 
 const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
 const normalizeOfficialAssignment = (a, r) => (typeof window !== 'undefined' && window.normalizeOfficialAssignment ? window.normalizeOfficialAssignment(a, r) : (a || r));
 const isDirectSupervisorAssignment = (rnd) => (typeof window !== 'undefined' && window.isDirectSupervisorAssignment ? window.isDirectSupervisorAssignment(rnd) : false);
+const resolveStudentSupervisorProfiles = (list, eff) => (typeof window !== 'undefined' && window.resolveStudentSupervisorProfiles ? window.resolveStudentSupervisorProfiles(list, eff) : []);
 /**
  * IFA+ Graduation — Student Journey & Timeline Subsystem
  */
