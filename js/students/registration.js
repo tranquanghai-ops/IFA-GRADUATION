@@ -437,18 +437,29 @@ function renderStudentExistingRegistration(reg) {
 
 window.enableEditRegistration = function() {
   if (!state.myRegistration) return;
-  document.getElementById('input-topic-title').value = state.myRegistration.topicTitle || '';
-  const storedTypes = state.myRegistration.projectTypes || parseStoredProjectTypes(state.myRegistration.projectType || '');
-  setSelectedProjectTypes(storedTypes, state.myRegistration.projectTypeOther || '');
+  const reg = state.myRegistration;
+  const topicTitleInput = document.getElementById('input-topic-title');
+  if (topicTitleInput) {
+    topicTitleInput.value = reg.topicTitle || '';
+    const charCount = document.getElementById('topic-char-count');
+    if (charCount) charCount.textContent = `${(reg.topicTitle || '').length}/250`;
+  }
+  const storedTypes = reg.projectTypes || parseStoredProjectTypes(reg.projectType || '');
+  setSelectedProjectTypes(storedTypes, reg.projectTypeOther || '');
   populateRegistrationStudentForm();
-  state.selectedPreferences = [...(state.myRegistration.preferences || [])];
+  state.selectedPreferences = [...(reg.preferences || [])];
 
   const alreadyCard = document.getElementById('already-registered-card');
   const ctaCard = document.getElementById('registration-cta-card');
+  const reviewInProgressCard = document.getElementById('review-in-progress-card');
   const flowContainer = document.getElementById('registration-flow-container');
   if (alreadyCard) alreadyCard.classList.add('hidden');
   if (ctaCard) ctaCard.classList.add('hidden');
-  if (flowContainer) flowContainer.classList.remove('hidden');
+  if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
+  if (flowContainer) {
+    flowContainer.classList.remove('hidden');
+    flowContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
   goToStep(1);
 };
 
@@ -728,15 +739,31 @@ window.submitRegistration = async function() {
     const studentEmail = String(actor?.email || state.user?.email || `${mssv}@student.tdtu.edu.vn`).toLowerCase().trim();
 
     const previous = state.myRegistration || null;
-    const titleChanged = !previous || String(previous.topicTitle || '').trim() !== topicTitle;
     const previousHistory = Array.isArray(previous?.topicTitleHistory) ? previous.topicTitleHistory : [];
-    const nextVersion = titleChanged ? Math.max(Number(previous?.topicTitleVersion || 0) + 1, previousHistory.length + 1) : Number(previous?.topicTitleVersion || 1);
-    const topicTitleHistory = titleChanged ? previousHistory.concat([{
-      version: nextVersion,
-      title: topicTitle,
-      submittedAt: new Date().toISOString(),
-      status: 'pending'
-    }]) : previousHistory;
+    const wasApproved = previous && (previous.topicApprovalStatus === 'approved' || previous.approvalStatus === 'approved');
+    const currentVersion = Number(previous?.topicTitleVersion || 1);
+    const nextVersion = wasApproved ? (currentVersion + 1) : currentVersion;
+    const topicTitleHistory = wasApproved || !previous
+      ? previousHistory.concat([{
+          version: nextVersion,
+          title: topicTitle,
+          submittedAt: new Date().toISOString(),
+          status: 'pending'
+        }])
+      : (previousHistory.length > 0
+          ? previousHistory.slice(0, -1).concat([{
+              version: nextVersion,
+              title: topicTitle,
+              submittedAt: new Date().toISOString(),
+              status: 'pending'
+            }])
+          : [{
+              version: nextVersion,
+              title: topicTitle,
+              submittedAt: new Date().toISOString(),
+              status: 'pending'
+            }]
+        );
 
     const payload = {
       studentId: mssv,
@@ -750,8 +777,8 @@ window.submitRegistration = async function() {
       major: getRegistrationStudentIdentity().major,
       topicTitleVersion: nextVersion,
       topicTitleHistory,
-      topicApprovalStatus: titleChanged ? 'pending' : (previous?.topicApprovalStatus || 'pending'),
-      topicApprovalNote: titleChanged ? '' : (previous?.topicApprovalNote || ''),
+      topicApprovalStatus: 'pending',
+      topicApprovalNote: '',
       preferences: directAssignment ? [] : state.selectedPreferences.map(p => ({
         rank: p.rank,
         supervisorId: p.supervisorId,
@@ -800,6 +827,14 @@ window.submitRegistration = async function() {
 // ============================================================================
 
 window.openEditTopicTitleModal = function() {
+  if (typeof closeTopicRegistrationPreviewModal === 'function') {
+    closeTopicRegistrationPreviewModal();
+  }
+  if (typeof enableEditRegistration === 'function') {
+    enableEditRegistration();
+    return;
+  }
+
   const modal = document.getElementById('modal-student-edit-topic');
   if (!modal) return;
 
@@ -811,7 +846,8 @@ window.openEditTopicTitleModal = function() {
 
   const currentTitle = reg.topicTitle || reg.topic || reg.proposalTitle || '';
   const currentVersion = Number(reg.topicTitleVersion || 1);
-  const nextVersion = currentVersion + 1;
+  const wasApproved = (reg.topicApprovalStatus === 'approved' || reg.approvalStatus === 'approved');
+  const nextVersion = wasApproved ? (currentVersion + 1) : currentVersion;
 
   const inputEl = document.getElementById('input-edit-topic-title');
   if (inputEl) {
@@ -880,8 +916,9 @@ window.submitUpdatedTopicTitle = async function() {
 
   try {
     const currentVersion = Number(reg.topicTitleVersion || 1);
+    const wasApproved = (reg.topicApprovalStatus === 'approved' || reg.approvalStatus === 'approved');
+    const nextVersion = wasApproved ? (currentVersion + 1) : currentVersion;
     const previousHistory = Array.isArray(reg.topicTitleHistory) ? reg.topicTitleHistory : [];
-    const nextVersion = Math.max(currentVersion + 1, previousHistory.length + 1);
 
     const historyEntry = {
       version: nextVersion,
@@ -889,7 +926,9 @@ window.submitUpdatedTopicTitle = async function() {
       submittedAt: new Date().toISOString(),
       status: 'pending'
     };
-    const topicTitleHistory = previousHistory.concat([historyEntry]);
+    const topicTitleHistory = wasApproved || previousHistory.length === 0
+      ? previousHistory.concat([historyEntry])
+      : previousHistory.slice(0, -1).concat([historyEntry]);
 
     const updatePayload = {
       topicTitle: newTitle,
