@@ -432,9 +432,10 @@ export function renderUnifiedTimelineWeekCard(week, round, options = {}) {
     ? resolveRoundWeekTitle(week.week, week.title)
     : (week.title || `Tuần ${week.week}`);
 
+  const isCurrent = week.status === 'ongoing';
   const onClickAttr = canEdit
-    ? ` role="button" tabindex="0" onclick="openRoundWeekEditor('${roundId}', ${week.week})" class="ifa-timeline-card relative min-w-[320px] sm:min-w-[335px] rounded-2xl border p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${cardTheme} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}"`
-    : ` class="ifa-timeline-card relative min-w-[320px] sm:min-w-[335px] rounded-2xl border p-3 flex flex-col items-center text-center transition ${cardTheme} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}"`;
+    ? ` role="button" tabindex="0" data-current-week="${isCurrent ? 'true' : 'false'}" onclick="openRoundWeekEditor('${roundId}', ${week.week})" class="ifa-timeline-card relative min-w-[320px] sm:min-w-[335px] rounded-2xl border p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${cardTheme} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}"`
+    : ` data-current-week="${isCurrent ? 'true' : 'false'}" class="ifa-timeline-card relative min-w-[320px] sm:min-w-[335px] rounded-2xl border p-3 flex flex-col items-center text-center transition ${cardTheme} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}"`;
 
   const visibilityButton = canToggleVisibility
     ? `<button type="button" onclick="toggleRoundTimelineWeekVisibility('${roundId}', ${week.week}, event)" class="px-1.5 py-0.5 rounded-md bg-white hover:bg-slate-100 border border-slate-200 text-[9px] font-bold shadow-xs transition cursor-pointer ${week.visible ? 'text-slate-600 hover:text-slate-900' : 'text-blue-700 hover:text-blue-900'}">${week.visible ? 'Ẩn' : 'Hiện'}</button>`
@@ -450,18 +451,32 @@ export function renderUnifiedTimelineWeekCard(week, round, options = {}) {
 
   return `
     <div${onClickAttr}>
-      <div class="flex items-center justify-between gap-1 w-full mb-1">
-        <span class="font-black text-xs ${isReviewWeek ? 'text-amber-950 font-black' : 'text-slate-900'} whitespace-nowrap">${escapeHtml(resolvedTitle)}</span>
+      <div class="flex items-center justify-between gap-1.5 w-full mb-1.5">
+        <span class="font-black text-sm ${isReviewWeek ? 'text-amber-950 font-black' : 'text-slate-900'} whitespace-nowrap">${escapeHtml(resolvedTitle)}</span>
+        <span class="font-mono font-bold text-[11px] ${isReviewWeek ? 'text-amber-900' : 'text-slate-600'} whitespace-nowrap">${week.dateText || ''}</span>
         <div class="flex items-center gap-1 shrink-0">
-          <span class="px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${isReviewWeek && week.visible ? 'bg-amber-100/90 text-amber-900 border-amber-300' : (week.visible ? style.badge : 'bg-slate-200 text-slate-600 border-slate-300')}">${week.visible ? style.label : 'Đang ẩn'}</span>
+          <span class="px-2 py-0.5 rounded-full border text-[9px] font-bold ${isReviewWeek && week.visible ? 'bg-amber-100/90 text-amber-900 border-amber-300' : (week.visible ? style.badge : 'bg-slate-200 text-slate-600 border-slate-300')}">${week.visible ? style.label : 'Đang ẩn'}</span>
           ${visibilityButton}
         </div>
       </div>
-      <span class="font-mono font-bold text-[11px] ${isReviewWeek ? 'text-amber-900' : 'text-slate-700'} my-1">${week.dateText || ''}</span>
       ${daysHtml}
       ${eventsHtml}
       ${week.note ? `<span class="text-[9px] text-slate-500 mt-1 line-clamp-1">${escapeHtml(week.note)}</span>` : ''}
     </div>`;
+}
+
+export function scrollTimelineToCurrentWeek() {
+  if (typeof window === 'undefined') return;
+  setTimeout(() => {
+    const currentWeekEl = document.querySelector('[data-current-week="true"]');
+    if (currentWeekEl) {
+      const scrollContainer = currentWeekEl.closest('.overflow-x-auto');
+      if (scrollContainer) {
+        const targetScrollLeft = currentWeekEl.offsetLeft - scrollContainer.offsetLeft;
+        scrollContainer.scrollTo({ left: Math.max(0, targetScrollLeft), behavior: 'smooth' });
+      }
+    }
+  }, 100);
 }
 
 export function renderUnifiedRoundTimeline(round, options = {}) {
@@ -519,6 +534,8 @@ export function renderUnifiedRoundTimeline(round, options = {}) {
         <button type="button" onclick="openRoundWeekEditor('${round.id}')" class="px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] transition cursor-pointer">＋ Thêm / sửa mốc</button>
       </div>`
     : `<span class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700">${current ? `Đang diễn ra: ${escapeHtml(currentTitle)}` : `Đã qua ${completed}/${allWeeks.length} tuần`}</span>`;
+
+  scrollTimelineToCurrentWeek();
 
   return `
     <section class="px-4 py-3.5 bg-white border-b border-slate-200">
