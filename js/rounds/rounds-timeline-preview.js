@@ -112,14 +112,13 @@ function rememberRoundTimelineEvents(roundId, weeks) {
 }
 
 function renderTimelineWeekDays(days = [], events = [], weekNumber = null, roundId = null) {
-  const studentCalendar = weekNumber !== null;
-  return `<div class="grid grid-cols-7 ${studentCalendar ? 'gap-1.5' : 'gap-1'} w-full mt-2 pt-2 border-t border-slate-200/80">${days.map(day => {
+  return `<div class="grid grid-cols-7 gap-1.5 w-full mt-2.5 pt-2 border-t border-slate-200/80">${days.map(day => {
     const dayEvents = events.filter(event => roundWeekEventOccursOnDay(event, day));
     const titles = dayEvents.map(event => escapeHtml(event.title)).join(' · ');
     const isToday = day.date instanceof Date && day.date.toDateString() === new Date().toDateString();
     const eventColors = [...new Set(dayEvents.map(event => normalizeRoundWeekEventColor(event.displayColor || event.color)))];
     const eventColor = eventColors[0] || '';
-    const dayClass = dayEvents.length ? '' : (isToday ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' : 'bg-white/70 border-slate-200 text-slate-500');
+    const dayClass = dayEvents.length ? '' : (isToday ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' : 'bg-white/90 border-slate-200 text-slate-600 shadow-2xs');
     const slices = eventColors.map((color, index) => `${color}38 ${index * 100 / eventColors.length}% ${(index + 1) * 100 / eventColors.length}%`).join(',');
     const dayStyle = eventColors.length > 1
       ? ` style="background:linear-gradient(90deg,${slices});border-color:${eventColor};color:#1e293b"`
@@ -127,7 +126,7 @@ function renderTimelineWeekDays(days = [], events = [], weekNumber = null, round
     const clickable = weekNumber !== null && dayEvents.length;
     const tag = clickable ? 'button' : 'span';
     const click = clickable ? ` type="button" onclick="event.stopPropagation(); openStudentTimelineDay(${weekNumber}, '${day.key}', ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" aria-label="Xem ${dayEvents.length} sự kiện ngày ${day.label}"` : '';
-    return `<${tag}${click} title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 rounded-md border text-center ${studentCalendar ? 'min-h-[52px] px-1 py-1.5' : 'px-0.5 py-0.5'} ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md' : ''}"${dayStyle}><b class="block ${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none">${day.shortName}</b><b class="block ${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none mt-1">${day.label}</b>${dayEvents.length ? `<span class="flex justify-center gap-0.5">${eventColors.map(color => `<i class="${studentCalendar ? 'text-[11px]' : 'text-[8px]'} leading-none not-italic" style="color:${color}">●</i>`).join('')}</span>` : ''}</${tag}>`;
+    return `<${tag}${click} title="${titles || `${day.shortName} ${day.label}`}" class="min-w-0 flex flex-col items-center justify-center rounded-lg border text-center py-1.5 px-0.5 min-h-[48px] ${dayClass} ${clickable ? 'cursor-pointer hover:shadow-md' : ''}"${dayStyle}><span class="block text-[10px] font-bold leading-none text-slate-500">${day.shortName}</span><span class="block text-[10.5px] font-bold leading-none mt-1 text-slate-800 whitespace-nowrap tracking-tight">${day.label}</span>${dayEvents.length ? `<span class="flex justify-center gap-0.5 mt-0.5">${eventColors.map(color => `<i class="text-[9px] leading-none not-italic" style="color:${color}">●</i>`).join('')}</span>` : ''}</${tag}>`;
   }).join('')}</div>`;
 }
 

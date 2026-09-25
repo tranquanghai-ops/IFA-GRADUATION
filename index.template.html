@@ -110,23 +110,6 @@
         <!-- User profile or Login trigger -->
         <div class="ifa-header-account">
           <div id="user-info-bar" class="hidden items-center gap-2.5">
-            <!-- Subtle Portal Switch Buttons -->
-            <a id="btn-goto-admin" href="/admin/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-300 bg-white/10 hover:bg-white/20 border border-amber-400/30 transition-all shadow-xs" title="Chuyển sang Cổng Quản trị">
-              <span>⚙️</span> <span class="hidden sm:inline">Quản trị</span>
-            </a>
-                        <a id="btn-goto-supervisor" href="/supervisor/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-200 bg-white/10 hover:bg-white/20 border border-emerald-400/30 transition-all shadow-xs" title="Chuyển sang Cổng GVHD">
-              <span>👨‍🏫</span> <span class="hidden sm:inline">Cổng GVHD</span>
-            </a>
-<a id="btn-goto-student" href="/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-200 bg-white/10 hover:bg-white/20 border border-blue-400/30 transition-all shadow-xs" title="Xem Cổng Sinh viên">
-              <span>🎓</span> <span class="hidden sm:inline">Cổng SV</span>
-            </a>
-            <a id="btn-goto-assessment" href="/assessment/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-purple-200 bg-white/10 hover:bg-white/20 border border-purple-400/30 transition-all shadow-xs" title="Chuyển sang Cổng Đánh giá">
-              <span>📝</span> <span class="hidden sm:inline">Đánh giá</span>
-            </a>
-            <!-- Admin Impersonate Entry Point (v2.6.0-beta.1) -->
-            <button id="btn-open-impersonate" onclick="openAdminImpersonateModal()" type="button" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-300 transition-all shadow-xs cursor-pointer" title="Đóng vai người dùng">
-              <span>🎭</span> <span class="hidden sm:inline">Đóng vai</span>
-            </button>
             <img id="user-avatar" class="ifa-user-avatar" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4' fill='%2364748b'/><path fill='%2364748b' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/></svg>" alt="Ảnh đại diện người dùng">
             <div class="ifa-account-identity">
               <div id="user-display-name" class="ifa-account-name">Đang tải...</div>
@@ -136,6 +119,23 @@
                 <span id="user-viewing-badge" class="hidden ifa-role-badge ifa-role-viewing">Đang xem: Sinh viên</span>
               </div>
             </div>
+            <!-- Subtle Portal Switch Buttons placed near Logout button -->
+            <a id="btn-goto-admin" href="/admin/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-300 bg-white/10 hover:bg-white/20 border border-amber-400/30 transition-all shadow-xs" title="Chuyển sang Cổng Quản trị">
+              <span>⚙️</span> <span class="hidden sm:inline">Quản trị</span>
+            </a>
+            <a id="btn-goto-supervisor" href="/supervisor/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-emerald-200 bg-white/10 hover:bg-white/20 border border-emerald-400/30 transition-all shadow-xs" title="Chuyển sang Cổng GVHD">
+              <span>👨‍🏫</span> <span class="hidden sm:inline">Cổng GVHD</span>
+            </a>
+            <a id="btn-goto-student" href="/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-200 bg-white/10 hover:bg-white/20 border border-blue-400/30 transition-all shadow-xs" title="Xem Cổng Sinh viên">
+              <span>🎓</span> <span class="hidden sm:inline">Cổng SV</span>
+            </a>
+            <a id="btn-goto-assessment" href="/assessment/" class="hidden items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-purple-200 bg-white/10 hover:bg-white/20 border border-purple-400/30 transition-all shadow-xs" title="Chuyển sang Cổng Đánh giá">
+              <span>📝</span> <span class="hidden sm:inline">Đánh giá</span>
+            </a>
+            <!-- Admin Impersonate Entry Point (v2.6.0-beta.1) -->
+            <button id="btn-open-impersonate" onclick="openAdminImpersonateModal()" type="button" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-amber-950 bg-amber-400 hover:bg-amber-300 border border-amber-300 transition-all shadow-xs cursor-pointer" title="Đóng vai người dùng">
+              <span>🎭</span> <span class="hidden sm:inline">Đóng vai</span>
+            </button>
             <button id="btn-logout" title="Đăng xuất" class="ifa-logout-button">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
               <span>Đăng xuất</span>
@@ -148,7 +148,7 @@
       </div>
     </div>
 
-    <nav class="ifa-portal-nav" aria-label="Điều hướng cổng Graduation">
+    <nav class="ifa-portal-nav hidden" aria-label="Điều hướng cổng Graduation">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-x-auto">
         <div id="portal-navigation" class="ifa-portal-nav-items"></div>
       </div>

@@ -417,20 +417,26 @@ export function renderUnifiedTimelineWeekCard(week, round, options = {}) {
   const roundId = round?.id || state.selectedRoundId || '';
 
   const statusStyles = {
-    completed: { card: 'bg-emerald-50 border-emerald-300', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300', label: 'Đã qua', icon: '✓', icon_bg: 'bg-emerald-600 text-white' },
-    ongoing: { card: 'bg-blue-50 border-blue-400 ring-2 ring-blue-200', badge: 'bg-blue-600 text-white border-blue-600', label: 'Đang diễn ra', icon: '●', icon_bg: 'bg-blue-600 text-white' },
-    upcoming: { card: 'bg-slate-50 border-slate-200', badge: 'bg-white text-slate-500 border-slate-200', label: 'Chưa tới', icon: null, icon_bg: 'bg-slate-200 text-slate-600' }
+    completed: { card: 'bg-emerald-50 border-emerald-300', badge: 'bg-emerald-100 text-emerald-800 border-emerald-300', label: 'Đã qua' },
+    ongoing: { card: 'bg-blue-50 border-blue-400 ring-2 ring-blue-200', badge: 'bg-blue-600 text-white border-blue-600', label: 'Đang diễn ra' },
+    upcoming: { card: 'bg-slate-50 border-slate-200', badge: 'bg-white text-slate-500 border-slate-200', label: 'Chưa tới' }
   };
 
+  const isReviewWeek = Boolean(week.milestone && String(week.milestone).trim().length > 0) ||
+    Boolean(week.events && week.events.some(e => String(e.title || '').toLowerCase().includes('duyệt')));
+
   const style = statusStyles[week.status] || statusStyles.upcoming;
+  const cardTheme = isReviewWeek
+    ? 'bg-gradient-to-b from-amber-50 to-orange-50/80 border-2 border-amber-400 shadow-sm ring-1 ring-amber-300/40 text-slate-900'
+    : style.card;
+
   const resolvedTitle = (typeof resolveRoundWeekTitle === 'function')
     ? resolveRoundWeekTitle(week.week, week.title)
     : (week.title || `Tuần ${week.week}`);
 
-  const circleContent = style.icon || (week.week > 12 ? (week.week === 13 ? '📄' : week.week === 14 ? '🎓' : '📌') : week.week);
   const onClickAttr = canEdit
-    ? ` role="button" tabindex="0" onclick="openRoundWeekEditor('${roundId}', ${week.week})" class="ifa-timeline-card relative min-w-[290px] rounded-2xl border p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}"`
-    : ` class="ifa-timeline-card relative min-w-[290px] rounded-2xl border p-3 flex flex-col items-center text-center transition ${style.card} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}"`;
+    ? ` role="button" tabindex="0" onclick="openRoundWeekEditor('${roundId}', ${week.week})" class="ifa-timeline-card relative min-w-[320px] sm:min-w-[335px] rounded-2xl border p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-md transition ${cardTheme} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}"`
+    : ` class="ifa-timeline-card relative min-w-[320px] sm:min-w-[335px] rounded-2xl border p-3 flex flex-col items-center text-center transition ${cardTheme} ${week.visible ? '' : 'opacity-55 border-dashed grayscale'}"`;
 
   const visibilityButton = canToggleVisibility
     ? `<button type="button" onclick="toggleRoundTimelineWeekVisibility('${roundId}', ${week.week}, event)" class="px-1.5 py-0.5 rounded-md bg-white hover:bg-slate-100 border border-slate-200 text-[9px] font-bold shadow-xs transition cursor-pointer ${week.visible ? 'text-slate-600 hover:text-slate-900' : 'text-blue-700 hover:text-blue-900'}">${week.visible ? 'Ẩn' : 'Hiện'}</button>`
@@ -447,15 +453,13 @@ export function renderUnifiedTimelineWeekCard(week, round, options = {}) {
   return `
     <div${onClickAttr}>
       <div class="flex items-center justify-between gap-1 w-full mb-1">
-        <span class="font-black text-xs text-slate-900 whitespace-nowrap">${escapeHtml(resolvedTitle)}</span>
-        ${week.milestone ? `<span class="px-1.5 py-0.5 rounded-md bg-amber-500 text-white font-black text-[9px] leading-tight text-center truncate max-w-[100px]" title="${escapeHtml(week.milestone)}">🚩 ${escapeHtml(week.milestone)}</span>` : ''}
+        <span class="font-black text-xs ${isReviewWeek ? 'text-amber-950 font-black' : 'text-slate-900'} whitespace-nowrap">${escapeHtml(resolvedTitle)}</span>
         <div class="flex items-center gap-1 shrink-0">
-          <span class="px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${week.visible ? style.badge : 'bg-slate-200 text-slate-600 border-slate-300'}">${week.visible ? style.label : 'Đang ẩn'}</span>
+          <span class="px-1.5 py-0.5 rounded-full border text-[9px] font-bold ${isReviewWeek && week.visible ? 'bg-amber-100/90 text-amber-900 border-amber-300' : (week.visible ? style.badge : 'bg-slate-200 text-slate-600 border-slate-300')}">${week.visible ? style.label : 'Đang ẩn'}</span>
           ${visibilityButton}
         </div>
       </div>
-      <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black my-1 ${style.icon_bg}">${circleContent}</span>
-      <span class="font-mono font-bold text-[11px] text-slate-700">${week.dateText || ''}</span>
+      <span class="font-mono font-bold text-[11px] ${isReviewWeek ? 'text-amber-900' : 'text-slate-700'} my-1">${week.dateText || ''}</span>
       ${daysHtml}
       ${eventsHtml}
       ${week.note ? `<span class="text-[9px] text-slate-500 mt-1 line-clamp-1">${escapeHtml(week.note)}</span>` : ''}

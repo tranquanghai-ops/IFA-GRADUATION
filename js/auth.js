@@ -246,14 +246,6 @@ export function updateAuthUI() {
     const userEmail = document.getElementById('user-email');
     if (userEmail) userEmail.textContent = effectiveEmail;
     document.getElementById('user-avatar').src = (isImp && (target.photoURL || target.photoUrl)) || state.user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="%2364748b"/><path fill="%2364748b" d="M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z"/></svg>';
-
-    // Keep portal access controls in the dedicated navigation row below the header.
-    const portalNavigation = document.getElementById('portal-navigation');
-    ['btn-goto-admin', 'btn-goto-supervisor', 'btn-goto-student', 'btn-goto-assessment', 'btn-open-impersonate']
-      .forEach(id => {
-        const control = document.getElementById(id);
-        if (portalNavigation && control && control.parentElement !== portalNavigation) portalNavigation.appendChild(control);
-      });
     
     // Display ACTUAL ROLE badge
     const roleBadge = document.getElementById('user-role-badge');
@@ -393,11 +385,10 @@ export function updateAuthUI() {
       if (btnGotoAssessment) btnGotoAssessment.classList.add('hidden');
     }
 
-    // Automatically hide portal nav row if empty or all items hidden
+    // Automatically hide legacy portal nav row
     const portalNavEl = document.querySelector('.ifa-portal-nav');
     if (portalNavEl) {
-      const hasVisibleNav = Array.from(portalNavigation?.children || []).some(el => !el.classList.contains('hidden') && el.style.display !== 'none');
-      portalNavEl.style.display = hasVisibleNav ? '' : 'none';
+      portalNavEl.style.display = 'none';
     }
 
     // Header is always kept visible across all views (student, supervisor, admin, assessment)
