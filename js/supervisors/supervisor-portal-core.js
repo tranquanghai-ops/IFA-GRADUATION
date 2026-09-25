@@ -452,12 +452,19 @@ window.loadSupervisorPortalData = async function(roundId) {
   const subTabsContainer = document.getElementById('supervisor-sub-tabs-container');
   const assignedPanel = document.getElementById('sup-panel-assigned');
 
-  // Check if supervisor has active duties in this round
-  const hasSupervisorDuties = actor.isAdmin || totalAssignedCount > 0 || (!isDirect && Boolean(roundSupervisor));
+  // Check if supervisor has active duties in this round (must have assigned students, or be in pre-assignment preference review)
+  const hasSupervisorDuties = totalAssignedCount > 0 || (!isDirect && !round.isAssigned && Boolean(roundSupervisor));
 
   if (!hasSupervisorDuties) {
-    document.getElementById('supervisor-round-timeline')?.classList.add('hidden');
-    document.getElementById('supervisor-plan-section')?.classList.add('hidden');
+    const timelineEl = document.getElementById('supervisor-round-timeline');
+    if (timelineEl) {
+      timelineEl.innerHTML = '';
+      timelineEl.classList.add('hidden');
+    }
+    const planSection = document.getElementById('supervisor-plan-section');
+    if (planSection) {
+      planSection.classList.add('hidden');
+    }
     if (notAssignedAlert) notAssignedAlert.classList.remove('hidden');
     if (subTabsContainer) subTabsContainer.classList.add('hidden');
     if (assignedPanel) assignedPanel.classList.add('hidden');
@@ -470,6 +477,7 @@ window.loadSupervisorPortalData = async function(roundId) {
     renderSupervisorPlanList(round);
     if (notAssignedAlert) notAssignedAlert.classList.add('hidden');
     if (subTabsContainer) subTabsContainer.classList.remove('hidden');
+    if (assignedPanel) assignedPanel.classList.remove('hidden');
 
     // In preference-based rounds, a participating GVHD with no assigned
     // students is normally waiting to review NV1/NV2/NV3 applications. Load
