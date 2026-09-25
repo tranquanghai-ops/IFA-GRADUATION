@@ -782,11 +782,31 @@ export function getRoundWeekEventRange(event = {}) {
 
 export function roundWeekEventOccursOnDay(event, day) {
   if (!event || !day) return false;
-  if (event.activityId && event.startDate && event.endDate) {
+  if (event.startDate && event.endDate && day.key) {
     return day.key >= event.startDate && day.key <= event.endDate;
   }
   const { startDayIndex, endDayIndex } = getRoundWeekEventRange(event);
   return day.dayIndex >= startDayIndex && day.dayIndex <= endDayIndex;
+}
+
+// A dated event belongs to the calendar week containing its date, regardless of
+// the week card where an older record was originally stored.
+export function getRoundManualEventsForWeek(configs = [], weekNumber, days = []) {
+  const first = days[0]?.key;
+  const last = days[6]?.key;
+  return configs.flatMap(config => (Array.isArray(config?.events) ? config.events : []).map((event, index) => {
+    const sourceWeek = Number(config.week);
+    const startDayIndex = Math.max(0, Math.min(6, Number(event.startDayIndex ?? event.dayIndex) || 0));
+    const endDayIndex = Math.max(startDayIndex, Math.min(6, Number(event.endDayIndex ?? startDayIndex) || 0));
+    const startDate = event.startDate || event.date || (sourceWeek === weekNumber ? days[startDayIndex]?.key : '');
+    const endDate = event.endDate || event.date || (sourceWeek === weekNumber ? days[endDayIndex]?.key : startDate);
+    const dated = /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate);
+    if (dated ? !(startDate <= last && endDate >= first) : sourceWeek !== weekNumber) return null;
+    return { id: event.id || `legacy-${sourceWeek}-${index}`, sourceWeek,
+      title: String(event.title || event.name || '').trim(), dayIndex: startDayIndex,
+      startDayIndex, endDayIndex, date: startDate, startDate, endDate,
+      color: normalizeRoundWeekEventColor(event.color) };
+  })).filter(event => event?.title);
 }
 
 export function distinguishOverlappingTimelineEvents(events = [], days = []) {
@@ -811,6 +831,7 @@ if (typeof window !== 'undefined') {
   window.normalizeRoundWeekEventColor = normalizeRoundWeekEventColor;
   window.getRoundWeekEventRange = getRoundWeekEventRange;
   window.roundWeekEventOccursOnDay = roundWeekEventOccursOnDay;
+  window.getRoundManualEventsForWeek = getRoundManualEventsForWeek;
   window.distinguishOverlappingTimelineEvents = distinguishOverlappingTimelineEvents;
 }
 

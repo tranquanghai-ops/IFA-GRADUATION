@@ -12,12 +12,14 @@ export const IFAA_FIREBASE_CONFIG = {
   appId: "1:633545868576:web:c1509233a2b5046b320345"
 };
 
-export const DEFAULT_IFAA_DATASET_URL = "https://firebasestorage.googleapis.com/v0/b/ifa-activities.firebasestorage.app/o/datasets%2Ffaculty-students.json.gz?alt=media&token=f66324b5-2ec1-45ad-a580-5f4d4041e431";
-export const BACKUP_IFAA_DATASET_URL = "https://firebasestorage.googleapis.com/v0/b/ifa-activities.firebasestorage.app/o/datasets%2Ffaculty-students.json.gz?alt=media&token=9a1e615e-3d20-48e7-8c9e-967e21140a21";
+// Download tokens are rotated by IFAA when the dataset is rebuilt. Never pin one in the app.
+export const DEFAULT_IFAA_DATASET_URL = '';
+export const BACKUP_IFAA_DATASET_URL = '';
 
 let ifaaAppInstance = null;
 let ifaaFirestoreInstance = null;
 let ifaaStorageInstance = null;
+let ifaaAuthInstance = null;
 
 export function getIFAAFirebase() {
   try {
@@ -31,10 +33,34 @@ export function getIFAAFirebase() {
     if (!ifaaStorageInstance && ifaaAppInstance) {
       ifaaStorageInstance = getStorage(ifaaAppInstance);
     }
-    return { app: ifaaAppInstance, db: ifaaFirestoreInstance, storage: ifaaStorageInstance };
+    if (!ifaaAuthInstance && ifaaAppInstance) {
+      ifaaAuthInstance = getAuth(ifaaAppInstance);
+    }
+    return { app: ifaaAppInstance, db: ifaaFirestoreInstance, storage: ifaaStorageInstance, auth: ifaaAuthInstance };
   } catch (err) {
     console.warn('[IFAA ReadOnly] Không thể khởi tạo secondary app:', err);
-    return { app: null, db: null, storage: null };
+    return { app: null, db: null, storage: null, auth: null };
+  }
+}
+
+async function waitForIFAAAuth(authInstance) {
+  if (!authInstance) return null;
+  if (typeof authInstance.authStateReady === 'function') await authInstance.authStateReady();
+  return authInstance.currentUser;
+}
+
+async function connectIFAAForAdmin() {
+  const { auth: ifaaAuth } = getIFAAFirebase();
+  if (!ifaaAuth) throw new Error('Không thể khởi tạo kết nối IFA+ Activities.');
+  // This is called directly from the admin's refresh click so the popup retains user activation.
+  if (!ifaaAuth.currentUser) {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ login_hint: auth?.currentUser?.email || '' });
+    await signInWithPopup(ifaaAuth, provider);
+  }
+  if (ifaaAuth.currentUser?.email?.toLowerCase() !== auth?.currentUser?.email?.toLowerCase()) {
+    await signOut(ifaaAuth);
+    throw new Error('Hãy đăng nhập IFA+ Activities bằng đúng tài khoản đang dùng tại Graduation.');
   }
 }
 
@@ -277,32 +303,23 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
   // 2. Local IndexedDB Cache
   const cached = await getFacultyCache();
 
-  // 3. Read metadata: Try primary tknt-tdtu first, then secondary ifaaDb
+  // 3. Read authoritative IFAA metadata when authenticated; the primary mirror may be stale.
   let meta = null;
   try {
-    const primarySnap = await getDoc(doc(db, 'facultyStudentMeta', 'current')).catch(() => null);
-    if (primarySnap && primarySnap.exists()) {
-      meta = primarySnap.data();
-      state.facultyDatasetMeta = meta;
+    const { db: ifaaDb, auth: ifaaAuth } = getIFAAFirebase();
+    if (ifaaDb && await waitForIFAAAuth(ifaaAuth)) {
+      const snap = await getDoc(doc(ifaaDb, 'facultyStudentMeta', 'current'));
+      if (snap.exists()) meta = snap.data();
     }
-  } catch (err) {
-    // ignore
-  }
+  } catch (err) { console.warn('[IFAA ReadOnly] Không đọc được metadata IFAA:', err); }
 
   if (!meta) {
     try {
-      const { db: ifaaDb } = getIFAAFirebase();
-      if (ifaaDb) {
-        const metaSnap = await getDoc(doc(ifaaDb, 'facultyStudentMeta', 'current')).catch(() => null);
-        if (metaSnap && metaSnap.exists()) {
-          meta = metaSnap.data();
-          state.facultyDatasetMeta = meta;
-        }
-      }
-    } catch (err) {
-      console.warn('[IFAA ReadOnly] Không thể đọc facultyStudentMeta từ IFAA:', err.message);
-    }
+      const primarySnap = await getDoc(doc(db, 'facultyStudentMeta', 'current'));
+      if (primarySnap.exists()) meta = primarySnap.data();
+    } catch (err) { console.warn('[IFAA ReadOnly] Không đọc được metadata dự phòng:', err); }
   }
+  state.facultyDatasetMeta = meta;
 
   const currentVersion = Number(meta?.datasetVersion || meta?.version || 0);
 
@@ -322,16 +339,10 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
   updateFacultyStatusUI('Đang tải dữ liệu từ IFA+ Activities...', 'info');
   let bytes = null;
 
-  // Compile candidate URLs: meta.datasetUrl first, then default and backup tokenized Storage URLs
+  // Use the current URL published by IFAA; old static download tokens are invalid.
   const candidateUrls = [];
   if (meta?.datasetUrl && typeof meta.datasetUrl === 'string') {
     candidateUrls.push(meta.datasetUrl);
-  }
-  if (DEFAULT_IFAA_DATASET_URL && !candidateUrls.includes(DEFAULT_IFAA_DATASET_URL)) {
-    candidateUrls.push(DEFAULT_IFAA_DATASET_URL);
-  }
-  if (typeof BACKUP_IFAA_DATASET_URL !== 'undefined' && BACKUP_IFAA_DATASET_URL && !candidateUrls.includes(BACKUP_IFAA_DATASET_URL)) {
-    candidateUrls.push(BACKUP_IFAA_DATASET_URL);
   }
 
   for (const rawUrl of candidateUrls) {
@@ -368,11 +379,25 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
     }
   }
 
-  // 6. Decompress & Parse
-  if (bytes && bytes.length > 0) {
+  // An IFAA faculty admin can still read the source collection if its compressed
+  // export has not been published yet. This remains read-only on IFAA.
+  let firestoreRows = null;
+  if (!bytes) {
     try {
-      const text = await gunzipData(bytes);
-      const parsed = JSON.parse(text);
+      const { db: ifaaDb, auth: ifaaAuth } = getIFAAFirebase();
+      if (ifaaDb && await waitForIFAAAuth(ifaaAuth)) {
+        const snap = await getDocs(collection(ifaaDb, 'facultyStudents'));
+        firestoreRows = snap.docs.map(item => ({ ...item.data(), mssv: item.id }));
+      }
+    } catch (error) {
+      console.warn('[IFAA ReadOnly] Không đọc được danh sách gốc:', error);
+    }
+  }
+
+  // 6. Decompress & Parse, or use the authorized source collection.
+  if ((bytes && bytes.length > 0) || firestoreRows) {
+    try {
+      const parsed = bytes ? JSON.parse(await gunzipData(bytes)) : firestoreRows;
       const rows = normalizeFacultyRows(parsed);
       rows.sort((a, b) => String(a.mssv).localeCompare(String(b.mssv)));
 
@@ -396,12 +421,12 @@ export async function loadFacultyDatasetFromIFAA({ force = false } = {}) {
         state.studentDatasetMeta = metaPayload;
 
         // Sync metadata to tknt-tdtu if admin
-        if (state.realIsAdmin && db) {
+        if (state.realIsAdmin && db && bytes) {
           setDoc(doc(db, 'facultyStudentMeta', 'current'), {
             count: rows.length,
             datasetVersion: currentVersion || Date.now(),
             datasetPath: 'datasets/faculty-students.json.gz',
-            datasetUrl: candidateUrls[0] || DEFAULT_IFAA_DATASET_URL,
+            datasetUrl: meta?.datasetUrl || '',
             datasetEncoding: 'gzip',
             datasetBytes: bytes.byteLength,
             datasetUpdatedAt: meta?.datasetUpdatedAt || serverTimestamp(),
@@ -454,9 +479,10 @@ window.ensureFacultyDatasetLoaded = async function(force = false) {
 };
 
 window.syncFacultyDatasetFromIFAA = async function() {
-  showToast('🔄 Đang làm mới danh mục sinh viên từ IFA+ Activities...', 'info');
-  updateFacultyStatusUI('Đang làm mới từ IFAA...', 'info');
   try {
+    if (state.realIsAdmin) await connectIFAAForAdmin();
+    showToast('🔄 Đang làm mới danh mục sinh viên từ IFA+ Activities...', 'info');
+    updateFacultyStatusUI('Đang làm mới từ IFAA...', 'info');
     state.lastFacultyLoadWasFallback = false;
     const rows = await loadFacultyDatasetFromIFAA({ force: true });
     if (!rows || rows.length === 0) {

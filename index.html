@@ -87,7 +87,7 @@
           <div class="ifa-header-copy">
             <div class="ifa-header-title-row">
               <span class="ifa-header-title">IFA+ Graduation</span>
-              <span class="ifa-version-badge">v2.7.0-beta.1</span>
+              <span class="ifa-version-badge">v2.7.3</span>
             </div>
             <p class="ifa-header-subtitle">Quản lý Đồ án Tốt nghiệp</p>
             <p class="ifa-header-faculty">Khoa Mỹ thuật Công nghiệp</p>
@@ -707,6 +707,7 @@
 
     </section>
 
+
 <section id="view-supervisor" class="hidden space-y-6">
 
       <!-- ACCESS DENIED STATE (WHEN USER HAS NO SUPERVISOR ROLE/ASSIGNMENT) -->
@@ -775,6 +776,7 @@
         <section id="supervisor-round-timeline" class="hidden card-surface rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"></section>
 
         <!-- INACTIVE SUPERVISOR NOTICE (WHEN NOT ASSIGNED IN THIS ROUND) -->
+        <div id="supervisor-round-loading" role="status" aria-live="polite" class="hidden card-surface p-8 text-center w-full my-4 border border-blue-200 bg-blue-50/70 rounded-2xl text-blue-900 font-semibold">Đang tải danh sách sinh viên của đợt…</div>
         <div id="supervisor-not-assigned-alert" class="hidden card-surface p-8 text-center w-full my-4 border-2 border-amber-200 bg-amber-50/70 rounded-2xl space-y-4 shadow-sm">
           <div class="w-14 h-14 bg-amber-100 text-amber-700 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-xs">
             📋
@@ -1082,6 +1084,7 @@
     <!-- ======================================================= -->
     <!-- PORTAL 4: ASSESSMENT / EVALUATION PORTAL (/graduation/assessment/) -->
     <!-- ======================================================= -->
+
     <section id="view-assessment" class="hidden space-y-6">
 
       <!-- ACCESS DENIED CARD (WHEN USER HAS NO EVALUATION ROLES) -->
@@ -1411,6 +1414,7 @@
       </div>
 
     </section>
+
 <section id="view-admin" class="hidden space-y-6">
 
       <!-- IMPERSONATION LOCK CARD (v2.6.0-beta.1) -->
@@ -2962,7 +2966,7 @@
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-xl">🎭</span>
                   <h4 class="font-black text-sm text-slate-900">Cho phép Admin đóng vai người dùng (Exact Act-As Test Mode)</h4>
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">v2.7.0-beta.1</span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">v2.7.3</span>
                 </div>
                 <p class="text-xs text-slate-600 leading-relaxed max-w-2xl">
                   Bật công cụ cho phép Quản trị viên đóng vai một người dùng thực tế trong đợt cụ thể để kiểm thử toàn diện quy trình và phân quyền với đầy đủ quyền thao tác thực tế (Real Test Actions).
@@ -3482,6 +3486,7 @@
     </div>
   </div>
 
+
   <!-- MODAL: TÌM VÀ THÊM SINH VIÊN VÀO ĐỢT (TỪ FACULTY STUDENT MASTER) -->
   <div id="modal-add-eligible-student" class="hidden fixed inset-0 z-[60] modal-backdrop flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
@@ -3540,6 +3545,7 @@
       </div>
     </div>
   </div>
+
 
   <!-- 2. CREATE / EDIT SUPERVISOR MASTER MODAL -->
   <div id="modal-supervisor" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
@@ -3656,6 +3662,7 @@
     </div>
   </div>
 
+
   <!-- 3. ADD SUPERVISORS TO ROUND MODAL -->
   <div id="modal-add-sup-to-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -3684,6 +3691,7 @@
       </div>
     </div>
   </div>
+
 
   <!-- 4. ADD / EDIT PROJECT TYPE MODAL -->
   <div id="modal-project-type" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
@@ -3718,6 +3726,7 @@
     </div>
   </div>
 
+
   <!-- 4.5. STUDENT PROFILE MODAL -->
   <div id="modal-student-profile" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 relative">
@@ -3733,6 +3742,7 @@
       </div>
     </div>
   </div>
+
   <div id="modal-student-edit-topic" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col">
       <!-- Modal Header -->
@@ -3887,6 +3897,7 @@
     </div>
   </div>
 
+
   <!-- 7. ADMIN LOCK ROUND MODAL -->
   <div id="modal-admin-lock-round" class="hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
@@ -3924,6 +3935,7 @@
     </div>
   </div>
 
+
   <!-- 8. ADMIN INSPECT SUPERVISOR DECISIONS MODAL -->
   <div id="modal-admin-inspect-sup" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
@@ -3955,6 +3967,7 @@
       </div>
     </div>
   </div>
+
 
   <!-- 9. ADMIN MANUAL ASSIGN MODAL -->
   <div id="modal-admin-edit-supervisor" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4">
@@ -4003,6 +4016,7 @@
         </button>
       </div>
     </div>
+
   </div>
 
   <div id="modal-admin-manual-assign" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4">
@@ -4033,6 +4047,7 @@
         </button>
       </div>
     </div>
+
   </div>
 
   <div id="modal-assignment-excel-preview" class="hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -4062,6 +4077,7 @@
     </div>
   </div>
 
+
   <!-- ROUND WORKSPACE POPUP: reuses the live admin panels without duplicating IDs or state -->
   <div id="modal-round-workspace" class="hidden fixed inset-0 z-[65] modal-backdrop flex items-center justify-center p-2 sm:p-4" onclick="if(event.target === this) closeRoundWorkspaceModal()">
     <div class="bg-slate-50 rounded-2xl w-full max-w-6xl h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
@@ -4075,6 +4091,7 @@
       <div id="modal-round-workspace-body" class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5"></div>
     </div>
   </div>
+
 
   <!-- CREATE / EDIT ACTIVITY MODAL (v1.9.0-beta.1) -->
   <div id="modal-activity" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -4605,6 +4622,7 @@
     </div>
   </div>
 
+
   <!-- COPY ACTIVITIES FROM ANOTHER ROUND MODAL -->
   <div id="modal-copy-round" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
@@ -4655,6 +4673,7 @@
     </div>
   </div>
 
+
   <!-- MODAL: ADD SUPPORT SUPERVISOR -->
   <div id="modal-add-support-supervisor" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
@@ -4704,6 +4723,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: ACTIVITY COUNCIL MANAGEMENT (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-activity-councils" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
@@ -4834,6 +4854,7 @@
     </div>
   </div>
 
+
   <!-- MODAL: CREATE / EDIT / COPY COUNCIL -->
   <div id="modal-edit-council" class="hidden fixed inset-0 z-[60] modal-backdrop flex items-center justify-center p-3 sm:p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
@@ -4953,6 +4974,7 @@
     </div>
   </div>
 
+
   <!-- MODAL: ADD GUEST SLOT TO ACTIVITY COUNCIL STRUCTURE -->
   <div id="modal-add-guest-slot" class="hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl flex flex-col overflow-hidden border border-slate-200">
@@ -4980,6 +5002,7 @@
     </div>
   </div>
 
+
   <!-- CUSTOM CONFIRM MODAL -->
   <div id="modal-confirm" class="hidden fixed inset-0 z-[9998] modal-backdrop flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
@@ -4999,6 +5022,7 @@
 
 
   <!-- ============================================================================
+
        MODAL: LETTER OPTION EDITOR (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-add-letter-option" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5037,6 +5061,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: QUICK COUNCIL IN MILESTONE (Item D)
        ============================================================================ -->
   <div id="modal-milestone-quick-council" class="hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5074,6 +5099,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: ADD INTERNAL MEMBER TO COUNCIL (Item D)
        ============================================================================ -->
   <div id="modal-add-council-internal-member" class="hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5112,6 +5138,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: ADD GUEST MEMBER TO COUNCIL (Item D)
        ============================================================================ -->
   <div id="modal-add-council-guest-member" class="hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5161,6 +5188,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: COUNCIL WORKSPACE / ĐIỀU HÀNH & CHẤM ĐIỂM HỘI ĐỒNG (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-council-workspace" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
@@ -5289,6 +5317,7 @@
 
 
   <!-- ============================================================================
+
        MODAL: ADMIN STUDENT SCORE DETAIL (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-admin-score-detail" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5362,6 +5391,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: GENERIC SCORE ENTRY FOR SUPERVISOR / PRELIMINARY / REVIEWER (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-score-entry" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5409,6 +5439,7 @@
 
 
   <!-- ============================================================================
+
        MODAL: RUBRIC CRITERION EDITOR (v2.0.0-beta.1)
        ============================================================================ -->
   <div id="modal-rubric-criterion" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5444,6 +5475,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: POST-COUNCIL SCORE CALIBRATION (v2.0.0-beta.1)
        ============================================================================ -->
   <div id="modal-score-calibration" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5497,6 +5529,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: REOPEN FINALIZED COUNCIL (ADMIN ONLY) (v2.0.0-beta.1)
        ============================================================================ -->
   <div id="modal-reopen-council" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5527,6 +5560,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: GUEST PASSCODE ENTRY (UI PLACEHOLDER PER SECTION 37) (v2.0.0-beta.1)
        ============================================================================ -->
   <div id="modal-guest-passcode-entry" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5558,6 +5592,7 @@
 
 
   <!-- ============================================================================
+
        MODAL: REOPEN FINALIZED ROUND RESULTS (ADMIN ONLY) (v2.1.0-beta.1)
        ============================================================================ -->
   <div id="modal-reopen-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5583,6 +5618,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: STUDENT FINAL SCORE FORMULA & DETAIL (v2.1.0-beta.1)
        ============================================================================ -->
   <div id="modal-final-score-detail" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5666,6 +5702,7 @@
 
 
   <!-- ============================================================================
+
        MODAL: ADMIN ACTIVITY SUBMISSIONS DASHBOARD (v2.2.0-beta.1)
        ============================================================================ -->
   <div id="modal-activity-submissions" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
@@ -5747,6 +5784,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: ADMIN DEADLINE & ATTEMPTS OVERRIDE (v2.2.0-beta.1)
        ============================================================================ -->
   <div id="modal-submission-override" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5796,6 +5834,7 @@
   </div>
 
   <!-- ============================================================================
+
        MODAL: SUBMISSION ATTEMPTS HISTORY (v2.2.0-beta.1)
        ============================================================================ -->
   <div id="modal-submission-history" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
@@ -5820,6 +5859,7 @@
   </div>
 
   <!-- ============================================================================
+
 <!-- ============================================================================
      MODAL: ADMIN IMPERSONATION / EXACT ACT-AS TEST MODE (v2.7.0-beta.1)
      ============================================================================ -->
@@ -5891,6 +5931,7 @@
     </div>
   </div>
 </div>
+
 <!-- MODAL: XEM VÀ DUYỆT PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC (MÔ PHỎNG A4 PDF CHO SV, GVHD & ADMIN) -->
 <div id="modal-supervisor-topic-preview" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-2 sm:p-4">
   <div class="bg-slate-100 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
@@ -6122,7 +6163,7 @@
   <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
   <!-- MODULE ENTRYPOINT -->
-  <script type="module" src="app.js?v=2.7.2"></script>
+  <script type="module" src="app.js?v=2.7.3"></script>
 
 </body>
 </html>

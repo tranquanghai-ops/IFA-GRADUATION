@@ -8,8 +8,8 @@ import './js/core.js';
 import './js/ui.js';
 
 // 2. Foundation Data & Masters
-import './js/supervisors.js?v=2.7.2';
-import './js/students.js?v=2.7.2';
+import './js/supervisors.js?v=2.7.3';
+import './js/students.js?v=2.7.3';
 
 // 3. Rounds, Planning & Google Drive
 import './js/rounds.js';

@@ -14,6 +14,7 @@ const resolveRoundWeekTitle = (w, t) => (typeof window !== 'undefined' && window
 const getRoundTimelineDefaultTitle = (w) => (typeof window !== 'undefined' && window.getRoundTimelineDefaultTitle ? window.getRoundTimelineDefaultTitle(w) : ('Tuần ' + w));
 
 const roundWeekEventOccursOnDay = (e, d) => (typeof window !== 'undefined' && window.roundWeekEventOccursOnDay ? window.roundWeekEventOccursOnDay(e, d) : false);
+const getRoundManualEventsForWeek = (configs, week, days) => window.getRoundManualEventsForWeek(configs, week, days);
 const distinguishOverlappingTimelineEvents = (evs, ds) => (typeof window !== 'undefined' && window.distinguishOverlappingTimelineEvents ? window.distinguishOverlappingTimelineEvents(evs, ds) : (evs || []));
 const normalizeRoundWeekEventColor = (val) => (typeof window !== 'undefined' && window.normalizeRoundWeekEventColor ? window.normalizeRoundWeekEventColor(val) : (val || '#2563eb'));
 
@@ -54,17 +55,7 @@ function getRoundWeekSchedule(round) {
       const date = new Date(start.getTime() + dayIndex * 86400000);
       return { dayIndex, shortName: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][dayIndex], date, label: `${pad(date.getDate())}/${pad(date.getMonth() + 1)}`, key: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` };
     });
-    const events = (Array.isArray(config.events) ? config.events : []).map((event, index) => ({
-      id: event.id || `legacy-${week}-${index}`,
-      title: String(event.title || event.name || '').trim(),
-      dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
-      date: event.date || event.startDate || '',
-      startDayIndex: Number.isInteger(Number(event.startDayIndex)) ? Math.max(0, Math.min(6, Number(event.startDayIndex))) : Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
-      endDayIndex: Number.isInteger(Number(event.endDayIndex)) ? Math.max(0, Math.min(6, Number(event.endDayIndex))) : Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
-      startDate: event.startDate || event.date || '',
-      endDate: event.endDate || event.date || '',
-      color: normalizeRoundWeekEventColor(event.color)
-    })).filter(event => event.title);
+    const events = getRoundManualEventsForWeek(weeklyConfig, week, days);
     return {
       week,
       title: resolveRoundWeekTitle(week, config.title),
@@ -159,7 +150,7 @@ function renderTimelineWeekEvents(events = [], weekNumber = null, roundId = null
       : (dayCount > 0 ? `Còn ${dayCount} ngày` : (endDate >= today ? (dayCount === 0 ? 'Hôm nay' : 'Đang diễn ra') : 'Đã diễn ra'));
     const dateLabel = startValue === endValue ? shortDate(startValue) : `${shortDate(startValue)}–${shortDate(endValue)}`;
     const clickHandler = isAdmin
-      ? (event.activityId ? `editActivityModal('${escapeHtml(event.activityId)}')` : `openAdminTimelineEventEditor('${escapeHtml(roundId || '')}', ${weekNumber}, '${escapeHtml(event.id || String(eventIndex))}')`)
+      ? (event.activityId ? `editActivityModal('${escapeHtml(event.activityId)}')` : `openAdminTimelineEventEditor('${escapeHtml(roundId || '')}', ${event.sourceWeek || weekNumber}, '${escapeHtml(event.id || String(eventIndex))}')`)
       : `openStudentTimelineEvent(${weekNumber}, ${eventIndex}, ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})`;
     return `<button type="button" onclick="event.stopPropagation(); ${clickHandler}" title="${isAdmin ? 'Bấm để chỉnh sửa sự kiện' : 'Xem chi tiết sự kiện'}" class="flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-[11px] leading-tight hover:shadow-sm cursor-pointer transition" style="background-color:${color}18;border-color:${color}66;color:${color}">
       <span class="shrink-0">📌 ${escapeHtml(dateLabel)}</span><span class="min-w-0 flex-1 truncate font-black">${escapeHtml(event.title)}</span>${countdown ? `<span class="shrink-0 font-bold opacity-80">${countdown}</span>` : ''}

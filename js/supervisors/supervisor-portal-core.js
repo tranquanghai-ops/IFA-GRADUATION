@@ -13,6 +13,7 @@ const isDirectSupervisorAssignment = (rnd) => (typeof window !== 'undefined' && 
 
 state.supervisorStudentFilter = 'all';
 state.supervisorAssignedStudents = [];
+let supervisorPortalLoadSequence = 0;
 
 window.initSupervisorPortal = async function() {
   if (typeof ensureSupervisorsMasterLoaded === 'function') {
@@ -155,6 +156,12 @@ window.onSupervisorRoundSelected = async function(roundId) {
 
 window.loadSupervisorPortalData = async function(roundId) {
   if (!roundId) return;
+  const loadSequence = ++supervisorPortalLoadSequence;
+  const loadingCard = document.getElementById('supervisor-round-loading');
+  loadingCard?.classList.remove('hidden');
+  document.getElementById('supervisor-not-assigned-alert')?.classList.add('hidden');
+  document.getElementById('supervisor-sub-tabs-container')?.classList.add('hidden');
+  document.getElementById('sup-panel-assigned')?.classList.add('hidden');
 
   if (typeof ensureSupervisorsMasterLoaded === 'function') {
     try { await ensureSupervisorsMasterLoaded(); } catch (e) {}
@@ -166,13 +173,14 @@ window.loadSupervisorPortalData = async function(roundId) {
   const actor = getEffectiveActor();
   const emailLower = (actor.email || '').toLowerCase().trim();
   const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
-  if (!round) return;
+  if (!round) { loadingCard?.classList.add('hidden'); return; }
   state.selectedRoundId = roundId;
   state.activeRound = round;
   // Always reload roster for the selected round before matching the logged-in
   // teacher. `state.roundSupervisors` otherwise belongs to the previously
   // active round and produces a false "không tham gia đợt" notice.
   await loadRoundSupervisors(roundId);
+  if (loadSequence !== supervisorPortalLoadSequence) return;
   const isDirect = isDirectSupervisorAssignment(round);
 
   // 1. Locate current supervisor profile
@@ -300,6 +308,7 @@ window.loadSupervisorPortalData = async function(roundId) {
   } catch (elErr) {
     console.warn('[SupervisorPortal] Could not query eligible students:', elErr);
   }
+  if (loadSequence !== supervisorPortalLoadSequence) return;
 
   const isStudentEligible = (stId) => {
     if (!hasEligibleStudentsList) return true;
@@ -455,6 +464,7 @@ window.loadSupervisorPortalData = async function(roundId) {
 
   // Check if supervisor has active duties in this round (must have assigned students, or be in pre-assignment preference review)
   const hasSupervisorDuties = totalAssignedCount > 0 || (!isDirect && !round.isAssigned && Boolean(roundSupervisor));
+  loadingCard?.classList.add('hidden');
 
   if (!hasSupervisorDuties) {
     const timelineEl = document.getElementById('supervisor-round-timeline');

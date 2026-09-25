@@ -20,6 +20,7 @@ const resolveRoundWeekTitle = (w, t) => (typeof window !== 'undefined' && window
 const getRoundTimelineDefaultTitle = (w) => (typeof window !== 'undefined' && window.getRoundTimelineDefaultTitle ? window.getRoundTimelineDefaultTitle(w) : ('Tuần ' + w));
 
 const roundWeekEventOccursOnDay = (e, d) => (typeof window !== 'undefined' && window.roundWeekEventOccursOnDay ? window.roundWeekEventOccursOnDay(e, d) : false);
+const getRoundManualEventsForWeek = (configs, week, days) => window.getRoundManualEventsForWeek(configs, week, days);
 const distinguishOverlappingTimelineEvents = (evs, ds) => (typeof window !== 'undefined' && window.distinguishOverlappingTimelineEvents ? window.distinguishOverlappingTimelineEvents(evs, ds) : (evs || []));
 const normalizeRoundWeekEventColor = (val) => (typeof window !== 'undefined' && window.normalizeRoundWeekEventColor ? window.normalizeRoundWeekEventColor(val) : (val || '#2563eb'));
 
@@ -557,17 +558,7 @@ window.renderStudentTimelineWeeks = function() {
     if (cfg.visible === false) return;
     const defMilestone = defaultMilestones[w.num] || null;
     const milestone = cfg.milestone || (defMilestone ? defMilestone : null);
-    const manualEvents = (Array.isArray(cfg.events) ? cfg.events : []).map((event, index) => ({
-      id: event.id || `legacy-${w.num}-${index}`,
-      title: String(event.title || event.name || '').trim(),
-      dayIndex: Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
-      date: event.date || event.startDate || '',
-      startDayIndex: Number.isInteger(Number(event.startDayIndex)) ? Math.max(0, Math.min(6, Number(event.startDayIndex))) : Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
-      endDayIndex: Number.isInteger(Number(event.endDayIndex)) ? Math.max(0, Math.min(6, Number(event.endDayIndex))) : Math.max(0, Math.min(6, Number(event.dayIndex) || 0)),
-      startDate: event.startDate || event.date || '',
-      endDate: event.endDate || event.date || '',
-      color: normalizeRoundWeekEventColor(event.color)
-    })).filter(event => event.title);
+    const manualEvents = getRoundManualEventsForWeek(weeklyConfig, w.num, w.days);
     const firstDay = w.days[0]?.key;
     const lastDay = w.days[6]?.key;
     const events = distinguishOverlappingTimelineEvents(

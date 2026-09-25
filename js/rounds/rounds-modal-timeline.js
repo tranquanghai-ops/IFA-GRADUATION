@@ -137,6 +137,8 @@ function getRoundWeekDaysFromForm(weekNumber) {
     const day = monday.getDay();
     monday.setDate(monday.getDate() - day + (day === 0 ? -6 : 1));
   }
+  const weekday = monday.getDay();
+  monday.setDate(monday.getDate() - weekday + (weekday === 0 ? -6 : 1));
   monday.setHours(0, 0, 0, 0);
   const pad = value => String(value).padStart(2, '0');
   const weekStart = new Date(monday.getTime() + (Number(weekNumber) - 1) * 7 * 86400000);
@@ -217,7 +219,7 @@ function getRoundWeekEventRange(event = {}) {
 }
 
 function roundWeekEventOccursOnDay(event, day) {
-  if (event.activityId && event.startDate && event.endDate) {
+  if (event.startDate && event.endDate && day.key) {
     return day.key >= event.startDate && day.key <= event.endDate;
   }
   const { startDayIndex, endDayIndex } = getRoundWeekEventRange(event);
