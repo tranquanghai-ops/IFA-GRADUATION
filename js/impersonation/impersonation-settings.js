@@ -272,3 +272,7 @@ window.onToggleAdminImpersonation = async function(enabled) {
     if (toggle) toggle.checked = state.allowImpersonation;
   }
 };
+
+if (typeof window !== 'undefined') {
+  window.updateSettingsActAsSessionUI = updateSettingsActAsSessionUI;
+}
