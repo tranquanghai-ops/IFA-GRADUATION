@@ -142,42 +142,45 @@ window.renderSupervisorAssignedStudents = function() {
     const studentAvatarUrl = st.photoURL || studentObj?.photoURL || studentObj?.avatar || defaultAvatar;
 
     return `
-      <div class="card-surface p-4 sm:p-5 bg-white rounded-2xl border border-slate-200 hover:border-tdtu-blue/40 shadow-xs hover:shadow-md transition-all flex flex-col space-y-3.5">
-        <!-- Row 1: Student Identity (Avatar inline with Name & Class) -->
-        <div class="flex items-center gap-3 min-w-0">
-          <img src="${studentAvatarUrl}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0" alt="Avatar">
-          <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-0.5">
-              ${roleBadge}
-              ${!hasRegistration ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Chưa đăng ký đề tài</span>' : ''}
-              <span class="font-mono text-xs font-bold text-tdtu-blue bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">${studentId}</span>
-              <span class="text-slate-400 text-xs hidden sm:inline">•</span>
-              <span class="text-xs text-slate-500 font-medium truncate">Lớp: ${className}</span>
+      <div class="card-surface p-4 sm:p-5 bg-white rounded-2xl border border-slate-200 hover:border-tdtu-blue/40 shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <!-- Left: Student Identity & Flush-left Topic Info -->
+        <div class="space-y-3 min-w-0 flex-1">
+          <!-- Row 1: Student Identity (Avatar inline with Name, MSSV & Class) -->
+          <div class="flex items-center gap-3 min-w-0">
+            <img src="${studentAvatarUrl}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0" alt="Avatar">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-0.5">
+                ${roleBadge}
+                ${!hasRegistration ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Chưa đăng ký đề tài</span>' : ''}
+                <span class="font-mono text-xs font-bold text-tdtu-blue bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">${studentId}</span>
+                <span class="text-slate-400 text-xs hidden sm:inline">•</span>
+                <span class="text-xs text-slate-500 font-medium truncate">Lớp: ${className}</span>
+              </div>
+              <h3 class="text-sm sm:text-base font-black text-slate-900 leading-snug truncate">${name}</h3>
             </div>
-            <h3 class="text-sm sm:text-base font-black text-slate-900 leading-snug truncate">${name}</h3>
+          </div>
+
+          <!-- Row 2: Flush-left Topic Info & Version Badge -->
+          <div class="pt-2 border-t border-slate-100 space-y-1.5 w-full text-left">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-xs font-bold text-slate-500 shrink-0">Đề tài:</span>
+              <span class="text-sm sm:text-base font-black text-slate-900 leading-snug">${escapeHtml(topicTitle)}</span>
+              ${hasRegistration ? topicApprovalBadge : ''}
+              <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-tdtu-blue border border-slate-200 shadow-2xs transition cursor-pointer" title="Bấm để xem lại phiếu đăng ký đề tài PDF">
+                📄 Phiên bản ${topicVersion}
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2.5 text-xs text-slate-500">
+              <span>Loại hình: <b class="text-slate-700">${escapeHtml(projectType)}</b></span>
+              <span>•</span>
+              <span>${submissionStatusStr}</span>
+            </div>
           </div>
         </div>
 
-        <!-- Row 2: Flush-left Topic Info & Version Badge -->
-        <div class="pt-2 border-t border-slate-100 space-y-1.5 w-full text-left">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-xs font-bold text-slate-500 shrink-0">Đề tài:</span>
-            <span class="text-sm sm:text-base font-black text-slate-900 leading-snug">${escapeHtml(topicTitle)}</span>
-            ${hasRegistration ? topicApprovalBadge : ''}
-            <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-tdtu-blue border border-slate-200 shadow-2xs transition cursor-pointer" title="Bấm để xem lại phiếu đăng ký đề tài PDF">
-              📄 Phiên bản ${topicVersion}
-            </button>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2.5 text-xs text-slate-500">
-            <span>Loại hình: <b class="text-slate-700">${escapeHtml(projectType)}</b></span>
-            <span>•</span>
-            <span>${submissionStatusStr}</span>
-          </div>
-        </div>
-
-        <!-- Row 3: Action Buttons (Centered) -->
-        <div class="pt-2.5 border-t border-slate-100 flex items-center justify-center gap-2 flex-wrap">
+        <!-- Right / Bottom: Action Buttons (On Desktop: right side; On Mobile: bottom centered) -->
+        <div class="pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 flex items-center justify-center sm:justify-end gap-2 flex-wrap shrink-0">
           <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}', 'profile')" class="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem hồ sơ chi tiết sinh viên và đề tài">
             <span>📋</span> <span>Xem hồ sơ</span>
           </button>
