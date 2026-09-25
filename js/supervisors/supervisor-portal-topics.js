@@ -295,3 +295,23 @@ window.closeTopicRegistrationPreviewModal = function() {
   if (modal) modal.classList.add('hidden');
 };
 
+window.unlockSupervisorStudentTopic = async function(studentId) {
+  if (!checkImpersonationWriteGuard('Mở khóa đề tài cho sinh viên')) return;
+  const registration = (state.supervisorAssignedStudents || []).find(st => (st.studentId || st.id) === studentId) ||
+    (typeof findStudentInRound === 'function' ? findStudentInRound(studentId) : null);
+  if (!registration) {
+    showToast('Không tìm thấy thông tin sinh viên.', 'error');
+    return;
+  }
+  const confirmed = await showConfirm(
+    'Mở khóa đề tài cho sinh viên',
+    `Bạn có chắc chắn muốn mở khóa đề tài “${registration.topicTitle || ''}” cho sinh viên ${registration.studentName || studentId} chỉnh sửa? Thao tác này sẽ thu hồi quyền đã duyệt của GVHD để sinh viên cập nhật lại.`,
+    { confirmText: 'Mở khóa', danger: true }
+  );
+  if (!confirmed) return;
+  await window.reviewStudentTopicTitle(studentId, 'cancel');
+};
+
+window.openSupervisorTopicFormPreview = window.openTopicRegistrationPreviewModal;
+
+

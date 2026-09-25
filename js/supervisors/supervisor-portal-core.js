@@ -202,8 +202,9 @@ window.loadSupervisorPortalData = async function(roundId) {
   const reviewIndicator = document.getElementById('sup-round-review-indicator');
 
   const supDisplayName = currentSup?.name || actor.displayName || 'Thầy/Cô';
-  if (greetingEl) greetingEl.textContent = `Kính chào Thầy/Cô ${supDisplayName}`;
-  if (roundInfoEl) roundInfoEl.textContent = `Đợt: ${round.title} • Năm học ${round.academicYear || ''}`;
+  if (greetingEl) greetingEl.innerHTML = `Kính chào Thầy/Cô<br class="sm:hidden"> <span class="font-black">${escapeHtml(supDisplayName)}</span>`;
+  const roundYear = round.academicYear ? ` (${round.academicYear})` : '';
+  if (roundInfoEl) roundInfoEl.textContent = `${round.title || ''}${roundYear}`;
   if (activeBadgeEl) activeBadgeEl.textContent = round.roundName || round.title || 'Đợt ĐATN';
 
   // Update Hero Supervisor Profile Pill

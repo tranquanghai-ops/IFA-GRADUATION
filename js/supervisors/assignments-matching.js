@@ -484,8 +484,10 @@ export async function loadSupervisorReviewData(roundId) {
   const roundInfoEl = document.getElementById('supervisor-round-info');
   const activeBadgeEl = document.getElementById('sup-active-round-badge');
 
-  if (greetingEl) greetingEl.textContent = `Kính chào Thầy/Cô ${currentSup?.name || actor?.displayName || state.user?.displayName || ''}`;
-  if (roundInfoEl) roundInfoEl.textContent = `Đợt tốt nghiệp: ${state.activeRound?.title || ''} (${state.activeRound?.academicYear || ''})`;
+  const supDisplayName = currentSup?.name || actor?.displayName || state.user?.displayName || 'Thầy/Cô';
+  if (greetingEl) greetingEl.innerHTML = `Kính chào Thầy/Cô<br class="sm:hidden"> <span class="font-black">${escapeHtml(supDisplayName)}</span>`;
+  const roundYear = state.activeRound?.academicYear ? ` (${state.activeRound?.academicYear})` : '';
+  if (roundInfoEl) roundInfoEl.textContent = `${state.activeRound?.title || ''}${roundYear}`;
   if (activeBadgeEl) activeBadgeEl.textContent = state.activeRound?.roundName || state.activeRound?.title || 'Đợt ĐATN';
 
   if (!currentSup) {

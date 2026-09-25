@@ -229,19 +229,13 @@ export function renderUnifiedActivityCard(act, round, options = {}) {
             <div class="flex items-center gap-1.5 font-mono text-xs sm:text-sm text-slate-800">
               <span class="shrink-0 text-sm">🕒</span> <span class="text-slate-500 font-sans font-normal whitespace-nowrap">${act.isTentative ? 'Dự kiến:' : 'Chính thức:'}</span> <span class="font-bold text-slate-900">${timeStr}</span>
             </div>
-            ${!expanded ? `
-              <div class="flex items-center gap-1.5 text-xs sm:text-sm text-slate-700">
-                <span class="shrink-0 text-sm">📍</span> <span class="font-medium text-slate-800">${escapeHtml(locationText)}</span>
-              </div>
-            ` : ''}
+            <div class="flex items-center gap-1.5 text-xs sm:text-sm text-slate-700">
+              <span class="shrink-0 text-sm">📍</span> <span class="font-medium text-slate-800">${escapeHtml(locationText)}</span>
+            </div>
           </div>
         </div>
 
         <div id="milestone-body-${pfx}${act.id}" class="${expanded ? '' : 'hidden'}">
-          <div class="flex items-center gap-1.5 text-xs sm:text-sm text-slate-700 mt-2">
-            <span class="shrink-0 text-sm">📍</span> <span class="font-medium text-slate-800">${escapeHtml(locationText)}</span>
-          </div>
-
           ${descriptionRender}
 
           ${isStudent && act.submissionEnabled && typeof renderStudentSubmissionPanel === 'function' ? renderStudentSubmissionPanel(act, round) : ''}
