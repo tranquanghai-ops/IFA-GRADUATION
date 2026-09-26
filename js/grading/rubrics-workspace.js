@@ -781,7 +781,8 @@ function renderCouncilSelectedStudentDetails() {
   renderAdminMonitor();
 }
 
-function formatStudentSupervisorsForDisplay(reg) {
+function formatStudentSupervisorsForDisplay(reg, hideSupervisor = false) {
+  if (hideSupervisor) return '<span class="text-slate-400 italic text-xs font-normal">Đã ẩn thông tin theo cài đặt Hội đồng</span>';
   if (!reg) return 'GVHD: Chưa phân công';
   const officials = getOfficialSupervisors(reg);
   if (!officials || officials.length === 0) {

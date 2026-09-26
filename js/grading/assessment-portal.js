@@ -38,7 +38,8 @@ function getStudentFullProfile(sid, targetRound) {
   return base;
 }
 
-function formatStudentSupervisorsForDisplay(reg) {
+function formatStudentSupervisorsForDisplay(reg, hideSupervisor = false) {
+  if (hideSupervisor) return '<span class="text-slate-400 italic font-medium">(Đã ẩn theo cài đặt Hội đồng)</span>';
   if (!reg) return '<span class="text-slate-400 font-medium">Chưa phân công</span>';
   const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(reg) : (reg.officialSupervisors || []);
   if (Array.isArray(officials) && officials.length > 0) {
