@@ -1,17 +1,60 @@
 
 // --- Module Bridges ---
-const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
-const findStudentInRound = (sid, roundId) => {
-  if (typeof window !== 'undefined' && typeof window.findStudentInRound === 'function') {
-    return window.findStudentInRound(sid, roundId);
+export const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
+
+export function getStudentFullProfile(sid, act = null, council = null, round = null) {
+  if (typeof window !== 'undefined' && typeof window.getStudentFullProfile === 'function' && window.getStudentFullProfile !== getStudentFullProfile) {
+    return window.getStudentFullProfile(sid, act, council, round);
   }
-  const r = (state.rounds || []).find(rd => rd.id === (roundId || state.activeCouncilWorkspace?.roundId || state.selectedAssessmentRoundId || state.selectedRoundId)) || state.activeRound;
-  const all = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
-    ? state.adminReviewData.registrations
-    : (r?.eligibleStudents || r?.registrations || []);
-  const found = all.find(s => (s.mssv || s.studentId) === sid);
-  return found || { studentId: sid, mssv: sid };
+  const currentRound = round || (state.rounds || []).find(r => r.id === (state.activeCouncilWorkspace?.roundId || state.selectedAssessmentRoundId || state.selectedRoundId)) || state.activeRound;
+  let sObj = null;
+
+  if (typeof window !== 'undefined' && typeof window.findStudentInRound === 'function') {
+    sObj = window.findStudentInRound(sid, currentRound?.id);
+  }
+
+  if (!sObj || !sObj.fullName) {
+    const off = (currentRound?.officialAssignments || []).find(a => (a.studentId === sid || a.mssv === sid));
+    if (off) sObj = { ...sObj, ...off };
+  }
+
+  if (!sObj || !sObj.fullName || !sObj.topicTitle) {
+    const reg = (currentRound?.registrations || []).find(r => (r.studentId === sid || r.mssv === sid));
+    if (reg) sObj = { ...sObj, ...reg };
+  }
+
+  if (!sObj || !sObj.fullName) {
+    const el = (currentRound?.eligibleStudents || []).find(e => (e.studentId === sid || e.mssv === sid));
+    if (el) sObj = { ...sObj, ...el };
+  }
+
+  const fac = (typeof window !== 'undefined' && typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(sid) : null;
+  if (fac && !fac.isMissing) {
+    sObj = {
+      ...sObj,
+      studentId: sid,
+      mssv: sid,
+      fullName: sObj?.fullName || sObj?.studentName || fac.fullName || fac.name,
+      studentName: sObj?.studentName || sObj?.fullName || fac.name || fac.fullName,
+      className: sObj?.className || sObj?.studentClass || fac.className || fac.studentClass,
+      major: sObj?.major || fac.major,
+      topicTitle: sObj?.topicTitle || sObj?.topic || fac.topicTitle || '--',
+      acceptedSupervisorName: sObj?.acceptedSupervisorName || sObj?.supervisorName || fac.supervisorName,
+      officialSupervisors: sObj?.officialSupervisors || (fac.supervisorName ? [{ supervisorName: fac.supervisorName, role: 'primary' }] : [])
+    };
+  }
+
+  return sObj || { studentId: sid, mssv: sid, fullName: sid, topicTitle: '--' };
+}
+
+export const findStudentInRound = (sid, roundId) => {
+  return getStudentFullProfile(sid, null, null, null);
 };
+
+if (typeof window !== 'undefined') {
+  window.getStudentFullProfile = getStudentFullProfile;
+  window.findStudentInRound = findStudentInRound;
+}
 /**
  * IFA+ Graduation — Council Live Workspace & Session Controls Submodule
  */
@@ -165,6 +208,13 @@ window.closeCouncilWorkspace = function() {
     try { state.activeCouncilUnsubscribe(); } catch (e) {}
     state.activeCouncilUnsubscribe = null;
   }
+  if (state.councilTimer?.intervalId) {
+    clearInterval(state.councilTimer.intervalId);
+    state.councilTimer.intervalId = null;
+  }
+  if (state.councilTimer) {
+    state.councilTimer.isRunning = false;
+  }
   document.getElementById('modal-council-workspace')?.classList.add('hidden');
 };
 
@@ -284,6 +334,7 @@ function renderCouncilWorkspaceFull() {
 
   renderCouncilStudentList();
   renderCouncilSelectedStudentDetails();
+  renderPresentationTimerUI();
   renderPostCouncilSection();
   renderAuditLogsSection();
 }
@@ -298,6 +349,9 @@ function renderCouncilWorkspacePartialSync() {
   // Update secretary controls for current student
   renderSecretaryControls();
 
+  // Update countdown timer
+  renderPresentationTimerUI();
+
   // Update scorers completion progress & admin monitor
   renderScorersProgress();
   renderAdminMonitor();
@@ -307,10 +361,171 @@ function renderCouncilWorkspacePartialSync() {
   renderAuditLogsSection();
 }
 
+// --- PRESENTATION COUNTDOWN TIMER CONTROLS ---
+export function initPresentationTimer(sid = null) {
+  state.councilTimer = state.councilTimer || {};
+  if (state.councilTimer.intervalId) {
+    clearInterval(state.councilTimer.intervalId);
+    state.councilTimer.intervalId = null;
+  }
+  state.councilTimer.studentId = sid || state.activeCouncilSelectedStudentId;
+  state.councilTimer.durationSeconds = state.councilTimer.durationSeconds || (15 * 60);
+  state.councilTimer.remainingSeconds = state.councilTimer.durationSeconds;
+  state.councilTimer.isRunning = true;
+  state.councilTimer.intervalId = setInterval(onPresentationTimerTick, 1000);
+  renderPresentationTimerUI();
+}
+
+function onPresentationTimerTick() {
+  const timer = state.councilTimer;
+  if (!timer || !timer.isRunning) return;
+
+  if (timer.remainingSeconds > 0) {
+    timer.remainingSeconds--;
+  }
+  renderPresentationTimerUI();
+}
+
+export function renderPresentationTimerUI() {
+  const widget = document.getElementById('cws-timer-widget');
+  const display = document.getElementById('cws-timer-display');
+  const statusEl = document.getElementById('cws-timer-status');
+  const toggleBtn = document.getElementById('cws-timer-toggle-btn');
+  const toggleText = document.getElementById('cws-timer-toggle-text');
+  const durationSelect = document.getElementById('cws-timer-duration-select');
+  if (!widget || !display) return;
+
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const assignments = act?.councilStudentAssignments || [];
+  const presentingAsgn = assignments.find(a => a.councilId === councilId && a.presentationStatus === 'presenting');
+
+  state.councilTimer = state.councilTimer || {
+    intervalId: null,
+    durationSeconds: 15 * 60,
+    remainingSeconds: 15 * 60,
+    isRunning: false
+  };
+  const timer = state.councilTimer;
+
+  // Show timer whenever there is a presenting student or timer is active
+  if (!presentingAsgn && !timer.isRunning && timer.remainingSeconds === timer.durationSeconds) {
+    widget.classList.add('hidden');
+    return;
+  }
+
+  widget.classList.remove('hidden');
+
+  const totalSec = timer.remainingSeconds != null ? timer.remainingSeconds : (15 * 60);
+  const mins = Math.floor(Math.max(0, totalSec) / 60);
+  const secs = Math.max(0, totalSec) % 60;
+  const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+  display.textContent = formatted;
+
+  // Visual cues
+  if (totalSec <= 0) {
+    display.className = 'font-mono font-black text-2xl sm:text-3xl text-rose-500 tracking-wider animate-bounce';
+    if (statusEl) {
+      statusEl.className = 'badge bg-rose-600 text-white font-black text-[10px] animate-pulse';
+      statusEl.textContent = '🚨 HẾT GIỜ BÁO CÁO';
+    }
+  } else if (totalSec <= 180) {
+    display.className = 'font-mono font-black text-2xl sm:text-3xl text-amber-400 tracking-wider animate-pulse';
+    if (statusEl) {
+      statusEl.className = 'badge bg-amber-500 text-slate-950 font-black text-[10px]';
+      statusEl.textContent = '⚠️ Sắp hết giờ (<3p)';
+    }
+  } else {
+    display.className = 'font-mono font-black text-2xl sm:text-3xl text-emerald-400 tracking-wider';
+    if (statusEl) {
+      statusEl.className = 'badge bg-slate-800 text-emerald-300 font-bold text-[10px]';
+      statusEl.textContent = timer.isRunning ? '● Đang tính giờ' : '⏸ Đang tạm dừng';
+    }
+  }
+
+  if (toggleText) {
+    toggleText.textContent = timer.isRunning ? '⏸ Tạm dừng' : '▶ Tiếp tục';
+  }
+  if (toggleBtn) {
+    toggleBtn.className = timer.isRunning
+      ? 'px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1'
+      : 'px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1';
+  }
+  if (durationSelect && timer.durationSeconds) {
+    durationSelect.value = String(timer.durationSeconds);
+  }
+
+  // Controls visibility: secretary/chair/admin can control, others view
+  const controlsEl = document.getElementById('cws-timer-controls');
+  if (controlsEl) {
+    controlsEl.classList.toggle('hidden', !(auth?.isAdmin || auth?.isSecretary || auth?.isChair));
+  }
+}
+
+window.togglePresentationTimer = function() {
+  state.councilTimer = state.councilTimer || {
+    intervalId: null,
+    durationSeconds: 15 * 60,
+    remainingSeconds: 15 * 60,
+    isRunning: false
+  };
+  const timer = state.councilTimer;
+  if (timer.isRunning) {
+    timer.isRunning = false;
+    if (timer.intervalId) {
+      clearInterval(timer.intervalId);
+      timer.intervalId = null;
+    }
+  } else {
+    timer.isRunning = true;
+    if (!timer.intervalId) {
+      timer.intervalId = setInterval(onPresentationTimerTick, 1000);
+    }
+  }
+  renderPresentationTimerUI();
+};
+
+window.addPresentationTimerMinutes = function(mins = 5) {
+  state.councilTimer = state.councilTimer || {
+    intervalId: null,
+    durationSeconds: 15 * 60,
+    remainingSeconds: 15 * 60,
+    isRunning: false
+  };
+  state.councilTimer.remainingSeconds = (state.councilTimer.remainingSeconds || 0) + mins * 60;
+  renderPresentationTimerUI();
+  showToast(`⏱️ Đã cộng thêm ${mins} phút thời gian báo cáo.`, 'info');
+};
+
+window.setPresentationTimerPreset = function(secStr) {
+  const sec = parseInt(secStr, 10);
+  if (isNaN(sec) || sec <= 0) return;
+  state.councilTimer = state.councilTimer || {};
+  state.councilTimer.durationSeconds = sec;
+  state.councilTimer.remainingSeconds = sec;
+  renderPresentationTimerUI();
+  showToast(`Đã đổi thời gian báo cáo thành ${Math.floor(sec / 60)} phút.`, 'info');
+};
+
+window.resetPresentationTimer = function() {
+  state.councilTimer = state.councilTimer || {};
+  if (state.councilTimer.intervalId) {
+    clearInterval(state.councilTimer.intervalId);
+    state.councilTimer.intervalId = null;
+  }
+  state.councilTimer.remainingSeconds = state.councilTimer.durationSeconds || (15 * 60);
+  state.councilTimer.isRunning = false;
+  renderPresentationTimerUI();
+  showToast('Đã đặt lại bộ đếm thời gian.', 'info');
+};
+
 function renderCouncilStudentList() {
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
   if (!targetRound || !act) return;
 
   const assignments = act.councilStudentAssignments || [];
@@ -345,8 +560,8 @@ function renderCouncilStudentList() {
 
   container.innerHTML = councilStudents.map((asgn) => {
     const sid = asgn.studentId;
-    const sObj = findStudentInRound(sid);
-    const sName = sObj?.fullName || sObj?.studentName || sid;
+    const sObj = getStudentFullProfile(sid, act, council, targetRound);
+    const sName = sObj?.fullName || sObj?.studentName || sObj?.name || sid;
     const isSelected = (sid === state.activeCouncilSelectedStudentId);
     const isPresenting = (asgn.presentationStatus === 'presenting');
     const isPresented = (asgn.presentationStatus === 'presented');
@@ -473,14 +688,18 @@ function renderCouncilSelectedStudentDetails() {
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
-  const sObj = findStudentInRound(sid);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  const sObj = getStudentFullProfile(sid, act, council, targetRound);
   const asgn = (act?.councilStudentAssignments || []).find(a => a.councilId === councilId && a.studentId === sid);
 
-  const sName = sObj?.fullName || sObj?.studentName || sid;
-  const sTopic = sObj?.topicTitle || '--';
+  const sName = sObj?.fullName || sObj?.studentName || sObj?.name || sid;
+  const sTopic = sObj?.topicTitle || sObj?.topic || '--';
+  const hideSupervisor = Boolean(act?.hideSupervisorInCouncil || council?.hideSupervisorInCouncil);
 
-  // Format Official Supervisors (using officialSupervisors helper with legacy fallback)
-  const supervisorsHtml = formatStudentSupervisorsForDisplay(sObj);
+  // Format Official Supervisors
+  const supervisorsHtml = hideSupervisor
+    ? '<span class="text-slate-400 italic text-xs font-normal">Đã ẩn thông tin theo cài đặt Hội đồng</span>'
+    : formatStudentSupervisorsForDisplay(sObj);
 
   // Presenting status badge
   const isPresenting = (asgn?.presentationStatus === 'presenting');
@@ -504,15 +723,17 @@ function renderCouncilSelectedStudentDetails() {
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-200 text-xs">
+    <div class="grid grid-cols-1 ${hideSupervisor ? '' : 'md:grid-cols-2'} gap-3 pt-2 border-t border-slate-200 text-xs">
       <div>
         <span class="text-[11px] font-bold text-slate-400 block mb-0.5">TÊN ĐỀ TÀI:</span>
         <p class="font-semibold text-slate-800 leading-snug">${sTopic}</p>
       </div>
+      ${!hideSupervisor ? `
       <div>
         <span class="text-[11px] font-bold text-slate-400 block mb-0.5">GIẢNG VIÊN HƯỚNG DẪN:</span>
         <div class="font-semibold text-slate-800">${supervisorsHtml}</div>
       </div>
+      ` : ''}
     </div>
 
     ${asgn?.presentationStatus === 'presented' ? (() => {
@@ -538,6 +759,9 @@ function renderCouncilSelectedStudentDetails() {
 
   // Update presenting banner
   renderPresentingBanner();
+
+  // Update presentation timer UI
+  renderPresentationTimerUI();
 
   // Render Secretary Actions
   renderSecretaryControls();
@@ -583,8 +807,9 @@ function renderPresentingBanner() {
   const currentSid = state.activeCouncilSelectedStudentId;
 
   if (pres && pres.studentId !== currentSid) {
-    const sObj = findStudentInRound(pres.studentId);
-    const sName = sObj?.fullName || sObj?.studentName || pres.studentId;
+    const council = (act?.councils || []).find(c => c.id === councilId);
+    const sObj = getStudentFullProfile(pres.studentId, act, council, targetRound);
+    const sName = sObj?.fullName || sObj?.studentName || sObj?.name || pres.studentId;
     if (bannerText) bannerText.textContent = `#${pres.order || ''} ${sName} (${pres.studentId})`;
     banner.classList.remove('hidden');
   } else {
@@ -643,14 +868,15 @@ window.startStudentPresentation = async function(targetSid) {
   const { roundId, activityId, councilId } = state.activeCouncilWorkspace;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
   if (!act) return;
 
   const assignments = act.councilStudentAssignments || [];
   const currentPres = assignments.find(a => a.councilId === councilId && a.presentationStatus === 'presenting');
 
   if (currentPres && currentPres.studentId !== targetSid) {
-    const curObj = findStudentInRound(currentPres.studentId);
-    const targetObj = findStudentInRound(targetSid);
+    const curObj = getStudentFullProfile(currentPres.studentId, act, council, targetRound);
+    const targetObj = getStudentFullProfile(targetSid, act, council, targetRound);
     const curName = curObj?.fullName || curObj?.studentName || currentPres.studentId;
     const targetName = targetObj?.fullName || targetObj?.studentName || targetSid;
 
@@ -669,6 +895,9 @@ window.startStudentPresentation = async function(targetSid) {
     targetAsgn.presentationStatus = 'presenting';
   }
 
+  // Start presentation countdown timer
+  initPresentationTimer(targetSid);
+
   await persistActivityCouncilChanges(targetRound);
   renderCouncilWorkspacePartialSync();
   renderSecretaryControls();
@@ -686,6 +915,9 @@ window.finishStudentPresentation = async function(sid) {
     asgn.presentationStatus = 'presented';
   }
 
+  // Stop timer
+  resetPresentationTimer();
+
   await persistActivityCouncilChanges(targetRound);
   renderCouncilWorkspacePartialSync();
   renderSecretaryControls();
@@ -702,6 +934,9 @@ window.resetStudentPresentation = async function(sid) {
   if (asgn) {
     asgn.presentationStatus = 'waiting';
   }
+
+  // Reset timer
+  resetPresentationTimer();
 
   await persistActivityCouncilChanges(targetRound);
   renderCouncilWorkspacePartialSync();
@@ -796,4 +1031,10 @@ if (typeof window !== 'undefined') {
   if (typeof resetStudentPresentation !== 'undefined') window.resetStudentPresentation = resetStudentPresentation;
   if (typeof startCouncilSession !== 'undefined') window.startCouncilSession = startCouncilSession;
   if (typeof endCouncilSession !== 'undefined') window.endCouncilSession = endCouncilSession;
+  if (typeof initPresentationTimer !== 'undefined') window.initPresentationTimer = initPresentationTimer;
+  if (typeof renderPresentationTimerUI !== 'undefined') window.renderPresentationTimerUI = renderPresentationTimerUI;
+  if (typeof togglePresentationTimer !== 'undefined') window.togglePresentationTimer = togglePresentationTimer;
+  if (typeof addPresentationTimerMinutes !== 'undefined') window.addPresentationTimerMinutes = addPresentationTimerMinutes;
+  if (typeof setPresentationTimerPreset !== 'undefined') window.setPresentationTimerPreset = setPresentationTimerPreset;
+  if (typeof resetPresentationTimer !== 'undefined') window.resetPresentationTimer = resetPresentationTimer;
 }

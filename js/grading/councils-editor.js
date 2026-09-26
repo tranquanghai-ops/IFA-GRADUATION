@@ -35,6 +35,11 @@ window.openCreateCouncilModal = async function() {
     driveStatusEl.innerHTML = '<span class="text-slate-400">Chưa kết nối thư mục Google Drive. Nhập tên và bấm "Tạo / Kết nối".</span>';
   }
 
+  const hideSupCheckbox = document.getElementById('council-form-hide-supervisor');
+  if (hideSupCheckbox) {
+    hideSupCheckbox.checked = Boolean(act.hideSupervisorInCouncil);
+  }
+
   await ensureSupervisorsMasterLoaded().catch(error => console.warn('[Council] Lecturer directory load notice:', error));
   renderCouncilMembersFormSlots(act, {});
 
@@ -59,6 +64,11 @@ window.editCouncilModal = async function(councilId) {
   document.getElementById('council-form-start-time').value = council.startTime || '';
   document.getElementById('council-form-end-time').value = council.endTime || '';
   document.getElementById('council-form-note').value = council.note || '';
+
+  const hideSupCheckbox = document.getElementById('council-form-hide-supervisor');
+  if (hideSupCheckbox) {
+    hideSupCheckbox.checked = Boolean(council.hideSupervisorInCouncil !== undefined ? council.hideSupervisorInCouncil : act.hideSupervisorInCouncil);
+  }
 
   // Populate Drive inputs & status
   const driveNameInput = document.getElementById('council-form-drive-folder-name');
@@ -472,6 +482,8 @@ window.saveCouncil = async function(e) {
   const driveFolderName = document.getElementById('council-form-drive-folder-name')?.value?.trim() || name;
   const driveFolderUrl = document.getElementById('council-form-drive-folder-url')?.value?.trim() || (driveFolderId ? `https://drive.google.com/drive/folders/${driveFolderId}` : null);
 
+  const hideSupervisorInCouncil = document.getElementById('council-form-hide-supervisor')?.checked === true;
+
   const councilData = {
     id: councilId,
     slug,
@@ -482,6 +494,7 @@ window.saveCouncil = async function(e) {
     startTime,
     endTime,
     note,
+    hideSupervisorInCouncil,
     driveFolderId,
     driveFolderName,
     driveFolderUrl,

@@ -1034,11 +1034,13 @@ window.renderAssessmentDefenseList = function() {
     return;
   }
 
+  const hideSupervisor = Boolean(act?.hideSupervisorInCouncil || council?.hideSupervisorInCouncil);
+
   container.innerHTML = studentsInCouncil.map((s, idx) => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || s.name || sid;
     const topic = s.topicTitle || 'Chưa cập nhật đề tài';
-    const supDisplay = formatStudentSupervisorsForDisplay(s);
+    const supDisplay = formatStudentSupervisorsForDisplay(s, hideSupervisor);
     const orderNum = s.presentationOrder || s.order || (idx + 1);
 
     // Defense status from council engine
@@ -1060,8 +1062,8 @@ window.renderAssessmentDefenseList = function() {
           </div>
         </div>
 
-        <!-- Col 2: Info Sinh viên & Đề tài (Col span 4) -->
-        <div class="col-span-1 md:col-span-4 min-w-0 pr-2 space-y-1">
+        <!-- Col 2: Info Sinh viên & Đề tài (Col span 5 or 8) -->
+        <div class="col-span-1 ${hideSupervisor ? 'md:col-span-8' : 'md:col-span-5'} min-w-0 pr-2 space-y-1">
           <div class="flex items-center gap-2">
             <div class="md:hidden w-7 h-7 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 font-black text-xs flex items-center justify-center shrink-0">
               ${orderNum}
@@ -1074,29 +1076,23 @@ window.renderAssessmentDefenseList = function() {
           </p>
         </div>
 
-        <!-- Col 3: GVHD (Col span 3 - EXACT FIXED ALIGNMENT) -->
-        <div class="col-span-1 md:col-span-3 min-w-0 md:px-3 md:border-l md:border-slate-100">
-          <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">GVHD</span>
-          <div class="text-xs truncate mt-0.5" title="${escapeHtml(s.acceptedSupervisorName || '')}">
-            ${supDisplay}
+        ${!hideSupervisor ? `
+          <!-- Col 3: GVHD (Col span 3 - EXACT FIXED ALIGNMENT) -->
+          <div class="col-span-1 md:col-span-3 min-w-0 md:px-3 md:border-l md:border-slate-100">
+            <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">GVHD</span>
+            <div class="text-xs truncate mt-0.5" title="${escapeHtml(s.acceptedSupervisorName || '')}">
+              ${supDisplay}
+            </div>
           </div>
-        </div>
+        ` : ''}
 
-        <!-- Col 4: Thứ tự báo cáo (Col span 2 - EXACT FIXED ALIGNMENT) -->
-        <div class="col-span-1 md:col-span-2 min-w-0 md:px-3 md:border-l md:border-slate-100">
-          <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Thứ tự báo cáo</span>
-          <div class="text-xs font-bold text-purple-900 mt-0.5">
-            Lượt #${orderNum}
-          </div>
-        </div>
-
-        <!-- Col 5: Trạng thái & Action (Col span 2) -->
-        <div class="col-span-1 md:col-span-2 flex items-center justify-between md:justify-end gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+        <!-- Col 4: Trạng thái & Action (Col span 3) -->
+        <div class="col-span-1 md:col-span-3 flex items-center justify-between md:justify-end gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
           <div class="text-right shrink-0">
             <div class="text-sm font-black text-purple-900 leading-none">${defenseScore !== '--' ? defenseScore + '/10' : '--'}</div>
             <div class="mt-1">${statusBadge}</div>
           </div>
-          <button type="button" onclick="openCouncilWorkspace('${targetRound.id}', '${act.id}', '${council.id}', '${sid}')" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0">
+          <button type="button" onclick="openCouncilWorkspace('${targetRound.id}', '${act.id}', '${council.id}', '${sid}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0">
             <span>🏛️</span> <span>Vào phòng chấm</span>
           </button>
         </div>

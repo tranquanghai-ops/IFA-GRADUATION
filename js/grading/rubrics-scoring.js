@@ -2,6 +2,12 @@
  * IFA+ Graduation — Council Live Scoring & Admin Monitor Submodule
  */
 const findStudentInRound = (sid, roundId) => {
+  if (typeof window !== 'undefined' && typeof window.getStudentFullProfile === 'function') {
+    const r = (state.rounds || []).find(rd => rd.id === (roundId || state.activeCouncilWorkspace?.roundId || state.selectedAssessmentRoundId || state.selectedRoundId)) || state.activeRound;
+    const act = (r?.activities || []).find(a => a.id === state.activeCouncilWorkspace?.activityId);
+    const council = (act?.councils || []).find(c => c.id === state.activeCouncilWorkspace?.councilId);
+    return window.getStudentFullProfile(sid, act, council, r);
+  }
   if (typeof window !== 'undefined' && typeof window.findStudentInRound === 'function') {
     return window.findStudentInRound(sid, roundId);
   }
@@ -39,6 +45,25 @@ function renderScoringSection() {
   const currentComment = draft?.comment !== undefined ? draft.comment : (savedScore?.comment ?? '');
   const isCompleted = (savedScore?.status === 'completed' && !draft);
   const councilEnded = (council.status === 'ended' || council.status === 'completed');
+
+  // Count draft scores across all students assigned to this council for current scorer
+  const assignments = (act?.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+  let councilDraftsCount = 0;
+  assignments.forEach(asgn => {
+    const k = `${activityId}_${councilId}_${asgn.studentId}_${myScorerId}`;
+    const sc = state.councilScores?.[k];
+    const hasLocalDraft = Boolean(state.councilLocalDrafts?.[asgn.studentId]?.value !== undefined || state.councilLocalDrafts?.[asgn.studentId]?.components);
+    if (sc?.status === 'draft' || hasLocalDraft) {
+      councilDraftsCount++;
+    }
+  });
+
+  const batchFinalizeBtnHtml = councilDraftsCount > 0 ? `
+    <button type="button" onclick="batchFinalizeAllCouncilScores()" class="px-3.5 py-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5" title="Hoàn tất và nộp tất cả ${councilDraftsCount} phiếu điểm đang lưu tạm trong hội đồng này">
+      <span>✓ Hoàn tất chấm tất cả</span>
+      <span class="px-1.5 py-0.2 bg-white/20 rounded-full text-[10px] font-mono">${councilDraftsCount}</span>
+    </button>
+  ` : '';
 
   const scoringConfig = act.scoringConfig || { enabled: true, mode: 'defense_rubric' };
   const mode = scoringConfig.mode || 'defense_rubric';
@@ -149,23 +174,29 @@ function renderScoringSection() {
   let actionsHtml = '';
   if (isCompleted) {
     actionsHtml = `
-      <div class="flex items-center justify-between gap-2 p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl">
+      <div class="flex items-center justify-between gap-2 p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl flex-wrap">
         <span class="font-bold text-emerald-800 text-xs flex items-center gap-1.5">
           <span>✓</span> Bạn đã hoàn tất chấm lúc ${fmt24h(savedScore.completedAt || savedScore.updatedAt)}
         </span>
-        ${!councilEnded ? `
-          <button type="button" onclick="reopenCurrentScore()" class="px-3 py-1.5 bg-white hover:bg-slate-100 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-xs">
-            ✏️ Mở lại để sửa
-          </button>
-        ` : ''}
+        <div class="flex items-center gap-2">
+          ${batchFinalizeBtnHtml}
+          ${!councilEnded ? `
+            <button type="button" onclick="reopenCurrentScore()" class="px-3 py-1.5 bg-white hover:bg-slate-100 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-xs">
+              ✏️ Mở lại để sửa
+            </button>
+          ` : ''}
+        </div>
       </div>
     `;
   } else {
     actionsHtml = `
       <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-        <span id="cws-score-draft-time" class="text-[11px] text-slate-400 font-mono">
-          ${savedScore?.status === 'draft' ? `Đã lưu tạm lúc ${fmt24h(savedScore.updatedAt)}` : ''}
-        </span>
+        <div class="flex items-center gap-2">
+          <span id="cws-score-draft-time" class="text-[11px] text-slate-400 font-mono">
+            ${savedScore?.status === 'draft' ? `Đã lưu tạm lúc ${fmt24h(savedScore.updatedAt)}` : ''}
+          </span>
+          ${batchFinalizeBtnHtml}
+        </div>
         <div class="flex items-center gap-2">
           <button type="button" onclick="saveCurrentScore(false)" class="px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors">
             💾 Lưu tạm
@@ -438,6 +469,178 @@ window.reopenCurrentScore = async function() {
   showToast('Đã mở lại phiếu chấm. Bạn có thể chỉnh sửa và hoàn tất lại.', 'info');
 };
 
+window.batchFinalizeAllCouncilScores = async function() {
+  if (!checkImpersonationWriteGuard('Hoàn tất chấm tất cả sinh viên')) return;
+
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!act || !council) return;
+
+  const effectiveScorer = getEffectiveActor();
+  const scorerId = effectiveScorer.uid || effectiveScorer.email;
+  const scorerEmail = (effectiveScorer.email || '').toLowerCase().trim();
+  const scorerName = effectiveScorer.displayName || auth?.roleName || 'Thành viên Hội đồng';
+
+  const assignments = (act.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+  if (assignments.length === 0) {
+    showToast('Hội đồng chưa có sinh viên nào.', 'warning');
+    return;
+  }
+
+  const mode = act.scoringConfig?.mode || 'defense_rubric';
+  const rubric = act.scoringConfig?.rubric || [
+    { id: 'crit_idea', key: 'idea', label: 'Ý tưởng', maxScore: 4 },
+    { id: 'crit_prac', key: 'practicality', label: 'Tính ứng dụng', maxScore: 3 },
+    { id: 'crit_tech', key: 'technique', label: 'Kỹ thuật thể hiện', maxScore: 2 },
+    { id: 'crit_pres', key: 'presentation', label: 'Trình bày', maxScore: 1 }
+  ];
+
+  // Save current student input first to drafts if present in DOM
+  const curSid = state.activeCouncilSelectedStudentId;
+  if (curSid) {
+    const valInput = document.getElementById('cws-score-input-numeric') || document.getElementById('cws-score-input-letter');
+    const commInput = document.getElementById('cws-score-comment');
+    if (valInput && valInput.value !== '') {
+      state.councilLocalDrafts = state.councilLocalDrafts || {};
+      state.councilLocalDrafts[curSid] = state.councilLocalDrafts[curSid] || {};
+      state.councilLocalDrafts[curSid].value = valInput.value;
+      if (commInput) state.councilLocalDrafts[curSid].comment = commInput.value;
+      
+      if (mode === 'defense_rubric') {
+        const rubricInputs = document.querySelectorAll('input[data-crit-key]');
+        const components = {};
+        rubricInputs.forEach(inp => {
+          if (inp.value !== '' && !isNaN(Number(inp.value))) components[inp.dataset.critKey] = Number(inp.value);
+        });
+        state.councilLocalDrafts[curSid].components = components;
+      }
+    }
+  }
+
+  const candidates = [];
+  const uncompletedList = [];
+
+  assignments.forEach(asgn => {
+    const sid = asgn.studentId;
+    const scoreKey = `${activityId}_${councilId}_${sid}_${scorerId}`;
+    const saved = state.councilScores?.[scoreKey];
+    const draft = state.councilLocalDrafts?.[sid];
+
+    const val = draft?.value !== undefined ? draft.value : saved?.value;
+    const comm = draft?.comment !== undefined ? draft.comment : (saved?.comment || '');
+    const comp = draft?.components !== undefined ? draft.components : (saved?.components || {});
+    const isAlreadyCompleted = (saved?.status === 'completed' && !draft);
+
+    if (val !== undefined && val !== null && val !== '') {
+      candidates.push({
+        sid,
+        asgn,
+        scoreKey,
+        value: val,
+        comment: comm,
+        components: comp,
+        isAlreadyCompleted,
+        existing: saved
+      });
+    } else {
+      uncompletedList.push(sid);
+    }
+  });
+
+  if (candidates.length === 0) {
+    showToast('Bạn chưa nhập điểm hoặc lưu tạm điểm cho sinh viên nào trong Hội đồng này!', 'warning');
+    return;
+  }
+
+  const draftCandidates = candidates.filter(c => !c.isAlreadyCompleted);
+  if (draftCandidates.length === 0) {
+    showToast('Tất cả các phiếu chấm của bạn trong Hội đồng đã được hoàn tất trước đó!', 'info');
+    return;
+  }
+
+  let confirmMsg = `Bạn đang có ${draftCandidates.length} phiếu chấm lưu tạm/đang soạn thảo. Xác nhận HOÀN TẤT CHẤM toàn bộ ${draftCandidates.length} sinh viên này?`;
+  if (uncompletedList.length > 0) {
+    confirmMsg += `\n(Lưu ý: Có ${uncompletedList.length} sinh viên chưa nhập điểm sẽ được giữ nguyên để chấm sau).`;
+  }
+
+  const confirmed = await showConfirm('Hoàn tất chấm tất cả', confirmMsg, { confirmText: '✓ Xác nhận hoàn tất tất cả', danger: false });
+  if (!confirmed) return;
+
+  // Process and batch save
+  let successCount = 0;
+  const now = new Date().toISOString();
+  const roundRef = doc(db, 'graduationRounds', roundId);
+  const batchUpdates = {};
+
+  for (const item of draftCandidates) {
+    let selectedLetterCode = undefined;
+    let selectedLetterNumericValue = undefined;
+    if (mode === 'letter') {
+      selectedLetterCode = String(item.value);
+      const letterOpt = (act.scoringConfig?.letterOptions || []).find(o => String(o.key) === selectedLetterCode || String(o.code) === selectedLetterCode);
+      if (letterOpt && typeof letterOpt.numericValue === 'number') {
+        selectedLetterNumericValue = letterOpt.numericValue;
+      }
+    }
+
+    const scoreRecord = {
+      activityId,
+      councilId,
+      studentId: item.sid,
+      scorerId,
+      scorerEmail,
+      scorerName,
+      decidedBy: scorerEmail,
+      supervisorEmail: scorerEmail,
+      slotKey: auth?.slotKey || 'admin',
+      role: auth?.role || 'member',
+      mode,
+      value: (mode === 'numeric' || mode === 'defense_rubric') ? parseFloat(item.value) : String(item.value),
+      selectedLetterCode,
+      selectedLetterNumericValue,
+      numericValue: (mode === 'numeric' || mode === 'defense_rubric')
+        ? parseFloat(item.value)
+        : (typeof selectedLetterNumericValue === 'number' ? selectedLetterNumericValue : undefined),
+      components: mode === 'defense_rubric' ? item.components : undefined,
+      comment: String(item.comment || '').trim(),
+      status: 'completed',
+      createdAt: item.existing?.createdAt || now,
+      updatedAt: now,
+      completedAt: now
+    };
+
+    state.councilScores = state.councilScores || {};
+    state.councilScores[item.scoreKey] = scoreRecord;
+    if (state.councilLocalDrafts) delete state.councilLocalDrafts[item.sid];
+    batchUpdates[`councilScores.${item.scoreKey}`] = scoreRecord;
+
+    try {
+      const decRef = doc(db, 'graduationRounds', roundId, 'reviewDecisions', item.scoreKey);
+      await setDoc(decRef, scoreRecord, { merge: true }).catch(() => {});
+    } catch (e) {}
+
+    successCount++;
+  }
+
+  if (state.isAdmin && Object.keys(batchUpdates).length > 0) {
+    try {
+      await updateDoc(roundRef, {
+        ...batchUpdates,
+        updatedAt: serverTimestamp()
+      });
+    } catch (e) {}
+  }
+
+  renderCouncilStudentList();
+  renderScoringSection();
+  renderScorersProgress();
+  renderAdminMonitor();
+
+  showToast(`✓ Đã hoàn tất chấm điểm cho ${successCount} sinh viên!`, 'success');
+};
+
 // 12. PROGRESS OF SCORERS IN COUNCIL (PRIVACY PRESERVED)
 function renderScorersProgress() {
   const container = document.getElementById('cws-scorers-progress-section');
@@ -695,4 +898,5 @@ if (typeof window !== 'undefined') {
   if (typeof renderScoringSection !== 'undefined') window.renderScoringSection = renderScoringSection;
   if (typeof renderScorersProgress !== 'undefined') window.renderScorersProgress = renderScorersProgress;
   if (typeof renderAdminMonitor !== 'undefined') window.renderAdminMonitor = renderAdminMonitor;
+  if (typeof batchFinalizeAllCouncilScores !== 'undefined') window.batchFinalizeAllCouncilScores = batchFinalizeAllCouncilScores;
 }
