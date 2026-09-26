@@ -5520,13 +5520,13 @@
           </div>
 
           <!-- COUNTDOWN PRESENTATION TIMER WIDGET -->
-          <div id="cws-timer-widget" class="hidden p-3.5 bg-slate-900 text-white rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md border border-slate-800 transition-all">
+          <div id="cws-timer-widget" class="hidden p-3.5 sm:p-4 bg-slate-900 text-white rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg border border-slate-800 transition-all">
             <div class="flex items-center gap-3">
-              <div class="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl text-lg font-bold">⏱️</div>
+              <div class="p-2.5 bg-indigo-500/20 text-indigo-400 rounded-xl text-xl font-black">⏱️</div>
               <div>
                 <div class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Bộ đếm thời gian trình bày</div>
-                <div class="flex items-center gap-2">
-                  <span id="cws-timer-display" class="font-mono font-black text-2xl sm:text-3xl text-emerald-400 tracking-wider">15:00</span>
+                <div class="flex items-center gap-2.5">
+                  <span id="cws-timer-display" class="font-mono font-black text-2xl sm:text-3xl text-emerald-400 tracking-wider cursor-pointer" onclick="togglePresentationTimer()" title="Bấm để Tạm dừng/Tiếp tục">15:00</span>
                   <span id="cws-timer-status" class="badge bg-slate-800 text-slate-300 font-bold text-[10px]">Đang đếm</span>
                 </div>
               </div>
@@ -5534,20 +5534,39 @@
             
             <!-- Controls for Secretary / Admin / Scorer -->
             <div id="cws-timer-controls" class="flex items-center gap-2 flex-wrap">
-              <select id="cws-timer-duration-select" onchange="setPresentationTimerPreset(this.value)" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs font-bold focus:outline-none cursor-pointer">
-                <option value="600">10 phút</option>
-                <option value="900" selected>15 phút (Chuẩn)</option>
-                <option value="1200">20 phút</option>
-                <option value="1800">30 phút</option>
-              </select>
-              <button type="button" id="cws-timer-toggle-btn" onclick="togglePresentationTimer()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1">
+              <!-- Duration Selector (Before or during timer reset) -->
+              <div class="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 py-1">
+                <span class="text-[10px] font-bold text-slate-400">Thời lượng:</span>
+                <select id="cws-timer-duration-select" onchange="onTimerDurationSelectChange(this.value)" class="bg-transparent text-slate-100 font-bold text-xs focus:outline-none cursor-pointer">
+                  <option value="300">5 phút</option>
+                  <option value="480">8 phút</option>
+                  <option value="600">10 phút</option>
+                  <option value="720">12 phút</option>
+                  <option value="900" selected>15 phút (Chuẩn)</option>
+                  <option value="1200">20 phút</option>
+                  <option value="1500">25 phút</option>
+                  <option value="1800">30 phút</option>
+                  <option value="2700">45 phút</option>
+                  <option value="custom">✏️ Tùy chỉnh...</option>
+                </select>
+              </div>
+
+              <!-- Start / Pause / Resume Button -->
+              <button type="button" id="cws-timer-toggle-btn" onclick="togglePresentationTimer()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1">
                 <span id="cws-timer-toggle-text">⏸ Tạm dừng</span>
               </button>
-              <button type="button" onclick="addPresentationTimerMinutes(5)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-900/50 rounded-xl text-xs font-bold transition-colors" title="Cộng thêm 5 phút">
-                +5p
-              </button>
-              <button type="button" onclick="resetPresentationTimer()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-xs font-bold transition-colors" title="Đặt lại bộ đếm">
-                ↺
+
+              <!-- Quick Add Time Buttons -->
+              <div class="flex items-center bg-slate-800/90 border border-slate-700/80 rounded-xl p-0.5 text-xs font-bold text-indigo-300">
+                <button type="button" onclick="addPresentationTimerMinutes(2)" class="px-2 py-1 hover:bg-slate-700 rounded-lg transition-colors" title="Cộng thêm 2 phút">+2p</button>
+                <button type="button" onclick="addPresentationTimerMinutes(5)" class="px-2 py-1 hover:bg-slate-700 rounded-lg transition-colors" title="Cộng thêm 5 phút">+5p</button>
+                <button type="button" onclick="addPresentationTimerMinutes(10)" class="px-2 py-1 hover:bg-slate-700 rounded-lg transition-colors" title="Cộng thêm 10 phút">+10p</button>
+                <button type="button" onclick="promptCustomAddTimerMinutes()" class="px-2 py-1 hover:bg-slate-700 rounded-lg transition-colors text-slate-300" title="Thêm số phút tùy chọn">+✏️</button>
+              </div>
+
+              <!-- Reset Button -->
+              <button type="button" onclick="resetPresentationTimer()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 rounded-xl text-xs font-bold transition-colors" title="Đặt lại bộ đếm thời gian">
+                ↺ Đặt lại
               </button>
             </div>
           </div>

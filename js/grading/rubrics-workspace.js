@@ -198,6 +198,12 @@ window.openCouncilWorkspace = async function(roundId, activityId, councilId, aut
     state.activeCouncilSelectedStudentId = null;
   }
 
+  // Sync live timer from council
+  const currentCouncil = (act.councils || []).find(c => c.id === councilId);
+  if (currentCouncil) {
+    syncLiveTimerFromCouncil(currentCouncil);
+  }
+
   // Render UI
   renderCouncilWorkspaceFull();
 
@@ -221,6 +227,14 @@ window.closeCouncilWorkspace = function() {
     state.councilTimer.isRunning = false;
   }
   document.getElementById('modal-council-workspace')?.classList.add('hidden');
+
+  // Seamless live auto-update of outer defense list
+  if (typeof window.renderAssessmentDefenseList === 'function' && state.currentView === 'assessment') {
+    window.renderAssessmentDefenseList();
+  }
+  if (typeof window.renderAssessmentHeroCard === 'function' && state.currentView === 'assessment') {
+    window.renderAssessmentHeroCard();
+  }
 };
 
 function setupCouncilRealtimeSync(roundId, activityId, councilId) {
@@ -244,8 +258,23 @@ function setupCouncilRealtimeSync(roundId, activityId, councilId) {
         state.councilScores = { ...(state.councilScores || {}), ...updatedData.councilScores };
       }
 
+      // Sync council live timer across all connected members
+      const updatedAct = (updatedData.activities || []).find(a => a.id === activityId);
+      const updatedCouncil = (updatedAct?.councils || []).find(c => c.id === councilId);
+      if (updatedCouncil) {
+        syncLiveTimerFromCouncil(updatedCouncil);
+      }
+
       // Re-render Council Workspace WITHOUT changing selected student!
       renderCouncilWorkspacePartialSync();
+
+      // Refresh outer assessment list in real-time
+      if (typeof window.renderAssessmentDefenseList === 'function' && state.currentView === 'assessment') {
+        window.renderAssessmentDefenseList();
+      }
+      if (typeof window.renderAssessmentHeroCard === 'function' && state.currentView === 'assessment') {
+        window.renderAssessmentHeroCard();
+      }
     }, (err) => {
       console.warn('Realtime council listener notice:', err);
     });
@@ -367,6 +396,79 @@ function renderCouncilWorkspacePartialSync() {
 }
 
 // --- PRESENTATION COUNTDOWN TIMER CONTROLS ---
+
+export function syncLiveTimerFromCouncil(council) {
+  const liveTimer = council?.liveTimer;
+  state.councilTimer = state.councilTimer || {
+    intervalId: null,
+    durationSeconds: 15 * 60,
+    remainingSeconds: 15 * 60,
+    isRunning: false,
+    studentId: null
+  };
+  const timer = state.councilTimer;
+
+  if (!liveTimer) return;
+
+  timer.durationSeconds = liveTimer.durationSeconds || (15 * 60);
+  timer.studentId = liveTimer.studentId || null;
+
+  if (liveTimer.isRunning && liveTimer.startedAt) {
+    const elapsed = Math.floor((Date.now() - liveTimer.startedAt) / 1000);
+    const baseRem = (liveTimer.remainingSeconds !== undefined && liveTimer.remainingSeconds !== null)
+      ? liveTimer.remainingSeconds
+      : timer.durationSeconds;
+    timer.remainingSeconds = Math.max(0, baseRem - elapsed);
+    timer.isRunning = true;
+
+    if (!timer.intervalId) {
+      timer.intervalId = setInterval(onPresentationTimerTick, 1000);
+    }
+  } else {
+    timer.remainingSeconds = (liveTimer.remainingSeconds !== undefined && liveTimer.remainingSeconds !== null)
+      ? liveTimer.remainingSeconds
+      : timer.durationSeconds;
+    timer.isRunning = false;
+
+    if (timer.intervalId) {
+      clearInterval(timer.intervalId);
+      timer.intervalId = null;
+    }
+  }
+}
+
+async function broadcastCouncilLiveTimer() {
+  const { roundId, activityId, councilId } = state.activeCouncilWorkspace || {};
+  if (!roundId || !activityId || !councilId) return;
+
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  const timer = state.councilTimer || {};
+  const actor = getEffectiveActor();
+  const uEmail = actor.email || 'user';
+
+  council.liveTimer = {
+    durationSeconds: timer.durationSeconds || (15 * 60),
+    remainingSeconds: timer.remainingSeconds != null ? timer.remainingSeconds : (timer.durationSeconds || (15 * 60)),
+    startedAt: timer.isRunning ? Date.now() : null,
+    isRunning: Boolean(timer.isRunning),
+    studentId: timer.studentId || state.activeCouncilSelectedStudentId || null,
+    updatedAt: Date.now(),
+    updatedBy: uEmail
+  };
+
+  try {
+    if (typeof persistActivityCouncilChanges === 'function') {
+      await persistActivityCouncilChanges(targetRound);
+    }
+  } catch (err) {
+    console.warn('Broadcast live timer notice:', err);
+  }
+}
+
 export function initPresentationTimer(sid = null) {
   state.councilTimer = state.councilTimer || {};
   if (state.councilTimer.intervalId) {
@@ -379,6 +481,7 @@ export function initPresentationTimer(sid = null) {
   state.councilTimer.isRunning = true;
   state.councilTimer.intervalId = setInterval(onPresentationTimerTick, 1000);
   renderPresentationTimerUI();
+  broadcastCouncilLiveTimer();
 }
 
 function onPresentationTimerTick() {
@@ -387,6 +490,8 @@ function onPresentationTimerTick() {
 
   if (timer.remainingSeconds > 0) {
     timer.remainingSeconds--;
+  } else {
+    timer.remainingSeconds = 0;
   }
   renderPresentationTimerUI();
 }
@@ -414,8 +519,8 @@ export function renderPresentationTimerUI() {
   };
   const timer = state.councilTimer;
 
-  // Show timer whenever there is a presenting student or timer is active
-  if (!presentingAsgn && !timer.isRunning && timer.remainingSeconds === timer.durationSeconds) {
+  // Show timer whenever there is a presenting student, timer is active, or timer has started
+  if (!presentingAsgn && !timer.isRunning && timer.remainingSeconds === timer.durationSeconds && !timer.studentId) {
     widget.classList.add('hidden');
     return;
   }
@@ -431,19 +536,19 @@ export function renderPresentationTimerUI() {
 
   // Visual cues
   if (totalSec <= 0) {
-    display.className = 'font-mono font-black text-2xl sm:text-3xl text-rose-500 tracking-wider animate-bounce';
+    display.className = 'font-mono font-black text-2xl sm:text-3xl text-rose-500 tracking-wider animate-bounce cursor-pointer';
     if (statusEl) {
       statusEl.className = 'badge bg-rose-600 text-white font-black text-[10px] animate-pulse';
       statusEl.textContent = '🚨 HẾT GIỜ BÁO CÁO';
     }
   } else if (totalSec <= 180) {
-    display.className = 'font-mono font-black text-2xl sm:text-3xl text-amber-400 tracking-wider animate-pulse';
+    display.className = 'font-mono font-black text-2xl sm:text-3xl text-amber-400 tracking-wider animate-pulse cursor-pointer';
     if (statusEl) {
       statusEl.className = 'badge bg-amber-500 text-slate-950 font-black text-[10px]';
       statusEl.textContent = '⚠️ Sắp hết giờ (<3p)';
     }
   } else {
-    display.className = 'font-mono font-black text-2xl sm:text-3xl text-emerald-400 tracking-wider';
+    display.className = 'font-mono font-black text-2xl sm:text-3xl text-emerald-400 tracking-wider cursor-pointer';
     if (statusEl) {
       statusEl.className = 'badge bg-slate-800 text-emerald-300 font-bold text-[10px]';
       statusEl.textContent = timer.isRunning ? '● Đang tính giờ' : '⏸ Đang tạm dừng';
@@ -455,11 +560,25 @@ export function renderPresentationTimerUI() {
   }
   if (toggleBtn) {
     toggleBtn.className = timer.isRunning
-      ? 'px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1'
-      : 'px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1';
+      ? 'px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1 cursor-pointer'
+      : 'px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1 cursor-pointer';
   }
   if (durationSelect && timer.durationSeconds) {
-    durationSelect.value = String(timer.durationSeconds);
+    const existingOpt = Array.from(durationSelect.options).find(o => o.value === String(timer.durationSeconds));
+    if (existingOpt) {
+      durationSelect.value = String(timer.durationSeconds);
+    } else {
+      let customOpt = durationSelect.querySelector('option[data-custom="true"]');
+      if (!customOpt) {
+        customOpt = document.createElement('option');
+        customOpt.setAttribute('data-custom', 'true');
+        durationSelect.insertBefore(customOpt, durationSelect.querySelector('option[value="custom"]'));
+      }
+      const durMins = Math.floor(timer.durationSeconds / 60);
+      customOpt.value = String(timer.durationSeconds);
+      customOpt.textContent = `${durMins} phút (Tùy chỉnh)`;
+      durationSelect.value = String(timer.durationSeconds);
+    }
   }
 
   // Controls visibility: secretary/chair/admin can control, others view
@@ -469,7 +588,57 @@ export function renderPresentationTimerUI() {
   }
 }
 
-window.togglePresentationTimer = function() {
+window.onTimerDurationSelectChange = function(val) {
+  if (val === 'custom') {
+    promptCustomPresentationTimer();
+  } else {
+    setPresentationTimerPreset(val);
+  }
+};
+
+window.promptCustomPresentationTimer = async function() {
+  const curMins = Math.floor((state.councilTimer?.durationSeconds || 900) / 60);
+  const input = window.prompt('Nhập thời lượng báo cáo mong muốn (số phút, từ 1 đến 180):', String(curMins));
+  if (input === null) {
+    renderPresentationTimerUI();
+    return;
+  }
+  const mins = parseInt(input.trim(), 10);
+  if (isNaN(mins) || mins <= 0 || mins > 180) {
+    showToast('Vui lòng nhập số phút hợp lệ (1 - 180 phút)!', 'error');
+    renderPresentationTimerUI();
+    return;
+  }
+  setCustomPresentationTimer(mins);
+};
+
+window.setCustomPresentationTimer = async function(mins) {
+  const sec = mins * 60;
+  state.councilTimer = state.councilTimer || {};
+  state.councilTimer.durationSeconds = sec;
+  state.councilTimer.remainingSeconds = sec;
+  state.councilTimer.isRunning = false;
+  if (state.councilTimer.intervalId) {
+    clearInterval(state.councilTimer.intervalId);
+    state.councilTimer.intervalId = null;
+  }
+  renderPresentationTimerUI();
+  await broadcastCouncilLiveTimer();
+  showToast(`⏱️ Đã tùy chỉnh thời gian báo cáo thành ${mins} phút.`, 'info');
+};
+
+window.promptCustomAddTimerMinutes = async function() {
+  const input = window.prompt('Nhập số phút muốn cộng thêm cho sinh viên (từ 1 đến 60 phút):', '3');
+  if (input === null) return;
+  const mins = parseInt(input.trim(), 10);
+  if (isNaN(mins) || mins <= 0 || mins > 60) {
+    showToast('Vui lòng nhập số phút cộng thêm hợp lệ (1 - 60 phút)!', 'error');
+    return;
+  }
+  await addPresentationTimerMinutes(mins);
+};
+
+window.togglePresentationTimer = async function() {
   state.councilTimer = state.councilTimer || {
     intervalId: null,
     durationSeconds: 15 * 60,
@@ -490,9 +659,10 @@ window.togglePresentationTimer = function() {
     }
   }
   renderPresentationTimerUI();
+  await broadcastCouncilLiveTimer();
 };
 
-window.addPresentationTimerMinutes = function(mins = 5) {
+window.addPresentationTimerMinutes = async function(mins = 5) {
   state.councilTimer = state.councilTimer || {
     intervalId: null,
     durationSeconds: 15 * 60,
@@ -501,20 +671,27 @@ window.addPresentationTimerMinutes = function(mins = 5) {
   };
   state.councilTimer.remainingSeconds = (state.councilTimer.remainingSeconds || 0) + mins * 60;
   renderPresentationTimerUI();
+  await broadcastCouncilLiveTimer();
   showToast(`⏱️ Đã cộng thêm ${mins} phút thời gian báo cáo.`, 'info');
 };
 
-window.setPresentationTimerPreset = function(secStr) {
+window.setPresentationTimerPreset = async function(secStr) {
   const sec = parseInt(secStr, 10);
   if (isNaN(sec) || sec <= 0) return;
   state.councilTimer = state.councilTimer || {};
   state.councilTimer.durationSeconds = sec;
   state.councilTimer.remainingSeconds = sec;
+  state.councilTimer.isRunning = false;
+  if (state.councilTimer.intervalId) {
+    clearInterval(state.councilTimer.intervalId);
+    state.councilTimer.intervalId = null;
+  }
   renderPresentationTimerUI();
+  await broadcastCouncilLiveTimer();
   showToast(`Đã đổi thời gian báo cáo thành ${Math.floor(sec / 60)} phút.`, 'info');
 };
 
-window.resetPresentationTimer = function() {
+window.resetPresentationTimer = async function() {
   state.councilTimer = state.councilTimer || {};
   if (state.councilTimer.intervalId) {
     clearInterval(state.councilTimer.intervalId);
@@ -523,6 +700,7 @@ window.resetPresentationTimer = function() {
   state.councilTimer.remainingSeconds = state.councilTimer.durationSeconds || (15 * 60);
   state.councilTimer.isRunning = false;
   renderPresentationTimerUI();
+  await broadcastCouncilLiveTimer();
   showToast('Đã đặt lại bộ đếm thời gian.', 'info');
 };
 

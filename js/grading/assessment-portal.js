@@ -1016,8 +1016,31 @@ window.renderAssessmentDefenseList = function() {
     return orderA - orderB;
   });
 
-  const tabBadge = document.getElementById('atab-badge-defense');
-  if (tabBadge) tabBadge.textContent = studentsInCouncil.length;
+  // Hydrate scores
+  state.councilScores = state.councilScores || {};
+  if (targetRound.councilScores) state.councilScores = { ...state.councilScores, ...targetRound.councilScores };
+  if (targetRound.councilRubricScores) state.councilScores = { ...state.councilScores, ...targetRound.councilRubricScores };
+
+  const scoreResolver = (s) => {
+    const sid = s.mssv || s.studentId;
+    const scoreKey = `${act.id}_${council.id}_${sid}_${uId}`;
+    const scoreKeyEmail = `${act.id}_${council.id}_${sid}_${uEmail}`;
+    const sc = state.councilScores?.[scoreKey] || state.councilScores?.[scoreKeyEmail] || targetRound.councilRubricScores?.[scoreKey] || targetRound.councilRubricScores?.[scoreKeyEmail] || targetRound.councilScores?.[scoreKey] || targetRound.councilScores?.[scoreKeyEmail];
+    const draft = state.councilLocalDrafts?.[sid];
+
+    if (sc?.status === 'completed' && !draft) {
+      const val = sc.value !== undefined ? sc.value : (sc.totalScore ?? null);
+      return { status: 'completed', score: val };
+    }
+    if (sc?.status === 'draft' || draft) {
+      const val = draft?.value !== undefined ? draft.value : (sc?.value !== undefined ? sc.value : (draft?.totalScore ?? sc?.totalScore ?? null));
+      return { status: 'draft', score: val };
+    }
+    return { status: 'unscored', score: null };
+  };
+
+  updateFilterCountBadges(studentsInCouncil, scoreResolver, 'atab-badge-defense');
+  const filtered = filterStudentList(studentsInCouncil, scoreResolver);
 
   if (studentsInCouncil.length === 0) {
     container.innerHTML = `
@@ -1035,27 +1058,65 @@ window.renderAssessmentDefenseList = function() {
     return;
   }
 
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-slate-400 text-xs font-medium">
+        Không có sinh viên nào phù hợp với bộ lọc trong Hội đồng bảo vệ.
+      </div>
+    `;
+    return;
+  }
+
   const hideSupervisor = Boolean(act?.hideSupervisorInCouncil || council?.hideSupervisorInCouncil);
 
-  container.innerHTML = studentsInCouncil.map((s, idx) => {
+  container.innerHTML = filtered.map((s, idx) => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || s.name || sid;
     const topic = s.topicTitle || 'Chưa cập nhật đề tài';
     const supDisplay = formatStudentSupervisorsForDisplay(s, hideSupervisor);
-    const orderNum = s.presentationOrder || s.order || (idx + 1);
+    const orderNum = s.presentationOrder || s.order || (s._origIdx !== undefined ? s._origIdx + 1 : idx + 1);
 
-    // Defense status from council engine
-    const defenseScore = s.defenseScore != null ? Number(s.defenseScore).toFixed(1) : '--';
-    const defenseStatus = s.presentationStatus || 'pending';
-    let statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">Chưa báo cáo</span>';
+    // Defense status from council engine (presented/completed/presenting/waiting)
+    const defenseStatus = s.presentationStatus || 'waiting';
+    let statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">Chờ báo cáo</span>';
     if (defenseStatus === 'presenting') {
-      statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse whitespace-nowrap">Đang báo cáo</span>';
-    } else if (defenseStatus === 'completed') {
-      statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">✓ Đã hoàn tất</span>';
+      statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse whitespace-nowrap">● Đang báo cáo</span>';
+    } else if (defenseStatus === 'presented' || defenseStatus === 'completed') {
+      statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">✓ Đã báo cáo</span>';
+    }
+
+    // Scorer's personal score badge
+    const scInfo = scoreResolver(s);
+    let myScoreBadge = '';
+    if (scInfo.status === 'completed') {
+      const sVal = typeof scInfo.score === 'number' ? Number(scInfo.score).toFixed(1) : (scInfo.score || '--');
+      myScoreBadge = `
+        <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-300 font-bold text-xs shadow-2xs">
+          <span class="text-emerald-600 font-black">✓</span>
+          <span class="text-[11px] text-emerald-700">Đã chấm:</span>
+          <span class="font-mono font-black text-sm text-emerald-950">${sVal}</span>
+        </div>
+      `;
+    } else if (scInfo.status === 'draft') {
+      const sVal = typeof scInfo.score === 'number' ? Number(scInfo.score).toFixed(1) : (scInfo.score || '--');
+      myScoreBadge = `
+        <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-950 border border-amber-300 font-bold text-xs shadow-2xs">
+          <span class="text-amber-600">✍️</span>
+          <span class="text-[11px] text-amber-800">Bản nháp:</span>
+          <span class="font-mono font-black text-sm text-amber-950">${sVal}</span>
+        </div>
+      `;
+    } else {
+      myScoreBadge = `
+        <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 text-slate-400 border border-slate-200 font-semibold text-xs">
+          <span class="text-slate-300">○</span>
+          <span>Chưa chấm</span>
+        </div>
+      `;
     }
 
     return `
-      <div class="grid grid-cols-1 md:grid-cols-12 items-center gap-3 p-4 bg-white rounded-2xl border border-slate-200 hover:border-purple-300 hover:shadow-md transition-all duration-300 transform hover:-translate-y-0.5">
+      <div onclick="openCouncilWorkspace('${targetRound.id}', '${act.id}', '${council.id}', '${sid}')" class="grid grid-cols-1 md:grid-cols-12 items-center gap-3 p-4 bg-white rounded-2xl border border-slate-200 hover:border-purple-300 hover:shadow-md transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer">
         <!-- Col 1: STT Lượt (Col span 1) -->
         <div class="hidden md:flex md:col-span-1 items-center justify-center">
           <div class="w-10 h-10 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 font-black text-sm flex items-center justify-center shadow-2xs">
@@ -1087,15 +1148,14 @@ window.renderAssessmentDefenseList = function() {
           </div>
         ` : ''}
 
-        <!-- Col 4: Trạng thái & Action (Col span 3) -->
+        <!-- Col 4: Trạng thái báo cáo & Điểm cá nhân đã chấm (Col span 3) -->
         <div class="col-span-1 md:col-span-3 flex items-center justify-between md:justify-end gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
           <div class="text-right shrink-0">
-            <div class="text-sm font-black text-purple-900 leading-none">${defenseScore !== '--' ? defenseScore + '/10' : '--'}</div>
-            <div class="mt-1">${statusBadge}</div>
+            <div>${statusBadge}</div>
           </div>
-          <button type="button" onclick="openCouncilWorkspace('${targetRound.id}', '${act.id}', '${council.id}', '${sid}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0">
-            <span>🏛️</span> <span>Vào phòng chấm</span>
-          </button>
+          <div class="shrink-0">
+            ${myScoreBadge}
+          </div>
         </div>
       </div>
     `;

@@ -427,6 +427,13 @@ window.saveCurrentScore = async function(isCompleted) {
   renderScorersProgress();
   renderAdminMonitor();
 
+  if (typeof window.renderAssessmentDefenseList === 'function' && state.currentView === 'assessment') {
+    window.renderAssessmentDefenseList();
+  }
+  if (typeof window.renderAssessmentHeroCard === 'function' && state.currentView === 'assessment') {
+    window.renderAssessmentHeroCard();
+  }
+
   const sObj = findStudentInRound(sid);
   const sName = sObj?.fullName || sObj?.studentName || sid;
   if (isCompleted) {
@@ -637,6 +644,13 @@ window.batchFinalizeAllCouncilScores = async function() {
   renderScoringSection();
   renderScorersProgress();
   renderAdminMonitor();
+
+  if (typeof window.renderAssessmentDefenseList === 'function' && state.currentView === 'assessment') {
+    window.renderAssessmentDefenseList();
+  }
+  if (typeof window.renderAssessmentHeroCard === 'function' && state.currentView === 'assessment') {
+    window.renderAssessmentHeroCard();
+  }
 
   showToast(`✓ Đã hoàn tất chấm điểm cho ${successCount} sinh viên!`, 'success');
 };
