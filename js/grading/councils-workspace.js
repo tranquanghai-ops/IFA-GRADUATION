@@ -262,33 +262,304 @@ function renderCouncilSlotsTable(act) {
   }).join('');
 }
 
-// --- TAB 3: RENDER STUDENTS & PRESENTATION ORDER ---
+// --- TAB 3: RENDER STUDENTS & PRESENTATION ORDER (SUB-TABS PER COUNCIL) ---
+
+window.switchCouncilStudentSubTab = function(subTabKey) {
+  state.activeCouncilManagement.studentSubTab = subTabKey;
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (act) renderCouncilStudentsTab(act);
+};
+
+export function shuffleStudentsAvoidingConsecutiveSupervisors(studentList) {
+  if (!studentList || studentList.length <= 1) return [...(studentList || [])];
+
+  const getSupKey = (s) => {
+    const fac = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(s.mssv || s.studentId) : null;
+    const supName = s.supervisorName || s.acceptedSupervisorName || fac?.supervisorName || (typeof formatStudentSupervisorsForDisplay === 'function' ? formatStudentSupervisorsForDisplay(s) : '');
+    return String(supName || 'unknown').toLowerCase().trim();
+  };
+
+  const groups = new Map();
+  studentList.forEach(s => {
+    const key = getSupKey(s);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(s);
+  });
+
+  // Randomize within each group first
+  groups.forEach((list) => {
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+  });
+
+  let bestResult = null;
+  let minAdjacentDuplicates = Infinity;
+
+  // Run multiple randomized trials to find a 0-conflict (or minimum conflict) permutation
+  for (let trial = 0; trial < 100; trial++) {
+    const remainingGroups = new Map();
+    groups.forEach((list, k) => {
+      remainingGroups.set(k, [...list]);
+    });
+
+    const result = [];
+    let lastKey = null;
+
+    while (result.length < studentList.length) {
+      const eligibleKeys = [];
+      let maxLen = 0;
+      remainingGroups.forEach((list, k) => {
+        if (list.length > 0) {
+          if (k !== lastKey) {
+            eligibleKeys.push(k);
+          }
+          if (list.length > maxLen) maxLen = list.length;
+        }
+      });
+
+      let chosenKey = null;
+      if (eligibleKeys.length > 0) {
+        const topEligible = eligibleKeys.filter(k => remainingGroups.get(k).length >= maxLen - 1);
+        chosenKey = topEligible[Math.floor(Math.random() * topEligible.length)];
+      } else {
+        const anyRemaining = [];
+        remainingGroups.forEach((list, k) => {
+          if (list.length > 0) anyRemaining.push(k);
+        });
+        if (anyRemaining.length === 0) break;
+        chosenKey = anyRemaining[Math.floor(Math.random() * anyRemaining.length)];
+      }
+
+      const pickedStudent = remainingGroups.get(chosenKey).pop();
+      result.push(pickedStudent);
+      lastKey = chosenKey;
+    }
+
+    let dupCount = 0;
+    for (let i = 0; i < result.length - 1; i++) {
+      if (getSupKey(result[i]) === getSupKey(result[i + 1])) {
+        dupCount++;
+      }
+    }
+
+    if (dupCount === 0) {
+      return result;
+    }
+
+    if (dupCount < minAdjacentDuplicates) {
+      minAdjacentDuplicates = dupCount;
+      bestResult = result;
+    }
+  }
+
+  return bestResult || studentList;
+}
+
+window.randomizeCouncilPresentationOrder = async function(councilId) {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const council = (act.councils || []).find(c => c.id === councilId);
+  if (!council) return;
+
+  const assignments = act.councilStudentAssignments || [];
+  const councilAssignments = assignments.filter(a => a.councilId === councilId);
+  if (councilAssignments.length === 0) {
+    showToast('Hội đồng này chưa có sinh viên nào để phân thứ tự.', 'warning');
+    return;
+  }
+
+  // Map each assignment to student object with supervisor info
+  const studentObjects = councilAssignments.map(asgn => {
+    const sObj = findStudentInRound(asgn.studentId) || { studentId: asgn.studentId, mssv: asgn.studentId };
+    return {
+      ...sObj,
+      _assignment: asgn
+    };
+  });
+
+  const shuffled = shuffleStudentsAvoidingConsecutiveSupervisors(studentObjects);
+
+  // Assign order 1..N
+  shuffled.forEach((s, idx) => {
+    s._assignment.order = idx + 1;
+  });
+
+  await persistActivityCouncilChanges(targetRound);
+  renderCouncilStudentsTab(act);
+  showToast(`✓ Đã tạo lượt thuyết trình ngẫu nhiên mới cho ${council.name} (đã tránh trùng GVHD liên tiếp)!`, 'success');
+};
+
+window.autoDistributeUnassignedStudents = async function() {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const councils = act.councils || [];
+  if (councils.length === 0) {
+    showToast('Vui lòng tạo ít nhất 1 Hội đồng trước khi phân bổ sinh viên.', 'warning');
+    return;
+  }
+
+  const roundStudents = getRoundAllStudents();
+  const assignments = act.councilStudentAssignments || [];
+  const assignedSids = new Set(assignments.filter(a => !!a.councilId).map(a => a.studentId));
+  const unassignedStudents = roundStudents.filter(s => !assignedSids.has(s.mssv || s.studentId));
+
+  if (unassignedStudents.length === 0) {
+    showToast('Tất cả sinh viên đã được phân công vào Hội đồng.', 'info');
+    return;
+  }
+
+  // Shuffle unassigned avoiding consecutive supervisors
+  const shuffled = shuffleStudentsAvoidingConsecutiveSupervisors(unassignedStudents);
+
+  // Distribute round-robin into councils
+  let cIndex = 0;
+  shuffled.forEach(s => {
+    const sid = s.mssv || s.studentId;
+    const targetCouncil = councils[cIndex % councils.length];
+    cIndex++;
+
+    const councilAssignments = assignments.filter(a => a.councilId === targetCouncil.id);
+    const maxOrder = councilAssignments.reduce((m, a) => Math.max(m, a.order || 0), 0);
+
+    const existingIdx = assignments.findIndex(a => a.studentId === sid);
+    if (existingIdx >= 0) {
+      assignments[existingIdx].councilId = targetCouncil.id;
+      assignments[existingIdx].order = maxOrder + 1;
+      assignments[existingIdx].presentationStatus = 'waiting';
+    } else {
+      assignments.push({
+        studentId: sid,
+        councilId: targetCouncil.id,
+        order: maxOrder + 1,
+        presentationStatus: 'waiting'
+      });
+    }
+  });
+
+  act.councilStudentAssignments = assignments;
+  await persistActivityCouncilChanges(targetRound);
+
+  // Switch to first council subtab
+  state.activeCouncilManagement.studentSubTab = councils[0].id;
+  refreshCouncilModalViews();
+  showToast(`✓ Đã tự động phân bổ ${shuffled.length} sinh viên đều vào ${councils.length} Hội đồng!`, 'success');
+};
+
 function renderCouncilStudentsTab(act) {
   const tbody = document.getElementById('council-students-tbody');
-  const councilFilterSelect = document.getElementById('council-student-filter-council');
+  const subtabsContainer = document.getElementById('council-student-subtabs');
+  const toolbarContainer = document.getElementById('council-student-subtab-toolbar');
   if (!tbody) return;
 
   const councils = act.councils || [];
   const assignments = act.councilStudentAssignments || [];
-
-  // Update Council filter dropdown
-  if (councilFilterSelect) {
-    const currentVal = state.activeCouncilManagement.filterCouncilId || 'all';
-    councilFilterSelect.innerHTML = '<option value="all">Tất cả sinh viên</option><option value="unassigned">Chưa phân Hội đồng</option>' + councils.map(c => {
-      const cCount = assignments.filter(a => a.councilId === c.id).length;
-      return `<option value="${c.id}">${c.name} (${cCount} SV)</option>`;
-    }).join('');
-    councilFilterSelect.value = currentVal;
-  }
-
-  // Get all registered or eligible students in round
   const roundStudents = getRoundAllStudents();
+
+  const assignedStudentIds = new Set(assignments.filter(a => !!a.councilId).map(a => a.studentId));
+  const unassignedCount = roundStudents.filter(s => !assignedStudentIds.has(s.mssv || s.studentId)).length;
+  const assignedCount = assignedStudentIds.size;
+
   const studentsCountBadge = document.getElementById('cbadge-students-count');
-  const assignedCount = assignments.filter(a => !!a.councilId).length;
   if (studentsCountBadge) studentsCountBadge.textContent = `${assignedCount}/${roundStudents.length}`;
 
+  // Determine current active subtab
+  let activeSubTab = state.activeCouncilManagement.studentSubTab;
+  const validSubTabs = ['unassigned', 'all', ...councils.map(c => c.id)];
+  if (!activeSubTab || !validSubTabs.includes(activeSubTab)) {
+    activeSubTab = (unassignedCount > 0) ? 'unassigned' : (councils[0]?.id || 'all');
+    state.activeCouncilManagement.studentSubTab = activeSubTab;
+  }
+
+  // 1. Render Sub-Tabs Bar
+  if (subtabsContainer) {
+    const unassignedPill = `
+      <button type="button" onclick="switchCouncilStudentSubTab('unassigned')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${activeSubTab === 'unassigned' ? 'bg-amber-600 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
+        <span>📁 Chưa phân công</span>
+        <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono ${activeSubTab === 'unassigned' ? 'bg-amber-800 text-amber-100' : 'bg-amber-50 text-amber-800 border border-amber-200'}">${unassignedCount}</span>
+      </button>
+    `;
+
+    const councilPills = councils.map(c => {
+      const cCount = assignments.filter(a => a.councilId === c.id).length;
+      const isActive = (activeSubTab === c.id);
+      return `
+        <button type="button" onclick="switchCouncilStudentSubTab('${c.id}')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${isActive ? 'bg-indigo-600 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
+          <span>🏛️ ${escapeHtml(c.name)}</span>
+          <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono ${isActive ? 'bg-indigo-800 text-indigo-100' : 'bg-indigo-50 text-indigo-800 border border-indigo-200'}">${cCount}</span>
+        </button>
+      `;
+    }).join('');
+
+    const allPill = `
+      <button type="button" onclick="switchCouncilStudentSubTab('all')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${activeSubTab === 'all' ? 'bg-slate-800 text-white shadow-xs' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}">
+        <span>👥 Tất cả</span>
+        <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono ${activeSubTab === 'all' ? 'bg-slate-900 text-slate-200' : 'bg-slate-100 text-slate-600'}">${roundStudents.length}</span>
+      </button>
+    `;
+
+    subtabsContainer.innerHTML = unassignedPill + councilPills + allPill;
+  }
+
+  // 2. Render Subtab Toolbar & Council Info
+  if (toolbarContainer) {
+    if (activeSubTab === 'unassigned') {
+      toolbarContainer.innerHTML = `
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+          <div>
+            <span class="font-bold text-slate-800 text-xs">Danh sách sinh viên chưa phân công Hội đồng (${unassignedCount} SV)</span>
+            <p class="text-[11px] text-slate-400 mt-0.5">Chọn Hội đồng ở cột "Hội đồng đánh giá" để chuyển sinh viên vào Hội đồng tương ứng.</p>
+          </div>
+          ${councils.length > 0 && unassignedCount > 0 ? `
+            <button type="button" onclick="autoDistributeUnassignedStudents()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 shrink-0">
+              <span>⚡ Tự động chia đều vào các Hội đồng</span>
+            </button>
+          ` : ''}
+        </div>
+      `;
+    } else if (activeSubTab === 'all') {
+      toolbarContainer.innerHTML = `
+        <div class="flex items-center justify-between w-full">
+          <div>
+            <span class="font-bold text-slate-800 text-xs">Tổng hợp danh sách tất cả sinh viên (${roundStudents.length} SV)</span>
+            <p class="text-[11px] text-slate-400 mt-0.5">Đã phân công: <strong class="text-indigo-700 font-bold">${assignedCount}</strong> / ${roundStudents.length} sinh viên • Chưa phân: <strong class="text-amber-700 font-bold">${unassignedCount}</strong></p>
+          </div>
+        </div>
+      `;
+    } else {
+      const activeCouncil = councils.find(c => c.id === activeSubTab);
+      const cAssignments = assignments.filter(a => a.councilId === activeSubTab);
+      toolbarContainer.innerHTML = `
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-black text-sm text-slate-900 tracking-tight">${escapeHtml(activeCouncil?.name || 'Hội đồng')}</span>
+              <span class="text-xs text-slate-500 font-medium">📍 ${escapeHtml(activeCouncil?.room || 'Chưa cập nhật phòng')} • 🕒 ${activeCouncil?.date || '--'} (${activeCouncil?.startTime || '--'} - ${activeCouncil?.endTime || '--'})</span>
+              <span class="badge bg-indigo-50 text-indigo-800 font-bold border border-indigo-200 text-[11px]">${cAssignments.length} SV báo cáo</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" onclick="randomizeCouncilPresentationOrder('${activeSubTab}')" class="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5" title="Xếp ngẫu nhiên thứ tự báo cáo sao cho sinh viên cùng GVHD không thuyết trình sát nhau (có thể bấm nhiều lần)">
+              <span>🎲 Trộn ngẫu nhiên thứ tự</span>
+              <span class="text-[10px] opacity-80">(Tránh trùng GVHD)</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // 3. Filter and Sort Students
   const q = String(state.activeCouncilManagement.filterQuery || '').trim().toLowerCase();
-  const filterCid = state.activeCouncilManagement.filterCouncilId || 'all';
 
   const filteredStudents = roundStudents.filter(s => {
     const sid = s.mssv || s.studentId;
@@ -300,16 +571,18 @@ function renderCouncilStudentsTab(act) {
     }
 
     const asgn = assignments.find(a => a.studentId === sid);
-    if (filterCid === 'unassigned') {
+    if (activeSubTab === 'unassigned') {
       return !asgn || !asgn.councilId;
     }
-    if (filterCid !== 'all') {
-      return asgn && asgn.councilId === filterCid;
+    if (activeSubTab !== 'all') {
+      return asgn && asgn.councilId === activeSubTab;
     }
     return true;
   });
 
-  // Sort students: Assigned councils first sorted by order ascending, then unassigned by MSSV
+  // Sort students:
+  // If in council subtab: sort by assignment.order ascending (1, 2, 3...)
+  // If unassigned or all: sort assigned first, then by order, then by MSSV
   filteredStudents.sort((a, b) => {
     const sidA = a.mssv || a.studentId;
     const sidB = b.mssv || b.studentId;
@@ -329,20 +602,17 @@ function renderCouncilStudentsTab(act) {
     return String(sidA || '').localeCompare(String(sidB || ''));
   });
 
-  const countTag = document.getElementById('council-student-filter-count');
-  if (countTag) countTag.textContent = `Hiển thị: ${filteredStudents.length} sinh viên`;
-
   if (roundStudents.length === 0 && state.councilStudentsLoading) {
     tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-500">⏳ Đang tải danh sách sinh viên đợt tốt nghiệp...</td></tr>';
     return;
   }
 
   if (filteredStudents.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">Không có sinh viên phù hợp điều kiện lọc.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">${activeSubTab === 'unassigned' ? '✓ Tất cả sinh viên đã được phân công vào Hội đồng!' : 'Không có sinh viên nào trong danh sách này.'}</td></tr>`;
     return;
   }
 
-  // Render rows
+  // 4. Render Table Rows
   tbody.innerHTML = filteredStudents.map((s, idx) => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || '--';
@@ -385,10 +655,10 @@ function renderCouncilStudentsTab(act) {
           <div class="font-bold text-slate-800 whitespace-nowrap">${escapeHtml(name)}</div>
           ${className && className !== '--' ? `<div class="text-[10px] text-slate-400 font-normal">Lớp: ${escapeHtml(className)}</div>` : ''}
         </td>
-        <td class="p-3 text-slate-700 text-xs">${escapeHtml(supName)}</td>
-        <td class="p-3 max-w-xs truncate text-slate-700" title="${escapeHtml(topic)}">${escapeHtml(topic)}</td>
+        <td class="p-3 text-slate-700 text-xs min-w-[140px] whitespace-normal break-words">${escapeHtml(supName)}</td>
+        <td class="p-3 max-w-xs truncate text-slate-700 min-w-[160px]" title="${escapeHtml(topic)}">${escapeHtml(topic)}</td>
         <td class="p-3">
-          <select onchange="changeStudentCouncil('${sid}', this.value)" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold ${assignedCouncilId ? 'bg-indigo-50/60 text-indigo-900 border-indigo-200' : 'bg-white text-slate-500'}">
+          <select onchange="changeStudentCouncil('${sid}', this.value)" class="w-full min-w-[140px] p-2 border border-slate-300 rounded-xl text-xs font-bold ${assignedCouncilId ? 'bg-indigo-50/70 text-indigo-950 border-indigo-300' : 'bg-slate-50 text-slate-600'} focus:ring-2 focus:ring-indigo-500 focus:outline-none">
             ${councilOptions}
           </select>
         </td>
@@ -417,9 +687,13 @@ function renderCouncilStudentsTab(act) {
 
 window.filterCouncilStudents = function() {
   const searchInput = document.getElementById('council-student-search');
-  const councilSelect = document.getElementById('council-student-filter-council');
   state.activeCouncilManagement.filterQuery = searchInput?.value || '';
-  state.activeCouncilManagement.filterCouncilId = councilSelect?.value || 'all';
+
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (act) renderCouncilStudentsTab(act);
+};
 
   const { roundId, activityId } = state.activeCouncilManagement;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);

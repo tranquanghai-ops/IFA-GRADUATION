@@ -4911,7 +4911,7 @@
        MODAL: ACTIVITY COUNCIL MANAGEMENT (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-activity-councils" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[94vh] overflow-hidden border border-slate-200">
+    <div class="bg-white rounded-2xl max-w-6xl xl:max-w-7xl w-full shadow-2xl flex flex-col max-h-[95vh] overflow-hidden border border-slate-200">
       <!-- Header -->
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0 bg-slate-50/50">
         <div>
@@ -4994,19 +4994,23 @@
           </div>
         </div>
 
-        <!-- TAB 3: PHÂN CÔNG SINH VIÊN & THỨ TỰ TRÌNH BÀY -->
+        <!-- TAB 3: PHÂN CÔNG SINH VIÊN & THỨ TỰ TRÌNH BÀY (CÓ SUB-TABS HỘI ĐỒNG) -->
         <div id="ctab-panel-students" class="hidden space-y-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
-            <div class="flex flex-wrap items-center gap-2.5">
-              <input type="text" id="council-student-search" oninput="filterCouncilStudents()" placeholder="Tìm MSSV, họ tên, đề tài, GVHD..." class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-56">
-              <select id="council-student-filter-council" onchange="filterCouncilStudents()" class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold">
-                <option value="all">Tất cả sinh viên</option>
-                <option value="unassigned">Chưa phân Hội đồng</option>
-              </select>
+          
+          <!-- Sub-tabs bar: Chưa phân công / HĐ1 / HĐ2 / Tất cả -->
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
+            <div id="council-student-subtabs" class="flex flex-wrap items-center gap-2">
+              <!-- Rendered dynamically with pill buttons -->
             </div>
-            <span id="council-student-filter-count" class="text-slate-500 font-semibold text-[11px]">
-              Hiển thị: 0 sinh viên
-            </span>
+
+            <div class="flex items-center gap-2">
+              <input type="text" id="council-student-search" oninput="filterCouncilStudents()" placeholder="Tìm MSSV, họ tên, đề tài, GVHD..." class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 w-52 sm:w-64">
+            </div>
+          </div>
+
+          <!-- Council Info & Action Toolbar for current sub-tab -->
+          <div id="council-student-subtab-toolbar" class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <!-- Rendered dynamically -->
           </div>
 
           <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
@@ -5014,12 +5018,12 @@
               <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
                 <tr>
                   <th class="p-3 w-20 text-center">STT / Thứ tự</th>
-                  <th class="p-3 w-24 text-center">MSSV</th>
-                  <th class="p-3">Họ và tên</th>
-                  <th class="p-3">GV Hướng dẫn</th>
-                  <th class="p-3">Tên đề tài</th>
-                  <th class="p-3 w-44">Hội đồng đánh giá</th>
-                  <th class="p-3 w-36 text-center">Trạng thái báo cáo</th>
+                  <th class="p-3 w-28 text-center font-mono">MSSV</th>
+                  <th class="p-3 min-w-[160px]">Họ và tên</th>
+                  <th class="p-3 min-w-[140px]">GV Hướng dẫn</th>
+                  <th class="p-3 min-w-[180px]">Tên đề tài</th>
+                  <th class="p-3 w-48">Hội đồng đánh giá</th>
+                  <th class="p-3 w-40 text-center">Trạng thái báo cáo</th>
                 </tr>
               </thead>
               <tbody id="council-students-tbody" class="divide-y divide-slate-100">
@@ -5103,8 +5107,8 @@
 
 
   <!-- MODAL: CREATE / EDIT / COPY COUNCIL -->
-  <div id="modal-edit-council" class="hidden fixed inset-0 z-[60] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
+  <div id="modal-edit-council" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl flex flex-col max-h-[94vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
         <h3 id="modal-edit-council-title" class="font-bold text-base text-tdtu-blue">Thêm Hội đồng mới</h3>
         <button type="button" onclick="closeEditCouncilModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
@@ -5148,10 +5152,11 @@
                 <div class="flex items-center">
                   <input type="text" id="council-form-date" placeholder="05/09/2026" maxlength="10"
                     class="w-full p-2 border border-slate-300 rounded-l-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
-                    oninput="formatDateInput(this)" onblur="validateDateInput(this)">
+                    oninput="formatDateInput(this); if (typeof onCouncilDateTimeInputsChange === 'function') onCouncilDateTimeInputsChange();"
+                    onblur="validateDateInput(this); if (typeof onCouncilDateTimeInputsChange === 'function') onCouncilDateTimeInputsChange();">
                   <label class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch">
                     📅
-                    <input type="date" id="council-form-date-picker" class="sr-only" onchange="syncCouncilDatePicker(this.value)">
+                    <input type="date" id="council-form-date-picker" class="sr-only" onchange="syncCouncilDatePicker(this.value); if (typeof onCouncilDateTimeInputsChange === 'function') onCouncilDateTimeInputsChange();">
                   </label>
                 </div>
               </div>
@@ -5159,13 +5164,13 @@
                 <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Bắt đầu:</span>
                 <input type="text" id="council-form-start-time" placeholder="08:00" maxlength="5"
                   class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono font-bold"
-                  onblur="validateTimeInput(this)">
+                  onblur="validateTimeInput(this); if (typeof onCouncilDateTimeInputsChange === 'function') onCouncilDateTimeInputsChange();">
               </div>
               <div>
                 <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Kết thúc:</span>
                 <input type="text" id="council-form-end-time" placeholder="11:30" maxlength="5"
                   class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono font-bold"
-                  onblur="validateTimeInput(this)">
+                  onblur="validateTimeInput(this); if (typeof onCouncilDateTimeInputsChange === 'function') onCouncilDateTimeInputsChange();">
               </div>
             </div>
           </div>
@@ -5174,7 +5179,7 @@
           <div>
             <label class="font-bold text-slate-800 block mb-1.5 flex items-center justify-between">
               <span>Phân công Thành viên Hội đồng</span>
-              <span class="text-[11px] text-slate-400 font-normal">Cùng cấu trúc slot của Mốc</span>
+              <span id="council-conflict-warning" class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md font-semibold hidden">⚠️ Đã ẩn GV bận ở HĐ khác</span>
             </label>
             <div id="council-members-form-container" class="space-y-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <!-- Rendered dynamically based on activity.councilStructure.slots -->

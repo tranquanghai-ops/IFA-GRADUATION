@@ -135,9 +135,78 @@ window.closeEditCouncilModal = function() {
   document.getElementById('modal-edit-council')?.classList.add('hidden');
 };
 
+export function isCouncilTimeOverlap(startA, endA, startB, endB) {
+  if (!startA || !endA || !startB || !endB) return true;
+  const toMinutes = (t) => {
+    const parts = String(t).split(':').map(Number);
+    return (parts[0] || 0) * 60 + (parts[1] || 0);
+  };
+  const sA = toMinutes(startA);
+  const eA = toMinutes(endA);
+  const sB = toMinutes(startB);
+  const eB = toMinutes(endB);
+  return Math.max(sA, sB) < Math.min(eA, eB);
+}
+
+export function getConflictingCouncilMembersForSlot(act, editingCouncilId, targetDate, targetStartTime, targetEndTime) {
+  const busyMembers = new Map(); // key (supId or email) -> { councilName, date, time }
+  if (!act || !Array.isArray(act.councils)) return busyMembers;
+
+  const curDate = (targetDate || '').trim();
+  const curStart = (targetStartTime || '').trim();
+  const curEnd = (targetEndTime || '').trim();
+
+  act.councils.forEach(otherC => {
+    if (otherC.id && editingCouncilId && otherC.id === editingCouncilId) return;
+
+    const otherDate = (otherC.date || '').trim();
+    // If both have explicit dates and they do not match, no schedule overlap
+    if (curDate && otherDate && curDate !== otherDate) return;
+
+    const otherStart = (otherC.startTime || '').trim();
+    const otherEnd = (otherC.endTime || '').trim();
+
+    const overlap = isCouncilTimeOverlap(curStart, curEnd, otherStart, otherEnd);
+    if (!overlap) return;
+
+    // Council overlaps schedule! Mark all its members as busy
+    const membersBySlot = otherC.membersBySlot || {};
+    Object.values(membersBySlot).forEach(m => {
+      if (!m) return;
+      const memId = String(m.memberId || m.id || '').trim();
+      const memEmail = String(m.memberEmail || m.email || '').toLowerCase().trim();
+      const info = {
+        councilName: otherC.name || 'HĐ khác',
+        date: otherDate || curDate || '--',
+        time: `${otherStart || '--'} - ${otherEnd || '--'}`
+      };
+      if (memId) busyMembers.set(memId, info);
+      if (memEmail) busyMembers.set(memEmail, info);
+    });
+  });
+
+  return busyMembers;
+}
+
 function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
   const container = document.getElementById('council-members-form-container');
   if (!container) return;
+
+  const editingCouncilId = document.getElementById('council-form-id')?.value?.trim();
+  const councilDate = document.getElementById('council-form-date')?.value?.trim() || '';
+  const councilStartTime = document.getElementById('council-form-start-time')?.value?.trim() || '';
+  const councilEndTime = document.getElementById('council-form-end-time')?.value?.trim() || '';
+
+  const busyMembers = getConflictingCouncilMembersForSlot(act, editingCouncilId, councilDate, councilStartTime, councilEndTime);
+  const conflictWarning = document.getElementById('council-conflict-warning');
+  if (conflictWarning) {
+    if (busyMembers.size > 0) {
+      conflictWarning.textContent = `⚠️ Đã ẩn ${busyMembers.size} GV bận ở HĐ khác cùng giờ`;
+      conflictWarning.classList.remove('hidden');
+    } else {
+      conflictWarning.classList.add('hidden');
+    }
+  }
 
   const slots = act.councilStructure?.slots || [];
   const supervisors = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
@@ -149,6 +218,13 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
     const memberId = assigned.memberId || '';
     const memberName = assigned.memberName || '';
     const isGuest = (assigned.type === 'guest');
+
+    // Filter supervisors who are not busy in overlapping councils (or already assigned in this specific slot)
+    const availableSupervisors = supervisors.filter(sup => {
+      if (memberId && sup.id === memberId) return true;
+      const isBusy = busyMembers.has(sup.id) || (sup.email && busyMembers.has(sup.email.toLowerCase().trim()));
+      return !isBusy;
+    });
 
     return `
       <div class="p-2.5 bg-white border border-slate-200 rounded-xl space-y-1.5">
@@ -167,7 +243,7 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
           <input type="search" oninput="filterCouncilSlotMembers('${s.key}', this.value)" placeholder="Tìm theo tên, email, đơn vị..." class="w-full p-2 mb-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
           <select id="slot-sup-${s.key}" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
             <option value="">-- Chưa phân công --</option>
-            ${supervisors.map(sup => `
+            ${availableSupervisors.map(sup => `
               <option value="${sup.id}" ${memberId === sup.id ? 'selected' : ''}>${sup.name} • ${sup.email || '--'} • ${sup.department || 'Khoa MTCN'}${sup.employmentType === 'adjunct' ? ' • Thỉnh giảng' : ''}</option>
             `).join('')}
           </select>
@@ -185,6 +261,35 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
     `;
   }).join('');
 }
+
+window.onCouncilDateTimeInputsChange = function() {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const slots = act.councilStructure?.slots || [];
+  const currentMembers = {};
+  slots.forEach(s => {
+    const isGuest = document.getElementById(`chk-guest-${s.key}`)?.checked === true;
+    if (isGuest) {
+      currentMembers[s.key] = {
+        type: 'guest',
+        memberName: document.getElementById(`slot-guest-name-${s.key}`)?.value?.trim() || '',
+        memberEmail: document.getElementById(`slot-guest-email-${s.key}`)?.value?.trim().toLowerCase() || '',
+        organization: document.getElementById(`slot-guest-org-${s.key}`)?.value?.trim() || ''
+      };
+    } else {
+      const supId = document.getElementById(`slot-sup-${s.key}`)?.value || '';
+      currentMembers[s.key] = {
+        type: 'internal',
+        memberId: supId
+      };
+    }
+  });
+
+  renderCouncilMembersFormSlots(act, currentMembers);
+};
 
 window.filterCouncilSlotMembers = function(slotKey, searchValue) {
   const queryText = String(searchValue || '').trim().toLowerCase();
@@ -226,6 +331,7 @@ window.clearCouncilDateTime = function() {
   if (dateInput) dateInput.value = '';
   if (startInput) startInput.value = '';
   if (endInput) endInput.value = '';
+  onCouncilDateTimeInputsChange();
 };
 
 window.saveCouncil = async function(e) {
@@ -258,6 +364,9 @@ window.saveCouncil = async function(e) {
       return;
     }
   }
+
+  // Check schedule conflicts with other councils
+  const busyMembers = getConflictingCouncilMembersForSlot(act, id, date, startTime, endTime);
 
   // Extract membersBySlot with strict email validation & duplicate checking
   const slots = act.councilStructure?.slots || [];
@@ -294,6 +403,11 @@ window.saveCouncil = async function(e) {
           emailError = `Email "${gEmail}" bị trùng lặp trong cùng Hội đồng!`;
           return;
         }
+        if (busyMembers.has(gEmail)) {
+          const conflict = busyMembers.get(gEmail);
+          emailError = `Khách mời "${gName}" (${gEmail}) đã trùng lịch với "${conflict.councilName}" (${conflict.date} ${conflict.time})!`;
+          return;
+        }
         seenEmails.add(gEmail);
         membersBySlot[s.key] = {
           type: 'guest',
@@ -314,6 +428,11 @@ window.saveCouncil = async function(e) {
         if (sEmail) {
           if (seenEmails.has(sEmail)) {
             emailError = `Email "${sEmail}" của giảng viên "${supObj?.name}" bị trùng lặp trong cùng Hội đồng!`;
+            return;
+          }
+          if (busyMembers.has(supId) || busyMembers.has(sEmail)) {
+            const conflict = busyMembers.get(supId) || busyMembers.get(sEmail);
+            emailError = `Giảng viên "${supObj?.name}" đã trùng lịch với "${conflict.councilName}" (${conflict.date} ${conflict.time})!`;
             return;
           }
           seenEmails.add(sEmail);

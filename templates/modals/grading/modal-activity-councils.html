@@ -1,7 +1,7 @@
        MODAL: ACTIVITY COUNCIL MANAGEMENT (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-activity-councils" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-4xl w-full shadow-2xl flex flex-col max-h-[94vh] overflow-hidden border border-slate-200">
+    <div class="bg-white rounded-2xl max-w-6xl xl:max-w-7xl w-full shadow-2xl flex flex-col max-h-[95vh] overflow-hidden border border-slate-200">
       <!-- Header -->
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0 bg-slate-50/50">
         <div>
@@ -84,19 +84,23 @@
           </div>
         </div>
 
-        <!-- TAB 3: PHÂN CÔNG SINH VIÊN & THỨ TỰ TRÌNH BÀY -->
+        <!-- TAB 3: PHÂN CÔNG SINH VIÊN & THỨ TỰ TRÌNH BÀY (CÓ SUB-TABS HỘI ĐỒNG) -->
         <div id="ctab-panel-students" class="hidden space-y-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
-            <div class="flex flex-wrap items-center gap-2.5">
-              <input type="text" id="council-student-search" oninput="filterCouncilStudents()" placeholder="Tìm MSSV, họ tên, đề tài, GVHD..." class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 sm:w-56">
-              <select id="council-student-filter-council" onchange="filterCouncilStudents()" class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold">
-                <option value="all">Tất cả sinh viên</option>
-                <option value="unassigned">Chưa phân Hội đồng</option>
-              </select>
+          
+          <!-- Sub-tabs bar: Chưa phân công / HĐ1 / HĐ2 / Tất cả -->
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
+            <div id="council-student-subtabs" class="flex flex-wrap items-center gap-2">
+              <!-- Rendered dynamically with pill buttons -->
             </div>
-            <span id="council-student-filter-count" class="text-slate-500 font-semibold text-[11px]">
-              Hiển thị: 0 sinh viên
-            </span>
+
+            <div class="flex items-center gap-2">
+              <input type="text" id="council-student-search" oninput="filterCouncilStudents()" placeholder="Tìm MSSV, họ tên, đề tài, GVHD..." class="px-3 py-1.5 border border-slate-300 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 w-52 sm:w-64">
+            </div>
+          </div>
+
+          <!-- Council Info & Action Toolbar for current sub-tab -->
+          <div id="council-student-subtab-toolbar" class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <!-- Rendered dynamically -->
           </div>
 
           <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
@@ -104,12 +108,12 @@
               <thead class="bg-slate-100 text-slate-600 font-bold uppercase border-b text-[11px]">
                 <tr>
                   <th class="p-3 w-20 text-center">STT / Thứ tự</th>
-                  <th class="p-3 w-24 text-center">MSSV</th>
-                  <th class="p-3">Họ và tên</th>
-                  <th class="p-3">GV Hướng dẫn</th>
-                  <th class="p-3">Tên đề tài</th>
-                  <th class="p-3 w-44">Hội đồng đánh giá</th>
-                  <th class="p-3 w-36 text-center">Trạng thái báo cáo</th>
+                  <th class="p-3 w-28 text-center font-mono">MSSV</th>
+                  <th class="p-3 min-w-[160px]">Họ và tên</th>
+                  <th class="p-3 min-w-[140px]">GV Hướng dẫn</th>
+                  <th class="p-3 min-w-[180px]">Tên đề tài</th>
+                  <th class="p-3 w-48">Hội đồng đánh giá</th>
+                  <th class="p-3 w-40 text-center">Trạng thái báo cáo</th>
                 </tr>
               </thead>
               <tbody id="council-students-tbody" class="divide-y divide-slate-100">
