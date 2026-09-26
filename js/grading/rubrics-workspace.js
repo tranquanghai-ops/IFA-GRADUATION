@@ -3,33 +3,51 @@
 export const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : (reg?.officialSupervisors || []));
 export const getPreliminarySummary = (sid, rId) => (typeof window !== 'undefined' && typeof window.getPreliminarySummary === 'function' ? window.getPreliminarySummary(sid, rId) : null);
 
-export function getStudentFullProfile(sid, act = null, council = null, round = null) {
+export function getStudentFullProfile(sid, arg2 = null, arg3 = null, arg4 = null) {
   if (!sid) return { studentId: '', mssv: '', fullName: '', topicTitle: '--' };
 
-  const currentRound = round || (state.rounds || []).find(r => r.id === (state.activeCouncilWorkspace?.roundId || state.selectedAssessmentRoundId || state.selectedRoundId)) || state.activeRound;
+  // Detect whether arg2 is round object or activity object
+  let roundObj = null;
+  let actObj = null;
+  let councilObj = null;
+
+  if (arg2 && (arg2.eligibleStudents || arg2.registrations || arg2.officialAssignments || arg2.activities || arg2.academicYear)) {
+    roundObj = arg2;
+  } else if (arg4 && (arg4.eligibleStudents || arg4.registrations || arg4.officialAssignments || arg4.activities)) {
+    roundObj = arg4;
+    actObj = arg2;
+    councilObj = arg3;
+  } else {
+    actObj = arg2;
+    councilObj = arg3;
+    roundObj = arg4;
+  }
+
+  const currentRound = roundObj
+    || (state.rounds || []).find(r => r.id === (state.activeCouncilWorkspace?.roundId || state.selectedAssessmentRoundId || state.selectedRoundId))
+    || state.activeRound;
   const roundId = currentRound?.id || state.activeCouncilWorkspace?.roundId;
 
-  // 1. Check cached council students for round if available
   const cachedList = state.councilStudentsByRound?.[roundId] || currentRound?.councilStudents || [];
   const cachedStudent = cachedList.find(s => (s.studentId === sid || s.mssv === sid));
-  if (cachedStudent && (cachedStudent.fullName || cachedStudent.studentName) && (cachedStudent.fullName !== sid || cachedStudent.topicTitle)) {
-    return cachedStudent;
-  }
 
   const off = (currentRound?.officialAssignments || []).find(a => (a.studentId === sid || a.mssv === sid || a.id === sid));
   const reg = (currentRound?.registrations || []).find(r => (r.studentId === sid || r.mssv === sid || r.id === sid));
   const adminReg = (state.adminReviewData?.registrations || []).find(r => (r.studentId === sid || r.mssv === sid || r.id === sid));
   const el = (currentRound?.eligibleStudents || []).find(e => (e.studentId === sid || e.mssv === sid || e.id === sid));
   const cStudent = (currentRound?.councilStudents || []).find(s => (s.studentId === sid || s.mssv === sid || s.id === sid));
+  const topicReg = currentRound?.topicRegistrations?.[sid] || currentRound?.topicRegistrations?.[sid?.toUpperCase()];
 
   let sObj = {
     studentId: sid,
     mssv: sid,
+    ...(cachedStudent || {}),
     ...(el || {}),
     ...(cStudent || {}),
     ...(adminReg || {}),
     ...(reg || {}),
-    ...(off || {})
+    ...(off || {}),
+    ...(topicReg || {})
   };
 
   const fac = (typeof window !== 'undefined' && typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(sid) : null;
@@ -39,7 +57,7 @@ export function getStudentFullProfile(sid, act = null, council = null, round = n
     sObj.className = sObj.className || sObj.studentClass || fac.className || fac.studentClass || '--';
     sObj.studentClass = sObj.className;
     sObj.major = sObj.major || fac.major;
-    sObj.topicTitle = sObj.topicTitle || sObj.topic || fac.topicTitle || '--';
+    sObj.topicTitle = sObj.topicTitle || sObj.topic || fac.topicTitle || fac.topic || '--';
     if (!sObj.acceptedSupervisorName && !sObj.supervisorName && fac.supervisorName) {
       sObj.acceptedSupervisorName = fac.supervisorName;
       sObj.supervisorName = fac.supervisorName;
@@ -47,7 +65,21 @@ export function getStudentFullProfile(sid, act = null, council = null, round = n
   }
 
   sObj.fullName = sObj.fullName || sObj.studentName || sObj.name || sid;
-  sObj.topicTitle = sObj.topicTitle || sObj.topic || '--';
+  sObj.topicTitle = sObj.topicTitle || sObj.topic || sObj.topicVietnamese || sObj.topicName || '--';
+
+  if (!sObj.acceptedSupervisorName && !sObj.supervisorName) {
+    const adminRegMatch = (state.adminReviewData?.registrations || []).find(r => r.studentId === sid);
+    if (adminRegMatch) {
+      sObj.acceptedSupervisorName = adminRegMatch.acceptedSupervisorName || adminRegMatch.supervisorName;
+      sObj.supervisorName = sObj.acceptedSupervisorName;
+    }
+  }
+
+  if (!sObj.officialSupervisors || sObj.officialSupervisors.length === 0) {
+    if (typeof window !== 'undefined' && typeof window.getOfficialSupervisors === 'function') {
+      sObj.officialSupervisors = window.getOfficialSupervisors(sObj);
+    }
+  }
 
   return sObj;
 }
@@ -63,13 +95,14 @@ if (typeof window !== 'undefined') {
 /**
  * IFA+ Graduation — Council Live Workspace & Session Controls Submodule
  */
+
 export function checkCouncilAuthorization(round, act, council, user) {
   if (!round || !act || !council) return { authorized: false, reason: 'Không tìm thấy dữ liệu Hội đồng' };
   
   const actor = user || getEffectiveActor();
 
-  // Admin always has full access
-  if (actor.isAdmin) {
+  // Real Admin without impersonation has full access
+  if (actor.isAdmin && !actor.impersonating) {
     return {
       authorized: true,
       role: 'admin',

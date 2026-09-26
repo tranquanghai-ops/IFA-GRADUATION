@@ -188,21 +188,17 @@ function renderScoringSection() {
         </div>
       </div>
     `;
-  } else {
     actionsHtml = `
       <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
         <div class="flex items-center gap-2">
           <span id="cws-score-draft-time" class="text-[11px] text-slate-400 font-mono">
-            ${savedScore?.status === 'draft' ? `Đã lưu tạm lúc ${fmt24h(savedScore.updatedAt)}` : ''}
+            ${savedScore?.status === 'draft' ? `Đã tự động lưu nháp lúc ${fmt24h(savedScore.updatedAt)}` : 'Hệ thống tự động lưu nháp khi chọn/nhập'}
           </span>
           ${batchFinalizeBtnHtml}
         </div>
         <div class="flex items-center gap-2">
-          <button type="button" onclick="saveCurrentScore(false)" class="px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors">
-            💾 Lưu tạm
-          </button>
-          <button type="button" onclick="saveCurrentScore(true)" class="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors">
-            ✓ Hoàn tất chấm
+          <button type="button" onclick="saveCurrentScore(true)" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer">
+            <span>✓</span> <span>Hoàn tất chấm</span>
           </button>
         </div>
       </div>
@@ -666,7 +662,8 @@ function renderScorersProgress() {
   const council = (act?.councils || []).find(c => c.id === councilId);
   const sid = state.activeCouncilSelectedStudentId;
   const scoringEnabled = Boolean(act?.scoringConfig?.enabled !== false && (act?.councilEnabled || act?.scoringConfig?.enabled));
-  if (!scoringEnabled || !sid || !council) {
+  const isChairOrAdmin = Boolean(auth?.isAdmin || auth?.isChair);
+  if (!scoringEnabled || !sid || !council || !isChairOrAdmin) {
     container.classList.add('hidden');
     return;
   }
