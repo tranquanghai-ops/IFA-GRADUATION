@@ -892,6 +892,9 @@ function findStudentInRound(studentId) {
   }
   return null;
 }
+if (typeof window !== 'undefined') {
+  window.findStudentInRound = findStudentInRound;
+}
 
 // --- STUDENT COUNCIL ASSIGNMENT ACTIONS ---
 window.changeStudentCouncil = async function(studentId, newCouncilId) {

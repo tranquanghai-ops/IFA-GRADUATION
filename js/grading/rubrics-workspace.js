@@ -1,6 +1,17 @@
 
 // --- Module Bridges ---
 const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
+const findStudentInRound = (sid, roundId) => {
+  if (typeof window !== 'undefined' && typeof window.findStudentInRound === 'function') {
+    return window.findStudentInRound(sid, roundId);
+  }
+  const r = (state.rounds || []).find(rd => rd.id === (roundId || state.activeCouncilWorkspace?.roundId || state.selectedAssessmentRoundId || state.selectedRoundId)) || state.activeRound;
+  const all = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
+    ? state.adminReviewData.registrations
+    : (r?.eligibleStudents || r?.registrations || []);
+  const found = all.find(s => (s.mssv || s.studentId) === sid);
+  return found || { studentId: sid, mssv: sid };
+};
 /**
  * IFA+ Graduation — Council Live Workspace & Session Controls Submodule
  */
