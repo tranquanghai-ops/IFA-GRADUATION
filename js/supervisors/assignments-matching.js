@@ -160,6 +160,10 @@ export function getPreliminaryExcludedSupervisorIds(reg) {
   return list.map(s => s.supervisorId);
 }
 
+if (typeof window !== 'undefined') {
+  window.getPreliminaryExcludedSupervisorIds = getPreliminaryExcludedSupervisorIds;
+}
+
 export function getSupervisorTotalAssignedCount(supId, registrations = []) {
   if (!supId || !Array.isArray(registrations)) return 0;
   return registrations.filter(r => {

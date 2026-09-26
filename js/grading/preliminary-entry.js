@@ -7,6 +7,17 @@
 
 // --- 1. CORE CALCULATION & HELPER FUNCTIONS ---
 
+export function getPreliminaryExcludedSupervisorIds(reg) {
+  if (typeof window !== 'undefined' && typeof window.getPreliminaryExcludedSupervisorIds === 'function' && window.getPreliminaryExcludedSupervisorIds !== getPreliminaryExcludedSupervisorIds) {
+    return window.getPreliminaryExcludedSupervisorIds(reg);
+  }
+  if (!reg) return [];
+  const list = (typeof window !== 'undefined' && typeof window.getOfficialSupervisors === 'function')
+    ? window.getOfficialSupervisors(reg)
+    : (reg.officialSupervisors || []);
+  return list.map(s => s.supervisorId || s.id || s.email);
+}
+
 export function getPreliminarySummary(studentId, roundId = null) {
   const rId = roundId || state.selectedRoundId || state.activeRound?.id;
   const targetRound = (state.rounds || []).find(r => r.id === rId) || state.activeRound;
