@@ -30,26 +30,34 @@ export function checkCouncilAuthorization(round, act, council, user) {
   }
 
   const userEmail = actor.email.toLowerCase().trim();
+  const userId = actor.uid || actor.email;
   const membersBySlot = council.membersBySlot || {};
-  const slots = act.councilStructure?.slots || [];
 
-  for (const s of slots) {
-    const assigned = membersBySlot[s.key];
-    if (assigned && assigned.memberEmail && assigned.memberEmail.toLowerCase().trim() === userEmail) {
-      const isSec = (s.key === 'secretary' || s.label === 'Thư ký');
-      const isChair = (s.key === 'chair' || s.label === 'Chủ tịch' || s.name === 'Chủ tịch Hội đồng');
-      return {
-        authorized: true,
-        role: s.key,
-        roleName: s.name || s.label || 'Thành viên Hội đồng',
-        slotKey: s.key,
-        canScore: true,
-        isSecretary: isSec,
-        isChair: isChair,
-        isAdmin: false,
-        canCalibrate: isChair,
-        canFinalize: isChair
-      };
+  // Check all members assigned to this council
+  for (const [slotKey, assigned] of Object.entries(membersBySlot)) {
+    if (assigned) {
+      const memEmail = String(assigned.memberEmail || assigned.email || '').toLowerCase().trim();
+      const memId = String(assigned.memberId || assigned.id || '').trim();
+      const isEmailMatch = memEmail && userEmail && memEmail === userEmail;
+      const isIdMatch = memId && (memId === userId || memId === userEmail);
+      const isMasterMatch = Boolean(state.supervisorsMaster && state.supervisorsMaster.some(s => s.id === memId && s.email && s.email.toLowerCase().trim() === userEmail));
+
+      if (isEmailMatch || isIdMatch || isMasterMatch) {
+        const isSec = (slotKey === 'secretary' || slotKey.startsWith('secretary') || String(assigned.role || '').toLowerCase().includes('thư ký'));
+        const isChair = (slotKey === 'chair' || slotKey.startsWith('chair') || String(assigned.role || '').toLowerCase().includes('chủ tịch'));
+        return {
+          authorized: true,
+          role: slotKey,
+          roleName: assigned.role || (isChair ? 'Chủ tịch Hội đồng' : (isSec ? 'Thư ký Hội đồng' : 'Thành viên Hội đồng')),
+          slotKey: slotKey,
+          canScore: true,
+          isSecretary: isSec,
+          isChair: isChair,
+          isAdmin: false,
+          canCalibrate: isChair,
+          canFinalize: isChair
+        };
+      }
     }
   }
 

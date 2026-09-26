@@ -11,6 +11,30 @@ state.assessmentSearchQuery = '';
 state.selectedAssessmentRoundId = null;
 state.selectedAssessmentCouncilId = null;
 
+export function isUserMatchingCouncilMember(m, userEmail, userId) {
+  if (!m) return false;
+  const memEmail = String(m.memberEmail || m.email || '').toLowerCase().trim();
+  const targetEmail = String(userEmail || '').toLowerCase().trim();
+  if (memEmail && targetEmail && memEmail === targetEmail) return true;
+
+  const memId = String(m.memberId || m.id || '').trim();
+  const targetId = String(userId || '').trim();
+  if (memId && targetId && memId === targetId) return true;
+  if (memId && targetEmail && memId.toLowerCase() === targetEmail) return true;
+
+  if (state.supervisorsMaster && state.supervisorsMaster.length > 0) {
+    const curSup = state.supervisorsMaster.find(s =>
+      (s.email && s.email.toLowerCase().trim() === targetEmail) || s.id === targetId
+    );
+    if (curSup) {
+      if (m.memberId === curSup.id) return true;
+      if (m.memberEmail && m.memberEmail.toLowerCase().trim() === (curSup.email || '').toLowerCase().trim()) return true;
+    }
+  }
+  return false;
+}
+window.isUserMatchingCouncilMember = isUserMatchingCouncilMember;
+
 export function checkUserAssessmentCapabilities(round, userEmail = null, userId = null) {
   const actor = getEffectiveActor();
   const uEmail = (userEmail || actor.email || '').toLowerCase().trim();
@@ -44,25 +68,25 @@ export function checkUserAssessmentCapabilities(round, userEmail = null, userId 
     };
   }
 
-  // Check if supervisor in round
-  const isSupervisor = (round.supervisors || []).some(s => (s.email && s.email.toLowerCase() === uEmail) || s.id === uId);
-
   // Check official supervised students
   const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
-    : (round.eligibleStudents || []);
+    : (round.registrations && round.registrations.length > 0 ? round.registrations : (round.eligibleStudents || []));
 
   const hasSupervisedStudents = allRegs.some(s => {
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : [];
-    return officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase() === uEmail));
+    return officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase().trim() === uEmail));
   });
 
   // Check reviewer assignments
   const reviewerAssignments = round.reviewerAssignments || {};
   const hasReviewerAssignments = allRegs.some(s => {
     const sid = s.mssv || s.studentId;
-    return reviewerAssignments[sid] === uId || reviewerAssignments[sid] === uEmail;
+    return reviewerAssignments[sid] === uId || (reviewerAssignments[sid] && reviewerAssignments[sid].toLowerCase().trim() === uEmail);
   });
+
+  // Check preliminary scores / assignments
+  const hasPreliminaryDuty = Object.keys(round.preliminaryScores || {}).some(k => k.includes(`_${uId}`) || (uEmail && k.includes(`_${uEmail}`)));
 
   // Check council membership in any activity
   const actsWithCouncils = (round.activities || []).filter(a => a.councilEnabled && Array.isArray(a.councils));
@@ -70,7 +94,7 @@ export function checkUserAssessmentCapabilities(round, userEmail = null, userId 
   for (const act of actsWithCouncils) {
     for (const c of (act.councils || [])) {
       const members = Object.values(c.membersBySlot || {});
-      if (members.some(m => m.memberEmail && m.memberEmail.toLowerCase() === uEmail)) {
+      if (members.some(m => isUserMatchingCouncilMember(m, uEmail, uId))) {
         hasDefenseDuty = true;
         break;
       }
@@ -78,13 +102,14 @@ export function checkUserAssessmentCapabilities(round, userEmail = null, userId 
     if (hasDefenseDuty) break;
   }
 
-  const canDuyet1 = hasSupervisedStudents || isSupervisor;
-  const canDuyet2 = hasSupervisedStudents || isSupervisor;
-  const canDuyet3 = hasSupervisedStudents || isSupervisor;
+  // Strictly only activate tabs where user has named responsibilities
+  const canDuyet1 = hasSupervisedStudents;
+  const canDuyet2 = hasSupervisedStudents;
+  const canDuyet3 = hasSupervisedStudents;
   const canThesis = hasSupervisedStudents || hasReviewerAssignments;
-  const canPreliminary = isSupervisor;
+  const canPreliminary = hasPreliminaryDuty;
   const canDefense = hasDefenseDuty;
-  const canSummary = state.isAdmin;
+  const canSummary = false;
 
   const hasAnyCapability = canDuyet1 || canDuyet2 || canDuyet3 || canThesis || canPreliminary || canDefense || canSummary;
 
@@ -104,6 +129,37 @@ window.checkUserAssessmentCapabilities = checkUserAssessmentCapabilities;
 
 window.initAssessmentPortal = async function() {
   if (!state.user) return;
+
+  // Hydrate activities & registrations for rounds to accurately detect capabilities & councils
+  try {
+    if (!state.rounds || state.rounds.length === 0) {
+      if (typeof loadRounds === 'function') await loadRounds();
+    }
+    await Promise.all((state.rounds || []).filter(r => !r.deleted).map(async round => {
+      try {
+        if (!Array.isArray(round.activities) || round.activities.length === 0) {
+          const actSnap = await getDocs(collection(db, 'graduationRounds', round.id, 'activities'));
+          round.activities = actSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+        if (!round.eligibleStudents || round.eligibleStudents.length === 0) {
+          const elSnap = await getDocs(collection(db, 'graduationRounds', round.id, 'eligibleStudents'));
+          round.eligibleStudents = elSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+        if (!round.registrations || round.registrations.length === 0) {
+          const regSnap = await getDocs(collection(db, 'graduationRounds', round.id, 'registrations'));
+          round.registrations = regSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+        if (!round.officialAssignments || round.officialAssignments.length === 0) {
+          const asgnSnap = await getDocs(collection(db, 'graduationRounds', round.id, 'officialAssignments'));
+          round.officialAssignments = asgnSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+      } catch (e) {
+        console.warn(`[AssessmentPortal] Hydrate round ${round.id} notice:`, e);
+      }
+    }));
+  } catch (err) {
+    console.warn('[AssessmentPortal] Init notice:', err);
+  }
 
   const allRounds = state.rounds || [];
   const eligibleRounds = allRounds.filter(r => checkUserAssessmentCapabilities(r).hasAnyCapability);
@@ -767,6 +823,7 @@ window.renderAssessmentDefenseList = function() {
 
   const actor = getEffectiveActor();
   const uEmail = (actor.email || '').toLowerCase().trim();
+  const uId = actor.uid || actor.email;
 
   // Find all activities with councils
   const actsWithCouncils = (targetRound.activities || []).filter(a => a.councilEnabled && Array.isArray(a.councils) && a.councils.length > 0);
@@ -775,19 +832,27 @@ window.renderAssessmentDefenseList = function() {
   actsWithCouncils.forEach(act => {
     act.councils.forEach(c => {
       const members = Object.values(c.membersBySlot || {});
-      const isMember = members.some(m => m.memberEmail && m.memberEmail.toLowerCase() === uEmail);
+      const isMember = members.some(m => isUserMatchingCouncilMember(m, uEmail, uId));
       if (actor.isAdmin || isMember) {
-        availableCouncils.push({ act, council: c });
+        availableCouncils.push({ act, council: c, isMember });
       }
     });
   });
 
   const councilSelect = document.getElementById('assessment-council-select');
+  const bannerEl = document.getElementById('assessment-council-info-banner');
+  const actionBoxEl = document.getElementById('assessment-council-action-box');
+
   if (availableCouncils.length === 0) {
     if (councilSelect) councilSelect.innerHTML = '<option value="">-- Chưa được phân công Hội đồng nào --</option>';
+    if (bannerEl) bannerEl.classList.add('hidden');
+    if (actionBoxEl) actionBoxEl.classList.add('hidden');
     container.innerHTML = '<div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-slate-400 text-xs font-medium">Thầy/Cô chưa có phân công trong Hội đồng bảo vệ nào của đợt này.</div>';
     return;
   }
+
+  if (bannerEl) bannerEl.classList.remove('hidden');
+  if (actionBoxEl) actionBoxEl.classList.remove('hidden');
 
   if (councilSelect) {
     councilSelect.innerHTML = availableCouncils.map(item => {
@@ -804,6 +869,7 @@ window.renderAssessmentDefenseList = function() {
   const currentItem = availableCouncils.find(item => item.council.id === state.selectedAssessmentCouncilId) || availableCouncils[0];
   const act = currentItem.act;
   const council = currentItem.council;
+  state.selectedAssessmentCouncilId = council.id;
 
   // Banner details
   const nameEl = document.getElementById('assessment-cinfo-name');
@@ -823,14 +889,54 @@ window.renderAssessmentDefenseList = function() {
   }
 
   const membersBySlot = council.membersBySlot || {};
-  if (chairEl) chairEl.textContent = membersBySlot['chair']?.memberName || '--';
-  if (secEl) secEl.textContent = membersBySlot['secretary']?.memberName || '--';
-  if (memEl) {
-    const otherMembers = Object.entries(membersBySlot)
-      .filter(([k]) => k !== 'chair' && k !== 'secretary')
-      .map(([, v]) => v.memberName)
-      .filter(Boolean);
-    memEl.textContent = otherMembers.join(', ') || '--';
+  const membersList = Object.entries(membersBySlot).map(([slotKey, m]) => ({ ...m, slotKey }));
+
+  // Find Chair
+  const chairMember = membersList.find(m => 
+    m.slotKey === 'chair' || 
+    m.roleKey === 'chair' || 
+    String(m.role || '').toLowerCase().includes('chủ tịch')
+  );
+  // Find Secretary
+  const secMember = membersList.find(m => 
+    m.slotKey === 'secretary' || 
+    m.roleKey === 'secretary' || 
+    String(m.role || '').toLowerCase().includes('thư ký')
+  );
+  // Other Members
+  const otherMembers = membersList.filter(m => m !== chairMember && m !== secMember && (m.memberName || m.name));
+
+  const chairName = chairMember?.memberName || chairMember?.name || '';
+  const secName = secMember?.memberName || secMember?.name || '';
+
+  const chairRow = chairEl?.parentElement;
+  if (chairRow) {
+    if (chairName) {
+      chairRow.classList.remove('hidden');
+      if (chairEl) chairEl.textContent = `${chairName}${chairMember.memberEmail ? ` <${chairMember.memberEmail}>` : ''}`;
+    } else {
+      chairRow.classList.add('hidden');
+    }
+  }
+
+  const secRow = secEl?.parentElement;
+  if (secRow) {
+    if (secName) {
+      secRow.classList.remove('hidden');
+      if (secEl) secEl.textContent = `${secName}${secMember.memberEmail ? ` <${secMember.memberEmail}>` : ''}`;
+    } else {
+      secRow.classList.add('hidden');
+    }
+  }
+
+  const memRow = memEl?.parentElement;
+  if (memRow) {
+    if (otherMembers.length > 0) {
+      memRow.classList.remove('hidden');
+      if (memEl) memEl.textContent = otherMembers.map(m => `${m.memberName || m.name} (${m.role || 'Ủy viên'})`).join(', ');
+    } else {
+      memRow.classList.add('hidden');
+    }
   }
 
   // Assigned students in this council
@@ -848,7 +954,18 @@ window.renderAssessmentDefenseList = function() {
   if (tabBadge) tabBadge.textContent = studentsInCouncil.length;
 
   if (studentsInCouncil.length === 0) {
-    container.innerHTML = '<div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-slate-400 text-xs font-medium">Hội đồng này hiện chưa có sinh viên nào được phân công.</div>';
+    container.innerHTML = `
+      <div class="p-8 bg-white rounded-2xl border border-slate-200 text-center space-y-3">
+        <div class="text-3xl">🏛️</div>
+        <p class="text-slate-800 font-bold text-sm">Hội đồng "${council.name}" hiện chưa được phân công sinh viên.</p>
+        <p class="text-xs text-slate-500 max-w-md mx-auto">Thầy/Cô vẫn có thể vào phòng Hội đồng để kiểm tra biểu mẫu tiêu chí chấm hoặc Quản trị viên sẽ phân bổ sinh viên vào Hội đồng.</p>
+        <div class="pt-2">
+          <button type="button" onclick="launchAssessmentCouncilWorkspace()" class="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all inline-flex items-center gap-2 cursor-pointer">
+            <span>🏛️</span> <span>Mở phòng Hội đồng "${council.name}" & Tiêu chí</span>
+          </button>
+        </div>
+      </div>
+    `;
     return;
   }
 
