@@ -695,12 +695,6 @@ window.filterCouncilStudents = function() {
   if (act) renderCouncilStudentsTab(act);
 };
 
-  const { roundId, activityId } = state.activeCouncilManagement;
-  const targetRound = (state.rounds || []).find(r => r.id === roundId);
-  const act = (targetRound?.activities || []).find(a => a.id === activityId);
-  if (act) renderCouncilStudentsTab(act);
-};
-
 // Helper: Load round students (eligible + registrations + officialAssignments + IFAA master)
 async function loadCouncilRoundStudents(roundId) {
   if (!roundId) return [];
