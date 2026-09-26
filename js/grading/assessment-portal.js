@@ -1,6 +1,63 @@
 
 // --- Module Bridges ---
-const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
+const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : (reg?.officialSupervisors || []));
+
+function getStudentFullProfile(sid, targetRound) {
+  const round = targetRound || (state.rounds || []).find(r => r.id === state.selectedAssessmentRoundId) || state.activeRound;
+  if (!round) return { studentId: sid, mssv: sid };
+
+  const officialAsgn = (round.officialAssignments || []).find(a => (a.studentId || a.id || a.mssv) === sid);
+  const reg = (round.registrations || []).find(r => (r.studentId || r.mssv || r.id) === sid);
+  const adminReg = (state.adminReviewData?.registrations || []).find(r => (r.studentId || r.mssv || r.id) === sid);
+  const eligible = (round.eligibleStudents || []).find(e => (e.studentId || e.mssv || e.id) === sid);
+  const fac = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(sid) : null;
+
+  const base = {
+    studentId: sid,
+    mssv: sid,
+    ...(eligible || {}),
+    ...(adminReg || {}),
+    ...(reg || {}),
+    ...(officialAsgn || {})
+  };
+
+  if (fac && !fac.isMissing) {
+    base.fullName = base.fullName || base.name || fac.fullName || fac.name;
+    base.name = base.name || base.fullName;
+    base.studentClass = base.studentClass || base.className || fac.studentClass || fac.className;
+    base.className = base.studentClass;
+    base.major = base.major || fac.major;
+  }
+
+  if (!base.officialSupervisors || base.officialSupervisors.length === 0) {
+    if (typeof window.getOfficialSupervisors === 'function') {
+      base.officialSupervisors = window.getOfficialSupervisors(base);
+    }
+  }
+
+  return base;
+}
+
+function formatStudentSupervisorsForDisplay(reg) {
+  if (!reg) return '<span class="text-slate-400 font-medium">Chưa phân công</span>';
+  const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(reg) : (reg.officialSupervisors || []);
+  if (Array.isArray(officials) && officials.length > 0) {
+    if (officials.length === 1) {
+      const name = officials[0].supervisorName || officials[0].name || reg.acceptedSupervisorName || reg.supervisorName;
+      return name ? `<span class="font-bold text-slate-800">${escapeHtml(name)}</span>` : '<span class="text-slate-400 font-medium">Chưa phân công</span>';
+    }
+    return officials.map(s => {
+      const role = (s.role === 'primary') ? 'GVHD chính' : 'GVHD 2';
+      const name = s.supervisorName || s.name || '';
+      return `<div class="font-bold text-slate-800">${escapeHtml(name)} <span class="text-purple-600 font-mono text-[10px]">(${role})</span></div>`;
+    }).join('');
+  }
+  const legacy = reg.acceptedSupervisorName || reg.supervisorName || reg.finalSupervisorName;
+  if (legacy) {
+    return `<span class="font-bold text-slate-800">${escapeHtml(legacy)}</span>`;
+  }
+  return '<span class="text-slate-400 font-medium">Chưa phân công</span>';
+}
 // ============================================================================
 // PHASE 4: ASSESSMENT PORTAL ENGINE
 // ============================================================================
@@ -231,14 +288,25 @@ window.renderAssessmentWorkspace = async function() {
     { key: 'duyet-3', visible: caps.canDuyet3 },
     { key: 'thesis', visible: caps.canThesis },
     { key: 'preliminary', visible: caps.canPreliminary },
-    { key: 'defense', visible: caps.canDefense },
-    { key: 'summary', visible: caps.canSummary }
+    { key: 'defense', visible: caps.canDefense }
   ];
+
+  const visibleTabs = tabConfig.filter(t => t.visible);
+
+  // If only 1 tab is available, hide the horizontal tabs container completely
+  const tabsContainer = document.getElementById('assessment-tabs-container');
+  if (tabsContainer) {
+    if (visibleTabs.length <= 1) {
+      tabsContainer.classList.add('hidden');
+    } else {
+      tabsContainer.classList.remove('hidden');
+    }
+  }
 
   tabConfig.forEach(tab => {
     const btn = document.getElementById('atab-btn-' + tab.key);
     if (btn) {
-      if (tab.visible) btn.classList.remove('hidden');
+      if (tab.visible && visibleTabs.length > 1) btn.classList.remove('hidden');
       else btn.classList.add('hidden');
     }
   });
@@ -246,7 +314,7 @@ window.renderAssessmentWorkspace = async function() {
   // Ensure current active tab is visible
   const activeTabConfig = tabConfig.find(t => t.key === state.assessmentTab);
   if (!activeTabConfig || !activeTabConfig.visible) {
-    const firstVisible = tabConfig.find(t => t.visible);
+    const firstVisible = visibleTabs[0];
     if (firstVisible) state.assessmentTab = firstVisible.key;
   }
 
@@ -255,13 +323,13 @@ window.renderAssessmentWorkspace = async function() {
   if (roleBadge) {
     if (actor.isAdmin) {
       roleBadge.textContent = state.assessmentAdminScope === 'all' ? 'Quản trị viên (Toàn bộ đợt)' : 'Quản trị viên';
-      roleBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200';
+      roleBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-500/30 text-purple-200 border border-purple-400/30';
     } else if (caps.canDefense) {
       roleBadge.textContent = 'Thành viên Hội đồng';
-      roleBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200';
+      roleBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-500/30 text-purple-200 border border-purple-400/30';
     } else {
       roleBadge.textContent = 'Cán bộ Đánh giá';
-      roleBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200';
+      roleBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-500/30 text-indigo-200 border border-indigo-400/30';
     }
   }
 
@@ -526,13 +594,14 @@ window.renderAssessmentDuyetList = function(phase) {
   const uEmail = (actor.email || '').toLowerCase().trim();
   const uId = actor.uid || actor.email;
   const isViewAll = actor.isAdmin && state.assessmentAdminScope === 'all';
-  const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
+  const rawRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
-    : (targetRound.eligibleStudents || []);
+    : (targetRound.eligibleStudents || targetRound.registrations || []);
+  const allRegs = rawRegs.map(s => getStudentFullProfile(s.mssv || s.studentId || s.id, targetRound));
 
   const candidates = allRegs.filter(s => {
     if (isViewAll) return true;
-    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : [];
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : (s.officialSupervisors || []);
     return officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase() === uEmail));
   });
 
@@ -633,9 +702,10 @@ window.renderAssessmentThesisList = function() {
   const uEmail = (actor.email || '').toLowerCase().trim();
   const uId = actor.uid || actor.email;
   const isViewAll = actor.isAdmin && state.assessmentAdminScope === 'all';
-  const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
+  const rawRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
-    : (targetRound.eligibleStudents || []);
+    : (targetRound.eligibleStudents || targetRound.registrations || []);
+  const allRegs = rawRegs.map(s => getStudentFullProfile(s.mssv || s.studentId || s.id, targetRound));
 
   const reviewerAssignments = targetRound.reviewerAssignments || {};
 
@@ -643,7 +713,7 @@ window.renderAssessmentThesisList = function() {
     if (isViewAll) return true;
     const sid = s.mssv || s.studentId;
     const isReviewer = (reviewerAssignments[sid] === uId || reviewerAssignments[sid] === uEmail);
-    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : [];
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : (s.officialSupervisors || []);
     const isSup = officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase() === uEmail));
     return isReviewer || isSup;
   });
@@ -753,9 +823,10 @@ window.renderAssessmentPreliminaryList = function() {
   const actor = getEffectiveActor();
   const uEmail = (actor.email || '').toLowerCase().trim();
   const uId = actor.uid || actor.email;
-  const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
+  const rawRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
-    : (targetRound.eligibleStudents || []);
+    : (targetRound.eligibleStudents || targetRound.registrations || []);
+  const allRegs = rawRegs.map(s => getStudentFullProfile(s.mssv || s.studentId || s.id, targetRound));
 
   const scoreResolver = (s) => {
     const sid = s.mssv || s.studentId;
@@ -869,11 +940,15 @@ window.renderAssessmentDefenseList = function() {
   });
 
   const councilSelect = document.getElementById('assessment-council-select');
+  const selectWrapper = document.getElementById('assessment-council-select-wrapper');
+  const singleTitleEl = document.getElementById('assessment-council-single-title');
   const bannerEl = document.getElementById('assessment-council-info-banner');
   const actionBoxEl = document.getElementById('assessment-council-action-box');
 
   if (availableCouncils.length === 0) {
     if (councilSelect) councilSelect.innerHTML = '<option value="">-- Chưa được phân công Hội đồng nào --</option>';
+    if (selectWrapper) selectWrapper.classList.add('hidden');
+    if (singleTitleEl) singleTitleEl.classList.add('hidden');
     if (bannerEl) bannerEl.classList.add('hidden');
     if (actionBoxEl) actionBoxEl.classList.add('hidden');
     container.innerHTML = '<div class="p-8 bg-white rounded-2xl border border-slate-200 text-center text-slate-400 text-xs font-medium">Thầy/Cô chưa có phân công trong Hội đồng bảo vệ nào của đợt này.</div>';
@@ -883,15 +958,26 @@ window.renderAssessmentDefenseList = function() {
   if (bannerEl) bannerEl.classList.remove('hidden');
   if (actionBoxEl) actionBoxEl.classList.remove('hidden');
 
-  if (councilSelect) {
-    councilSelect.innerHTML = availableCouncils.map(item => {
-      return `<option value="${item.council.id}">${item.council.name} (${item.act.title})</option>`;
-    }).join('');
-
-    if (!state.selectedAssessmentCouncilId || !availableCouncils.some(item => item.council.id === state.selectedAssessmentCouncilId)) {
-      state.selectedAssessmentCouncilId = availableCouncils[0].council.id;
+  if (availableCouncils.length === 1) {
+    if (selectWrapper) selectWrapper.classList.add('hidden');
+    if (singleTitleEl) {
+      singleTitleEl.classList.remove('hidden');
+      singleTitleEl.textContent = `${availableCouncils[0].council.name} (${availableCouncils[0].act.title || 'Đồ án'})`;
     }
-    councilSelect.value = state.selectedAssessmentCouncilId;
+    state.selectedAssessmentCouncilId = availableCouncils[0].council.id;
+  } else {
+    if (selectWrapper) selectWrapper.classList.remove('hidden');
+    if (singleTitleEl) singleTitleEl.classList.add('hidden');
+    if (councilSelect) {
+      councilSelect.innerHTML = availableCouncils.map(item => {
+        return `<option value="${item.council.id}">${item.council.name} (${item.act.title})</option>`;
+      }).join('');
+
+      if (!state.selectedAssessmentCouncilId || !availableCouncils.some(item => item.council.id === state.selectedAssessmentCouncilId)) {
+        state.selectedAssessmentCouncilId = availableCouncils[0].council.id;
+      }
+      councilSelect.value = state.selectedAssessmentCouncilId;
+    }
   }
 
   // Current council info
@@ -900,13 +986,10 @@ window.renderAssessmentDefenseList = function() {
   const council = currentItem.council;
   state.selectedAssessmentCouncilId = council.id;
 
-  // Banner details
+  // Banner details (Room & Schedule only, NO members list)
   const nameEl = document.getElementById('assessment-cinfo-name');
   const statusEl = document.getElementById('assessment-cinfo-status');
   const timeRoomEl = document.getElementById('assessment-cinfo-time-room');
-  const chairEl = document.getElementById('assessment-cinfo-chair');
-  const secEl = document.getElementById('assessment-cinfo-secretary');
-  const memEl = document.getElementById('assessment-cinfo-members');
 
   if (nameEl) nameEl.textContent = council.name || 'Hội đồng Bảo vệ';
   if (statusEl) {
@@ -917,66 +1000,19 @@ window.renderAssessmentDefenseList = function() {
     timeRoomEl.textContent = `📍 Phòng: ${council.room || 'Chưa cập nhật'} • 📅 Ngày: ${council.date || '--'} (${council.startTime || '--'} – ${council.endTime || '--'})`;
   }
 
-  const membersBySlot = council.membersBySlot || {};
-  const membersList = Object.entries(membersBySlot).map(([slotKey, m]) => ({ ...m, slotKey }));
-
-  // Find Chair
-  const chairMember = membersList.find(m => 
-    m.slotKey === 'chair' || 
-    m.roleKey === 'chair' || 
-    String(m.role || '').toLowerCase().includes('chủ tịch')
-  );
-  // Find Secretary
-  const secMember = membersList.find(m => 
-    m.slotKey === 'secretary' || 
-    m.roleKey === 'secretary' || 
-    String(m.role || '').toLowerCase().includes('thư ký')
-  );
-  // Other Members
-  const otherMembers = membersList.filter(m => m !== chairMember && m !== secMember && (m.memberName || m.name));
-
-  const chairName = chairMember?.memberName || chairMember?.name || '';
-  const secName = secMember?.memberName || secMember?.name || '';
-
-  const chairRow = chairEl?.parentElement;
-  if (chairRow) {
-    if (chairName) {
-      chairRow.classList.remove('hidden');
-      if (chairEl) chairEl.textContent = `${chairName}${chairMember.memberEmail ? ` <${chairMember.memberEmail}>` : ''}`;
-    } else {
-      chairRow.classList.add('hidden');
-    }
-  }
-
-  const secRow = secEl?.parentElement;
-  if (secRow) {
-    if (secName) {
-      secRow.classList.remove('hidden');
-      if (secEl) secEl.textContent = `${secName}${secMember.memberEmail ? ` <${secMember.memberEmail}>` : ''}`;
-    } else {
-      secRow.classList.add('hidden');
-    }
-  }
-
-  const memRow = memEl?.parentElement;
-  if (memRow) {
-    if (otherMembers.length > 0) {
-      memRow.classList.remove('hidden');
-      if (memEl) memEl.textContent = otherMembers.map(m => `${m.memberName || m.name} (${m.role || 'Ủy viên'})`).join(', ');
-    } else {
-      memRow.classList.add('hidden');
-    }
-  }
-
   // Assigned students in this council
   const assignments = (act.councilStudentAssignments || []).filter(a => a.councilId === council.id);
-  const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
-    ? state.adminReviewData.registrations
-    : (targetRound.eligibleStudents || []);
 
-  const studentsInCouncil = assignments.map(a => {
-    const sObj = allRegs.find(s => (s.mssv || s.studentId) === a.studentId) || { studentId: a.studentId };
-    return { ...sObj, ...a };
+  const studentsInCouncil = assignments.map((a, idx) => {
+    const fullProfile = getStudentFullProfile(a.studentId, targetRound);
+    return { ...fullProfile, ...a, _origIdx: idx };
+  });
+
+  // SORT STRICTLY BY PRESENTATION ORDER (LƯỢT BÁO CÁO)
+  studentsInCouncil.sort((a, b) => {
+    const orderA = (a.presentationOrder !== undefined && a.presentationOrder !== null && a.presentationOrder !== '') ? Number(a.presentationOrder) : ((a.order !== undefined && a.order !== null) ? Number(a.order) : a._origIdx + 1);
+    const orderB = (b.presentationOrder !== undefined && b.presentationOrder !== null && b.presentationOrder !== '') ? Number(b.presentationOrder) : ((b.order !== undefined && b.order !== null) ? Number(b.order) : b._origIdx + 1);
+    return orderA - orderB;
   });
 
   const tabBadge = document.getElementById('atab-badge-defense');
@@ -1000,63 +1036,71 @@ window.renderAssessmentDefenseList = function() {
 
   container.innerHTML = studentsInCouncil.map((s, idx) => {
     const sid = s.mssv || s.studentId;
-    const name = s.fullName || s.studentName || sid;
+    const name = s.fullName || s.studentName || s.name || sid;
     const topic = s.topicTitle || 'Chưa cập nhật đề tài';
-    const supName = formatStudentSupervisorsForDisplay(s);
-    const initial = (name || 'SV').charAt(0).toUpperCase();
+    const supDisplay = formatStudentSupervisorsForDisplay(s);
+    const orderNum = s.presentationOrder || s.order || (idx + 1);
 
     // Defense status from council engine
     const defenseScore = s.defenseScore != null ? Number(s.defenseScore).toFixed(1) : '--';
     const defenseStatus = s.presentationStatus || 'pending';
-    let statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Chưa báo cáo</span>';
+    let statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">Chưa báo cáo</span>';
     if (defenseStatus === 'presenting') {
-      statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">Đang báo cáo</span>';
+      statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse whitespace-nowrap">Đang báo cáo</span>';
     } else if (defenseStatus === 'completed') {
-      statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã hoàn tất</span>';
+      statusBadge = '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">✓ Đã hoàn tất</span>';
     }
 
     return `
-      <div class="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 hover:border-purple-300 hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <!-- Left: Info -->
-        <div class="flex items-start gap-3.5 min-w-[260px] max-w-sm">
-          <div class="w-11 h-11 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 font-black text-sm flex items-center justify-center shrink-0">
-            ${idx + 1}
+      <div class="grid grid-cols-1 md:grid-cols-12 items-center gap-3 p-4 bg-white rounded-2xl border border-slate-200 hover:border-purple-300 hover:shadow-md transition-all duration-300 transform hover:-translate-y-0.5">
+        <!-- Col 1: STT Lượt (Col span 1) -->
+        <div class="hidden md:flex md:col-span-1 items-center justify-center">
+          <div class="w-10 h-10 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 font-black text-sm flex items-center justify-center shadow-2xs">
+            ${orderNum}
           </div>
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <h4 class="font-black text-slate-900 text-sm leading-tight">${name}</h4>
-              <span class="font-mono text-xs font-bold text-slate-500">${sid}</span>
+        </div>
+
+        <!-- Col 2: Info Sinh viên & Đề tài (Col span 4) -->
+        <div class="col-span-1 md:col-span-4 min-w-0 pr-2 space-y-1">
+          <div class="flex items-center gap-2">
+            <div class="md:hidden w-7 h-7 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 font-black text-xs flex items-center justify-center shrink-0">
+              ${orderNum}
             </div>
-            <p class="text-xs text-slate-600 line-clamp-1" title="${escapeHtml(topic)}">
-              <strong>Đề tài:</strong> ${escapeHtml(topic)}
-            </p>
+            <h4 class="font-black text-slate-900 text-sm leading-tight truncate" title="${escapeHtml(name)}">${escapeHtml(name)}</h4>
+            <span class="font-mono text-xs font-bold text-slate-500 shrink-0">${sid}</span>
+          </div>
+          <p class="text-xs text-slate-600 truncate" title="${escapeHtml(topic)}">
+            <span class="text-slate-400 font-medium">Đề tài:</span> ${escapeHtml(topic)}
+          </p>
+        </div>
+
+        <!-- Col 3: GVHD (Col span 3 - EXACT FIXED ALIGNMENT) -->
+        <div class="col-span-1 md:col-span-3 min-w-0 md:px-3 md:border-l md:border-slate-100">
+          <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">GVHD</span>
+          <div class="text-xs truncate mt-0.5" title="${escapeHtml(s.acceptedSupervisorName || '')}">
+            ${supDisplay}
           </div>
         </div>
 
-        <!-- Middle: Supervisors & presentation order -->
-        <div class="flex flex-col sm:flex-row sm:items-center gap-4 text-xs text-slate-600 md:px-4 md:border-x md:border-slate-100 flex-1">
-          <div>
-            <span class="text-slate-400 block text-[10px] uppercase font-bold">GVHD</span>
-            <span class="font-semibold text-slate-800">${supName}</span>
-          </div>
-          <div>
-            <span class="text-slate-400 block text-[10px] uppercase font-bold">Thứ tự báo cáo</span>
-            <span class="font-bold text-slate-800">Lượt #${s.presentationOrder || (idx + 1)}</span>
+        <!-- Col 4: Thứ tự báo cáo (Col span 2 - EXACT FIXED ALIGNMENT) -->
+        <div class="col-span-1 md:col-span-2 min-w-0 md:px-3 md:border-l md:border-slate-100">
+          <span class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Thứ tự báo cáo</span>
+          <div class="text-xs font-bold text-purple-900 mt-0.5">
+            Lượt #${orderNum}
           </div>
         </div>
 
-        <!-- Right: Status & Workspace button -->
-        <div class="flex items-center justify-between md:justify-end gap-3 shrink-0">
-          <div class="text-right">
-            <div class="text-sm font-black text-purple-900">${defenseScore !== '--' ? defenseScore + '/10' : '--'}</div>
-            <div class="mt-0.5">${statusBadge}</div>
+        <!-- Col 5: Trạng thái & Action (Col span 2) -->
+        <div class="col-span-1 md:col-span-2 flex items-center justify-between md:justify-end gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+          <div class="text-right shrink-0">
+            <div class="text-sm font-black text-purple-900 leading-none">${defenseScore !== '--' ? defenseScore + '/10' : '--'}</div>
+            <div class="mt-1">${statusBadge}</div>
           </div>
-          <button type="button" onclick="openCouncilWorkspace('${targetRound.id}', '${act.id}', '${council.id}', '${sid}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0">
+          <button type="button" onclick="openCouncilWorkspace('${targetRound.id}', '${act.id}', '${council.id}', '${sid}')" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0">
             <span>🏛️</span> <span>Vào phòng chấm</span>
           </button>
         </div>
       </div>
-    `;
   }).join('');
 };
 
