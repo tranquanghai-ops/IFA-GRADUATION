@@ -793,6 +793,10 @@ window.submitRegistration = async function() {
     }, { merge: true });
     await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload, { merge: true });
     
+    if (typeof window.trackUserActivity === 'function') {
+      window.trackUserActivity('Đăng ký đề tài', { context: payload.topicTitle });
+    }
+
     showToast(directAssignment
       ? (primaryPublishedSupervisor ? '🎉 ĐĂNG KÝ THÀNH CÔNG! GVHD đã phân công được giữ nguyên.' : '🎉 ĐĂNG KÝ THÀNH CÔNG! Vui lòng chờ Khoa phân công GVHD.')
       : '🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
@@ -945,6 +949,9 @@ window.submitUpdatedTopicTitle = async function() {
     }
 
     closeEditTopicTitleModal();
+    if (typeof window.trackUserActivity === 'function') {
+      window.trackUserActivity(`Chỉnh sửa tên đề tài (Lần ${nextVersion})`, { context: newTitle });
+    }
     showToast(`🎉 Đã cập nhật tên đề tài (Lần ${nextVersion}) và chuyển GVHD duyệt lại!`, 'success');
   } catch (err) {
     console.error('Lỗi khi cập nhật tên đề tài:', err);

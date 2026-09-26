@@ -22,7 +22,10 @@ import './js/grading.js?v=2.7.4';
 // 5. Exact Act-As Impersonation Test Mode
 import './js/impersonation.js';
 
-// 6. Authentication, Roles & Session Router (Initializes onAuthStateChanged)
+// 6. User Activity & Login Tracker
+import './js/tracking/user-activity-tracker.js';
+
+// 7. Authentication, Roles & Session Router (Initializes onAuthStateChanged)
 import './js/auth.js';
 
 // Bootstrap Notice

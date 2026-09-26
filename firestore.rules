@@ -29,6 +29,17 @@ service cloud.firestore {
     }
 
     // ==========================================
+    // USER ACTIVITY & LOGIN TRACKING
+    // ==========================================
+    match /userActivities/{userEmail} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && (
+        email().lower() == userEmail.lower() || admin()
+      );
+      allow delete: if admin();
+    }
+
+    // ==========================================
     // IFA GRADUATION MASTER CATALOGS
     // ==========================================
     

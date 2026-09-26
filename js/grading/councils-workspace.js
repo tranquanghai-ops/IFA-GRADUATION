@@ -160,6 +160,22 @@ function renderCouncilCards(act) {
       }
     });
 
+    const membersSummaryList = slots.map(s => {
+      const assigned = membersBySlot[s.key];
+      if (!assigned || (!assigned.memberName && !assigned.name)) return '';
+      const name = assigned.memberName || assigned.name;
+      const email = assigned.memberEmail || assigned.email || assigned.memberId || '';
+      const badge = typeof window.renderUserActivityBadge === 'function'
+        ? window.renderUserActivityBadge(email, { compact: true })
+        : '';
+      return `
+        <div class="flex items-center justify-between text-[11px] py-1 border-b border-slate-100 last:border-0">
+          <span class="text-slate-700 font-semibold truncate"><b class="text-indigo-900 font-bold">${escapeHtml(s.label || s.key)}:</b> ${escapeHtml(name)}</span>
+          <span class="shrink-0 ml-1.5">${badge}</span>
+        </div>
+      `;
+    }).filter(Boolean).join('');
+
     let statusBadge = '<span class="badge bg-slate-100 text-slate-700 font-bold">Chuẩn bị</span>';
     if (c.status === 'ongoing') statusBadge = '<span class="badge bg-emerald-100 text-emerald-800 font-bold">● Đang diễn ra</span>';
     else if (c.status === 'completed') statusBadge = '<span class="badge bg-slate-200 text-slate-600 font-bold">✓ Đã kết thúc</span>';
@@ -186,6 +202,13 @@ function renderCouncilCards(act) {
         </div>
 
         ${presentingStudentHtml}
+
+        ${membersSummaryList ? `
+          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Thành viên HĐ & Truy cập:</span>
+            ${membersSummaryList}
+          </div>
+        ` : ''}
 
         <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
@@ -284,12 +307,12 @@ function renderCouncilStudentsTab(act) {
   if (countTag) countTag.textContent = `Hiển thị: ${filteredStudents.length} sinh viên`;
 
   if (roundStudents.length === 0 && state.councilStudentsLoading) {
-    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-500">⏳ Đang tải danh sách sinh viên đợt tốt nghiệp...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500">⏳ Đang tải danh sách sinh viên đợt tốt nghiệp...</td></tr>';
     return;
   }
 
   if (filteredStudents.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">Không có sinh viên phù hợp điều kiện lọc.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400">Không có sinh viên phù hợp điều kiện lọc.</td></tr>';
     return;
   }
 
@@ -314,6 +337,10 @@ function renderCouncilStudentsTab(act) {
     } else if (status === 'presented') {
       statusPill = '<span class="badge bg-indigo-100 text-indigo-800 font-bold">✓ Đã xong</span>';
     }
+
+    const activityBadge = typeof window.renderUserActivityBadge === 'function'
+      ? window.renderUserActivityBadge(sid)
+      : '<span class="text-slate-400 text-xs">--</span>';
 
     return `
       <tr class="hover:bg-slate-50 transition-colors">
@@ -340,6 +367,7 @@ function renderCouncilStudentsTab(act) {
             </div>
           ` : '<span class="text-slate-300 font-mono">--</span>'}
         </td>
+        <td class="p-3 whitespace-nowrap">${activityBadge}</td>
         <td class="p-3 text-center whitespace-nowrap space-x-1">
           ${assignedCouncilId ? `
             ${statusPill}

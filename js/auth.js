@@ -63,6 +63,14 @@ export async function setupAuthListener() {
           state.impersonation = null;
         }
 
+        // 1.3 Ghi nhận đăng nhập & Theo dõi hoạt động
+        if (typeof window.recordUserLogin === 'function') {
+          window.recordUserLogin(user).catch(() => {});
+        }
+        if (state.realIsAdmin && typeof window.loadUserActivities === 'function') {
+          window.loadUserActivities().catch(() => {});
+        }
+
         updateAuthUI();
 
         // 2. Kích hoạt ngay view ban đầu để UI hiển thị tức thì

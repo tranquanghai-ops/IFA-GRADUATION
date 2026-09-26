@@ -67,6 +67,10 @@ window.saveCouncilScoreRecord = async function(roundId, scoreData) {
   if (!state.councilScores) state.councilScores = {};
   state.councilScores[legacyKey] = docPayload;
 
+  if (typeof window.trackUserActivity === 'function') {
+    window.trackUserActivity(`Chấm điểm SV ${stId}`, { context: `Hội đồng ${cId}` });
+  }
+
   return { success: true, scoreId, docPayload, subcolSuccess };
 };
 

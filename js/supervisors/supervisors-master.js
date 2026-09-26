@@ -736,6 +736,7 @@ window.saveSupervisorMaster = async function(e) {
 window.loadAdminRoundSupervisors = async function(roundId) {
   try {
     const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'supervisors'));
+    if (typeof window.loadUserActivities === 'function') await window.loadUserActivities().catch(() => {});
     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderAdminRoundSupervisorsTable(roundId, list);
   } catch (e) {
@@ -748,7 +749,7 @@ function renderAdminRoundSupervisorsTable(roundId, list) {
   if (!tbody) return;
 
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400">Chưa có GVHD nào trong đợt này. Bấm "+ Thêm GVHD từ kho Master" để thêm.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Chưa có GVHD nào trong đợt này. Bấm "+ Thêm GVHD từ kho Master" để thêm.</td></tr>';
     return;
   }
 
@@ -760,6 +761,10 @@ function renderAdminRoundSupervisorsTable(roundId, list) {
       ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 ml-1">Thỉnh giảng (tối đa 5)</span>'
       : '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 ml-1">Cơ hữu (tối đa 10)</span>';
 
+    const supEmail = supMaster?.email || s.email || s.id;
+    const activityBadge = typeof window.renderUserActivityBadge === 'function'
+      ? window.renderUserActivityBadge(supEmail)
+      : '<span class="text-slate-400 text-xs">--</span>';
     return `
       <tr class="hover:bg-slate-50">
         <td class="p-3.5">
@@ -776,6 +781,7 @@ function renderAdminRoundSupervisorsTable(roundId, list) {
             <span class="text-xs font-semibold">${s.activeInRound !== false ? 'Hoạt động' : 'Tạm ẩn'}</span>
           </label>
         </td>
+        <td class="p-3.5 whitespace-nowrap">${activityBadge}</td>
         <td class="p-3.5 text-right space-x-2">
           <button onclick="saveRoundSupervisorRow('${roundId}', '${s.id}')" class="text-emerald-600 font-bold hover:underline">Lưu</button>
           <button onclick="removeRoundSupervisor('${roundId}', '${s.id}')" class="text-rose-600 font-bold hover:underline">Bỏ khỏi đợt</button>

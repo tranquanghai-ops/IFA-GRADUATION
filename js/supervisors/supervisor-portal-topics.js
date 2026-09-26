@@ -62,6 +62,10 @@ window.reviewStudentTopicTitle = async function(studentId, decision) {
     registration.topicApprovalStatus = decision;
     registration.topicApprovalNote = note.trim();
     registration.topicTitleHistory = history;
+    if (typeof window.trackUserActivity === 'function') {
+      const actionText = decision === 'approved' ? `Duyệt đề tài SV ${studentId}` : (decision === 'rejected' ? `Yêu cầu SV ${studentId} sửa đề tài` : `Hủy duyệt đề tài SV ${studentId}`);
+      window.trackUserActivity(actionText, { context: registration.topicTitle });
+    }
     renderSupervisorAssignedStudents();
     showToast(decision === 'approved' ? 'Đã duyệt tên đề tài.' : (decision === 'rejected' ? 'Đã gửi yêu cầu sinh viên chỉnh sửa tên đề tài.' : 'Đã hủy trạng thái duyệt tên đề tài.'), 'success');
   } catch (err) {

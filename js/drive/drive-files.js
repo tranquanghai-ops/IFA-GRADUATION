@@ -810,6 +810,10 @@ window.saveSubmissionAttemptRecord = async function(roundId, activityId, student
     // Parent round doc is kept clean without appending submission payload arrays.
   }
 
+  if (typeof window.trackUserActivity === 'function') {
+    window.trackUserActivity(`Nộp bài mốc ${activityId}`, { context: `Biên nhận: ${receiptId}` });
+  }
+
   return { success: true, submissionId, attemptNumber: attemptNum, receiptId, docPayload, subcolSuccess };
 };
 

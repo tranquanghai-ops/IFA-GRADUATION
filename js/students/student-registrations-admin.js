@@ -7,6 +7,9 @@ window.loadAdminRegistrations = async function(roundId) {
       getDocs(collection(db, 'graduationRounds', roundId, 'registrations')),
       getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents'))
     ]);
+    if (typeof window.loadUserActivities === 'function') {
+      await window.loadUserActivities().catch(() => {});
+    }
     const regs = regSnap.docs.map(d => ({ id: d.id, ...d.data(), isRegistered: true, registrationStatus: 'registered' }));
     const regMssvSet = new Set(regs.map(r => String(r.studentId || r.mssv || r.id).trim().toUpperCase()));
 
@@ -73,7 +76,7 @@ function renderAdminRegistrationsTable(list) {
   if (!tbody) return;
 
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="11" class="p-6 text-center text-slate-400 font-medium">Không có sinh viên nào phù hợp bộ lọc.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="p-6 text-center text-slate-400 font-medium">Không có sinh viên nào phù hợp bộ lọc.</td></tr>';
     return;
   }
 
@@ -104,6 +107,10 @@ function renderAdminRegistrationsTable(list) {
       }
     }
 
+    const activityBadge = typeof window.renderUserActivityBadge === 'function'
+      ? window.renderUserActivityBadge(r.studentId)
+      : '<span class="text-slate-400 text-xs">--</span>';
+
     return `
       <tr class="hover:bg-slate-50 transition-colors">
         <td class="p-3.5 font-mono font-bold text-slate-900">${escapeHtml(r.studentId)}</td>
@@ -116,6 +123,7 @@ function renderAdminRegistrationsTable(list) {
         <td class="p-3.5 text-slate-600">${escapeHtml(getSupName(3))}</td>
         <td class="p-3.5 text-center">${elBadge}</td>
         <td class="p-3.5 whitespace-nowrap">${reviewBadge}</td>
+        <td class="p-3.5 whitespace-nowrap">${activityBadge}</td>
         <td class="p-3.5 text-[11px] text-slate-400 whitespace-nowrap">${subDate ? subDate.toLocaleString('vi-VN') : '--'}</td>
       </tr>
     `;

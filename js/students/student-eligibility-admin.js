@@ -125,6 +125,9 @@ window.loadAdminEligibleStudents = async function(roundId) {
       getDocs(collection(db, 'graduationRounds', roundId, 'officialAssignments')),
       getDocs(collection(db, 'graduationRounds', roundId, 'assignmentDrafts'))
     ]);
+    if (typeof window.loadUserActivities === 'function') {
+      await window.loadUserActivities().catch(() => {});
+    }
     if (document.getElementById('admin-round-student-select')?.value !== roundId) return;
     state.eligibleStudents = eligibleSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     state.eligibleStudentDetails = {
@@ -228,7 +231,7 @@ function renderAdminEligibleStudentsTable() {
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-400 font-medium">Chưa có dữ liệu sinh viên trong đợt này. Tải file Excel lên để nhập danh sách.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-slate-400 font-medium">Chưa có dữ liệu sinh viên trong đợt này. Tải file Excel lên để nhập danh sách.</td></tr>';
     return;
   }
 
@@ -239,6 +242,11 @@ function renderAdminEligibleStudentsTable() {
       : (status.preferences.length
         ? `<div class="mt-1 text-[11px] text-slate-600">${status.preferences.map(escapeHtml).join(' · ')}</div>`
         : (directAssignment ? '<div class="mt-1 text-[11px] text-slate-500">GVHD: Chưa phân công</div>' : ''));
+    
+    const activityBadge = typeof window.renderUserActivityBadge === 'function'
+      ? window.renderUserActivityBadge(s.studentId)
+      : '<span class="text-slate-400 text-xs">--</span>';
+
     return `
     <tr class="hover:bg-slate-50 transition-colors">
       <td class="p-3 font-mono font-bold text-slate-900">${escapeHtml(s.studentId)}</td>
@@ -250,6 +258,7 @@ function renderAdminEligibleStudentsTable() {
       <td class="p-3 font-mono text-slate-700">${String(s.resolvedClass).includes('<span') ? s.resolvedClass : escapeHtml(s.resolvedClass)}</td>
       <td class="p-3 text-slate-700">${escapeHtml(s.resolvedMajor)}</td>
       <td class="p-3"><span class="badge badge-open">Đủ ĐK</span></td>
+      <td class="p-3 whitespace-nowrap">${activityBadge}</td>
       <td class="p-3 text-right">
         <button type="button" onclick="deleteEligibleStudent('${s.studentId}')" class="text-rose-600 hover:underline font-bold text-xs cursor-pointer">Xóa</button>
       </td>
