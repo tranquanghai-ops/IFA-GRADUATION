@@ -287,8 +287,12 @@ window.renderSupervisorReviewerList = function() {
 // --- 5. GENERIC SCORE ENTRY MODAL (SƠ KHẢO, GVHD, TM HD, TM PB) ---
 
 window.openScoreEntryModal = function(type, studentId) {
-  const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
+  const targetRoundId = state.selectedAssessmentRoundId || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === targetRoundId) || state.activeRound;
   if (!targetRound) return;
+  state.selectedRoundId = targetRound.id;
+  state.activeCouncilManagement = state.activeCouncilManagement || {};
+  state.activeCouncilManagement.roundId = targetRound.id;
 
   const sObj = findStudentInRound(studentId);
   const sName = sObj?.fullName || sObj?.studentName || studentId;
@@ -389,8 +393,10 @@ window.saveScoreEntry = async function(isCompleted) {
   const valStr = document.getElementById('score-entry-value').value;
   const comment = document.getElementById('score-entry-comment').value.trim();
 
-  const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
+  const targetRoundId = state.selectedAssessmentRoundId || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === targetRoundId) || state.activeRound;
   if (!targetRound || !studentId) return;
+  state.selectedRoundId = targetRound.id;
 
   const numVal = parseFloat(valStr);
   if (isCompleted) {

@@ -10,7 +10,8 @@ function renderScoringSection() {
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
   const council = (act?.councils || []).find(c => c.id === councilId);
 
-  if (!act?.scoringConfig?.enabled) {
+  const scoringEnabled = Boolean(act?.scoringConfig?.enabled !== false && (act?.councilEnabled || act?.scoringConfig?.enabled));
+  if (!scoringEnabled) {
     container.classList.add('hidden');
     return;
   }
@@ -28,7 +29,8 @@ function renderScoringSection() {
   const isCompleted = (savedScore?.status === 'completed' && !draft);
   const councilEnded = (council.status === 'ended' || council.status === 'completed');
 
-  const mode = act.scoringConfig.mode || 'numeric';
+  const scoringConfig = act.scoringConfig || { enabled: true, mode: 'defense_rubric' };
+  const mode = scoringConfig.mode || 'defense_rubric';
 
   let inputHtml = '';
   if (mode === 'letter') {
@@ -224,6 +226,12 @@ window.saveCurrentScore = async function(isCompleted) {
   const council = (act?.councils || []).find(c => c.id === councilId);
   if (!act || !council) return;
 
+  const effectiveScorer = getEffectiveActor();
+  const scorerId = effectiveScorer.uid || effectiveScorer.email;
+  const scorerEmail = (effectiveScorer.email || '').toLowerCase().trim();
+  const scorerName = effectiveScorer.displayName || auth?.roleName || 'Thành viên Hội đồng';
+  const scoreKey = `${activityId}_${councilId}_${sid}_${scorerId}`;
+
   const mode = act.scoringConfig?.mode || 'numeric';
   let val = '';
   let components = {};
@@ -308,12 +316,6 @@ window.saveCurrentScore = async function(isCompleted) {
     );
     if (!confirmed) return;
   }
-
-  const effectiveScorer = getEffectiveActor();
-  const scorerId = effectiveScorer.uid || effectiveScorer.email;
-  const scorerEmail = (effectiveScorer.email || '').toLowerCase().trim();
-  const scorerName = effectiveScorer.displayName || auth.roleName || 'Thành viên Hội đồng';
-  const scoreKey = `${activityId}_${councilId}_${sid}_${scorerId}`;
 
   let selectedLetterCode = undefined;
   let selectedLetterNumericValue = undefined;
@@ -435,7 +437,8 @@ function renderScorersProgress() {
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
   const council = (act?.councils || []).find(c => c.id === councilId);
   const sid = state.activeCouncilSelectedStudentId;
-  if (!act?.scoringConfig?.enabled || !sid || !council) {
+  const scoringEnabled = Boolean(act?.scoringConfig?.enabled !== false && (act?.councilEnabled || act?.scoringConfig?.enabled));
+  if (!scoringEnabled || !sid || !council) {
     container.classList.add('hidden');
     return;
   }

@@ -10,6 +10,7 @@ state.assessmentFilter = 'all';
 state.assessmentSearchQuery = '';
 state.selectedAssessmentRoundId = null;
 state.selectedAssessmentCouncilId = null;
+state.assessmentAdminScope = 'mine'; // 'mine' (default) or 'all'
 
 export function isUserMatchingCouncilMember(m, userEmail, userId) {
   if (!m) return false;
@@ -40,23 +41,9 @@ export function checkUserAssessmentCapabilities(round, userEmail = null, userId 
   const uEmail = (userEmail || actor.email || '').toLowerCase().trim();
   const uId = userId || actor.uid || actor.email;
 
-  if (actor.isAdmin) {
-    return {
-      isRoundAdmin: true,
-      canDuyet1: true,
-      canDuyet2: true,
-      canDuyet3: true,
-      canThesis: true,
-      canPreliminary: true,
-      canDefense: true,
-      canSummary: true,
-      hasAnyCapability: true
-    };
-  }
-
   if (!round) {
     return {
-      isRoundAdmin: false,
+      isRoundAdmin: Boolean(actor.isAdmin),
       canDuyet1: false,
       canDuyet2: false,
       canDuyet3: false,
@@ -102,19 +89,21 @@ export function checkUserAssessmentCapabilities(round, userEmail = null, userId 
     if (hasDefenseDuty) break;
   }
 
-  // Strictly only activate tabs where user has named responsibilities
-  const canDuyet1 = hasSupervisedStudents;
-  const canDuyet2 = hasSupervisedStudents;
-  const canDuyet3 = hasSupervisedStudents;
-  const canThesis = hasSupervisedStudents || hasReviewerAssignments;
-  const canPreliminary = hasPreliminaryDuty;
-  const canDefense = hasDefenseDuty;
-  const canSummary = false;
+  const isAdmin = Boolean(actor.isAdmin);
+  const isViewAll = (state.assessmentAdminScope === 'all' && isAdmin);
 
-  const hasAnyCapability = canDuyet1 || canDuyet2 || canDuyet3 || canThesis || canPreliminary || canDefense || canSummary;
+  const canDuyet1 = isViewAll ? true : hasSupervisedStudents;
+  const canDuyet2 = isViewAll ? true : hasSupervisedStudents;
+  const canDuyet3 = isViewAll ? true : hasSupervisedStudents;
+  const canThesis = isViewAll ? true : (hasSupervisedStudents || hasReviewerAssignments);
+  const canPreliminary = isViewAll ? true : hasPreliminaryDuty;
+  const canDefense = isViewAll ? true : hasDefenseDuty;
+  const canSummary = isAdmin;
+
+  const hasAnyCapability = isAdmin || canDuyet1 || canDuyet2 || canDuyet3 || canThesis || canPreliminary || canDefense || canSummary;
 
   return {
-    isRoundAdmin: false,
+    isRoundAdmin: isAdmin,
     canDuyet1,
     canDuyet2,
     canDuyet3,
@@ -126,6 +115,22 @@ export function checkUserAssessmentCapabilities(round, userEmail = null, userId 
   };
 }
 window.checkUserAssessmentCapabilities = checkUserAssessmentCapabilities;
+
+window.setAssessmentAdminScope = function(scope) {
+  state.assessmentAdminScope = scope;
+  const btnMine = document.getElementById('btn-ascope-mine');
+  const btnAll = document.getElementById('btn-ascope-all');
+  if (btnMine && btnAll) {
+    if (scope === 'all') {
+      btnAll.className = 'px-3 py-1 rounded-lg bg-white shadow-xs text-purple-900 font-bold transition';
+      btnMine.className = 'px-3 py-1 rounded-lg text-slate-600 hover:text-slate-900 transition';
+    } else {
+      btnMine.className = 'px-3 py-1 rounded-lg bg-white shadow-xs text-purple-900 font-bold transition';
+      btnAll.className = 'px-3 py-1 rounded-lg text-slate-600 hover:text-slate-900 transition';
+    }
+  }
+  renderAssessmentWorkspace();
+};
 
 window.initAssessmentPortal = async function() {
   if (!state.user) return;
@@ -209,7 +214,15 @@ window.renderAssessmentWorkspace = async function() {
   const targetRound = (state.rounds || []).find(r => r.id === state.selectedAssessmentRoundId) || state.activeRound;
   if (!targetRound) return;
 
+  const actor = getEffectiveActor();
   const caps = checkUserAssessmentCapabilities(targetRound);
+
+  // Admin Scope Toggle visibility
+  const scopeToggle = document.getElementById('assessment-admin-scope-toggle');
+  if (scopeToggle) {
+    scopeToggle.classList.toggle('hidden', !actor.isAdmin);
+    scopeToggle.classList.toggle('flex', Boolean(actor.isAdmin));
+  }
 
   // 1. Tab visibility
   const tabConfig = [
@@ -240,15 +253,15 @@ window.renderAssessmentWorkspace = async function() {
   // Update role badge in top bar
   const roleBadge = document.getElementById('assessment-user-role-badge');
   if (roleBadge) {
-    if (state.isAdmin) {
-      roleBadge.textContent = 'Quản trị viên';
-      roleBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200';
+    if (actor.isAdmin) {
+      roleBadge.textContent = state.assessmentAdminScope === 'all' ? 'Quản trị viên (Toàn bộ đợt)' : 'Quản trị viên';
+      roleBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200';
     } else if (caps.canDefense) {
       roleBadge.textContent = 'Thành viên Hội đồng';
-      roleBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200';
+      roleBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200';
     } else {
       roleBadge.textContent = 'Cán bộ Đánh giá';
-      roleBadge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200';
+      roleBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200';
     }
   }
 
@@ -261,17 +274,10 @@ window.renderAssessmentHeroCard = function() {
   const targetRound = (state.rounds || []).find(r => r.id === state.selectedAssessmentRoundId) || state.activeRound;
   if (!targetRound) return;
 
-  // Update Evaluator Profile Pill
   const actor = getEffectiveActor();
-  const evalHeroName = document.getElementById('hero-assessment-name');
-  const evalHeroEmail = document.getElementById('hero-assessment-email');
-  const evalHeroAvatar = document.getElementById('hero-assessment-avatar');
-  if (evalHeroName) evalHeroName.textContent = actor.displayName || 'Giảng viên';
-  if (evalHeroEmail) evalHeroEmail.textContent = actor.email || '--';
-  if (evalHeroAvatar) {
-    const photoUrl = actor.photoURL;
-    evalHeroAvatar.src = (photoUrl && photoUrl.trim()) ? photoUrl : getSupervisorAvatarSvgDataUri(actor.displayName || 'GV');
-  }
+  const uEmail = (actor.email || '').toLowerCase().trim();
+  const uId = actor.uid || actor.email;
+  const isViewAll = (state.assessmentAdminScope === 'all' && actor.isAdmin);
 
   const titleEl = document.getElementById('assessment-hero-round-title');
   if (titleEl) {
@@ -304,11 +310,9 @@ window.renderAssessmentHeroCard = function() {
   }
 
   // Metrics computation for user
-  const uEmail = (actor.email || '').toLowerCase().trim();
-  const uId = actor.uid || actor.email;
   const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
-    : (targetRound.eligibleStudents || []);
+    : (targetRound.registrations && targetRound.registrations.length > 0 ? targetRound.registrations : (targetRound.eligibleStudents || []));
 
   let neededCount = 0;
   let scoredCount = 0;
@@ -316,27 +320,29 @@ window.renderAssessmentHeroCard = function() {
 
   // 1. Duyet 1, 2, 3
   const supervised = allRegs.filter(s => {
-    if (actor.isAdmin) return true;
+    if (isViewAll) return true;
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : [];
-    return officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase() === uEmail));
+    return officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase().trim() === uEmail));
   });
 
-  [1, 2, 3].forEach(phase => {
-    supervised.forEach(s => {
-      neededCount++;
-      const sid = s.mssv || s.studentId;
-      const sc = targetRound.progressReviews?.['duyet_' + phase]?.[sid];
-      if (sc && sc.status && sc.status !== 'draft') scoredCount++;
-      else if (sc && sc.status === 'draft') draftCount++;
+  if (supervised.length > 0) {
+    [1, 2, 3].forEach(phase => {
+      supervised.forEach(s => {
+        neededCount++;
+        const sid = s.mssv || s.studentId;
+        const sc = targetRound.progressReviews?.['duyet_' + phase]?.[sid];
+        if (sc && (sc.status === 'passed' || sc.status === 'failed' || sc.status === 'completed')) scoredCount++;
+        else if (sc && sc.status === 'draft') draftCount++;
+      });
     });
-  });
+  }
 
   // 2. Thesis (Reviewer)
   const reviewerAssignments = targetRound.reviewerAssignments || {};
   const myReviewerStudents = allRegs.filter(s => {
-    if (actor.isAdmin) return true;
+    if (isViewAll) return true;
     const sid = s.mssv || s.studentId;
-    return reviewerAssignments[sid] === uId || reviewerAssignments[sid] === uEmail;
+    return reviewerAssignments[sid] === uId || (reviewerAssignments[sid] && reviewerAssignments[sid].toLowerCase().trim() === uEmail);
   });
   myReviewerStudents.forEach(s => {
     neededCount++;
@@ -344,6 +350,26 @@ window.renderAssessmentHeroCard = function() {
     const sc = targetRound.thesisScores?.[sid]?.pb;
     if (sc && sc.status === 'completed') scoredCount++;
     else if (sc && sc.status === 'draft') draftCount++;
+  });
+
+  // 3. Defense (Council Members)
+  const actsWithCouncils = (targetRound.activities || []).filter(a => a.councilEnabled && Array.isArray(a.councils));
+  actsWithCouncils.forEach(act => {
+    (act.councils || []).forEach(c => {
+      const members = Object.values(c.membersBySlot || {});
+      const isMember = members.some(m => isUserMatchingCouncilMember(m, uEmail, uId));
+      if (isViewAll || isMember) {
+        const assignedStudents = (act.councilStudentAssignments || []).filter(a => a.councilId === c.id);
+        assignedStudents.forEach(a => {
+          neededCount++;
+          const scoreKey = `${act.id}_${c.id}_${a.studentId}_${uId}`;
+          const sc = state.councilScores?.[scoreKey];
+          const hasDraft = Boolean(state.councilLocalDrafts?.[a.studentId]);
+          if (sc?.status === 'completed') scoredCount++;
+          else if (sc?.status === 'draft' || hasDraft) draftCount++;
+        });
+      }
+    });
   });
 
   const unscoredCount = Math.max(0, neededCount - scoredCount - draftCount);
@@ -499,12 +525,13 @@ window.renderAssessmentDuyetList = function(phase) {
   const actor = getEffectiveActor();
   const uEmail = (actor.email || '').toLowerCase().trim();
   const uId = actor.uid || actor.email;
+  const isViewAll = actor.isAdmin && state.assessmentAdminScope === 'all';
   const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (targetRound.eligibleStudents || []);
 
   const candidates = allRegs.filter(s => {
-    if (actor.isAdmin) return true;
+    if (isViewAll) return true;
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : [];
     return officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase() === uEmail));
   });
@@ -605,6 +632,7 @@ window.renderAssessmentThesisList = function() {
   const actor = getEffectiveActor();
   const uEmail = (actor.email || '').toLowerCase().trim();
   const uId = actor.uid || actor.email;
+  const isViewAll = actor.isAdmin && state.assessmentAdminScope === 'all';
   const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (targetRound.eligibleStudents || []);
@@ -612,7 +640,7 @@ window.renderAssessmentThesisList = function() {
   const reviewerAssignments = targetRound.reviewerAssignments || {};
 
   const candidates = allRegs.filter(s => {
-    if (actor.isAdmin) return true;
+    if (isViewAll) return true;
     const sid = s.mssv || s.studentId;
     const isReviewer = (reviewerAssignments[sid] === uId || reviewerAssignments[sid] === uEmail);
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : [];
@@ -655,8 +683,8 @@ window.renderAssessmentThesisList = function() {
     const supName = formatStudentSupervisorsForDisplay(s);
 
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : [];
-    const isSup = state.isAdmin || officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase() === uEmail));
-    const isReviewer = state.isAdmin || (reviewerAssignments[sid] === uId || reviewerAssignments[sid] === uEmail);
+    const isSup = isViewAll || officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase() === uEmail));
+    const isReviewer = isViewAll || (reviewerAssignments[sid] === uId || reviewerAssignments[sid] === uEmail);
 
     const thesisObj = targetRound.thesisScores?.[sid] || {};
     const hdScore = thesisObj.hd?.score;
@@ -826,6 +854,7 @@ window.renderAssessmentDefenseList = function() {
   const uId = actor.uid || actor.email;
 
   // Find all activities with councils
+  const isViewAll = actor.isAdmin && state.assessmentAdminScope === 'all';
   const actsWithCouncils = (targetRound.activities || []).filter(a => a.councilEnabled && Array.isArray(a.councils) && a.councils.length > 0);
   let availableCouncils = [];
 
@@ -833,7 +862,7 @@ window.renderAssessmentDefenseList = function() {
     act.councils.forEach(c => {
       const members = Object.values(c.membersBySlot || {});
       const isMember = members.some(m => isUserMatchingCouncilMember(m, uEmail, uId));
-      if (actor.isAdmin || isMember) {
+      if (isViewAll || isMember) {
         availableCouncils.push({ act, council: c, isMember });
       }
     });
