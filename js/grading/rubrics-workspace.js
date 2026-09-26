@@ -1,50 +1,46 @@
 
 // --- Module Bridges ---
-export const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
+export const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : (reg?.officialSupervisors || []));
 
 export function getStudentFullProfile(sid, act = null, council = null, round = null) {
-  if (typeof window !== 'undefined' && typeof window.getStudentFullProfile === 'function' && window.getStudentFullProfile !== getStudentFullProfile) {
-    return window.getStudentFullProfile(sid, act, council, round);
-  }
+  if (!sid) return { studentId: '', mssv: '', fullName: '', topicTitle: '--' };
+
   const currentRound = round || (state.rounds || []).find(r => r.id === (state.activeCouncilWorkspace?.roundId || state.selectedAssessmentRoundId || state.selectedRoundId)) || state.activeRound;
-  let sObj = null;
 
-  if (typeof window !== 'undefined' && typeof window.findStudentInRound === 'function') {
-    sObj = window.findStudentInRound(sid, currentRound?.id);
-  }
+  const off = (currentRound?.officialAssignments || []).find(a => (a.studentId === sid || a.mssv === sid || a.id === sid));
+  const reg = (currentRound?.registrations || []).find(r => (r.studentId === sid || r.mssv === sid || r.id === sid));
+  const adminReg = (state.adminReviewData?.registrations || []).find(r => (r.studentId === sid || r.mssv === sid || r.id === sid));
+  const el = (currentRound?.eligibleStudents || []).find(e => (e.studentId === sid || e.mssv === sid || e.id === sid));
+  const cStudent = (currentRound?.councilStudents || []).find(s => (s.studentId === sid || s.mssv === sid || s.id === sid));
 
-  if (!sObj || !sObj.fullName) {
-    const off = (currentRound?.officialAssignments || []).find(a => (a.studentId === sid || a.mssv === sid));
-    if (off) sObj = { ...sObj, ...off };
-  }
-
-  if (!sObj || !sObj.fullName || !sObj.topicTitle) {
-    const reg = (currentRound?.registrations || []).find(r => (r.studentId === sid || r.mssv === sid));
-    if (reg) sObj = { ...sObj, ...reg };
-  }
-
-  if (!sObj || !sObj.fullName) {
-    const el = (currentRound?.eligibleStudents || []).find(e => (e.studentId === sid || e.mssv === sid));
-    if (el) sObj = { ...sObj, ...el };
-  }
+  let sObj = {
+    studentId: sid,
+    mssv: sid,
+    ...(el || {}),
+    ...(cStudent || {}),
+    ...(adminReg || {}),
+    ...(reg || {}),
+    ...(off || {})
+  };
 
   const fac = (typeof window !== 'undefined' && typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(sid) : null;
   if (fac && !fac.isMissing) {
-    sObj = {
-      ...sObj,
-      studentId: sid,
-      mssv: sid,
-      fullName: sObj?.fullName || sObj?.studentName || fac.fullName || fac.name,
-      studentName: sObj?.studentName || sObj?.fullName || fac.name || fac.fullName,
-      className: sObj?.className || sObj?.studentClass || fac.className || fac.studentClass,
-      major: sObj?.major || fac.major,
-      topicTitle: sObj?.topicTitle || sObj?.topic || fac.topicTitle || '--',
-      acceptedSupervisorName: sObj?.acceptedSupervisorName || sObj?.supervisorName || fac.supervisorName,
-      officialSupervisors: sObj?.officialSupervisors || (fac.supervisorName ? [{ supervisorName: fac.supervisorName, role: 'primary' }] : [])
-    };
+    sObj.fullName = sObj.fullName || sObj.studentName || fac.fullName || fac.name || sid;
+    sObj.studentName = sObj.studentName || sObj.fullName || fac.name || fac.fullName || sid;
+    sObj.className = sObj.className || sObj.studentClass || fac.className || fac.studentClass || '--';
+    sObj.studentClass = sObj.className;
+    sObj.major = sObj.major || fac.major;
+    sObj.topicTitle = sObj.topicTitle || sObj.topic || fac.topicTitle || '--';
+    if (!sObj.acceptedSupervisorName && !sObj.supervisorName && fac.supervisorName) {
+      sObj.acceptedSupervisorName = fac.supervisorName;
+      sObj.supervisorName = fac.supervisorName;
+    }
   }
 
-  return sObj || { studentId: sid, mssv: sid, fullName: sid, topicTitle: '--' };
+  sObj.fullName = sObj.fullName || sObj.studentName || sObj.name || sid;
+  sObj.topicTitle = sObj.topicTitle || sObj.topic || '--';
+
+  return sObj;
 }
 
 export const findStudentInRound = (sid, roundId) => {
