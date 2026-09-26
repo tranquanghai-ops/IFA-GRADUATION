@@ -65,6 +65,12 @@ export function getThesisFinalScore(studentId, roundId = null) {
   return (Number(thesis.hd.score) + Number(thesis.pb.score)) / 2;
 }
 
+if (typeof window !== 'undefined') {
+  window.getPreliminarySummary = getPreliminarySummary;
+  window.getPreliminaryAverage = getPreliminaryAverage;
+  window.getThesisFinalScore = getThesisFinalScore;
+}
+
 // --- 2. SUPERVISOR ACCEPTED TABLE SCORING CELLS ---
 
 function renderSupervisorScoreCell(studentId) {
