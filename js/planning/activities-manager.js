@@ -609,20 +609,40 @@ window.loadAdminRoundActivities = async function(roundId) {
             ${subBadge}
           </td>
           
-          <td class="p-2 align-top pr-3">
-            <div class="flex flex-col gap-1 items-end whitespace-nowrap">
-              <div class="flex items-center gap-1">
-                ${act.submissionEnabled ? `<button type="button" onclick="openActivitySubmissionDashboard('${targetRound.id}', '${act.id}')" class="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded text-[10px] font-bold border border-indigo-200 shadow-sm transition-all flex items-center gap-1" title="Quản lý Sinh viên Nộp bài"><span>📥</span><span>Nộp bài</span></button>` : ''}
-                ${act.councilEnabled ? `<button type="button" onclick="openActivityCouncilManagement('${targetRound.id}', '${act.id}')" class="px-2 py-0.5 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded text-[10px] font-bold border border-violet-200 shadow-sm transition-all flex items-center gap-1" title="Quản lý Hội đồng Mốc này"><span>⚖️</span><span>Hội đồng</span><span class="bg-violet-200 text-violet-900 px-1 py-0.2 rounded-full text-[8px] leading-none">${(act.councils || []).length}</span></button>` : ''}
+          <td class="p-2.5 align-middle pr-3">
+            <div class="flex flex-col gap-1.5 items-end justify-center min-w-[150px]">
+              <!-- Primary Quick Actions -->
+              <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                ${act.submissionEnabled ? `
+                  <button type="button" onclick="openActivitySubmissionDashboard('${targetRound.id}', '${act.id}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold border border-indigo-200 shadow-2xs transition flex items-center gap-1 cursor-pointer" title="Quản lý Sinh viên Nộp bài">
+                    <span>📥</span><span>Nộp bài</span>
+                  </button>
+                ` : ''}
+                ${act.councilEnabled ? `
+                  <button type="button" onclick="openActivityCouncilManagement('${targetRound.id}', '${act.id}')" class="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-[11px] font-bold border border-purple-200 shadow-2xs transition flex items-center gap-1 cursor-pointer" title="Quản lý Hội đồng Mốc này">
+                    <span>🏛️</span><span>Hội đồng</span>
+                    <span class="bg-purple-200 text-purple-900 px-1.5 py-0.5 rounded-full text-[9px] font-black leading-none">${(act.councils || []).length}</span>
+                  </button>
+                ` : ''}
+                <button type="button" onclick="editActivityModal('${act.id}')" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold border border-blue-200 shadow-2xs transition flex items-center gap-1 cursor-pointer" title="Chỉnh sửa thông tin mốc">
+                  <span>✏️</span><span>Sửa</span>
+                </button>
               </div>
-              
-              <div class="flex items-center gap-1 mt-0.5">
-                <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="p-1 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 rounded border border-slate-200 shadow-sm transition-colors text-[10px]" title="Sao chép link mốc">🔗</button>
-                <button type="button" onclick="duplicateActivityWithinRound('${act.id}')" class="px-1.5 py-0.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded font-bold text-[9px] border border-amber-200 shadow-sm transition-colors flex items-center gap-1" title="Nhân bản mốc này trong cùng đợt"><span>📋</span><span>Sao chép</span></button>
-                <button type="button" onclick="toggleActivityVisibility('${act.id}')" class="px-1.5 py-0.5 bg-white hover:bg-slate-100 text-slate-600 rounded text-[9px] font-bold border border-slate-200 shadow-sm transition-colors">${isActivityPublished(act) ? '🔒 Về bản nháp' : '📢 Công bố'}</button>
-                <div class="w-px h-3 bg-slate-200 mx-0.5"></div>
-                <button type="button" onclick="editActivityModal('${act.id}')" class="px-1.5 py-0.5 text-blue-600 hover:bg-blue-50 rounded font-bold text-[9px] transition-colors">Sửa</button>
-                <button type="button" onclick="deleteActivity('${act.id}')" class="px-1.5 py-0.5 text-rose-600 hover:bg-rose-50 rounded font-bold text-[9px] transition-colors">Xóa</button>
+
+              <!-- Secondary Utilities Row -->
+              <div class="flex items-center gap-1 justify-end text-[10px]">
+                <button type="button" onclick="copyActivityLink('${targetRound.id}', '${act.slug}')" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-600 rounded-md border border-slate-200 shadow-2xs transition cursor-pointer" title="Sao chép link trực tiếp đến mốc này">
+                  🔗 Link
+                </button>
+                <button type="button" onclick="duplicateActivityWithinRound('${act.id}')" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-600 rounded-md border border-slate-200 shadow-2xs transition cursor-pointer" title="Nhân bản mốc này trong cùng đợt">
+                  📋 Sao chép
+                </button>
+                <button type="button" onclick="toggleActivityVisibility('${act.id}')" class="px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-600 rounded-md border border-slate-200 shadow-2xs transition cursor-pointer" title="${isActivityPublished(act) ? 'Chuyển về bản nháp' : 'Công bố mốc này cho sinh viên'}">
+                  ${isActivityPublished(act) ? '🔒 Về nháp' : '📢 Công bố'}
+                </button>
+                <button type="button" onclick="deleteActivity('${act.id}')" class="px-2 py-0.5 text-rose-600 hover:bg-rose-50 rounded-md font-bold transition cursor-pointer" title="Xóa mốc kế hoạch">
+                  🗑️
+                </button>
               </div>
             </div>
           </td>

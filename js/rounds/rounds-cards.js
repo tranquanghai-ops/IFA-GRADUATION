@@ -464,7 +464,7 @@ window.renderAdminRoundsCards = function() {
               <div class="text-[10px] font-bold text-slate-400 group-hover:text-emerald-700 uppercase tracking-wider">Đã phân GVHD ↗</div>
               <div class="text-xl font-black text-emerald-600 mt-0.5">${assignedCount === null ? '—' : assignedCount} ${unassignedCount === null ? '<span class="text-[10px] font-normal text-slate-400">chưa tổng hợp</span>' : `<span class="text-[10px] font-normal text-slate-500">(${unassignedCount} chưa)</span>`}</div>
             </button>
-            <button type="button" onclick="editRoundModal('${r.id}', 'supervisors')" class="px-3 py-2.5 text-center hover:bg-indigo-50 transition group cursor-pointer">
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'round-supervisors')" class="px-3 py-2.5 text-center hover:bg-indigo-50 transition group cursor-pointer">
               <div class="text-[10px] font-bold text-slate-400 group-hover:text-indigo-700 uppercase tracking-wider">GVHD tham gia ↗</div>
               <div class="text-xl font-black text-indigo-700 mt-0.5">${supCount}</div>
             </button>
@@ -482,6 +482,7 @@ window.renderAdminRoundsCards = function() {
             <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'registrations')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-800 transition shadow-2xs cursor-pointer">📝 Đăng ký (${regCount})</button>
             ${directAssignment ? '' : `<button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 text-slate-800 transition shadow-2xs cursor-pointer">🎯 Xét nguyện vọng</button>`}
             <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'review', 'assigned')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-purple-50 hover:border-purple-300 text-slate-800 transition shadow-2xs cursor-pointer">👥 ${directAssignment ? 'Phân công GVHD' : 'Kết quả phân công'}</button>
+            <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'councils')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-violet-50 hover:border-violet-300 text-slate-800 transition shadow-2xs cursor-pointer">🏛️ Hội đồng</button>
             <button type="button" onclick="openRoundWorkspaceModal('${r.id}', 'scoring-dashboard')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 text-slate-800 transition shadow-2xs cursor-pointer">📊 Quản lý điểm</button>
             <button type="button" onclick="openRoundAccessMonitoringModal('${r.id}')" class="flex-1 sm:flex-initial min-w-[120px] sm:min-w-0 text-center px-3.5 py-2 text-xs font-bold rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100 text-amber-900 transition shadow-2xs cursor-pointer" title="Xem lần cuối SV, GVHD, Thành viên Hội đồng đăng nhập và thao tác">👁️ Giám sát đăng nhập</button>
             <div class="w-full sm:w-auto flex items-center justify-center gap-1.5 mt-1 sm:mt-0 pt-1.5 sm:pt-0 border-t sm:border-t-0 sm:border-l border-slate-100 sm:border-slate-200 sm:pl-2 text-xs">
@@ -522,7 +523,8 @@ window.navigateToRoundAction = async function(roundId, actionKey, subSection = n
     'admin-round-reg-select',
     'admin-review-round-select',
     'admin-round-sup-select',
-    'admin-scoring-round-select'
+    'admin-scoring-round-select',
+    'admin-round-councils-select'
   ];
   dropdownIds.forEach(id => {
     const el = document.getElementById(id);
@@ -549,7 +551,45 @@ window.openRoundWorkspaceModal = async function(roundId, actionKey, subSection =
   if (!roundId || !actionKey) return;
   if (state.roundWorkspaceModal?.panel) window.closeRoundWorkspaceModal();
 
-  await window.navigateToRoundAction(roundId, actionKey, subSection);
+  state.selectedRoundId = roundId;
+  state.activeRound = (state.rounds || []).find(r => r.id === roundId) || null;
+
+  // Sync selectors across all admin views
+  const dropdownIds = [
+    'select-active-round',
+    'admin-timeline-round-select',
+    'admin-round-student-select',
+    'admin-round-reg-select',
+    'admin-review-round-select',
+    'admin-round-sup-select',
+    'admin-scoring-round-select',
+    'admin-round-councils-select'
+  ];
+  dropdownIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = roundId;
+  });
+
+  // Call the target loader directly without switching background tab
+  try {
+    if (actionKey === 'timeline' && typeof window.loadAdminRoundActivities === 'function') {
+      await window.loadAdminRoundActivities(roundId);
+    } else if (actionKey === 'eligible-students' && typeof window.loadAdminEligibleStudents === 'function') {
+      await window.loadAdminEligibleStudents(roundId);
+    } else if (actionKey === 'registrations' && typeof window.loadAdminRegistrations === 'function') {
+      await window.loadAdminRegistrations(roundId);
+    } else if (actionKey === 'round-supervisors' && typeof window.loadAdminRoundSupervisors === 'function') {
+      await window.loadAdminRoundSupervisors(roundId);
+    } else if (actionKey === 'review' && typeof window.loadAdminReviewData === 'function') {
+      await window.loadAdminReviewData(roundId);
+    } else if (actionKey === 'councils' && typeof window.loadAdminRoundCouncils === 'function') {
+      await window.loadAdminRoundCouncils(roundId);
+    } else if (actionKey === 'scoring-dashboard' && typeof window.loadAdminScoringDashboard === 'function') {
+      await window.loadAdminScoringDashboard(roundId);
+    }
+  } catch (loaderErr) {
+    console.warn(`[WorkspaceModal] Loader for ${actionKey} notice:`, loaderErr);
+  }
 
   const panel = document.getElementById(`atab-panel-${actionKey}`);
   const modal = document.getElementById('modal-round-workspace');
@@ -560,11 +600,13 @@ window.openRoundWorkspaceModal = async function(roundId, actionKey, subSection =
 
   const round = (state.rounds || []).find(item => item.id === roundId);
   const labels = {
-    timeline: 'Kế hoạch đợt',
-    'eligible-students': 'Danh sách sinh viên',
-    registrations: 'Danh sách đăng ký',
-    review: isDirectSupervisorAssignment(round) ? 'Phân công GVHD' : 'Xét nguyện vọng & Phân công',
-    'scoring-dashboard': 'Quản lý điểm'
+    timeline: '📅 Kế hoạch đợt',
+    'eligible-students': '🎓 Danh sách sinh viên',
+    registrations: '📝 Danh sách đăng ký',
+    'round-supervisors': '👨‍🏫 Giảng viên hướng dẫn tham gia đợt',
+    review: isDirectSupervisorAssignment(round) ? '👥 Phân công GVHD' : '🎯 Xét nguyện vọng & Phân công',
+    councils: '🏛️ Quản lý Hội đồng đợt',
+    'scoring-dashboard': '📊 Quản lý điểm'
   };
 
   const placeholder = document.createComment(`round-workspace-${actionKey}`);
@@ -600,11 +642,10 @@ window.closeRoundWorkspaceModal = function() {
   document.body.style.overflow = modalState?.previousBodyOverflow || '';
   state.roundWorkspaceModal = null;
   modal?.classList.add('hidden');
-  window.switchAdminTab('rounds');
 };
 
 window.updateRoundBreadcrumb = function(tabKey) {
-  const roundSubTabs = ['timeline', 'eligible-students', 'registrations', 'review', 'preview-student', 'scoring-dashboard'];
+  const roundSubTabs = ['timeline', 'eligible-students', 'registrations', 'review', 'preview-student', 'scoring-dashboard', 'councils'];
   if (!roundSubTabs.includes(tabKey)) return;
 
   const bEl = document.getElementById(`round-breadcrumb-${tabKey}`);
@@ -619,6 +660,7 @@ window.updateRoundBreadcrumb = function(tabKey) {
     'eligible-students': 'Danh sách SV thực hiện',
     'registrations': 'Danh sách đăng ký',
     'review': 'Xét nguyện vọng',
+    'councils': 'Quản lý Hội đồng',
     'preview-student': 'Xem trước giao diện Sinh viên',
     'scoring-dashboard': 'Quản lý điểm'
   };

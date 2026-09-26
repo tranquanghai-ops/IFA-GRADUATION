@@ -665,4 +665,348 @@ window.setStudentPresentationStatus = async function(studentId, newStatus) {
   refreshCouncilModalViews();
 };
 
-// --- CREATE / EDIT / COPY COUNCIL MODALS ---
+// ============================================================================
+// ADMIN ROUND COUNCILS DASHBOARD (UNIFIED COUNCIL WORKSPACE FOR ROUND)
+// ============================================================================
+
+window.loadAdminRoundCouncils = async function(roundId) {
+  const targetRoundId = roundId || state.selectedRoundId || state.activeRound?.id;
+  if (!targetRoundId) return;
+
+  const targetRound = (state.rounds || []).find(r => r.id === targetRoundId);
+  if (!targetRound) return;
+
+  // Sync dropdown
+  const selectEl = document.getElementById('admin-round-councils-select');
+  if (selectEl) {
+    selectEl.innerHTML = (state.rounds || []).map(r => `
+      <option value="${r.id}" ${r.id === targetRoundId ? 'selected' : ''}>${escapeHtml(r.title || r.name)}</option>
+    `).join('');
+  }
+
+  // Load activities, round students, and user activities
+  if (typeof loadAdminRoundActivities === 'function') {
+    await loadAdminRoundActivities(targetRoundId).catch(() => {});
+  }
+  await loadCouncilRoundStudents(targetRoundId).catch(() => []);
+  if (typeof window.loadUserActivities === 'function') {
+    await window.loadUserActivities().catch(() => {});
+  }
+
+  // Populate milestone filter dropdown
+  const milestoneSelect = document.getElementById('admin-councils-filter-milestone');
+  const activities = (targetRound.activities || []).filter(a => a.councilEnabled || (a.councils && a.councils.length > 0));
+  if (milestoneSelect) {
+    milestoneSelect.innerHTML = '<option value="all">Tất cả mốc có Hội đồng</option>' + activities.map(a => `
+      <option value="${a.id}">Mốc #${a.order || '--'}: ${escapeHtml(a.title)} (${(a.councils || []).length} HĐ)</option>
+    `).join('');
+  }
+
+  filterAdminRoundCouncils(targetRoundId);
+};
+
+window.filterAdminRoundCouncils = function(roundId = null) {
+  const targetRoundId = roundId || document.getElementById('admin-round-councils-select')?.value || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === targetRoundId);
+  const container = document.getElementById('admin-round-councils-container');
+  if (!container || !targetRound) return;
+
+  const milestoneFilter = document.getElementById('admin-councils-filter-milestone')?.value || 'all';
+  const searchQuery = (document.getElementById('admin-councils-search')?.value || '').toLowerCase().trim();
+
+  const activities = (targetRound.activities || []).filter(a => a.councilEnabled || (a.councils && a.councils.length > 0));
+  const roundStudents = getRoundAllStudents();
+
+  // Metrics computation
+  let totalCouncils = 0;
+  const allCouncilMembers = new Map();
+  const assignedStudentSet = new Set();
+
+  activities.forEach(act => {
+    const councils = act.councils || [];
+    totalCouncils += councils.length;
+    (act.councilStudentAssignments || []).forEach(asgn => {
+      if (asgn.councilId) assignedStudentSet.add(asgn.studentId);
+    });
+    councils.forEach(c => {
+      const slots = c.membersBySlot || {};
+      Object.keys(slots).forEach(slotKey => {
+        const m = slots[slotKey];
+        if (!m || (!m.memberEmail && !m.memberName)) return;
+        const key = (m.memberEmail || m.memberName).toLowerCase().trim();
+        allCouncilMembers.set(key, m);
+      });
+    });
+  });
+
+  // Render Stats
+  const statTotalEl = document.getElementById('adm-councils-stat-total');
+  const statMilestonesEl = document.getElementById('adm-councils-stat-milestones');
+  const statStudentsEl = document.getElementById('adm-councils-stat-students');
+  const statUnassignedEl = document.getElementById('adm-councils-stat-unassigned');
+  const statMembersEl = document.getElementById('adm-councils-stat-members');
+  const statActiveMembersEl = document.getElementById('adm-councils-stat-active-members');
+
+  if (statTotalEl) statTotalEl.textContent = totalCouncils;
+  if (statMilestonesEl) statMilestonesEl.textContent = `Trên ${activities.length} mốc kế hoạch có Hội đồng`;
+  if (statStudentsEl) statStudentsEl.textContent = `${assignedStudentSet.size} / ${roundStudents.length} SV`;
+  if (statUnassignedEl) statUnassignedEl.textContent = `${roundStudents.length - assignedStudentSet.size} sinh viên chưa phân HĐ`;
+  if (statMembersEl) statMembersEl.textContent = `${allCouncilMembers.size} thành viên`;
+
+  let activeCount = 0;
+  allCouncilMembers.forEach((m, email) => {
+    const info = (typeof window.getUserActivityInfo === 'function') ? window.getUserActivityInfo(email) : null;
+    if (info?.hasLoggedIn) activeCount++;
+  });
+  if (statActiveMembersEl) statActiveMembersEl.textContent = `${activeCount} / ${allCouncilMembers.size} đã đăng nhập hệ thống`;
+
+  // Filter activities and councils
+  let filteredActivities = activities;
+  if (milestoneFilter !== 'all') {
+    filteredActivities = activities.filter(a => a.id === milestoneFilter);
+  }
+
+  if (filteredActivities.length === 0) {
+    container.innerHTML = `
+      <div class="p-12 text-center bg-white rounded-2xl border border-dashed border-slate-300 space-y-3">
+        <span class="text-4xl block">🏛️</span>
+        <h3 class="font-bold text-slate-700 text-sm">Đợt này chưa có mốc kế hoạch nào kích hoạt Hội đồng</h3>
+        <p class="text-xs text-slate-400 max-w-md mx-auto">Vào tab "Kế hoạch đợt", chọn mốc cần đánh giá và bật tùy chọn "Kích hoạt Hội đồng chấm điểm" để thiết lập hội đồng.</p>
+        <button type="button" onclick="openRoundWorkspaceModal('${targetRoundId}', 'timeline')" class="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl font-bold text-xs border border-indigo-200 transition-colors">
+          📅 Mở Kế hoạch đợt
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  let totalVisibleCouncils = 0;
+  const milestoneBlocksHtml = filteredActivities.map(act => {
+    let councils = act.councils || [];
+    const assignments = act.councilStudentAssignments || [];
+    const slots = act.councilStructure?.slots || [];
+
+    if (searchQuery) {
+      councils = councils.filter(c => {
+        const matchName = String(c.name || '').toLowerCase().includes(searchQuery);
+        const matchRoom = String(c.room || '').toLowerCase().includes(searchQuery);
+        const matchMembers = Object.values(c.membersBySlot || {}).some(m => String(m.memberName || m.name || '').toLowerCase().includes(searchQuery) || String(m.memberEmail || '').toLowerCase().includes(searchQuery));
+        const matchStudents = assignments.filter(a => a.councilId === c.id).some(a => {
+          const st = roundStudents.find(s => s.mssv === a.studentId || s.studentId === a.studentId);
+          return String(a.studentId).toLowerCase().includes(searchQuery) || String(st?.fullName || st?.name || '').toLowerCase().includes(searchQuery);
+        });
+        return matchName || matchRoom || matchMembers || matchStudents;
+      });
+    }
+
+    totalVisibleCouncils += councils.length;
+
+    const councilCardsHtml = councils.length === 0 ? `
+      <div class="col-span-full p-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+        <span class="text-xs text-slate-400 font-semibold">Chưa có Hội đồng nào trong mốc này hoặc không khớp tìm kiếm.</span>
+      </div>
+    ` : councils.map(c => {
+      const assignedStudents = assignments.filter(a => a.councilId === c.id);
+      const membersBySlot = c.membersBySlot || {};
+
+      let statusBadge = '<span class="badge bg-slate-100 text-slate-700 font-bold">Chuẩn bị</span>';
+      if (c.status === 'ongoing') statusBadge = '<span class="badge bg-emerald-100 text-emerald-800 font-bold">● Đang diễn ra</span>';
+      else if (c.status === 'completed') statusBadge = '<span class="badge bg-slate-200 text-slate-600 font-bold">✓ Đã kết thúc</span>';
+
+      const membersListHtml = slots.map(s => {
+        const assigned = membersBySlot[s.key];
+        if (!assigned || (!assigned.memberName && !assigned.name)) return '';
+        const name = assigned.memberName || assigned.name;
+        const email = assigned.memberEmail || assigned.email || assigned.memberId || '';
+        const badge = typeof window.renderUserActivityBadge === 'function'
+          ? window.renderUserActivityBadge(email, { compact: true })
+          : '';
+        return `
+          <div class="flex items-center justify-between text-[11px] py-1 border-b border-slate-100 last:border-0">
+            <span class="text-slate-700 font-medium truncate"><b class="text-indigo-950 font-bold">${escapeHtml(s.label || s.key)}:</b> ${escapeHtml(name)}</span>
+            <span class="shrink-0 ml-1.5">${badge}</span>
+          </div>
+        `;
+      }).filter(Boolean).join('');
+
+      return `
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 hover:border-indigo-200 shadow-xs transition-all space-y-3 flex flex-col justify-between">
+          <div class="space-y-2.5">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h4 class="font-black text-sm text-slate-900 tracking-tight">${escapeHtml(c.name)}</h4>
+                  ${statusBadge}
+                </div>
+                <p class="text-[11px] text-slate-500 mt-0.5 font-medium">📍 ${escapeHtml(c.room || 'Chưa cập nhật phòng')}</p>
+              </div>
+              <div class="text-right shrink-0">
+                <span class="font-black text-indigo-700 text-xs block">${assignedStudents.length} SV báo cáo</span>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600 font-mono bg-slate-50 p-2 rounded-xl border border-slate-100">
+              <span>📅 ${c.date || '--'}</span>
+              <span>🕒 ${c.startTime || '--'} → ${c.endTime || '--'}</span>
+            </div>
+
+            ${membersListHtml ? `
+              <div class="p-2.5 bg-slate-50/80 rounded-xl border border-slate-100 space-y-1">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Thành viên Hội đồng:</span>
+                ${membersListHtml}
+              </div>
+            ` : '<div class="p-2 text-center text-slate-400 text-xs italic bg-slate-50 rounded-xl">Chưa phân công thành viên</div>'}
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="copyCouncilLink('${act.slug}', '${c.slug || c.id}')" class="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold" title="Sao chép link trực tiếp đến Hội đồng này">🔗</button>
+              ${c.driveFolderUrl ? `
+                <a href="${c.driveFolderUrl}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold border border-blue-200 transition-colors flex items-center gap-1" title="Mở Drive Hội đồng">
+                  <span>📁 Drive</span>
+                </a>
+              ` : ''}
+            </div>
+
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button type="button" onclick="openCouncilWorkspace('${targetRoundId}', '${act.id}', '${c.id}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs">▶ Vào phòng HĐ</button>
+              <button type="button" onclick="openActivityCouncilManagement('${targetRoundId}', '${act.id}')" class="px-2.5 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 rounded-lg text-xs font-bold border border-violet-200 transition-colors" title="Phân sinh viên và thứ tự">👥 Phân SV</button>
+              <button type="button" onclick="openEditCouncilModalForAct('${targetRoundId}', '${act.id}', '${c.id}')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-colors">Sửa HĐ</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="card-surface p-5 space-y-4 bg-white border border-slate-200 rounded-2xl shadow-xs">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-black text-sm text-slate-900">Mốc #${act.order || '--'}: ${escapeHtml(act.title)}</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 text-violet-800 border border-violet-300">${(act.councils || []).length} Hội đồng</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-0.5 font-medium">🗓️ ${fmtActivityTime(act.startAt, act.endAt)} • 📍 ${act.location || 'Địa điểm khoa'}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="openActivityCouncilManagement('${targetRoundId}', '${act.id}')" class="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-2xs">
+              <span>⚖️ Quản lý & Phân SV mốc này</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          ${councilCardsHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const countBadge = document.getElementById('adm-councils-filtered-count');
+  if (countBadge) countBadge.textContent = `${totalVisibleCouncils} Hội đồng`;
+
+  container.innerHTML = milestoneBlocksHtml;
+};
+
+window.openEditCouncilModalForAct = async function(roundId, activityId, councilId) {
+  state.activeCouncilManagement = {
+    roundId,
+    activityId,
+    filterQuery: '',
+    filterCouncilId: 'all'
+  };
+  await loadCouncilRoundStudents(roundId);
+  editCouncilModal(councilId);
+};
+
+window.openCreateCouncilForRound = function() {
+  const roundId = document.getElementById('admin-round-councils-select')?.value || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const activities = (targetRound?.activities || []).filter(a => a.councilEnabled || (a.councils && a.councils.length > 0));
+
+  if (!activities.length) {
+    showToast('Đợt này chưa có mốc kế hoạch nào kích hoạt Hội đồng. Hãy bật Hội đồng ở mốc kế hoạch trước.', 'warning');
+    return;
+  }
+
+  // Open first council-enabled activity's council management
+  openActivityCouncilManagement(roundId, activities[0].id);
+};
+
+window.exportAdminRoundCouncilsExcel = function() {
+  const roundId = document.getElementById('admin-round-councils-select')?.value || state.selectedRoundId;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) return;
+
+  const activities = (targetRound.activities || []).filter(a => a.councilEnabled || (a.councils && a.councils.length > 0));
+  const roundStudents = getRoundAllStudents();
+
+  const headers = ['Mốc kế hoạch', 'Tên Hội đồng', 'Phòng', 'Ngày', 'Giờ', 'Chức danh / Slot', 'Họ và tên thành viên', 'Email thành viên', 'Đơn vị', 'MSSV SV Báo cáo', 'Họ tên SV', 'Tên đề tài', 'Thứ tự báo cáo'];
+  const rows = [];
+
+  activities.forEach(act => {
+    const councils = act.councils || [];
+    const assignments = act.councilStudentAssignments || [];
+    const slots = act.councilStructure?.slots || [];
+
+    councils.forEach(c => {
+      const assignedStudents = assignments.filter(a => a.councilId === c.id).sort((a, b) => (a.order || 0) - (b.order || 0));
+      const membersBySlot = c.membersBySlot || {};
+
+      // If has assigned students
+      if (assignedStudents.length > 0) {
+        assignedStudents.forEach(asgn => {
+          const st = roundStudents.find(s => s.mssv === asgn.studentId || s.studentId === asgn.studentId);
+          rows.push([
+            `"${act.title}"`,
+            `"${c.name}"`,
+            `"${c.room || ''}"`,
+            c.date || '',
+            `${c.startTime || ''} - ${c.endTime || ''}`,
+            '--',
+            '--',
+            '--',
+            '--',
+            asgn.studentId,
+            `"${st?.fullName || st?.name || ''}"`,
+            `"${(st?.topicTitle || '').replace(/"/g, '""')}"`,
+            asgn.order || ''
+          ]);
+        });
+      } else {
+        // Just council info
+        rows.push([
+          `"${act.title}"`,
+          `"${c.name}"`,
+          `"${c.room || ''}"`,
+          c.date || '',
+          `${c.startTime || ''} - ${c.endTime || ''}`,
+          '--',
+          '--',
+          '--',
+          '--',
+          '--',
+          '--',
+          '--',
+          '--'
+        ]);
+      }
+    });
+  });
+
+  if (rows.length === 0) {
+    showToast('Chưa có dữ liệu Hội đồng để xuất.', 'warning');
+    return;
+  }
+
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `Danh_sach_Hoi_dong_${(targetRound.title || 'dot').replace(/[^a-zA-Z0-9]/g, '_')}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('✓ Đã xuất danh sách Hội đồng thành công!', 'success');
+};

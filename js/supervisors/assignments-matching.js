@@ -967,7 +967,7 @@ window.switchAdminTab = async function(tabKey) {
   }
 
   // 3. Tab panels toggle
-  ['overview', 'review', 'rounds', 'faculty-students', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash', 'timeline', 'scoring-dashboard', 'system-settings'].forEach(t => {
+  ['overview', 'review', 'rounds', 'faculty-students', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash', 'timeline', 'scoring-dashboard', 'system-settings', 'councils'].forEach(t => {
     const p = document.getElementById('atab-panel-' + t);
     if (p) {
       if (t === tabKey) p.classList.remove('hidden');
@@ -1001,6 +1001,9 @@ window.switchAdminTab = async function(tabKey) {
   else if (tabKey === 'trash') renderAdminTrashTable();
   else if (tabKey === 'scoring-dashboard') loadAdminScoringDashboard();
   else if (tabKey === 'system-settings') loadAdminSystemSettings();
+  else if (tabKey === 'councils' && roundId) {
+    if (typeof window.loadAdminRoundCouncils === 'function') await window.loadAdminRoundCouncils(roundId);
+  }
   else if (tabKey === 'timeline') {
     if (roundId) {
       const sel = document.getElementById('admin-timeline-round-select');

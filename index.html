@@ -1800,6 +1800,82 @@
       </div>
 
       <!-- ADMIN TAB: SUPERVISORS MASTER -->
+      <!-- ADMIN TAB: COUNCILS MANAGEMENT -->
+      <div id="atab-panel-councils" class="hidden space-y-5">
+        <!-- BREADCRUMB TO ROUNDS -->
+        <div id="round-breadcrumb-councils" class="round-breadcrumb-container mb-4"></div>
+
+        <!-- Round Selector & Summary Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-100 p-3.5 rounded-2xl">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2">
+              <label for="admin-round-councils-select" class="text-xs font-bold text-slate-700">Đợt tốt nghiệp:</label>
+              <select id="admin-round-councils-select" onchange="loadAdminRoundCouncils(this.value)" class="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none">
+              </select>
+            </div>
+            <div class="flex items-center gap-2">
+              <label for="admin-councils-filter-milestone" class="text-xs font-bold text-slate-700">Mốc kế hoạch:</label>
+              <select id="admin-councils-filter-milestone" onchange="filterAdminRoundCouncils()" class="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none">
+                <option value="all">Tất cả mốc có Hội đồng</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" onclick="openCreateCouncilForRound()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5">
+              <span>+ Thêm Hội đồng</span>
+            </button>
+            <button type="button" onclick="exportAdminRoundCouncilsExcel()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm transition-all">
+              📄 Xuất Excel Hội đồng
+            </button>
+          </div>
+        </div>
+
+        <!-- Summary Metric Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-600">🏛️ Tổng số Hội đồng</span>
+              <span class="text-[10px] text-slate-400 font-semibold uppercase">Đợt này</span>
+            </div>
+            <div id="adm-councils-stat-total" class="text-2xl font-black text-indigo-700 mt-1">0</div>
+            <p id="adm-councils-stat-milestones" class="text-[11px] text-slate-500 mt-0.5">Trên 0 mốc kế hoạch</p>
+          </div>
+
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-600">🎓 Sinh viên đã phân HĐ</span>
+              <span class="text-[10px] text-slate-400 font-semibold uppercase">Phân bổ</span>
+            </div>
+            <div id="adm-councils-stat-students" class="text-2xl font-black text-emerald-600 mt-1">0 / 0 SV</div>
+            <p id="adm-councils-stat-unassigned" class="text-[11px] text-slate-500 mt-0.5">0 sinh viên chưa phân</p>
+          </div>
+
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-600">👥 Thành viên Hội đồng</span>
+              <span class="text-[10px] text-slate-400 font-semibold uppercase">Giảng viên / Khách</span>
+            </div>
+            <div id="adm-councils-stat-members" class="text-2xl font-black text-slate-900 mt-1">0 thành viên</div>
+            <p id="adm-councils-stat-active-members" class="text-[11px] text-emerald-700 font-semibold mt-0.5">0 đã đăng nhập</p>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="flex items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200">
+          <div class="relative flex-1">
+            <input type="text" id="admin-councils-search" oninput="filterAdminRoundCouncils()" placeholder="Tìm theo tên Hội đồng, phòng, tên thành viên, sinh viên..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:bg-white focus:outline-none">
+            <span class="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
+          </div>
+          <span id="adm-councils-filtered-count" class="text-xs font-bold text-slate-500 whitespace-nowrap">0 Hội đồng</span>
+        </div>
+
+        <!-- Councils Container Grid (Grouped by Milestone) -->
+        <div id="admin-round-councils-container" class="space-y-6">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
       <div id="atab-panel-supervisors-master" class="hidden space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
