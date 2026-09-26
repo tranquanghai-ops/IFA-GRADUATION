@@ -50,11 +50,19 @@ window.openActivityCouncilManagement = async function(roundId, actId) {
 
 window.closeActivityCouncilManagement = function() {
   document.getElementById('modal-activity-councils')?.classList.add('hidden');
-  const roundId = state.activeCouncilManagement.roundId;
+  const roundId = state.activeCouncilManagement?.roundId || state.selectedRoundId;
   if (roundId) {
-    loadAdminRoundActivities(roundId);
-    if (state.selectedRoundId === roundId) {
-      loadStudentRoundActivities(roundId);
+    if (typeof loadAdminRoundActivities === 'function') {
+      loadAdminRoundActivities(roundId).catch(() => {});
+    }
+    if (typeof filterAdminRoundCouncils === 'function') {
+      filterAdminRoundCouncils(roundId);
+    }
+    if (typeof window.filterAdminRoundCouncils === 'function') {
+      window.filterAdminRoundCouncils(roundId);
+    }
+    if (state.selectedRoundId === roundId && typeof loadStudentRoundActivities === 'function') {
+      loadStudentRoundActivities(roundId).catch(() => {});
     }
   }
 };
@@ -158,14 +166,28 @@ function renderCouncilCards(act) {
 
     // Member slot fulfillment
     const membersBySlot = c.membersBySlot || {};
+    const effectiveSlots = (slots && slots.length > 0)
+      ? [...slots]
+      : [
+          { key: 'chair', label: 'Chủ tịch', name: 'Chủ tịch Hội đồng' },
+          { key: 'member', label: 'Ủy viên', name: 'Ủy viên Hội đồng' },
+          { key: 'secretary', label: 'Thư ký', name: 'Thư ký Hội đồng' }
+        ];
+    const knownKeys = new Set(effectiveSlots.map(s => s.key));
+    Object.keys(membersBySlot).forEach(k => {
+      if (!knownKeys.has(k)) {
+        effectiveSlots.push({ key: k, label: membersBySlot[k]?.role || k, name: membersBySlot[k]?.role || k });
+      }
+    });
+
     let filledSlotsCount = 0;
-    slots.forEach(s => {
+    effectiveSlots.forEach(s => {
       if (membersBySlot[s.key] && (membersBySlot[s.key].memberName || membersBySlot[s.key].name)) {
         filledSlotsCount++;
       }
     });
 
-    const membersSummaryList = slots.map(s => {
+    const membersSummaryList = effectiveSlots.map(s => {
       const assigned = membersBySlot[s.key];
       if (!assigned || (!assigned.memberName && !assigned.name)) return '';
       const name = assigned.memberName || assigned.name;
@@ -1275,7 +1297,13 @@ window.filterAdminRoundCouncils = function(roundId = null) {
   const milestoneBlocksHtml = filteredActivities.map(act => {
     let councils = act.councils || [];
     const assignments = act.councilStudentAssignments || [];
-    const slots = act.councilStructure?.slots || [];
+    const slots = (act.councilStructure?.slots && act.councilStructure.slots.length > 0)
+      ? act.councilStructure.slots
+      : [
+          { key: 'chair', label: 'Chủ tịch', name: 'Chủ tịch Hội đồng' },
+          { key: 'member', label: 'Ủy viên', name: 'Ủy viên Hội đồng' },
+          { key: 'secretary', label: 'Thư ký', name: 'Thư ký Hội đồng' }
+        ];
 
     if (searchQuery) {
       councils = councils.filter(c => {
@@ -1304,7 +1332,15 @@ window.filterAdminRoundCouncils = function(roundId = null) {
       if (c.status === 'ongoing') statusBadge = '<span class="badge bg-emerald-100 text-emerald-800 font-bold">● Đang diễn ra</span>';
       else if (c.status === 'completed') statusBadge = '<span class="badge bg-slate-200 text-slate-600 font-bold">✓ Đã kết thúc</span>';
 
-      const membersListHtml = slots.map(s => {
+      const effectiveSlots = [...slots];
+      const knownKeys = new Set(effectiveSlots.map(s => s.key));
+      Object.keys(membersBySlot).forEach(k => {
+        if (!knownKeys.has(k)) {
+          effectiveSlots.push({ key: k, label: membersBySlot[k]?.role || k, name: membersBySlot[k]?.role || k });
+        }
+      });
+
+      const membersListHtml = effectiveSlots.map(s => {
         const assigned = membersBySlot[s.key];
         if (!assigned || (!assigned.memberName && !assigned.name)) return '';
         const name = assigned.memberName || assigned.name;

@@ -133,6 +133,15 @@ window.copyCouncil = async function(councilId) {
 
 window.closeEditCouncilModal = function() {
   document.getElementById('modal-edit-council')?.classList.add('hidden');
+  const roundId = state.activeCouncilManagement?.roundId || state.selectedRoundId;
+  if (roundId) {
+    if (typeof window.filterAdminRoundCouncils === 'function') {
+      window.filterAdminRoundCouncils(roundId);
+    }
+    if (typeof window.refreshCouncilModalViews === 'function') {
+      window.refreshCouncilModalViews();
+    }
+  }
 };
 
 export function isCouncilTimeOverlap(startA, endA, startB, endB) {
@@ -610,6 +619,7 @@ window.copyCouncilLink = async function(activitySlug, councilSlug) {
 
 // --- PERSISTENCE HELPER ---
 async function persistActivityCouncilChanges(targetRound) {
+  if (!targetRound) return;
   const roundId = targetRound.id;
   try {
     const roundRef = doc(db, 'graduationRounds', roundId);
@@ -620,6 +630,36 @@ async function persistActivityCouncilChanges(targetRound) {
   } catch (err) {
     console.error('Lỗi lưu thay đổi Hội đồng:', err);
     showToast('Lỗi lưu dữ liệu: ' + err.message, 'error');
+  }
+
+  // Synchronize all UI views immediately!
+  try {
+    if (typeof refreshCouncilModalViews === 'function') {
+      refreshCouncilModalViews();
+    }
+    if (typeof filterAdminRoundCouncils === 'function') {
+      filterAdminRoundCouncils(roundId);
+    }
+    if (typeof window.filterAdminRoundCouncils === 'function') {
+      window.filterAdminRoundCouncils(roundId);
+    }
+    if (typeof renderAdminRoundActivitiesList === 'function') {
+      renderAdminRoundActivitiesList(targetRound);
+    }
+    if (typeof window.renderAdminRoundActivitiesList === 'function') {
+      window.renderAdminRoundActivitiesList(targetRound);
+    }
+    if (typeof renderSupervisorTimelineActivities === 'function') {
+      renderSupervisorTimelineActivities(targetRound);
+    }
+    if (typeof window.renderSupervisorTimelineActivities === 'function') {
+      window.renderSupervisorTimelineActivities(targetRound);
+    }
+    if (state.selectedRoundId === roundId && typeof window.loadStudentRoundActivities === 'function') {
+      window.loadStudentRoundActivities(roundId).catch(() => {});
+    }
+  } catch (syncErr) {
+    console.warn('[Council] UI sync warning:', syncErr);
   }
 }
 
