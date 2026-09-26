@@ -1,6 +1,7 @@
 
 // --- Module Bridges ---
 export const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : (reg?.officialSupervisors || []));
+export const getPreliminarySummary = (sid, rId) => (typeof window !== 'undefined' && typeof window.getPreliminarySummary === 'function' ? window.getPreliminarySummary(sid, rId) : null);
 
 export function getStudentFullProfile(sid, act = null, council = null, round = null) {
   if (!sid) return { studentId: '', mssv: '', fullName: '', topicTitle: '--' };
