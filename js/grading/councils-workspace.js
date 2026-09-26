@@ -1,7 +1,9 @@
 /**
  * IFA+ Graduation — Activity Council Workspace & Student Allocations
  */
-window.openActivityCouncilManagement = function(roundId, actId) {
+const escapeHtml = (str) => (typeof window !== 'undefined' && window.escapeHtml ? window.escapeHtml(str) : String(str || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])));
+
+window.openActivityCouncilManagement = async function(roundId, actId) {
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   if (!targetRound) {
     showToast('Không tìm thấy thông tin đợt tốt nghiệp!', 'error');
@@ -35,12 +37,15 @@ window.openActivityCouncilManagement = function(roundId, actId) {
 
   // Update header text
   document.getElementById('council-modal-act-title').textContent = `QUẢN LÝ HỘI ĐỒNG — ${act.title}`;
-  document.getElementById('council-modal-act-subtitle').textContent = `Đợt: ${targetRound.title} • Thời gian mốc: ${fmtActivityTime(act.startAt, act.endAt)}`;
+  document.getElementById('council-modal-act-subtitle').textContent = `Đợt: ${targetRound.title || targetRound.roundName} • Thời gian mốc: ${fmtActivityTime(act.startAt, act.endAt)}`;
 
+  document.getElementById('modal-activity-councils')?.classList.remove('hidden');
   switchCouncilTab('councils');
   refreshCouncilModalViews();
 
-  document.getElementById('modal-activity-councils')?.classList.remove('hidden');
+  // Asynchronously load round students if not cached
+  await loadCouncilRoundStudents(roundId);
+  refreshCouncilModalViews();
 };
 
 window.closeActivityCouncilManagement = function() {
@@ -278,6 +283,11 @@ function renderCouncilStudentsTab(act) {
   const countTag = document.getElementById('council-student-filter-count');
   if (countTag) countTag.textContent = `Hiển thị: ${filteredStudents.length} sinh viên`;
 
+  if (roundStudents.length === 0 && state.councilStudentsLoading) {
+    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-500">⏳ Đang tải danh sách sinh viên đợt tốt nghiệp...</td></tr>';
+    return;
+  }
+
   if (filteredStudents.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">Không có sinh viên phù hợp điều kiện lọc.</td></tr>';
     return;
@@ -287,6 +297,7 @@ function renderCouncilStudentsTab(act) {
   tbody.innerHTML = filteredStudents.map((s, idx) => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || '--';
+    const className = s.className || s.studentClass || '';
     const topic = s.topicTitle || '--';
     const asgn = assignments.find(a => a.studentId === sid);
     const assignedCouncilId = asgn?.councilId || '';
@@ -308,8 +319,11 @@ function renderCouncilStudentsTab(act) {
       <tr class="hover:bg-slate-50 transition-colors">
         <td class="p-3 text-center font-mono font-bold text-slate-400">${idx + 1}</td>
         <td class="p-3 font-mono font-bold text-slate-900">${sid}</td>
-        <td class="p-3 font-semibold text-slate-800 whitespace-nowrap">${name}</td>
-        <td class="p-3 max-w-xs truncate text-slate-700" title="${topic}">${topic}</td>
+        <td class="p-3">
+          <div class="font-semibold text-slate-800 whitespace-nowrap">${escapeHtml(name)}</div>
+          ${className && className !== '--' ? `<div class="text-[10px] text-slate-400 font-normal">Lớp: ${escapeHtml(className)}</div>` : ''}
+        </td>
+        <td class="p-3 max-w-xs truncate text-slate-700" title="${escapeHtml(topic)}">${escapeHtml(topic)}</td>
         <td class="p-3">
           <select onchange="changeStudentCouncil('${sid}', this.value)" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold ${assignedCouncilId ? 'bg-indigo-50/60 text-indigo-900 border-indigo-200' : 'bg-white text-slate-500'}">
             ${councilOptions}
@@ -353,20 +367,139 @@ window.filterCouncilStudents = function() {
   if (act) renderCouncilStudentsTab(act);
 };
 
+// Helper: Load round students (eligible + registrations + officialAssignments + IFAA master)
+async function loadCouncilRoundStudents(roundId) {
+  if (!roundId) return [];
+  if (state.councilStudentsByRound?.[roundId] && state.councilStudentsByRound[roundId].length > 0) {
+    return state.councilStudentsByRound[roundId];
+  }
+
+  state.councilStudentsLoading = true;
+  try {
+    if (typeof ensureFacultyDatasetLoaded === 'function' && (!state.facultyStudents || state.facultyStudents.length === 0)) {
+      await ensureFacultyDatasetLoaded().catch(() => {});
+    }
+
+    const [regSnap, elSnap, assignSnap] = await Promise.all([
+      getDocs(collection(db, 'graduationRounds', roundId, 'registrations')).catch(() => ({ docs: [] })),
+      getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents')).catch(() => ({ docs: [] })),
+      getDocs(collection(db, 'graduationRounds', roundId, 'officialAssignments')).catch(() => ({ docs: [] }))
+    ]);
+
+    const studentMap = new Map();
+
+    // 1. From eligibleStudents
+    elSnap.docs.forEach(d => {
+      const data = d.data() || {};
+      const mssv = String(d.id || data.studentId || data.mssv || '').trim().toUpperCase();
+      if (!mssv) return;
+      studentMap.set(mssv, {
+        studentId: mssv,
+        mssv: mssv,
+        fullName: data.fullName || data.name || data.studentName || '',
+        studentName: data.studentName || data.name || data.fullName || '',
+        className: data.className || data.studentClass || '',
+        major: data.major || '',
+        topicTitle: data.topicTitle || data.topic || '',
+        isEligible: true,
+        ...data
+      });
+    });
+
+    // 2. From officialAssignments
+    assignSnap.docs.forEach(d => {
+      const data = d.data() || {};
+      const mssv = String(d.id || data.studentId || data.mssv || '').trim().toUpperCase();
+      if (!mssv) return;
+      const existing = studentMap.get(mssv) || { studentId: mssv, mssv: mssv };
+      studentMap.set(mssv, {
+        ...existing,
+        ...data,
+        studentId: mssv,
+        mssv: mssv,
+        topicTitle: data.topicTitle || existing.topicTitle || '',
+        supervisorName: data.acceptedSupervisorName || data.supervisorName || existing.supervisorName || ''
+      });
+    });
+
+    // 3. From registrations
+    regSnap.docs.forEach(d => {
+      const data = d.data() || {};
+      const mssv = String(d.id || data.studentId || data.mssv || '').trim().toUpperCase();
+      if (!mssv) return;
+      const existing = studentMap.get(mssv) || { studentId: mssv, mssv: mssv };
+      studentMap.set(mssv, {
+        ...existing,
+        ...data,
+        studentId: mssv,
+        mssv: mssv,
+        fullName: data.studentName || data.fullName || existing.fullName || '',
+        studentName: data.studentName || data.fullName || existing.studentName || '',
+        className: data.currentClass || data.className || existing.className || '',
+        topicTitle: data.topicTitle || existing.topicTitle || ''
+      });
+    });
+
+    // 4. Enrich with Faculty master dataset (IFAA)
+    const list = Array.from(studentMap.values()).map(s => {
+      const fac = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(s.mssv) : null;
+      return {
+        ...s,
+        fullName: s.fullName || s.studentName || fac?.fullName || fac?.name || s.mssv,
+        studentName: s.studentName || s.fullName || fac?.name || fac?.fullName || s.mssv,
+        className: s.className || fac?.className || fac?.studentClass || '--',
+        major: s.major || fac?.major || 'Thiết kế nội thất',
+        email: s.personalEmail || s.email || fac?.email || '',
+        phone: s.studentPhone || s.phone || fac?.phone || '',
+        topicTitle: s.topicTitle || 'Chưa đăng ký đề tài'
+      };
+    });
+
+    // Sort by MSSV ascending
+    list.sort((a, b) => (a.mssv || '').localeCompare(b.mssv || ''));
+
+    state.councilStudentsByRound = state.councilStudentsByRound || {};
+    state.councilStudentsByRound[roundId] = list;
+
+    const targetRound = (state.rounds || []).find(r => r.id === roundId);
+    if (targetRound) {
+      targetRound.councilStudents = list;
+    }
+
+    return list;
+  } catch (err) {
+    console.error('[Councils] Failed to load round students:', err);
+    return [];
+  } finally {
+    state.councilStudentsLoading = false;
+  }
+}
+
 // Helper: Get all students registered or eligible in round
 function getRoundAllStudents() {
   const { roundId } = state.activeCouncilManagement;
-  const targetRound = (state.rounds || []).find(r => r.id === roundId);
-  if (!targetRound) return [];
+  if (!roundId) return [];
 
-  // Priority 1: registrations in adminReviewData
+  // Priority 1: cached council students for this round
+  if (state.councilStudentsByRound?.[roundId] && state.councilStudentsByRound[roundId].length > 0) {
+    return state.councilStudentsByRound[roundId];
+  }
+
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (targetRound?.councilStudents && targetRound.councilStudents.length > 0) {
+    return targetRound.councilStudents;
+  }
+
+  // Priority 2: registrations in adminReviewData
   if (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0) {
     return state.adminReviewData.registrations;
   }
-  // Priority 2: eligibleStudents
-  if (Array.isArray(targetRound.eligibleStudents) && targetRound.eligibleStudents.length > 0) {
+
+  // Priority 3: eligibleStudents in targetRound
+  if (Array.isArray(targetRound?.eligibleStudents) && targetRound.eligibleStudents.length > 0) {
     return targetRound.eligibleStudents;
   }
+
   return [];
 }
 

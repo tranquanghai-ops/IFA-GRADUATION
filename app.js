@@ -17,7 +17,7 @@ import './js/planning.js';
 import './js/drive.js';
 
 // 4. Councils, Rubric Scoring & Grading
-import './js/grading.js';
+import './js/grading.js?v=2.7.4';
 
 // 5. Exact Act-As Impersonation Test Mode
 import './js/impersonation.js';
