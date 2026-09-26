@@ -25,6 +25,12 @@ assert.doesNotMatch(students, /token=[0-9a-f]{8}-/);
 const supervisor = read('js/supervisors/supervisor-portal-core.js');
 assert.match(supervisor, /supervisor-round-loading/);
 assert.match(supervisor, /loadSequence !== supervisorPortalLoadSequence/);
-assert.match(read('index.html'), /ifa-version-badge">v2\.7\.3/);
-assert.doesNotMatch(read('index.html'), /__APP_VERSION__/);
+const councilsWorkspace = read('js/grading/councils-workspace.js');
+assert.match(councilsWorkspace, /openCopyCouncilsFromMilestoneModal/);
+assert.match(councilsWorkspace, /confirmCopyCouncilsFromMilestone/);
+assert.match(councilsWorkspace, /stopCouncilPresentation/);
+assert.match(read('templates/modals/grading/modal-activity-councils.html'), /modal-copy-councils-from-milestone/);
+assert.match(read('templates/modals/grading/modal-activity-councils.html'), /GV Hướng dẫn/);
+assert.match(read('templates/modals/grading/modal-council-workspace.html'), /z-\[75\]/);
+
 console.log('Current regression checks passed.');

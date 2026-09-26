@@ -36,13 +36,20 @@ export function checkCouncilAuthorization(round, act, council, user) {
   // Check all members assigned to this council
   for (const [slotKey, assigned] of Object.entries(membersBySlot)) {
     if (assigned) {
-      const memEmail = String(assigned.memberEmail || assigned.email || '').toLowerCase().trim();
-      const memId = String(assigned.memberId || assigned.id || '').trim();
-      const isEmailMatch = memEmail && userEmail && memEmail === userEmail;
-      const isIdMatch = memId && (memId === userId || memId === userEmail);
-      const isMasterMatch = Boolean(state.supervisorsMaster && state.supervisorsMaster.some(s => s.id === memId && s.email && s.email.toLowerCase().trim() === userEmail));
+      let isMatch = false;
+      if (typeof window.isUserMatchingCouncilMember === 'function') {
+        isMatch = window.isUserMatchingCouncilMember(assigned, userEmail, userId);
+      }
+      if (!isMatch) {
+        const memEmail = String(assigned.memberEmail || assigned.email || '').toLowerCase().trim();
+        const memId = String(assigned.memberId || assigned.id || '').trim();
+        const isEmailMatch = memEmail && userEmail && memEmail === userEmail;
+        const isIdMatch = memId && (memId === userId || memId.toLowerCase() === userEmail);
+        const isMasterMatch = Boolean(state.supervisorsMaster && state.supervisorsMaster.some(s => (s.id === memId || (s.email && s.email.toLowerCase().trim() === userEmail)) && (s.email && s.email.toLowerCase().trim() === userEmail)));
+        isMatch = isEmailMatch || isIdMatch || isMasterMatch;
+      }
 
-      if (isEmailMatch || isIdMatch || isMasterMatch) {
+      if (isMatch) {
         const isSec = (slotKey === 'secretary' || slotKey.startsWith('secretary') || String(assigned.role || '').toLowerCase().includes('thư ký'));
         const isChair = (slotKey === 'chair' || slotKey.startsWith('chair') || String(assigned.role || '').toLowerCase().includes('chủ tịch'));
         return {
@@ -94,6 +101,11 @@ window.openCouncilWorkspace = async function(roundId, activityId, councilId, aut
   if (!authCheck.authorized) {
     showToast(authCheck.reason || 'Bạn không có quyền truy cập Hội đồng này.', 'error');
     return;
+  }
+
+  // Ensure round students are loaded
+  if (typeof loadCouncilRoundStudents === 'function') {
+    await loadCouncilRoundStudents(roundId).catch(() => {});
   }
 
   state.activeCouncilWorkspace = {

@@ -140,13 +140,18 @@ function renderCouncilCards(act) {
     if (presentingAssignment) {
       const studentObj = findStudentInRound(presentingAssignment.studentId);
       presentingStudentHtml = `
-        <div class="mt-2 p-2 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-lg flex items-center justify-between">
-          <div class="flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            <span class="font-bold text-[10px] uppercase tracking-wider text-emerald-800">Đang trình bày:</span>
-            <span class="font-extrabold text-xs">${studentObj?.fullName || studentObj?.studentName || presentingAssignment.studentId}</span>
+        <div class="mt-2 p-2.5 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
+          <div class="flex items-center gap-2 truncate min-w-0">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
+            <span class="font-black text-[10px] uppercase tracking-wider text-emerald-800 shrink-0">Đang trình bày:</span>
+            <span class="font-extrabold text-xs text-emerald-950 truncate">${escapeHtml(studentObj?.fullName || studentObj?.studentName || presentingAssignment.studentId)}</span>
           </div>
-          <span class="font-mono text-[10px] text-emerald-700 font-bold">#${presentingAssignment.order || '--'}</span>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="font-mono text-[11px] text-emerald-800 font-black bg-emerald-100/80 px-1.5 py-0.5 rounded">#${presentingAssignment.order || '--'}</span>
+            <button type="button" onclick="stopCouncilPresentation('${c.id}')" class="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-[10px] shadow-xs flex items-center gap-1 transition" title="Kết thúc lượt trình bày">
+              <span>⏹ Dừng trình bày</span>
+            </button>
+          </div>
         </div>
       `;
     }
@@ -289,7 +294,8 @@ function renderCouncilStudentsTab(act) {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || '';
     const topic = s.topicTitle || '';
-    if (q && !sid.toLowerCase().includes(q) && !name.toLowerCase().includes(q) && !topic.toLowerCase().includes(q)) {
+    const supName = (typeof formatStudentSupervisorsForDisplay === 'function') ? formatStudentSupervisorsForDisplay(s) : (s.supervisorName || '');
+    if (q && !sid.toLowerCase().includes(q) && !name.toLowerCase().includes(q) && !topic.toLowerCase().includes(q) && !supName.toLowerCase().includes(q)) {
       return false;
     }
 
@@ -303,16 +309,36 @@ function renderCouncilStudentsTab(act) {
     return true;
   });
 
+  // Sort students: Assigned councils first sorted by order ascending, then unassigned by MSSV
+  filteredStudents.sort((a, b) => {
+    const sidA = a.mssv || a.studentId;
+    const sidB = b.mssv || b.studentId;
+    const asgnA = assignments.find(x => x.studentId === sidA);
+    const asgnB = assignments.find(x => x.studentId === sidB);
+    const hasCA = asgnA?.councilId ? 1 : 2;
+    const hasCB = asgnB?.councilId ? 1 : 2;
+    if (hasCA !== hasCB) return hasCA - hasCB;
+    if (asgnA?.councilId && asgnB?.councilId) {
+      if (asgnA.councilId !== asgnB.councilId) {
+        return String(asgnA.councilId).localeCompare(String(asgnB.councilId));
+      }
+      const orderA = asgnA.order != null ? asgnA.order : 999;
+      const orderB = asgnB.order != null ? asgnB.order : 999;
+      if (orderA !== orderB) return orderA - orderB;
+    }
+    return String(sidA || '').localeCompare(String(sidB || ''));
+  });
+
   const countTag = document.getElementById('council-student-filter-count');
   if (countTag) countTag.textContent = `Hiển thị: ${filteredStudents.length} sinh viên`;
 
   if (roundStudents.length === 0 && state.councilStudentsLoading) {
-    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-500">⏳ Đang tải danh sách sinh viên đợt tốt nghiệp...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-500">⏳ Đang tải danh sách sinh viên đợt tốt nghiệp...</td></tr>';
     return;
   }
 
   if (filteredStudents.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="p-8 text-center text-slate-400">Không có sinh viên phù hợp điều kiện lọc.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">Không có sinh viên phù hợp điều kiện lọc.</td></tr>';
     return;
   }
 
@@ -326,9 +352,12 @@ function renderCouncilStudentsTab(act) {
     const assignedCouncilId = asgn?.councilId || '';
     const order = asgn?.order || (idx + 1);
     const status = asgn?.presentationStatus || 'waiting';
+    const supName = (typeof formatStudentSupervisorsForDisplay === 'function')
+      ? formatStudentSupervisorsForDisplay(s)
+      : (s.supervisorName || '--');
 
     const councilOptions = '<option value="">-- Chưa phân công --</option>' + councils.map(c => {
-      return `<option value="${c.id}" ${assignedCouncilId === c.id ? 'selected' : ''}>${c.name}</option>`;
+      return `<option value="${c.id}" ${assignedCouncilId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`;
     }).join('');
 
     let statusPill = '<span class="badge bg-slate-100 text-slate-600 font-bold">Chờ</span>';
@@ -338,43 +367,46 @@ function renderCouncilStudentsTab(act) {
       statusPill = '<span class="badge bg-indigo-100 text-indigo-800 font-bold">✓ Đã xong</span>';
     }
 
-    const activityBadge = typeof window.renderUserActivityBadge === 'function'
-      ? window.renderUserActivityBadge(sid)
-      : '<span class="text-slate-400 text-xs">--</span>';
-
     return `
       <tr class="hover:bg-slate-50 transition-colors">
-        <td class="p-3 text-center font-mono font-bold text-slate-400">${idx + 1}</td>
-        <td class="p-3 font-mono font-bold text-slate-900">${sid}</td>
+        <td class="p-3 text-center whitespace-nowrap">
+          ${assignedCouncilId ? `
+            <div class="flex items-center justify-center gap-1 font-mono">
+              <span class="font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-xs min-w-[28px]">#${order}</span>
+              <div class="flex flex-col">
+                <button type="button" onclick="moveStudentCouncilOrder('${sid}', 'up')" class="text-[10px] text-slate-400 hover:text-indigo-600 font-bold leading-none p-0.5" title="Di chuyển lên">▲</button>
+                <button type="button" onclick="moveStudentCouncilOrder('${sid}', 'down')" class="text-[10px] text-slate-400 hover:text-indigo-600 font-bold leading-none p-0.5" title="Di chuyển xuống">▼</button>
+              </div>
+            </div>
+          ` : `<span class="font-mono text-slate-400 font-bold text-xs">${idx + 1}</span>`}
+        </td>
+        <td class="p-3 font-mono font-bold text-slate-900 text-center whitespace-nowrap">${sid}</td>
         <td class="p-3">
-          <div class="font-semibold text-slate-800 whitespace-nowrap">${escapeHtml(name)}</div>
+          <div class="font-bold text-slate-800 whitespace-nowrap">${escapeHtml(name)}</div>
           ${className && className !== '--' ? `<div class="text-[10px] text-slate-400 font-normal">Lớp: ${escapeHtml(className)}</div>` : ''}
         </td>
+        <td class="p-3 text-slate-700 text-xs">${escapeHtml(supName)}</td>
         <td class="p-3 max-w-xs truncate text-slate-700" title="${escapeHtml(topic)}">${escapeHtml(topic)}</td>
         <td class="p-3">
           <select onchange="changeStudentCouncil('${sid}', this.value)" class="w-full p-1.5 border border-slate-300 rounded-lg text-xs font-bold ${assignedCouncilId ? 'bg-indigo-50/60 text-indigo-900 border-indigo-200' : 'bg-white text-slate-500'}">
             ${councilOptions}
           </select>
         </td>
-        <td class="p-3 text-center whitespace-nowrap">
-          ${assignedCouncilId ? `
-            <div class="flex items-center justify-center gap-1">
-              <span class="font-mono font-bold text-slate-700 w-5">#${order}</span>
-              <div class="flex flex-col">
-                <button type="button" onclick="moveStudentCouncilOrder('${sid}', 'up')" class="text-[10px] text-slate-400 hover:text-slate-800 leading-none">▲</button>
-                <button type="button" onclick="moveStudentCouncilOrder('${sid}', 'down')" class="text-[10px] text-slate-400 hover:text-slate-800 leading-none">▼</button>
-              </div>
-            </div>
-          ` : '<span class="text-slate-300 font-mono">--</span>'}
-        </td>
-        <td class="p-3 whitespace-nowrap">${activityBadge}</td>
         <td class="p-3 text-center whitespace-nowrap space-x-1">
           ${assignedCouncilId ? `
-            ${statusPill}
-            <div class="inline-flex gap-1 ml-1.5">
-              <button type="button" onclick="setStudentPresentationStatus('${sid}', 'presenting')" class="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold" title="Bắt đầu trình bày">▶</button>
-              <button type="button" onclick="setStudentPresentationStatus('${sid}', 'presented')" class="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold" title="Hoàn tất trình bày">✓</button>
-              <button type="button" onclick="setStudentPresentationStatus('${sid}', 'waiting')" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[10px] font-bold" title="Đặt lại trạng thái chờ">↺</button>
+            <div class="inline-flex items-center gap-1.5">
+              ${statusPill}
+              ${status === 'presenting' ? `
+                <button type="button" onclick="setStudentPresentationStatus('${sid}', 'waiting')" class="px-2 py-0.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-[10px] font-bold shadow-2xs flex items-center gap-0.5 transition" title="Dừng lượt trình bày">
+                  <span>⏹ Dừng</span>
+                </button>
+              ` : `
+                <div class="inline-flex gap-0.5 ml-1">
+                  <button type="button" onclick="setStudentPresentationStatus('${sid}', 'presenting')" class="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold transition" title="Bắt đầu trình bày">▶</button>
+                  <button type="button" onclick="setStudentPresentationStatus('${sid}', 'presented')" class="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold transition" title="Hoàn tất trình bày">✓</button>
+                  <button type="button" onclick="setStudentPresentationStatus('${sid}', 'waiting')" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[10px] font-bold transition" title="Đặt lại trạng thái chờ">↺</button>
+                </div>
+              `}
             </div>
           ` : '<span class="text-slate-300">--</span>'}
         </td>
@@ -622,6 +654,9 @@ window.moveStudentCouncilOrder = async function(studentId, direction) {
     .filter(a => a.councilId === current.councilId)
     .sort((a, b) => (a.order || 0) - (b.order || 0));
 
+  // Normalize sequential order 1..N
+  councilStudents.forEach((a, i) => { a.order = i + 1; });
+
   const idx = councilStudents.findIndex(a => a.studentId === studentId);
   if (idx < 0) return;
 
@@ -639,6 +674,36 @@ window.moveStudentCouncilOrder = async function(studentId, direction) {
 
   await persistActivityCouncilChanges(targetRound);
   renderCouncilStudentsTab(act);
+};
+
+window.stopCouncilPresentation = async function(councilId) {
+  const roundId = state.activeCouncilManagement.roundId || state.selectedRoundId || state.activeRound?.id;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!targetRound) return;
+
+  const actId = state.activeCouncilManagement.activityId;
+  let act = actId ? (targetRound.activities || []).find(a => a.id === actId) : null;
+  if (!act) {
+    act = (targetRound.activities || []).find(a => (a.councils || []).some(c => c.id === councilId));
+  }
+  if (!act) return;
+
+  let stopped = false;
+  (act.councilStudentAssignments || []).forEach(a => {
+    if (a.councilId === councilId && a.presentationStatus === 'presenting') {
+      a.presentationStatus = 'waiting';
+      stopped = true;
+    }
+  });
+
+  if (stopped) {
+    await persistActivityCouncilChanges(targetRound);
+    refreshCouncilModalViews();
+    if (typeof filterAdminRoundCouncils === 'function') {
+      filterAdminRoundCouncils(roundId);
+    }
+    showToast('✓ Đã dừng lượt trình bày của sinh viên trong Hội đồng.', 'success');
+  }
 };
 
 window.setStudentPresentationStatus = async function(studentId, newStatus) {
@@ -663,6 +728,164 @@ window.setStudentPresentationStatus = async function(studentId, newStatus) {
 
   await persistActivityCouncilChanges(targetRound);
   refreshCouncilModalViews();
+};
+
+// ============================================================================
+// COPY COUNCILS & STUDENTS FROM ANOTHER MILESTONE
+// ============================================================================
+
+window.openCopyCouncilsFromMilestoneModal = function() {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const currentRound = (state.rounds || []).find(r => r.id === roundId);
+  if (!currentRound) return;
+
+  const select = document.getElementById('copy-councils-source-select');
+  const preview = document.getElementById('copy-councils-source-preview');
+  if (!select) return;
+
+  const candidateActs = [];
+  (state.rounds || []).forEach(r => {
+    (r.activities || []).forEach(a => {
+      // Don't list the exact same activity as source
+      if (r.id === roundId && a.id === activityId) return;
+      if (a.councils && a.councils.length > 0) {
+        candidateActs.push({
+          roundId: r.id,
+          roundTitle: r.title || r.name || 'Đợt không tên',
+          activityId: a.id,
+          actTitle: a.title,
+          actOrder: a.order,
+          councilsCount: a.councils.length,
+          studentsCount: (a.councilStudentAssignments || []).filter(asgn => !!asgn.councilId).length,
+          slotsCount: (a.councilStructure?.slots || []).length
+        });
+      }
+    });
+  });
+
+  if (candidateActs.length === 0) {
+    showToast('Không tìm thấy Mốc kế hoạch nào khác có Hội đồng để sao chép.', 'info');
+    return;
+  }
+
+  select.innerHTML = candidateActs.map(c => `
+    <option value="${c.roundId}:::${c.activityId}" data-info="${c.councilsCount} Hội đồng, ${c.studentsCount} SV phân công, ${c.slotsCount} vị trí">
+      [${escapeHtml(c.roundTitle)}] Mốc #${c.actOrder || '--'}: ${escapeHtml(c.actTitle)} (${c.councilsCount} HĐ, ${c.studentsCount} SV)
+    </option>
+  `).join('');
+
+  const updatePreview = () => {
+    const opt = select.options[select.selectedIndex];
+    if (opt && preview) {
+      preview.textContent = `Nguồn: ${opt.getAttribute('data-info')}`;
+    }
+  };
+
+  select.onchange = updatePreview;
+  updatePreview();
+
+  document.getElementById('modal-copy-councils-from-milestone')?.classList.remove('hidden');
+};
+
+window.closeCopyCouncilsFromMilestoneModal = function() {
+  document.getElementById('modal-copy-councils-from-milestone')?.classList.add('hidden');
+};
+
+window.confirmCopyCouncilsFromMilestone = async function() {
+  const select = document.getElementById('copy-councils-source-select');
+  if (!select || !select.value) {
+    showToast('Vui lòng chọn mốc nguồn cần sao chép.', 'warning');
+    return;
+  }
+
+  const [srcRoundId, srcActId] = select.value.split(':::');
+  const srcRound = (state.rounds || []).find(r => r.id === srcRoundId);
+  const srcAct = (srcRound?.activities || []).find(a => a.id === srcActId);
+
+  if (!srcAct) {
+    showToast('Không tìm thấy thông tin mốc nguồn.', 'error');
+    return;
+  }
+
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const targetAct = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!targetAct) return;
+
+  const copyStructure = document.getElementById('copy-opt-structure')?.checked ?? true;
+  const copyCouncils = document.getElementById('copy-opt-councils')?.checked ?? true;
+  const copyStudents = document.getElementById('copy-opt-students')?.checked ?? true;
+  const mode = document.querySelector('input[name="copy-councils-mode"]:checked')?.value || 'replace';
+
+  if (!copyStructure && !copyCouncils && !copyStudents) {
+    showToast('Vui lòng chọn ít nhất một nội dung cần sao chép.', 'warning');
+    return;
+  }
+
+  // 1. Structure
+  if (copyStructure && srcAct.councilStructure) {
+    targetAct.councilStructure = JSON.parse(JSON.stringify(srcAct.councilStructure));
+  }
+
+  // 2. Councils & Student assignments
+  const councilIdMap = new Map(); // srcId -> newId
+
+  if (copyCouncils) {
+    const clonedCouncils = (srcAct.councils || []).map(c => {
+      const newId = (mode === 'replace') ? (c.id || ('council_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4))) : ('council_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+      councilIdMap.set(c.id, newId);
+      return {
+        ...JSON.parse(JSON.stringify(c)),
+        id: newId,
+        status: 'draft'
+      };
+    });
+
+    if (mode === 'replace') {
+      targetAct.councils = clonedCouncils;
+    } else {
+      targetAct.councils = targetAct.councils || [];
+      targetAct.councils.push(...clonedCouncils);
+    }
+  }
+
+  // 3. Student assignments
+  if (copyStudents && srcAct.councilStudentAssignments) {
+    const targetStudents = getRoundAllStudents();
+    const targetStudentIds = new Set(targetStudents.map(s => s.mssv || s.studentId));
+
+    const clonedAssignments = (srcAct.councilStudentAssignments || [])
+      .filter(asgn => asgn.councilId && (targetStudentIds.size === 0 || targetStudentIds.has(asgn.studentId)))
+      .map(asgn => {
+        const mappedCouncilId = councilIdMap.get(asgn.councilId) || asgn.councilId;
+        return {
+          studentId: asgn.studentId,
+          councilId: mappedCouncilId,
+          order: asgn.order || 1,
+          presentationStatus: 'waiting'
+        };
+      });
+
+    if (mode === 'replace') {
+      targetAct.councilStudentAssignments = clonedAssignments;
+    } else {
+      targetAct.councilStudentAssignments = targetAct.councilStudentAssignments || [];
+      const copiedSids = new Set(clonedAssignments.map(a => a.studentId));
+      targetAct.councilStudentAssignments = targetAct.councilStudentAssignments.filter(a => !copiedSids.has(a.studentId));
+      targetAct.councilStudentAssignments.push(...clonedAssignments);
+    }
+  }
+
+  targetAct.councilEnabled = true;
+
+  await persistActivityCouncilChanges(targetRound);
+  closeCopyCouncilsFromMilestoneModal();
+  refreshCouncilModalViews();
+  if (typeof filterAdminRoundCouncils === 'function') {
+    filterAdminRoundCouncils(roundId);
+  }
+
+  showToast(`✓ Đã sao chép thành công từ "${srcAct.title}" sang mốc hiện tại!`, 'success');
 };
 
 // ============================================================================
