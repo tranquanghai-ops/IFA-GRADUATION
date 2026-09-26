@@ -1101,6 +1101,7 @@ window.renderAssessmentDefenseList = function() {
           </button>
         </div>
       </div>
+    `;
   }).join('');
 };
 
@@ -1158,7 +1159,7 @@ window.renderAssessmentSummaryTable = function() {
     const tmScore = st.components?.tm?.raw != null ? Number(st.components.tm.raw).toFixed(1) : '--';
     const defenseScore = st.components?.defense?.raw != null ? Number(st.components.defense.raw).toFixed(1) : '--';
     const finalScore = isRanked && st.rawScore != null ? Number(st.rawScore).toFixed(2) : '--';
-    const rankDisplay = isRanked ? `#${st.rank}` : '--';
+    const rankDisplay = isRanked ? ('#' + st.rank) : '--';
     const titleDisplay = st.title || (isRanked ? 'Hoàn thành' : 'Chưa đủ điểm');
 
     return `
