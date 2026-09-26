@@ -6,6 +6,14 @@ export function getStudentFullProfile(sid, act = null, council = null, round = n
   if (!sid) return { studentId: '', mssv: '', fullName: '', topicTitle: '--' };
 
   const currentRound = round || (state.rounds || []).find(r => r.id === (state.activeCouncilWorkspace?.roundId || state.selectedAssessmentRoundId || state.selectedRoundId)) || state.activeRound;
+  const roundId = currentRound?.id || state.activeCouncilWorkspace?.roundId;
+
+  // 1. Check cached council students for round if available
+  const cachedList = state.councilStudentsByRound?.[roundId] || currentRound?.councilStudents || [];
+  const cachedStudent = cachedList.find(s => (s.studentId === sid || s.mssv === sid));
+  if (cachedStudent && (cachedStudent.fullName || cachedStudent.studentName) && (cachedStudent.fullName !== sid || cachedStudent.topicTitle)) {
+    return cachedStudent;
+  }
 
   const off = (currentRound?.officialAssignments || []).find(a => (a.studentId === sid || a.mssv === sid || a.id === sid));
   const reg = (currentRound?.registrations || []).find(r => (r.studentId === sid || r.mssv === sid || r.id === sid));
