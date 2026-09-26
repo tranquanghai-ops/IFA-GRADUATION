@@ -4201,6 +4201,13 @@
             </div>
           </div>
 
+          <!-- MỐC KẾ HOẠCH DỰ KIẾN (NGAY DƯỚI CHỖ NHẬP NGÀY GIỜ) -->
+          <label class="flex items-center gap-2 cursor-pointer p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 hover:bg-amber-100/70 transition-colors">
+            <input type="checkbox" id="activity-form-is-tentative" class="rounded text-amber-600 focus:ring-amber-500">
+            <span class="font-bold text-xs text-amber-900">🟡 Mốc kế hoạch Dự kiến (isTentative)</span>
+            <span class="text-[10px] text-amber-700 ml-1 font-normal">(Hiển thị nhãn Dự kiến cho SV và Giảng viên khi ngày giờ chưa cố định)</span>
+          </label>
+
           <!-- RICH TEXT EDITOR CHO "NỘI DUNG / HƯỚNG DẪN CHI TIẾT" -->
           <div>
             <label class="font-bold text-slate-700 block mb-1">Nội dung / Hướng dẫn chi tiết</label>
@@ -4285,11 +4292,6 @@
 
           <!-- Tùy chọn hiển thị & nộp bài -->
           <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 text-slate-700">
-            <label class="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg bg-amber-50/80 border border-amber-200 hover:bg-amber-100/60 transition-colors">
-              <input type="checkbox" id="activity-form-is-tentative" class="rounded text-amber-600 focus:ring-amber-500">
-              <span class="font-bold text-xs text-amber-900">🟡 Mốc kế hoạch Dự kiến (isTentative)</span>
-              <span class="text-[10px] text-amber-700 ml-1 font-normal">(Hiển thị nhãn Dự kiến cho SV và Giảng viên)</span>
-            </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="activity-form-visibility" class="rounded text-tdtu-blue">
               <span class="font-bold text-xs">Công bố ngay cho sinh viên</span>
@@ -4362,7 +4364,8 @@
                   </div>
                   <div>
                     <label class="text-[11px] font-bold text-slate-700 block mb-0.5">Dung lượng tối đa (MB)</label>
-                    <input type="number" id="sub-max-size" value="100" min="1" max="500" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
+                    <input type="number" id="sub-max-size" value="100" min="1" max="2048" placeholder="Tối đa 2048" class="w-full p-1.5 border border-slate-300 rounded-lg font-bold">
+                    <span class="text-[10px] text-slate-500 font-medium block mt-0.5">Tối đa: 2048 MB (2 GB)</span>
                   </div>
                   <div>
                     <label class="text-[11px] font-bold text-slate-700 block mb-0.5">Số lần nộp tối đa</label>

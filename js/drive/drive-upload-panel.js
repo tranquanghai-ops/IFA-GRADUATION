@@ -168,13 +168,15 @@ window.validateFileSubmission = function(files, student, activity, round) {
   }
 
   const maxBytes = (cfg.maxFileSizeMB || 100) * 1024 * 1024;
+  const maxMb = cfg.maxFileSizeMB || 100;
+  const maxLabel = maxMb >= 1024 ? (maxMb / 1024).toFixed(1).replace(/\.0$/, '') + ' GB' : maxMb + ' MB';
   let expectedFilename = '';
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     // Size check
     if (file.size > maxBytes) {
-      errors.push(`File "${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)} MB) vượt quá dung lượng tối đa ${cfg.maxFileSizeMB || 100} MB.`);
+      errors.push(`File "${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)} MB) vượt quá dung lượng tối đa ${maxLabel}.`);
     }
 
     // Filename check
@@ -304,7 +306,7 @@ window.renderStudentSubmissionPanel = function(act, round) {
         </div>
         <div>
           <span class="text-[10px] text-slate-400 block uppercase font-bold">Dung lượng tối đa</span>
-          <span class="font-bold text-slate-800">≤ ${cfg.maxFileSizeMB || 100} MB</span>
+          <span class="font-bold text-slate-800">≤ ${(cfg.maxFileSizeMB || 100) >= 1024 ? ((cfg.maxFileSizeMB || 100) / 1024).toFixed(1).replace(/\.0$/, '') + ' GB' : (cfg.maxFileSizeMB || 100) + ' MB'}</span>
         </div>
         <div>
           <span class="text-[10px] text-slate-400 block uppercase font-bold">Số file</span>
