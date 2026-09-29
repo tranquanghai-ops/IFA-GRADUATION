@@ -413,24 +413,6 @@ body {
   width: 100%;
 }
 
-/* Council Workspace Mobile & Tablet Enhancements */
-@media (max-width: 767px) {
-  #modal-council-workspace .bg-white.rounded-2xl {
-    height: 98vh !important;
-    max-height: 98vh !important;
-    border-radius: 1rem !important;
-  }
-  #cws-timer-widget {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 0.75rem !important;
-  }
-  #cws-timer-controls {
-    justify-content: space-between !important;
-    width: 100% !important;
-  }
-}
-
 /* Council Standalone / Direct Link Mode (?hd=CODE) */
 body.council-standalone-active {
   background-color: #f8fafc !important;

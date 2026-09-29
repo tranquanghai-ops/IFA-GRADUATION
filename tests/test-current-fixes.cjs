@@ -60,6 +60,8 @@ assert.match(stylesCss, /body\.council-standalone-active/);
 assert.match(stylesCss, /#app-header/);
 assert.match(stylesCss, /@media \(max-width: 767px\)[\s\S]*\.cws-header-layout/);
 assert.match(stylesCss, /#cws-council-status-badge,[\s\S]*#cws-my-role-badge \{[\s\S]*white-space: nowrap/);
+assert.doesNotMatch(stylesCss, /#modal-council-workspace \.bg-white\.rounded-2xl \{/);
+assert.doesNotMatch(stylesCss, /#cws-timer-controls \{[\s\S]*width: 100% !important/);
 
 const authJs = read('js/auth.js');
 assert.match(authJs, /checkAndHandlePendingCouncilDirectLink/);
