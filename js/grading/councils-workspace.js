@@ -851,6 +851,7 @@ async function loadCouncilRoundStudents(roundId) {
     return [];
   } finally {
     state.councilStudentsLoading = false;
+  }
 }
 window.loadCouncilRoundStudents = loadCouncilRoundStudents;
 
