@@ -1010,7 +1010,9 @@ window.navigateCouncilPrevStudent = function() {
   const { roundId, activityId, councilId } = state.activeCouncilWorkspace || {};
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
-  const assignments = (act?.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+  const assignments = (act?.councilStudentAssignments || [])
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
   if (assignments.length === 0) return;
 
   const currentSid = state.activeCouncilSelectedStudentId;
@@ -1026,7 +1028,9 @@ window.navigateCouncilNextStudent = function() {
   const { roundId, activityId, councilId } = state.activeCouncilWorkspace || {};
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
-  const assignments = (act?.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+  const assignments = (act?.councilStudentAssignments || [])
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
   if (assignments.length === 0) return;
 
   const currentSid = state.activeCouncilSelectedStudentId;

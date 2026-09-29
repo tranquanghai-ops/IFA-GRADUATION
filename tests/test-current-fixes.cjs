@@ -54,6 +54,8 @@ assert.match(rubricsWorkspace, /isAdmin:\s*false/);
 assert.match(rubricsWorkspace, /const targetCard = document\.getElementById\('cws-student-score-card'\)/);
 assert.match(rubricsWorkspace, /exit\.finished\.then\(\(\) => \{[\s\S]*applySelection\(\)/);
 assert.match(rubricsWorkspace, /prefers-reduced-motion/);
+assert.match(rubricsWorkspace, /navigateCouncilPrevStudent[\s\S]*?\.sort\(\(a, b\) => \(a\.order \|\| 0\) - \(b\.order \|\| 0\)\)/);
+assert.match(rubricsWorkspace, /navigateCouncilNextStudent[\s\S]*?\.sort\(\(a, b\) => \(a\.order \|\| 0\) - \(b\.order \|\| 0\)\)/);
 
 const stylesCss = read('styles.css');
 assert.match(stylesCss, /body\.council-standalone-active/);
