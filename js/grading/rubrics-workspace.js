@@ -128,33 +128,40 @@ export function checkCouncilAuthorization(round, act, council, user) {
       if (!isMatch) {
         const memEmail = String(assigned.memberEmail || assigned.email || '').toLowerCase().trim();
         const memId = String(assigned.memberId || assigned.id || '').trim();
-        const isEmailMatch = memEmail && userEmail && memEmail === userEmail;
-        const isIdMatch = memId && (memId === userId || memId.toLowerCase() === userEmail);
-        const isMasterMatch = Boolean(state.supervisorsMaster && state.supervisorsMaster.some(s => (s.id === memId || (s.email && s.email.toLowerCase().trim() === userEmail)) && (s.email && s.email.toLowerCase().trim() === userEmail)));
+        const isEmailMatch = Boolean(memEmail && userEmail && memEmail === userEmail);
+        const isIdMatch = Boolean(memId && (memId === userId || memId.toLowerCase() === userEmail));
+        let isMasterMatch = false;
+        if (memId && state.supervisorsMaster && state.supervisorsMaster.length > 0) {
+          const matchedSup = state.supervisorsMaster.find(s => s.id === memId);
+          if (matchedSup && matchedSup.email && matchedSup.email.toLowerCase().trim() === userEmail) {
+            isMasterMatch = true;
+          }
+        }
         isMatch = isEmailMatch || isIdMatch || isMasterMatch;
       }
 
       if (isMatch) {
         const isSec = (slotKey === 'secretary' || slotKey.startsWith('secretary') || String(assigned.role || '').toLowerCase().includes('thư ký'));
         const isChair = (slotKey === 'chair' || slotKey.startsWith('chair') || String(assigned.role || '').toLowerCase().includes('chủ tịch'));
+        const roleLabel = isChair ? 'Chủ tịch Hội đồng' : (isSec ? 'Thư ký Hội đồng' : (assigned.role || 'Thành viên Hội đồng'));
         return {
           authorized: true,
           role: slotKey,
-          roleName: assigned.role || (isChair ? 'Chủ tịch Hội đồng' : (isSec ? 'Thư ký Hội đồng' : 'Thành viên Hội đồng')),
+          roleName: roleLabel,
           slotKey: slotKey,
           canScore: true,
           isSecretary: isSec,
           isChair: isChair,
           isAdmin: isDirectMode ? false : Boolean(actor.isAdmin && !actor.impersonating),
-          canCalibrate: isDirectMode ? false : isChair,
-          canFinalize: isDirectMode ? false : isChair
+          canCalibrate: isChair || Boolean(actor.isAdmin && !isDirectMode),
+          canFinalize: isChair || Boolean(actor.isAdmin && !isDirectMode)
         };
       }
     }
   }
 
   // Real Admin handling:
-  // If in direct council mode (?hd=CODE), Admin acts STRICTLY as a normal council member with zero extra powers!
+  // If in direct council mode (?hd=CODE), Admin acts as a normal council member if not explicitly assigned
   if (actor.isAdmin && !actor.impersonating) {
     if (isDirectMode) {
       return {

@@ -266,12 +266,20 @@ window.renderPostCouncilSection = function() {
     return;
   }
 
-  const isEndedOrFinalized = (council.status === 'ended' || council.status === 'finalized' || council.status === 'completed');
-  if (!isEndedOrFinalized || (!auth.isAdmin && !auth.isChair)) {
+  const isAdmin = Boolean(auth?.isAdmin);
+  const isChair = Boolean(auth?.isChair);
+
+  // Unified board is visible ONLY to Admin and Council Chair
+  if (!isAdmin && !isChair) {
     container.classList.add('hidden');
     return;
   }
   container.classList.remove('hidden');
+
+  const isEndedOrFinalized = (council.status === 'ended' || council.status === 'finalized' || council.status === 'completed');
+  // Admin sees raw/draft numbers at all times. Chair sees raw numbers only when session is ended/finalized.
+  const canViewRawScores = isAdmin || isEndedOrFinalized;
+  const mode = act.scoringConfig?.mode || 'numeric';
 
   const assignments = (act.councilStudentAssignments || [])
     .filter(a => a.councilId === councilId)
@@ -286,6 +294,9 @@ window.renderPostCouncilSection = function() {
     const sName = sObj?.fullName || sObj?.studentName || sid;
     const official = getOfficialDefenseScore(sid, council, act, targetRound);
 
+    let totalCompletedVal = 0;
+    let completedCount = 0;
+
     const cellsHtml = slots.map(s => {
       const assigned = membersBySlot[s.key];
       const scorerId = assigned?.memberId || assigned?.memberEmail || assigned?.memberName;
@@ -296,52 +307,133 @@ window.renderPostCouncilSection = function() {
         return '<td class="p-2 text-center text-slate-300 font-mono text-[11px]">—</td>';
       }
 
-      if (!score || score.status !== 'completed') {
-        return '<td class="p-2 text-center text-amber-600 font-mono text-[11px]">Chưa xong</td>';
+      if (score?.status === 'completed') {
+        completedCount++;
+        if (mode === 'numeric') {
+          totalCompletedVal += Number(score.value || 0);
+        } else {
+          const numVal = resolveScoreNumericValue(score, act);
+          if (typeof numVal === 'number' && !isNaN(numVal)) {
+            totalCompletedVal += numVal;
+          }
+        }
       }
 
-      const isGuest = (s.type === 'guest');
-      const isIncluded = isGuest ? (council.guestInclusion?.[sid]?.[s.key] !== false) : true;
+      // 1. PRIVACY PRESERVED: Chair during live active/preparing session
+      if (!canViewRawScores) {
+        if (score?.status === 'completed') {
+          return '<td class="p-2 text-center"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">✓ Đã chấm</span></td>';
+        } else if (score?.status === 'draft') {
+          return '<td class="p-2 text-center"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">● Đang chấm</span></td>';
+        }
+        return '<td class="p-2 text-center text-slate-300 font-mono text-[11px]">Chưa chấm</td>';
+      }
 
-      return `
-        <td class="p-2 text-center">
-          <div class="flex flex-col items-center gap-0.5">
-            <span class="font-mono font-bold text-xs ${isGuest && !isIncluded ? 'line-through text-slate-400' : 'text-slate-900'}">${score.value}</span>
-            ${isGuest ? `
-              <button type="button" onclick="toggleGuestInclusion('${sid}', '${s.key}', ${!isIncluded})" class="px-1.5 py-0.2 rounded text-[9px] font-black border transition-colors ${isIncluded ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-500 border-slate-300'}">
-                ${isIncluded ? 'LẤY' : 'BỎ'}
-              </button>
-            ` : ''}
-            <button type="button" onclick="openScoreCalibrationModal('${sid}', '${scorerId}', '${s.key}')" class="text-[10px] text-indigo-600 hover:underline font-bold mt-0.5" title="Hiệu chỉnh điểm">
-              Hiệu chỉnh
-            </button>
-          </div>
-        </td>
-      `;
+      // 2. DETAILED SCORES: Admin at all times OR Chair when ended/finalized
+      if (score?.status === 'completed') {
+        const isGuest = (s.type === 'guest');
+        const isIncluded = isGuest ? (council.guestInclusion?.[sid]?.[s.key] !== false) : true;
+        const subText = (mode === 'letter') ? (() => {
+          const numVal = resolveScoreNumericValue(score, act);
+          return (typeof numVal === 'number' && !isNaN(numVal)) ? `<div class="text-[9px] text-slate-400 font-normal">(${numVal}đ)</div>` : '';
+        })() : '';
+
+        return `
+          <td class="p-2 text-center">
+            <div class="flex flex-col items-center gap-0.5">
+              <span class="font-mono font-bold text-xs ${isGuest && !isIncluded ? 'line-through text-slate-400' : 'text-slate-900'}">
+                ${score.value}${subText}
+              </span>
+              ${isEndedOrFinalized && isGuest ? `
+                <button type="button" onclick="toggleGuestInclusion('${sid}', '${s.key}', ${!isIncluded})" class="px-1.5 py-0.2 rounded text-[9px] font-black border transition-colors ${isIncluded ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-500 border-slate-300'}">
+                  ${isIncluded ? 'LẤY' : 'BỎ'}
+                </button>
+              ` : ''}
+              ${isEndedOrFinalized ? `
+                <button type="button" onclick="openScoreCalibrationModal('${sid}', '${scorerId}', '${s.key}')" class="text-[10px] text-indigo-600 hover:underline font-bold mt-0.5" title="Hiệu chỉnh điểm">
+                  Hiệu chỉnh
+                </button>
+              ` : ''}
+            </div>
+          </td>
+        `;
+      } else if (score?.status === 'draft') {
+        return `<td class="p-2 text-center font-mono text-amber-600 text-[10px]">● ${score.value || 'Draft'} <span class="text-[9px]">(nháp)</span></td>`;
+      }
+
+      return '<td class="p-2 text-center text-slate-400 font-mono text-[11px]">Chưa chấm</td>';
     }).join('');
 
+    // Summary / Official Column
+    let summaryColumnHtml = '';
+    if (isEndedOrFinalized) {
+      summaryColumnHtml = `
+        <td class="p-2 text-center font-mono font-black text-sm ${official.isComplete ? 'text-indigo-900 bg-indigo-50/50' : 'text-amber-700 bg-amber-50/50'}">
+          ${official.formattedScore}
+        </td>
+      `;
+    } else {
+      if (isAdmin) {
+        let liveSummary = '--';
+        if (completedCount > 0) {
+          const avg = (totalCompletedVal / completedCount).toFixed(2);
+          liveSummary = `<strong class="text-slate-900">${avg}</strong> <span class="text-[10px] text-slate-400">(${completedCount}/${slots.length})</span>`;
+        }
+        summaryColumnHtml = `<td class="p-2 text-center font-mono font-semibold">${liveSummary}</td>`;
+      } else {
+        // Chair during active session
+        summaryColumnHtml = `
+          <td class="p-2 text-center">
+            <span class="font-bold text-xs ${completedCount === slots.length && slots.length > 0 ? 'text-emerald-700 font-black' : 'text-slate-700'}">
+              ${completedCount}/${slots.length} hoàn thành
+            </span>
+          </td>
+        `;
+      }
+    }
+
     return `
-      <tr class="hover:bg-amber-50/40 transition-colors">
+      <tr class="hover:bg-amber-50/30 transition-colors">
         <td class="p-2 text-center font-mono font-bold text-slate-400">#${asgn.order || '--'}</td>
         <td class="p-2 font-mono font-bold text-slate-900 whitespace-nowrap">${sid}</td>
         <td class="p-2 font-bold text-slate-800 whitespace-nowrap">${sName}</td>
         ${cellsHtml}
-        <td class="p-2 text-center font-mono font-black text-sm ${official.isComplete ? 'text-indigo-900 bg-indigo-50/50' : 'text-amber-700 bg-amber-50/50'}">
-          ${official.formattedScore}
-        </td>
+        ${summaryColumnHtml}
       </tr>
     `;
   }).join('');
+
+  // Title & Header info based on role & session state
+  let boardTitle = '⚖️ Bảng Hiệu chỉnh & Tính điểm Bảo vệ Chính thức (Chủ tịch / Quản trị viên)';
+  let boardSubtitle = 'Chủ tịch có quyền hiệu chỉnh điểm và quyết định LẤY / BỎ điểm Khách mời trước khi chốt điểm.';
+  let badgeText = council.status === 'finalized' ? 'Đã chốt điểm' : 'Sẵn sàng chốt';
+  let badgeClass = 'bg-amber-200 text-amber-900';
+
+  if (!isEndedOrFinalized) {
+    if (isAdmin) {
+      boardTitle = '🛡️ Bảng Theo dõi Điểm & Trạng thái Hội đồng (Live Monitor)';
+      boardSubtitle = 'Quản trị viên theo dõi live điểm thành viên nhập (bao gồm bản nháp) theo thời gian thực.';
+      badgeText = '● Real-time Live';
+      badgeClass = 'bg-indigo-600 text-white animate-pulse';
+    } else {
+      boardTitle = '⚖️ Bảng Theo dõi Tiến độ Chấm điểm Hội đồng (Chủ tịch)';
+      boardSubtitle = 'Theo dõi tiến độ chấm của thành viên. Điểm chi tiết và công cụ hiệu chỉnh sẽ hiển thị khi kết thúc buổi bảo vệ.';
+      badgeText = '● Đang diễn ra';
+      badgeClass = 'bg-emerald-600 text-white';
+    }
+  }
+
+  const finalHeaderTitle = isEndedOrFinalized ? 'ĐIỂM CHÍNH THỨC' : (isAdmin ? 'TỔNG HỢP LIVE' : 'TIẾN ĐỘ CHẤM');
 
   container.innerHTML = `
     <div class="flex items-center justify-between flex-wrap gap-2">
       <div>
         <h4 class="font-black text-xs text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
-          <span>⚖️</span> Bảng Hiệu chỉnh & Tính điểm Bảo vệ Chính thức (Chủ tịch / Quản trị viên)
+          ${boardTitle}
         </h4>
-        <p class="text-[11px] text-amber-800 mt-0.5">Chủ tịch có quyền hiệu chỉnh điểm và quyết định LẤY / BỎ điểm Khách mời trước khi chốt điểm.</p>
+        <p class="text-[11px] text-amber-800 mt-0.5">${boardSubtitle}</p>
       </div>
-      <span class="badge bg-amber-200 text-amber-900 font-bold text-[10px]">${council.status === 'finalized' ? 'Đã chốt điểm' : 'Sẵn sàng chốt'}</span>
+      <span class="badge ${badgeClass} font-bold text-[10px]">${badgeText}</span>
     </div>
 
     <div class="overflow-x-auto">
@@ -352,7 +444,7 @@ window.renderPostCouncilSection = function() {
             <th class="p-2">MSSV</th>
             <th class="p-2">Họ và tên</th>
             ${slots.map(s => `<th class="p-2 text-center whitespace-nowrap">${s.label || s.name} ${s.type === 'guest' ? '<span class="text-indigo-600 font-normal">(Khách)</span>' : ''}</th>`).join('')}
-            <th class="p-2 text-center whitespace-nowrap bg-indigo-100/80 text-indigo-950">ĐIỂM CHÍNH THỨC</th>
+            <th class="p-2 text-center whitespace-nowrap bg-indigo-100/80 text-indigo-950">${finalHeaderTitle}</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">

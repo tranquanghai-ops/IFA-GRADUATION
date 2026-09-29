@@ -750,119 +750,12 @@ function renderScorersProgress() {
 // 13. ADMIN REAL-TIME MONITOR (ONLY FOR ADMIN)
 function renderAdminMonitor() {
   const container = document.getElementById('cws-admin-monitor-section');
-  if (!container) return;
-
-  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
-  if (!auth.isAdmin) {
+  if (container) {
     container.classList.add('hidden');
-    return;
   }
-  container.classList.remove('hidden');
-
-  const targetRound = (state.rounds || []).find(r => r.id === roundId);
-  const act = (targetRound?.activities || []).find(a => a.id === activityId);
-  const council = (act?.councils || []).find(c => c.id === councilId);
-  if (!council) return;
-
-  const assignments = (act?.councilStudentAssignments || [])
-    .filter(a => a.councilId === councilId)
-    .sort((a, b) => (a.order || 0) - (b.order || 0));
-
-  const slots = act?.councilStructure?.slots || [];
-  const membersBySlot = council.membersBySlot || {};
-  const mode = act?.scoringConfig?.mode || 'numeric';
-
-  const rowsHtml = assignments.map(asgn => {
-    const sid = asgn.studentId;
-    const sObj = findStudentInRound(sid);
-    const sName = sObj?.fullName || sObj?.studentName || sid;
-
-    let totalCompletedVal = 0;
-    let completedCount = 0;
-    const letterCounts = {};
-
-    const cellsHtml = slots.map(s => {
-      const assigned = membersBySlot[s.key];
-      const scorerId = assigned?.memberId || assigned?.memberEmail || assigned?.memberName;
-      const scoreKey = scorerId ? `${activityId}_${councilId}_${sid}_${scorerId}` : null;
-      const score = scoreKey ? state.councilScores?.[scoreKey] : null;
-
-      if (score?.status === 'completed') {
-        if (mode === 'numeric') {
-          totalCompletedVal += Number(score.value || 0);
-          completedCount++;
-          return `<td class="p-2 text-center font-mono font-bold text-emerald-700">${score.value}</td>`;
-        } else {
-          letterCounts[score.value] = (letterCounts[score.value] || 0) + 1;
-          const numVal = resolveScoreNumericValue(score, act);
-          if (typeof numVal === 'number' && !isNaN(numVal)) {
-            totalCompletedVal += numVal;
-            completedCount++;
-          }
-          const subText = (typeof numVal === 'number' && !isNaN(numVal)) ? `<div class="text-[10px] text-slate-400 font-normal">(${numVal}đ)</div>` : '';
-          return `<td class="p-2 text-center font-mono font-bold text-indigo-700">${score.value}${subText}</td>`;
-        }
-      } else if (score?.status === 'draft') {
-        return `<td class="p-2 text-center font-mono text-amber-600 text-[10px]">● ${score.value || 'Draft'}</td>`;
-      }
-      return '<td class="p-2 text-center text-slate-300 font-mono">--</td>';
-    }).join('');
-
-    let summaryCol = '--';
-    if (mode === 'numeric') {
-      if (completedCount > 0) {
-        const avg = (totalCompletedVal / completedCount).toFixed(2);
-        summaryCol = `<strong class="text-slate-900">${avg}</strong> <span class="text-[10px] text-slate-400">(${completedCount} chấm)</span>`;
-      }
-    } else {
-      const entries = Object.entries(letterCounts);
-      if (entries.length > 0) {
-        const countsStr = entries.map(([k, c]) => `${k}: ${c}`).join(', ');
-        if (completedCount > 0) {
-          const avg = (totalCompletedVal / completedCount).toFixed(2);
-          summaryCol = `<div class="font-bold text-slate-900">${countsStr}</div><div class="text-[10px] text-indigo-600 font-semibold mt-0.5">TB: ${avg}đ (${completedCount} chấm)</div>`;
-        } else {
-          summaryCol = `<div class="font-bold text-slate-900">${countsStr}</div>`;
-        }
-      }
-    }
-
-    return `
-      <tr class="hover:bg-indigo-50/40 transition-colors">
-        <td class="p-2 text-center font-mono font-bold text-slate-400">#${asgn.order || '--'}</td>
-        <td class="p-2 font-mono font-bold text-slate-900 whitespace-nowrap">${sid}</td>
-        <td class="p-2 font-bold text-slate-800 whitespace-nowrap">${sName}</td>
-        ${cellsHtml}
-        <td class="p-2 text-center font-mono font-semibold">${summaryCol}</td>
-      </tr>
-    `;
-  }).join('');
-
-  container.innerHTML = `
-    <div class="flex items-center justify-between">
-      <h4 class="font-black text-xs text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
-        <span>🛡️</span> Bảng theo dõi Điểm & Trạng thái Hội đồng (Chỉ Quản trị viên)
-      </h4>
-      <span class="text-[10px] text-indigo-600 font-bold">Real-time Monitor</span>
-    </div>
-
-    <div class="overflow-x-auto">
-      <table class="w-full text-xs text-left border-collapse bg-white rounded-xl overflow-hidden shadow-xs border border-indigo-100">
-        <thead class="bg-indigo-50/70 text-indigo-900 border-b border-indigo-100 font-bold">
-          <tr>
-            <th class="p-2 text-center">#</th>
-            <th class="p-2">MSSV</th>
-            <th class="p-2">Họ và tên</th>
-            ${slots.map(s => `<th class="p-2 text-center whitespace-nowrap">${s.label || s.name}</th>`).join('')}
-            <th class="p-2 text-center whitespace-nowrap">${mode === 'numeric' ? 'Điểm TB' : 'Tổng hợp'}</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          ${rowsHtml}
-        </tbody>
-      </table>
-    </div>
-  `;
+  if (typeof window.renderPostCouncilSection === 'function') {
+    window.renderPostCouncilSection();
+  }
 }
 
 // 14. URL DIRECT NAVIGATION LISTENER (?hd= or ?x=&a=&c=)
