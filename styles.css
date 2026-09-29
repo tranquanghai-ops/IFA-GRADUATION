@@ -457,6 +457,10 @@ body.council-standalone-active #modal-council-workspace > div {
   box-shadow: none !important;
 }
 
+body.council-standalone-active #modal-confirm {
+  z-index: 10001 !important;
+}
+
 @supports (height: 100dvh) {
   body.council-standalone-active #modal-council-workspace,
   body.council-standalone-active #modal-council-workspace > div {
@@ -476,6 +480,28 @@ body.council-standalone-active #modal-council-workspace > div {
   backface-visibility: hidden;
 }
 
+.cws-member-menu-anchor { position: relative; min-width: 0; }
+.cws-member-menu-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 5px; max-width: 100%; padding: 3px 5px; border-radius: 6px; }
+.cws-member-menu-trigger:hover, .cws-member-menu-trigger[aria-expanded="true"] { background: rgba(255,255,255,.12); }
+.cws-member-menu-trigger:focus-visible, .cws-member-menu-logout:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.cws-member-menu { position: absolute; z-index: 80; top: calc(100% + 8px); left: 0; width: min(280px, calc(100vw - 32px)); padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #0f172a; box-shadow: 0 12px 28px rgba(15,23,42,.22); text-align: left; }
+.cws-member-menu-heading { margin-bottom: 6px; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.cws-member-menu-name { font-size: 14px; font-weight: 700; }
+.cws-member-menu-detail { margin-top: 3px; color: #475569; font-size: 12px; overflow-wrap: anywhere; }
+.cws-member-menu-logout { display: block; width: 100%; margin-top: 11px; padding: 9px 10px; border: 1px solid #fecdd3; border-radius: 7px; background: #fff1f2; color: #9f1239; font-size: 13px; font-weight: 700; text-align: left; }
+.cws-member-menu-logout:hover { background: #ffe4e6; }
+
+/* Alternate waiting students; a live or completed presentation overrides the stripe. */
+.cws-student-list-card { background-color: #fff; }
+.cws-student-list-card[data-tone="even"],
+.cws-student-score-card[data-tone="even"] { background-color: #f8fafc; }
+.cws-student-list-card[data-presentation-state="presenting"],
+.cws-student-score-card[data-presentation-state="presenting"] { background-color: #ecfdf5; border-color: #6ee7b7; }
+.cws-student-list-card[data-presentation-state="presented"],
+.cws-student-score-card[data-presentation-state="presented"] { background-color: #e2e8f0; border-color: #94a3b8; }
+.cws-student-score-card #cws-selected-student-card,
+.cws-student-score-card #cws-scoring-section { background-color: transparent; }
+
 #cws-selected-student-card h2 {
   overflow-wrap: anywhere;
   line-height: 1.25;
@@ -485,7 +511,7 @@ body.council-standalone-active #modal-council-workspace > div {
   #modal-council-workspace .cws-header-layout {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
     gap: 0.5rem;
   }
 
@@ -498,8 +524,18 @@ body.council-standalone-active #modal-council-workspace > div {
 
   #modal-council-workspace .cws-header-identity > div:last-child {
     min-width: 0;
-    flex: 1;
+    text-align: center;
   }
+
+  #modal-council-workspace .cws-header-identity,
+  #cws-header-timer-container,
+  #modal-council-workspace .cws-header-actions,
+  #modal-council-workspace .cws-header-identity > div:last-child > div:first-child,
+  #modal-council-workspace .cws-member-row {
+    justify-content: center;
+  }
+
+  .cws-member-menu { left: 50%; transform: translateX(-50%); }
 
   #cws-council-status-badge,
   #cws-my-role-badge {
@@ -518,10 +554,6 @@ body.council-standalone-active #modal-council-workspace > div {
   #cws-timer-controls button {
     flex: none;
     white-space: nowrap;
-  }
-
-  #modal-council-workspace .cws-header-actions {
-    justify-content: flex-start;
   }
 
   #cws-col-grading {

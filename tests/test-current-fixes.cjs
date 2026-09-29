@@ -45,6 +45,8 @@ assert.match(read('templates/modals/grading/modal-council-workspace.html'), /z-\
 const councilTemplate = read('templates/modals/grading/modal-council-workspace.html');
 assert.match(councilTemplate, /id="cws-student-score-card"[\s\S]*id="cws-selected-student-card"[\s\S]*id="cws-scoring-section"[\s\S]*<\/div>/);
 assert.doesNotMatch(councilTemplate, /cardFlipNext|card-flip-next/);
+assert.match(councilTemplate, /id="cws-member-menu-trigger"[\s\S]*id="cws-member-menu"/);
+assert.doesNotMatch(councilTemplate, /id="btn-cws-direct-logout"/);
 const rubricsWorkspace = read('js/grading/rubrics-workspace.js');
 assert.match(rubricsWorkspace, /council-standalone-active/);
 assert.match(rubricsWorkspace, /handleCouncilDirectLogout/);
@@ -56,6 +58,11 @@ assert.match(rubricsWorkspace, /exit\.finished\.then\(\(\) => \{[\s\S]*applySele
 assert.match(rubricsWorkspace, /prefers-reduced-motion/);
 assert.match(rubricsWorkspace, /navigateCouncilPrevStudent[\s\S]*?\.sort\(\(a, b\) => \(a\.order \|\| 0\) - \(b\.order \|\| 0\)\)/);
 assert.match(rubricsWorkspace, /navigateCouncilNextStudent[\s\S]*?\.sort\(\(a, b\) => \(a\.order \|\| 0\) - \(b\.order \|\| 0\)\)/);
+assert.match(rubricsWorkspace, /data-tone="\$\{index % 2 === 0 \? 'odd' : 'even'\}"/);
+assert.match(rubricsWorkspace, /updateCouncilSelectedStudentSurface\(\)/);
+assert.match(rubricsWorkspace, /toggleCouncilMemberMenu/);
+assert.match(rubricsWorkspace, /showConfirm\('Đăng xuất'/);
+assert.doesNotMatch(rubricsWorkspace, /confirm\('Bạn có chắc chắn muốn đăng xuất/);
 
 const stylesCss = read('styles.css');
 assert.match(stylesCss, /body\.council-standalone-active/);
@@ -64,6 +71,9 @@ assert.match(stylesCss, /@media \(max-width: 767px\)[\s\S]*\.cws-header-layout/)
 assert.match(stylesCss, /#cws-council-status-badge,[\s\S]*#cws-my-role-badge \{[\s\S]*white-space: nowrap/);
 assert.doesNotMatch(stylesCss, /#modal-council-workspace \.bg-white\.rounded-2xl \{/);
 assert.doesNotMatch(stylesCss, /#cws-timer-controls \{[\s\S]*width: 100% !important/);
+assert.match(stylesCss, /\.cws-student-list-card\[data-presentation-state="presenting"\]/);
+assert.match(stylesCss, /\.cws-student-score-card\[data-presentation-state="presented"\]/);
+assert.match(stylesCss, /body\.council-standalone-active #modal-confirm/);
 
 const authJs = read('js/auth.js');
 assert.match(authJs, /checkAndHandlePendingCouncilDirectLink/);

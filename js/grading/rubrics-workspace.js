@@ -294,7 +294,9 @@ window.openCouncilWorkspace = async function(roundId, activityId, councilId, aut
 };
 
 window.handleCouncilDirectLogout = async function() {
-  if (confirm('Bạn có chắc chắn muốn đăng xuất khỏi phiên chấm Hội đồng?')) {
+  const confirmed = await showConfirm('Đăng xuất', 'Bạn muốn đăng xuất khỏi phiên chấm Hội đồng?', { confirmText: 'Đăng xuất' });
+  if (confirmed) {
+    closeCouncilMemberMenu();
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem('pendingCouncilCode');
       sessionStorage.removeItem('councilDirectMode');
@@ -457,13 +459,15 @@ function renderCouncilWorkspaceFull() {
 
   const mobileMemberLine = document.getElementById('cws-mobile-member-line');
   if (mobileMemberLine) {
-    if (memberDisplayName) {
-      mobileMemberLine.textContent = `👤 ${memberDisplayName}`;
-      mobileMemberLine.classList.remove('hidden');
-    } else {
-      mobileMemberLine.classList.add('hidden');
-    }
+    mobileMemberLine.textContent = `👤 ${memberDisplayName || actor?.email || 'Thành viên hội đồng'}`;
   }
+  const memberMenuName = document.getElementById('cws-member-menu-name');
+  const memberMenuRole = document.getElementById('cws-member-menu-role');
+  const memberMenuEmail = document.getElementById('cws-member-menu-email');
+  if (memberMenuName) memberMenuName.textContent = memberDisplayName || 'Thành viên hội đồng';
+  if (memberMenuRole) memberMenuRole.textContent = `${council.name || 'Hội đồng'} · ${memberRoleText}`;
+  if (memberMenuEmail) memberMenuEmail.textContent = actor?.email || state.user?.email || '';
+  closeCouncilMemberMenu();
 
   // Session Controls (Secretary / Chair / Admin)
   const sessionControls = document.getElementById('cws-session-controls');
@@ -488,25 +492,11 @@ function renderCouncilWorkspaceFull() {
 
   // Direct Council Link Mode Header Actions
   const isDirectMode = Boolean(state.isCouncilDirectMode || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('councilDirectMode') === 'true'));
-  const directActions = document.getElementById('cws-direct-user-actions');
   const normalClose = document.getElementById('btn-cws-normal-close');
-  const directEmail = document.getElementById('cws-direct-user-email');
 
   if (isDirectMode) {
-    if (directActions) {
-      directActions.classList.remove('hidden');
-      directActions.classList.add('flex');
-    }
     if (normalClose) normalClose.classList.add('hidden');
-    if (directEmail) {
-      const email = getEffectiveActor()?.email || state.user?.email || '';
-      directEmail.textContent = email;
-    }
   } else {
-    if (directActions) {
-      directActions.classList.add('hidden');
-      directActions.classList.remove('flex');
-    }
     if (normalClose) normalClose.classList.remove('hidden');
   }
 
@@ -520,6 +510,7 @@ function renderCouncilWorkspaceFull() {
 function renderCouncilWorkspacePartialSync() {
   // Update student list badges & counts
   renderCouncilStudentList();
+  updateCouncilSelectedStudentSurface();
 
   // Update presenting banner
   renderPresentingBanner();
@@ -913,7 +904,7 @@ function renderCouncilStudentList() {
   const myScorerId = getEffectiveActor().uid || getEffectiveActor().email;
   const scoringEnabled = Boolean(act.scoringConfig?.enabled);
 
-  container.innerHTML = councilStudents.map((asgn) => {
+  container.innerHTML = councilStudents.map((asgn, index) => {
     const sid = asgn.studentId;
     const sObj = getStudentFullProfile(sid, act, council, targetRound);
     const sName = sObj?.fullName || sObj?.studentName || sObj?.name || sid;
@@ -924,9 +915,9 @@ function renderCouncilStudentList() {
     // Presentation badge
     let presBadge = '<span class="text-[10px] text-slate-400">Chờ</span>';
     if (isPresenting) {
-      presBadge = '<span class="badge bg-emerald-500 text-white font-black text-[9px] animate-pulse">🔴 Đang trình bày</span>';
+      presBadge = '<span class="badge bg-emerald-600 text-white font-black text-[9px]">● Đang trình bày</span>';
     } else if (isPresented) {
-      presBadge = '<span class="badge bg-indigo-100 text-indigo-800 font-bold text-[9px]">✓ Đã xong</span>';
+      presBadge = '<span class="badge bg-slate-600 text-white font-bold text-[9px]">✓ Đã xong</span>';
     }
 
     // Scoring status badge for this member
@@ -945,8 +936,10 @@ function renderCouncilStudentList() {
       }
     }
 
+    const presentationState = isPresenting ? 'presenting' : isPresented ? 'presented' : 'waiting';
+    const selectedRing = isPresenting ? 'ring-emerald-500' : isPresented ? 'ring-slate-500' : 'ring-indigo-500';
     return `
-      <div onclick="selectCouncilStudent('${sid}')" class="p-2.5 rounded-xl border transition-all cursor-pointer ${isSelected ? 'bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-500 shadow-xs' : 'bg-white border-slate-200 hover:border-slate-300'}">
+      <div onclick="selectCouncilStudent('${sid}')" data-tone="${index % 2 === 0 ? 'odd' : 'even'}" data-presentation-state="${presentationState}" class="cws-student-list-card p-2.5 rounded-xl border border-slate-200 transition-all cursor-pointer hover:border-slate-400 ${isSelected ? `ring-2 ${selectedRing} shadow-xs` : ''}">
         <div class="flex items-center justify-between gap-1">
           <span class="font-mono font-bold text-xs ${isSelected ? 'text-indigo-900' : 'text-slate-600'}">#${asgn.order || '--'}</span>
           ${presBadge}
@@ -1121,6 +1114,29 @@ window.selectCouncilStudent = function(studentId, forceMobileGradingTab = false,
   }).finally(() => { councilStudentTransitioning = false; });
 };
 
+function closeCouncilMemberMenu() {
+  const menu = document.getElementById('cws-member-menu');
+  const trigger = document.getElementById('cws-member-menu-trigger');
+  menu?.classList.add('hidden');
+  trigger?.setAttribute('aria-expanded', 'false');
+}
+
+window.toggleCouncilMemberMenu = function() {
+  const menu = document.getElementById('cws-member-menu');
+  const trigger = document.getElementById('cws-member-menu-trigger');
+  if (!menu || !trigger) return;
+  const willOpen = menu.classList.contains('hidden');
+  menu.classList.toggle('hidden', !willOpen);
+  trigger.setAttribute('aria-expanded', String(willOpen));
+};
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.cws-member-menu-anchor')) closeCouncilMemberMenu();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closeCouncilMemberMenu();
+});
+
 window.goToCurrentPresentingStudent = function() {
   const { roundId, activityId, councilId } = state.activeCouncilWorkspace;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
@@ -1135,6 +1151,34 @@ window.goToCurrentPresentingStudent = function() {
 };
 
 // 6. RENDER SELECTED STUDENT DETAILS & SCORING
+function getCouncilPresentationBadge(status) {
+  if (status === 'presenting') return { text: '● ĐANG TRÌNH BÀY', className: 'badge bg-emerald-600 text-white font-black text-xs' };
+  if (status === 'presented') return { text: '✓ Đã trình bày', className: 'badge bg-slate-600 text-white font-bold text-xs' };
+  return { text: 'Chờ trình bày', className: 'badge bg-slate-100 text-slate-600 font-bold text-xs' };
+}
+
+function updateCouncilSelectedStudentSurface() {
+  const card = document.getElementById('cws-student-score-card');
+  const { roundId, activityId, councilId } = state.activeCouncilWorkspace || {};
+  const round = (state.rounds || []).find(r => r.id === roundId);
+  const act = (round?.activities || []).find(a => a.id === activityId);
+  const students = (act?.councilStudentAssignments || [])
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const index = students.findIndex(a => a.studentId === state.activeCouncilSelectedStudentId);
+  const status = students[index]?.presentationStatus || 'waiting';
+  if (card) {
+    card.dataset.tone = index % 2 === 1 ? 'even' : 'odd';
+    card.dataset.presentationState = status;
+  }
+  const badge = document.getElementById('cws-student-presentation-badge');
+  if (badge) {
+    const presentation = getCouncilPresentationBadge(status);
+    badge.className = presentation.className;
+    badge.textContent = presentation.text;
+  }
+}
+
 function renderCouncilSelectedStudentDetails() {
   const sid = state.activeCouncilSelectedStudentId;
   const card = document.getElementById('cws-selected-student-card');
@@ -1179,14 +1223,8 @@ function renderCouncilSelectedStudentDetails() {
     : formatStudentSupervisorsForDisplay(sObj);
 
   // Presenting status badge
-  const isPresenting = (asgn?.presentationStatus === 'presenting');
-  const isPresented = (asgn?.presentationStatus === 'presented');
-  let statusBadgeHtml = '<span class="badge bg-slate-100 text-slate-600 font-bold text-xs">Chờ trình bày</span>';
-  if (isPresenting) {
-    statusBadgeHtml = '<span class="badge bg-emerald-500 text-white font-black text-xs animate-pulse">🔴 ĐANG TRÌNH BÀY</span>';
-  } else if (isPresented) {
-    statusBadgeHtml = '<span class="badge bg-indigo-100 text-indigo-800 font-bold text-xs">✓ Đã trình bày</span>';
-  }
+  const presentationBadge = getCouncilPresentationBadge(asgn?.presentationStatus);
+  const statusBadgeHtml = `<span id="cws-student-presentation-badge" class="${presentationBadge.className}">${presentationBadge.text}</span>`;
 
   card.innerHTML = `
     <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -1238,6 +1276,7 @@ function renderCouncilSelectedStudentDetails() {
       return '';
     })() : ''}
   `;
+  updateCouncilSelectedStudentSurface();
 
   // Update presenting banner
   renderPresentingBanner();
