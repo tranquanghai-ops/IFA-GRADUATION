@@ -42,16 +42,24 @@ assert.match(read('templates/modals/grading/modal-activity-councils.html'), /GV 
 assert.match(read('templates/modals/grading/modal-activity-councils.html'), /council-student-subtabs/);
 assert.match(read('templates/modals/grading/modal-activity-councils.html'), /max-w-6xl/);
 assert.match(read('templates/modals/grading/modal-council-workspace.html'), /z-\[75\]/);
+const councilTemplate = read('templates/modals/grading/modal-council-workspace.html');
+assert.match(councilTemplate, /id="cws-student-score-card"[\s\S]*id="cws-selected-student-card"[\s\S]*id="cws-scoring-section"[\s\S]*<\/div>/);
+assert.doesNotMatch(councilTemplate, /cardFlipNext|card-flip-next/);
 const rubricsWorkspace = read('js/grading/rubrics-workspace.js');
 assert.match(rubricsWorkspace, /council-standalone-active/);
 assert.match(rubricsWorkspace, /handleCouncilDirectLogout/);
 assert.match(rubricsWorkspace, /isDirectMode/);
 assert.match(rubricsWorkspace, /role:\s*'member'/);
 assert.match(rubricsWorkspace, /isAdmin:\s*false/);
+assert.match(rubricsWorkspace, /const targetCard = document\.getElementById\('cws-student-score-card'\)/);
+assert.match(rubricsWorkspace, /exit\.finished\.then\(\(\) => \{[\s\S]*applySelection\(\)/);
+assert.match(rubricsWorkspace, /prefers-reduced-motion/);
 
 const stylesCss = read('styles.css');
 assert.match(stylesCss, /body\.council-standalone-active/);
 assert.match(stylesCss, /#app-header/);
+assert.match(stylesCss, /@media \(max-width: 767px\)[\s\S]*\.cws-header-layout/);
+assert.match(stylesCss, /#cws-council-status-badge,[\s\S]*#cws-my-role-badge \{[\s\S]*white-space: nowrap/);
 
 const authJs = read('js/auth.js');
 assert.match(authJs, /checkAndHandlePendingCouncilDirectLink/);

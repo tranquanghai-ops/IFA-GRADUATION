@@ -474,3 +474,93 @@ body.council-standalone-active #modal-council-workspace > div {
   border: none !important;
   box-shadow: none !important;
 }
+
+@supports (height: 100dvh) {
+  body.council-standalone-active #modal-council-workspace,
+  body.council-standalone-active #modal-council-workspace > div {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+}
+
+/* Council scoring: keep the student identity and score sheet on one moving surface. */
+.touch-pan-y-smooth {
+  touch-action: pan-y;
+}
+
+.cws-student-score-card {
+  min-width: 0;
+  transform-origin: center top;
+  backface-visibility: hidden;
+}
+
+#cws-selected-student-card h2 {
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+@media (max-width: 767px) {
+  #modal-council-workspace .cws-header-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  #modal-council-workspace .cws-header-identity,
+  #modal-council-workspace .cws-header-actions,
+  #cws-header-timer-container {
+    width: 100%;
+    min-width: 0;
+  }
+
+  #modal-council-workspace .cws-header-identity > div:last-child {
+    min-width: 0;
+    flex: 1;
+  }
+
+  #cws-council-status-badge,
+  #cws-my-role-badge {
+    flex: none;
+    width: auto;
+    white-space: nowrap;
+  }
+
+  #cws-header-timer-container,
+  #modal-council-workspace .cws-header-actions,
+  #cws-session-controls {
+    flex-wrap: wrap;
+  }
+
+  #modal-council-workspace .cws-header-actions button,
+  #cws-timer-controls button {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  #modal-council-workspace .cws-header-actions {
+    justify-content: flex-start;
+  }
+
+  #cws-col-grading {
+    overflow-x: hidden;
+  }
+
+  #cws-selected-student-card h2 {
+    font-size: 0.95rem;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 430px) {
+  #cws-mobile-tab-bar .cws-mobile-active-label {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cws-student-score-card {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1004,6 +1004,8 @@ window.switchCouncilWorkspaceMobileTab = function(tab = 'grading') {
   }
 };
 
+let councilStudentTransitioning = false;
+
 window.navigateCouncilPrevStudent = function() {
   const { roundId, activityId, councilId } = state.activeCouncilWorkspace || {};
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
@@ -1037,6 +1039,7 @@ window.navigateCouncilNextStudent = function() {
 };
 
 window.selectCouncilStudent = function(studentId, forceMobileGradingTab = false, flipDirection = null) {
+  if (councilStudentTransitioning) return;
   // PRESERVE UNSAVED INPUTS from current student (including rubric components)
   const oldSid = state.activeCouncilSelectedStudentId;
   if (oldSid && oldSid !== studentId) {
@@ -1070,29 +1073,48 @@ window.selectCouncilStudent = function(studentId, forceMobileGradingTab = false,
     }
   }
 
-  // SET NEW SELECTED STUDENT (NEVER changes current presenting student)
-  state.activeCouncilSelectedStudentId = studentId;
-
-  renderCouncilStudentList();
-  renderCouncilSelectedStudentDetails();
-
-  // Trigger 3D card flip animation if direction is specified or switching students
-  if (flipDirection) {
-    const card = document.getElementById('cws-selected-student-card');
-    if (card) {
-      card.classList.remove('card-flip-next', 'card-flip-prev');
-      void card.offsetWidth; // force reflow
-      card.classList.add(flipDirection === 'next' ? 'card-flip-next' : 'card-flip-prev');
-      setTimeout(() => {
-        card.classList.remove('card-flip-next', 'card-flip-prev');
-      }, 350);
+  const showGrading = () => {
+    if (window.innerWidth < 768 || forceMobileGradingTab) {
+      switchCouncilWorkspaceMobileTab('grading');
     }
+  };
+  const applySelection = () => {
+    // Never change the student currently presenting to the council.
+    state.activeCouncilSelectedStudentId = studentId;
+    renderCouncilStudentList();
+    renderCouncilSelectedStudentDetails();
+    showGrading();
+  };
+
+  const card = document.getElementById('cws-student-score-card');
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (!flipDirection || oldSid === studentId || !card?.animate || reduceMotion) {
+    applySelection();
+    return;
   }
 
-  // On mobile/tablet screens (< md / 768px), auto-switch to grading tab
-  if (window.innerWidth < 768 || forceMobileGradingTab) {
-    switchCouncilWorkspaceMobileTab('grading');
-  }
+  // Two phases keep the old student's sheet visible on the way out; then the
+  // entire new sheet (identity, topic and score form) rises into place together.
+  councilStudentTransitioning = true;
+  showGrading();
+  const sign = flipDirection === 'next' ? -1 : 1;
+  const exit = card.animate([
+    { transform: 'perspective(1100px) translateX(0) rotateY(0) scale(1)', opacity: 1, filter: 'drop-shadow(0 2px 4px rgba(15,23,42,.08))' },
+    { transform: `perspective(1100px) translateX(${sign * 38}px) rotateY(${sign * 10}deg) scale(.97)`, opacity: .15, filter: 'drop-shadow(0 18px 18px rgba(15,23,42,.18))' }
+  ], { duration: 170, easing: 'ease-in', fill: 'forwards' });
+  exit.finished.then(() => {
+    exit.cancel();
+    applySelection();
+    document.getElementById('cws-col-grading')?.scrollTo({ top: 0, behavior: 'smooth' });
+    const enter = card.animate([
+      { transform: `perspective(1100px) translateX(${-sign * 38}px) rotateY(${-sign * 10}deg) scale(.97)`, opacity: .15, filter: 'drop-shadow(0 18px 18px rgba(15,23,42,.18))' },
+      { transform: 'perspective(1100px) translateX(0) rotateY(0) scale(1)', opacity: 1, filter: 'drop-shadow(0 2px 4px rgba(15,23,42,.08))' }
+    ], { duration: 290, easing: 'cubic-bezier(.18,.8,.25,1)', fill: 'forwards' });
+    return enter.finished.finally(() => enter.cancel());
+  }).catch(() => {
+    exit.cancel();
+    if (state.activeCouncilSelectedStudentId !== studentId) applySelection();
+  }).finally(() => { councilStudentTransitioning = false; });
 };
 
 window.goToCurrentPresentingStudent = function() {
@@ -1238,7 +1260,7 @@ function renderCouncilSelectedStudentDetails() {
 }
 
 export function initCouncilTouchSwipeListeners() {
-  const targetCard = document.getElementById('cws-selected-student-card');
+  const targetCard = document.getElementById('cws-student-score-card');
   if (!targetCard || targetCard._swipeListenersAttached) return;
   targetCard._swipeListenersAttached = true;
 
@@ -1248,6 +1270,10 @@ export function initCouncilTouchSwipeListeners() {
 
   targetCard.addEventListener('touchstart', (e) => {
     if (e.touches && e.touches.length === 1) {
+      if (e.target.closest('input, textarea, select, button, label')) {
+        touchStartX = null;
+        return;
+      }
       touchStartX = e.touches[0].clientX;
       touchStartY = e.touches[0].clientY;
       touchStartTime = Date.now();
@@ -1255,7 +1281,7 @@ export function initCouncilTouchSwipeListeners() {
   }, { passive: true });
 
   targetCard.addEventListener('touchend', (e) => {
-    if (e.changedTouches && e.changedTouches.length === 1) {
+    if (touchStartX !== null && e.changedTouches && e.changedTouches.length === 1) {
       const touchEndX = e.changedTouches[0].clientX;
       const touchEndY = e.changedTouches[0].clientY;
       const deltaX = touchEndX - touchStartX;

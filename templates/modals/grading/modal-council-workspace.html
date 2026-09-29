@@ -2,54 +2,13 @@
      MODAL: COUNCIL WORKSPACE / ĐIỀU HÀNH & CHẤM ĐIỂM HỘI ĐỒNG (v2.7.4)
      ============================================================================ -->
 <div id="modal-council-workspace" class="hidden fixed inset-0 z-[75] modal-backdrop flex items-center justify-center p-1 sm:p-4">
-  <style>
-    @keyframes cardFlipNext {
-      0% {
-        transform: perspective(900px) rotateY(0deg) scale(1);
-        opacity: 1;
-      }
-      45% {
-        transform: perspective(900px) rotateY(45deg) scale(0.94);
-        opacity: 0.35;
-      }
-      100% {
-        transform: perspective(900px) rotateY(0deg) scale(1);
-        opacity: 1;
-      }
-    }
-    @keyframes cardFlipPrev {
-      0% {
-        transform: perspective(900px) rotateY(0deg) scale(1);
-        opacity: 1;
-      }
-      45% {
-        transform: perspective(900px) rotateY(-45deg) scale(0.94);
-        opacity: 0.35;
-      }
-      100% {
-        transform: perspective(900px) rotateY(0deg) scale(1);
-        opacity: 1;
-      }
-    }
-    .card-flip-next {
-      animation: cardFlipNext 0.32s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-    }
-    .card-flip-prev {
-      animation: cardFlipPrev 0.32s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-    }
-    .touch-pan-y-smooth {
-      touch-action: pan-y;
-      will-change: transform, opacity;
-    }
-  </style>
-
   <div class="bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[98vh] sm:h-[94vh] max-h-[98vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
     
     <!-- Ultra-Compact Top Header -->
     <div class="px-2.5 py-2 sm:px-4 sm:py-2.5 border-b border-slate-200 bg-slate-900 text-white shrink-0 shadow-xs">
-      <div class="flex items-center justify-between gap-1.5 sm:gap-3">
+      <div class="cws-header-layout flex items-center justify-between gap-1.5 sm:gap-3">
         <!-- Left: Council Name & Role -->
-        <div class="flex items-center gap-2 min-w-0">
+        <div class="cws-header-identity flex items-center gap-2 min-w-0">
           <div class="w-7 h-7 bg-indigo-500/30 text-indigo-300 rounded-lg text-sm flex items-center justify-center font-black shrink-0">🏛️</div>
           <div class="min-w-0">
             <div class="flex items-center gap-1.5 flex-wrap">
@@ -83,7 +42,7 @@
         </div>
 
         <!-- Right: Actions / Logout / Session Controls -->
-        <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <div class="cws-header-actions flex items-center gap-1 sm:gap-1.5 shrink-0">
           <!-- Secretary / Admin / Chair Session Controls -->
           <div id="cws-session-controls" class="hidden items-center gap-1">
             <button type="button" id="btn-start-council-session" onclick="startCouncilSession()" class="px-2 sm:px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold shadow-xs flex items-center gap-1 cursor-pointer">
@@ -118,7 +77,7 @@
         <span>👥</span> <span>Danh sách SV</span> (<span id="cws-mobile-student-count-badge">0</span>)
       </button>
       <button type="button" id="btn-cws-tab-grading" onclick="switchCouncilWorkspaceMobileTab('grading')" class="flex-1 py-1.5 px-2 text-xs font-bold rounded-lg bg-white shadow-xs text-indigo-900 border border-indigo-200 flex items-center justify-center gap-1 transition-all cursor-pointer">
-        <span>📝</span> <span>Chấm điểm</span>: <span id="cws-mobile-active-name" class="truncate max-w-[110px] ml-0.5">--</span>
+        <span>📝</span> <span>Chấm điểm</span><span class="cws-mobile-active-label">: <span id="cws-mobile-active-name" class="truncate max-w-[110px] ml-0.5">--</span></span>
       </button>
     </div>
 
@@ -175,9 +134,14 @@
           </button>
         </div>
 
-        <!-- SELECTED STUDENT DETAILS CARD WITH 3D FLIP ANIMATION -->
-        <div id="cws-selected-student-card" class="p-3.5 sm:p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5 sm:space-y-3 touch-pan-y-smooth">
-          <!-- Rendered dynamically -->
+        <!-- ONE STUDENT CARD: DETAILS AND PERSONAL SCORE SHEET MOVE TOGETHER -->
+        <div id="cws-student-score-card" class="cws-student-score-card bg-white border border-slate-200 rounded-2xl shadow-xs touch-pan-y-smooth">
+          <div id="cws-selected-student-card" class="p-3.5 sm:p-5 bg-slate-50/70 rounded-t-2xl space-y-2.5 sm:space-y-3">
+            <!-- Rendered dynamically -->
+          </div>
+          <div id="cws-scoring-section" class="p-3.5 sm:p-5 border-t border-slate-200 space-y-4">
+            <!-- Rendered dynamically -->
+          </div>
         </div>
 
         <!-- SECRETARY CONTROLS FOR THIS STUDENT -->
@@ -188,11 +152,6 @@
           <div id="cws-secretary-buttons" class="flex items-center gap-2">
             <!-- Rendered dynamically -->
           </div>
-        </div>
-
-        <!-- SCORING CARD (LETTER / NUMERIC) -->
-        <div id="cws-scoring-section" class="p-4 sm:p-5 bg-white border border-slate-200 rounded-2xl space-y-4 shadow-xs">
-          <!-- Rendered dynamically -->
         </div>
 
         <!-- PROGRESS OF SCORERS IN COUNCIL (PRIVACY PRESERVED) -->
