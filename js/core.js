@@ -22,6 +22,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
 import { 
   getFirestore, 
+  FieldPath,
   collection, 
   doc, 
   getDoc, 
@@ -52,6 +53,7 @@ window.uploadBytes = uploadBytes;
 window.getDownloadURL = getDownloadURL;
 window.deleteObject = deleteObject;
 window.getAuth = getAuth;
+window.FieldPath = FieldPath;
 window.onAuthStateChanged = onAuthStateChanged;
 window.signInWithPopup = signInWithPopup;
 window.GoogleAuthProvider = GoogleAuthProvider;

@@ -1,6 +1,13 @@
 /**
  * IFA+ Graduation — Council Live Scoring & Admin Monitor Submodule
  */
+function getActiveCouncilScorerId() {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const round = (state.rounds || []).find(r => r.id === roundId);
+  const activity = (round?.activities || []).find(a => a.id === activityId);
+  const council = (activity?.councils || []).find(c => c.id === councilId);
+  return window.resolveCouncilScorerId(council, auth, getEffectiveActor());
+}
 const findStudentInRound = (sid, roundId) => {
   if (typeof window !== 'undefined' && typeof window.getStudentFullProfile === 'function') {
     const r = (state.rounds || []).find(rd => rd.id === (roundId || state.activeCouncilWorkspace?.roundId || state.selectedAssessmentRoundId || state.selectedRoundId)) || state.activeRound;
@@ -35,7 +42,7 @@ function renderScoringSection() {
   container.classList.remove('hidden');
 
   const sid = state.activeCouncilSelectedStudentId;
-  const myScorerId = getEffectiveActor().uid || getEffectiveActor().email;
+  const myScorerId = getActiveCouncilScorerId();
   const scoreKey = `${activityId}_${councilId}_${sid}_${myScorerId}`;
   const savedScore = state.councilScores?.[scoreKey];
   const draft = state.councilLocalDrafts?.[sid];
@@ -332,7 +339,7 @@ window.saveCurrentScore = async function(isCompleted) {
   if (!act || !council) return;
 
   const effectiveScorer = getEffectiveActor();
-  const scorerId = effectiveScorer.uid || effectiveScorer.email;
+  const scorerId = getActiveCouncilScorerId();
   const scorerEmail = (effectiveScorer.email || '').toLowerCase().trim();
   const scorerName = effectiveScorer.displayName || auth?.roleName || 'Thành viên Hội đồng';
   const scoreKey = `${activityId}_${councilId}_${sid}_${scorerId}`;
@@ -459,30 +466,25 @@ window.saveCurrentScore = async function(isCompleted) {
     completedAt: isCompleted ? (existing.completedAt || new Date().toISOString()) : null
   };
 
-  // 1. In-memory update
-  state.councilScores[scoreKey] = scoreRecord;
-  delete state.councilLocalDrafts[sid];
-
-  // 2. Persist to Firestore: Concurrency-safe atomic key update
+  // Persist first: a failed write must never look like a completed score.
   try {
     const roundRef = doc(db, 'graduationRounds', roundId);
-    
-    // Best-effort subcollection write (authorized for both admin and staff under reviewDecisions)
-    try {
-      const decRef = doc(db, 'graduationRounds', roundId, 'reviewDecisions', scoreKey);
-      await setDoc(decRef, scoreRecord, { merge: true }).catch(() => {});
-    } catch (subErr) {}
+    const decRef = doc(db, 'graduationRounds', roundId, 'reviewDecisions', scoreKey);
+    await setDoc(decRef, scoreRecord, { merge: true });
 
-    // Atomic dot-notation update on graduationRounds document (preserves other scorers)
+    // Admin cache remains compatible with legacy reports. FieldPath keeps IDs
+    // containing periods (email addresses) as a single map key.
     if (state.isAdmin) {
-      await updateDoc(roundRef, {
-        [`councilScores.${scoreKey}`]: scoreRecord,
-        updatedAt: serverTimestamp()
-      });
+      await updateDoc(roundRef, new window.FieldPath('councilScores', scoreKey), scoreRecord, 'updatedAt', serverTimestamp()).catch(err => console.warn('Council score cache notice:', err));
     }
   } catch (err) {
-    console.warn('Persist score notice:', err);
+    console.error('Persist council score failed:', err);
+    showToast('Không lưu được điểm. Vui lòng thử lại; kết quả chưa được ghi nhận.', 'error');
+    return;
   }
+
+  state.councilScores[scoreKey] = scoreRecord;
+  delete state.councilLocalDrafts[sid];
 
   // Refresh Views
   renderCouncilStudentList();
@@ -511,26 +513,26 @@ window.reopenCurrentScore = async function() {
   if (!sid) return;
 
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
-  const scorerId = getEffectiveActor().uid || getEffectiveActor().email;
+  const scorerId = getActiveCouncilScorerId();
   const scoreKey = `${activityId}_${councilId}_${sid}_${scorerId}`;
 
   const existing = state.councilScores?.[scoreKey];
   if (!existing) return;
 
-  existing.status = 'draft';
-  existing.updatedAt = new Date().toISOString();
+  const draftScore = { ...existing, status: 'draft', updatedAt: new Date().toISOString() };
 
   try {
     const decRef = doc(db, 'graduationRounds', roundId, 'reviewDecisions', scoreKey);
-    await setDoc(decRef, existing, { merge: true }).catch(() => {});
+    await setDoc(decRef, draftScore, { merge: true });
     if (state.isAdmin) {
       const roundRef = doc(db, 'graduationRounds', roundId);
-      await updateDoc(roundRef, {
-        [`councilScores.${scoreKey}`]: existing,
-        updatedAt: serverTimestamp()
-      });
+      await updateDoc(roundRef, new window.FieldPath('councilScores', scoreKey), draftScore, 'updatedAt', serverTimestamp()).catch(err => console.warn('Council score cache notice:', err));
     }
-  } catch (e) {}
+  } catch (err) {
+    showToast('Không mở lại được phiếu điểm. Vui lòng thử lại.', 'error');
+    return;
+  }
+  state.councilScores[scoreKey] = draftScore;
 
   renderCouncilStudentList();
   renderScoringSection();
@@ -549,7 +551,7 @@ window.batchFinalizeAllCouncilScores = async function() {
   if (!act || !council) return;
 
   const effectiveScorer = getEffectiveActor();
-  const scorerId = effectiveScorer.uid || effectiveScorer.email;
+  const scorerId = getActiveCouncilScorerId();
   const scorerEmail = (effectiveScorer.email || '').toLowerCase().trim();
   const scorerName = effectiveScorer.displayName || auth?.roleName || 'Thành viên Hội đồng';
 
@@ -642,7 +644,7 @@ window.batchFinalizeAllCouncilScores = async function() {
   let successCount = 0;
   const now = new Date().toISOString();
   const roundRef = doc(db, 'graduationRounds', roundId);
-  const batchUpdates = {};
+  const batchUpdates = [];
 
   for (const item of draftCandidates) {
     let selectedLetterCode = undefined;
@@ -681,26 +683,23 @@ window.batchFinalizeAllCouncilScores = async function() {
       completedAt: now
     };
 
-    state.councilScores = state.councilScores || {};
-    state.councilScores[item.scoreKey] = scoreRecord;
-    if (state.councilLocalDrafts) delete state.councilLocalDrafts[item.sid];
-    batchUpdates[`councilScores.${item.scoreKey}`] = scoreRecord;
-
     try {
       const decRef = doc(db, 'graduationRounds', roundId, 'reviewDecisions', item.scoreKey);
-      await setDoc(decRef, scoreRecord, { merge: true }).catch(() => {});
-    } catch (e) {}
-
-    successCount++;
+      await setDoc(decRef, scoreRecord, { merge: true });
+      state.councilScores = state.councilScores || {};
+      state.councilScores[item.scoreKey] = scoreRecord;
+      if (state.councilLocalDrafts) delete state.councilLocalDrafts[item.sid];
+      batchUpdates.push(new window.FieldPath('councilScores', item.scoreKey), scoreRecord);
+      successCount++;
+    } catch (err) {
+      console.warn('Council batch score failed:', err);
+    }
   }
 
-  if (state.isAdmin && Object.keys(batchUpdates).length > 0) {
+  if (state.isAdmin && batchUpdates.length > 0) {
     try {
-      await updateDoc(roundRef, {
-        ...batchUpdates,
-        updatedAt: serverTimestamp()
-      });
-    } catch (e) {}
+      await updateDoc(roundRef, ...batchUpdates, 'updatedAt', serverTimestamp());
+    } catch (err) { console.warn('Council batch cache notice:', err); }
   }
 
   renderCouncilStudentList();
@@ -715,7 +714,7 @@ window.batchFinalizeAllCouncilScores = async function() {
     window.renderAssessmentHeroCard();
   }
 
-  showToast(`✓ Đã hoàn tất chấm điểm cho ${successCount} sinh viên!`, 'success');
+  showToast(successCount ? `✓ Đã hoàn tất chấm điểm cho ${successCount} sinh viên!` : 'Không lưu được điểm. Vui lòng thử lại.', successCount ? 'success' : 'error');
 };
 
 // 12. PROGRESS OF SCORERS IN COUNCIL (PRIVACY PRESERVED)
@@ -738,7 +737,7 @@ function renderScorersProgress() {
 
   const slots = act.councilStructure?.slots || [];
   const membersBySlot = council.membersBySlot || {};
-  const myUserId = getEffectiveActor().uid || getEffectiveActor().email;
+  const myUserId = getActiveCouncilScorerId();
 
   const reqSlots = getRequiredScorers(council, act);
   const guestSlots = getGuestScorers(council, act);

@@ -9,46 +9,58 @@
       <div class="cws-header-layout flex items-center justify-between gap-1.5 sm:gap-3">
         <!-- Left: Council Name & Role -->
         <div class="cws-header-identity flex items-center gap-2 min-w-0">
-          <div class="w-7 h-7 bg-indigo-500/30 text-indigo-300 rounded-lg text-sm flex items-center justify-center font-black shrink-0">🏛️</div>
           <div class="min-w-0">
             <div class="flex items-center gap-1.5 flex-wrap">
-              <h3 id="cws-council-name" class="font-black text-xs sm:text-sm text-white tracking-tight truncate">HĐ 1</h3>
-              <span id="cws-council-status-badge" class="badge bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[9px] sm:text-[10px] py-0.5 px-1.5">Chuẩn bị</span>
-              <span id="cws-my-role-badge" class="badge bg-indigo-500/30 text-indigo-200 border border-indigo-500/30 font-bold text-[9px] sm:text-[10px] py-0.5 px-1.5">Ủy viên</span>
-            </div>
-            <div class="cws-member-row text-[10px] text-slate-300 flex items-center gap-x-2">
               <div class="cws-member-menu-anchor">
-                <button type="button" id="cws-member-menu-trigger" onclick="toggleCouncilMemberMenu()" aria-expanded="false" aria-controls="cws-member-menu" class="cws-member-menu-trigger font-semibold text-slate-200" title="Xem thông tin tài khoản và đăng xuất">
-                  <span id="cws-mobile-member-line" class="truncate"></span><span aria-hidden="true">⌄</span>
-                </button>
+                <button type="button" id="cws-member-menu-trigger" onclick="toggleCouncilMemberMenu()" aria-expanded="false" aria-controls="cws-member-menu" class="cws-member-menu-trigger font-black text-xs sm:text-sm text-white tracking-tight" title="Xem thông tin tài khoản và đăng xuất"><span id="cws-member-heading">Thành viên hội đồng</span><span aria-hidden="true">⌄</span></button>
                 <div id="cws-member-menu" class="cws-member-menu hidden" aria-label="Thông tin thành viên hội đồng">
                   <p class="cws-member-menu-heading">Tài khoản hội đồng</p>
                   <p id="cws-member-menu-name" class="cws-member-menu-name"></p>
                   <p id="cws-member-menu-role" class="cws-member-menu-detail"></p>
                   <p id="cws-member-menu-email" class="cws-member-menu-detail"></p>
-                  <button type="button" onclick="handleCouncilDirectLogout()" class="cws-member-menu-logout">🚪 Đăng xuất</button>
+                  <button type="button" onclick="handleCouncilDirectLogout()" class="cws-member-menu-logout">Đăng xuất</button>
                 </div>
               </div>
-              <p id="cws-council-meta" class="hidden md:inline text-slate-400">📍 Phòng: D501A • 📅 25/09/2026</p>
+              <span id="cws-my-role-badge" class="badge bg-indigo-500/30 text-indigo-200 border border-indigo-500/30 font-bold text-[9px] sm:text-[10px] py-0.5 px-1.5">Ủy viên</span>
+              <span id="cws-council-name" class="font-bold text-xs text-slate-200">HĐ 1</span>
+              <span id="cws-council-status-badge" class="badge bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[9px] sm:text-[10px] py-0.5 px-1.5">Chuẩn bị</span>
             </div>
+            <span id="cws-mobile-member-line" class="hidden"></span>
+            <p id="cws-council-meta" class="hidden"></p>
           </div>
         </div>
 
         <!-- Center: Fixed Live Countdown Timer Pill in Header -->
-        <div id="cws-header-timer-container" class="flex items-center gap-1 shrink-0">
-          <div id="cws-header-timer-pill" class="flex items-center gap-1.5 bg-slate-800/95 border border-slate-700/80 px-2 sm:px-2.5 py-1 rounded-xl shadow-xs transition-colors">
-            <span class="text-xs">⏱️</span>
-            <span id="cws-timer-display" class="font-mono font-black text-sm sm:text-base text-emerald-400 tracking-wider">15:00</span>
+        <div id="cws-header-timer-container" class="relative flex items-center gap-1 shrink-0">
+          <div id="cws-header-timer-pill" class="flex items-center gap-1.5 bg-rose-950/70 border border-rose-600/70 px-2 sm:px-2.5 py-1 rounded-xl shadow-xs transition-colors">
+            <button type="button" id="cws-timer-settings-trigger" onclick="toggleCouncilTimerSettings()" class="hidden text-xs rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300" title="Cài đặt đồng hồ" aria-label="Cài đặt đồng hồ" aria-expanded="false" aria-controls="cws-timer-settings">⏱️</button>
+            <span id="cws-timer-readonly-icon" class="text-xs">⏱️</span>
+            <span id="cws-timer-display" class="font-mono font-black text-sm sm:text-base text-rose-300 tracking-wider">15:00</span>
             <span id="cws-timer-status" class="hidden sm:inline-block badge bg-slate-700 text-slate-300 text-[9px] font-bold px-1 py-0.5">Sẵn sàng</span>
           </div>
 
           <!-- Quick Timer Controls for Chair / Secretary / Admin ONLY -->
           <div id="cws-timer-controls" class="hidden items-center gap-1">
-            <button type="button" id="cws-timer-toggle-btn" onclick="togglePresentationTimer()" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold shadow-xs transition-colors cursor-pointer" title="Tạm dừng / Tiếp tục">
-              <span id="cws-timer-toggle-text">⏸</span>
+            <button type="button" id="cws-timer-toggle-btn" onclick="togglePresentationTimer()" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold shadow-xs transition-colors cursor-pointer" title="Bắt đầu / Tạm dừng">
+              <span id="cws-timer-toggle-text">Bắt đầu</span>
             </button>
-            <button type="button" onclick="addPresentationTimerMinutes(2)" class="px-1.5 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 rounded-lg text-[10px] font-bold transition-colors cursor-pointer" title="Cộng 2 phút">+2p</button>
+            <button type="button" id="cws-timer-short-add-btn" onclick="addCouncilTimerQuickTime('short')" class="px-1.5 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 rounded-lg text-[10px] font-bold transition-colors cursor-pointer" title="Cộng thêm 30 giây">+30s</button>
+            <button type="button" id="cws-timer-long-add-btn" onclick="addCouncilTimerQuickTime('long')" class="px-1.5 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 rounded-lg text-[10px] font-bold transition-colors cursor-pointer" title="Cộng thêm 1 phút">+1p</button>
             <button type="button" onclick="resetPresentationTimer()" class="hidden sm:inline-flex px-1.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 rounded-lg text-[10px] font-bold transition-colors cursor-pointer" title="Đặt lại">↺</button>
+          </div>
+          <div id="cws-timer-settings" class="hidden cws-timer-settings" role="group" aria-label="Cài đặt đồng hồ trình bày">
+            <div class="flex items-center justify-between gap-2 mb-3"><strong class="text-sm text-slate-900">Cài đặt đồng hồ</strong><button type="button" onclick="toggleCouncilTimerSettings(false)" class="text-slate-500 hover:text-slate-900" aria-label="Đóng cài đặt đồng hồ">✕</button></div>
+            <label class="cws-timer-setting-label" for="cws-timer-duration-input">Thời gian trình bày (phút)</label>
+            <input id="cws-timer-duration-input" type="number" min="1" max="180" step="1" class="cws-timer-setting-input" value="15">
+            <label class="cws-timer-setting-label" for="cws-timer-short-add-input">Nút cộng nhanh 1 (giây)</label>
+            <input id="cws-timer-short-add-input" type="number" min="5" max="300" step="5" class="cws-timer-setting-input" value="30">
+            <label class="cws-timer-setting-label" for="cws-timer-long-add-input">Nút cộng nhanh 2 (phút)</label>
+            <input id="cws-timer-long-add-input" type="number" min="1" max="30" step="1" class="cws-timer-setting-input" value="1">
+            <label class="cws-timer-setting-label" for="cws-timer-sound-select">Âm báo hết giờ</label>
+            <select id="cws-timer-sound-select" class="cws-timer-setting-input">
+              <option value="1">1 · Chuông nhịp đôi</option><option value="2">2 · Chuông ba nhịp</option><option value="3">3 · Âm thăng</option><option value="4">4 · Âm trầm</option><option value="5">5 · Nhịp nhanh</option><option value="6">6 · Nhịp chậm</option><option value="7">7 · Nhịp bậc thang</option><option value="8">8 · Nhịp luân phiên</option><option value="9">9 · Chuông dài</option><option value="10">10 · Báo khẩn</option>
+            </select>
+            <div class="flex flex-wrap gap-2 mt-3"><button type="button" onclick="saveCouncilTimerSettings()" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold">Lưu cài đặt</button><button type="button" onclick="previewCouncilTimerSound()" class="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-xs font-bold">Nghe thử</button><button type="button" onclick="stopCouncilTimerAlarm()" class="px-3 py-2 rounded-lg border border-rose-200 text-rose-700 text-xs font-bold">Tắt âm</button></div>
           </div>
         </div>
 
@@ -58,9 +70,6 @@
           <div id="cws-session-controls" class="hidden items-center gap-1">
             <button type="button" id="btn-start-council-session" onclick="startCouncilSession()" class="px-2 sm:px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold shadow-xs flex items-center gap-1 cursor-pointer">
               <span>▶ Bắt đầu</span>
-            </button>
-            <button type="button" id="btn-end-council-session" onclick="endCouncilSession()" class="px-2 sm:px-2.5 py-1 bg-rose-700 hover:bg-rose-600 text-white rounded-lg text-[11px] font-bold shadow-xs flex items-center gap-1 cursor-pointer">
-              <span>⏹ Kết thúc</span>
             </button>
             <button type="button" id="btn-finalize-council-session" onclick="finalizeCouncilSession()" class="hidden px-2 sm:px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[11px] font-bold shadow-xs flex items-center gap-1 cursor-pointer">
               <span>🔒 Chốt điểm</span>
@@ -138,22 +147,20 @@
           </button>
         </div>
 
+        <div id="cws-secretary-actions" class="hidden p-3 bg-indigo-50/60 border border-indigo-200 rounded-xl flex flex-wrap items-center justify-between gap-2">
+          <span class="font-bold text-indigo-950 text-xs flex items-center gap-1.5"><span>⚡</span> Điều hành trình bày</span>
+          <label class="text-xs font-semibold text-indigo-950" for="cws-presentation-student-select">Chọn SV:
+            <select id="cws-presentation-student-select" onchange="selectCouncilStudent(this.value, true)" class="ml-1 max-w-[220px] rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs text-slate-900"></select>
+          </label>
+          <div id="cws-secretary-buttons" class="flex flex-wrap items-center gap-2"></div>
+        </div>
+
         <!-- ONE STUDENT CARD: DETAILS AND PERSONAL SCORE SHEET MOVE TOGETHER -->
         <div id="cws-student-score-card" class="cws-student-score-card bg-white border border-slate-200 rounded-2xl shadow-xs touch-pan-y-smooth">
           <div id="cws-selected-student-card" class="p-3.5 sm:p-5 bg-slate-50/70 rounded-t-2xl space-y-2.5 sm:space-y-3">
             <!-- Rendered dynamically -->
           </div>
           <div id="cws-scoring-section" class="p-3.5 sm:p-5 border-t border-slate-200 space-y-4">
-            <!-- Rendered dynamically -->
-          </div>
-        </div>
-
-        <!-- SECRETARY CONTROLS FOR THIS STUDENT -->
-        <div id="cws-secretary-actions" class="hidden p-3 bg-indigo-50/60 border border-indigo-200 rounded-xl flex items-center justify-between gap-2">
-          <span class="font-bold text-indigo-950 text-xs flex items-center gap-1.5">
-            <span>⚡</span> Điều hành báo cáo (Thư ký / Admin):
-          </span>
-          <div id="cws-secretary-buttons" class="flex items-center gap-2">
             <!-- Rendered dynamically -->
           </div>
         </div>
@@ -176,6 +183,9 @@
         <!-- AUDIT LOG HISTORY PANEL (CHAIR & ADMIN) (v2.0.0-beta.1) -->
         <div id="cws-audit-logs-section" class="hidden p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
           <!-- Rendered dynamically -->
+        </div>
+        <div id="cws-end-session-footer" class="hidden mt-3 pt-4 border-t border-slate-200 text-right">
+          <button type="button" id="btn-end-council-session" onclick="endCouncilSession()" class="px-4 py-2.5 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-sm font-bold shadow-xs cursor-pointer">⏹ Kết thúc hội đồng</button>
         </div>
 
       </div>

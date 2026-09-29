@@ -4,6 +4,9 @@
   <base href="/">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    if (new URLSearchParams(window.location.search).has('hd')) document.documentElement.classList.add('council-direct-entry');
+  </script>
   <title>IFA+ Graduation Beta — Đăng ký & Xét duyệt GVHD Đồ án Tốt nghiệp</title>
   <script>
     window.IFA_CONFIG = {
@@ -178,7 +181,7 @@
           🎓
         </div>
         <h2 class="text-xl font-bold text-tdtu-blue">Hệ thống IFA+ Graduation</h2>
-        <p class="text-xs text-slate-500 leading-relaxed">
+        <p id="login-standard-instruction" class="text-xs text-slate-500 leading-relaxed">
           Đăng nhập bằng tài khoản email trường <strong>@student.tdtu.edu.vn</strong> (Sinh viên) hoặc <strong>@tdtu.edu.vn</strong> (Giảng viên / Quản trị) để tiếp tục.
         </p>
         <div id="login-council-prompt-card" class="hidden p-3.5 bg-indigo-50 border border-indigo-200 rounded-2xl text-left text-xs text-indigo-950 space-y-1 shadow-2xs">
@@ -186,11 +189,11 @@
             <span>🏛️</span> <span>Truy cập phòng chấm Hội đồng</span>
           </div>
           <p class="text-[11px] text-indigo-700 leading-relaxed">
-            Đăng nhập tài khoản Google của Thầy/Cô để vào thẳng không gian chấm điểm Hội đồng (<span id="login-council-prompt-code" class="font-mono font-bold text-indigo-900">--</span>).
+            Thành viên được phân công đăng nhập bằng tài khoản Google của mình để vào phòng chấm Hội đồng (<span id="login-council-prompt-code" class="font-mono font-bold text-indigo-900">--</span>).
           </p>
         </div>
         <button id="btn-login-main" class="w-full py-3 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer">
-          <span>Đăng nhập với Google TDTU</span>
+          <span>Đăng nhập bằng Google</span>
         </button>
       </div>
     </section>

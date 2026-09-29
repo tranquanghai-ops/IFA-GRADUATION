@@ -154,6 +154,8 @@ export async function setupAuthListener() {
       const standardInst = document.getElementById('login-standard-instruction');
       const councilInst = document.getElementById('login-council-instruction');
       if (hdParam) {
+        const codeEl = document.getElementById('login-council-prompt-code');
+        if (codeEl) codeEl.textContent = String(hdParam).trim();
         sessionStorage.setItem('pendingCouncilCode', hdParam);
         sessionStorage.setItem('councilDirectMode', 'true');
         sessionStorage.setItem('directCouncilCode', hdParam);

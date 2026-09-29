@@ -268,6 +268,10 @@ service cloud.firestore {
         return isCouncilMember(actId, cId, mEmail)
           && get(councilMemberDoc(actId, cId, mEmail)).data.role == 'chair';
       }
+      function canOperateCouncilLive(actId, cId, mEmail) {
+        return isCouncilMember(actId, cId, mEmail)
+          && get(councilMemberDoc(actId, cId, mEmail)).data.role in ['chair', 'secretary', 'secretary_minutes', 'minutes_secretary', 'minute_secretary'];
+      }
       function councilStudentDoc(actId, stId) {
         return /databases/$(database)/documents/graduationRounds/$(roundId)/councilStudentAssignments/$(actId + '_' + stId);
       }
@@ -312,6 +316,35 @@ service cloud.firestore {
       match /councilAccess/{councilAccessId} {
         allow read: if admin() || staff();
         allow write: if admin();
+      }
+
+      // Isolated live presentation/timer state. Staff cannot edit the round document.
+      match /councilLive/{liveId} {
+        allow read: if admin() || staff();
+        allow create: if admin() || (staff()
+          && request.resource.data.keys().hasOnly(['activityId', 'councilId', 'status', 'presentationStatuses', 'liveTimer', 'timerSettings', 'updatedAt', 'updatedBy'])
+          && request.resource.data.activityId is string
+          && request.resource.data.councilId is string
+          && liveId == request.resource.data.activityId + '_' + request.resource.data.councilId
+          && request.resource.data.presentationStatuses is map
+          && request.resource.data.liveTimer is map
+          && request.resource.data.timerSettings is map
+          && request.resource.data.updatedBy == email()
+          && canOperateCouncilLive(request.resource.data.activityId, request.resource.data.councilId, email())
+          && (request.resource.data.status in ['preparing', 'active', 'ongoing'] || isCouncilChair(request.resource.data.activityId, request.resource.data.councilId, email())));
+        allow update: if admin() || (staff()
+          && request.resource.data.keys().hasOnly(['activityId', 'councilId', 'status', 'presentationStatuses', 'liveTimer', 'timerSettings', 'updatedAt', 'updatedBy'])
+          && request.resource.data.activityId == resource.data.activityId
+          && request.resource.data.councilId == resource.data.councilId
+          && request.resource.data.updatedBy == email()
+          && request.resource.data.presentationStatuses is map
+          && request.resource.data.liveTimer is map
+          && request.resource.data.timerSettings is map
+          && canOperateCouncilLive(resource.data.activityId, resource.data.councilId, email())
+          && (request.resource.data.status == resource.data.status
+            || (request.resource.data.status == 'active' && resource.data.status == 'preparing')
+            || (isCouncilChair(resource.data.activityId, resource.data.councilId, email()) && request.resource.data.status == 'ended')));
+        allow delete: if admin();
       }
 
       match /supervisorAssignments/{studentId} {

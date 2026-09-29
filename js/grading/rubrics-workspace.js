@@ -1,3 +1,4 @@
+import { getNextCouncilPresentation } from './council-presentation-state.js';
 
 // --- Module Bridges ---
 export const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : (reg?.officialSupervisors || []));
@@ -142,9 +143,11 @@ export function checkCouncilAuthorization(round, act, council, user) {
       }
 
       if (isMatch) {
-        const isSec = (slotKey === 'secretary' || slotKey.startsWith('secretary') || String(assigned.role || '').toLowerCase().includes('thư ký'));
+        const memberRole = String(assigned.role || '').toLowerCase();
+        const isMinutesSecretary = /biên bản|bien ban|minutes/.test(`${slotKey} ${memberRole}`);
+        const isSec = (slotKey === 'secretary' || slotKey.startsWith('secretary') || memberRole.includes('thư ký') || isMinutesSecretary);
         const isChair = (slotKey === 'chair' || slotKey.startsWith('chair') || String(assigned.role || '').toLowerCase().includes('chủ tịch'));
-        const roleLabel = isChair ? 'Chủ tịch Hội đồng' : (isSec ? 'Thư ký Hội đồng' : (assigned.role || 'Thành viên Hội đồng'));
+        const roleLabel = isChair ? 'Chủ tịch Hội đồng' : (isMinutesSecretary ? 'Thư ký biên bản' : (isSec ? 'Thư ký Hội đồng' : (assigned.role || 'Thành viên Hội đồng')));
         return {
           authorized: true,
           role: slotKey,
@@ -152,6 +155,7 @@ export function checkCouncilAuthorization(round, act, council, user) {
           slotKey: slotKey,
           canScore: true,
           isSecretary: isSec,
+          isMinutesSecretary,
           isChair: isChair,
           isAdmin: isDirectMode ? false : Boolean(actor.isAdmin && !actor.impersonating),
           canCalibrate: isChair || Boolean(actor.isAdmin && !isDirectMode),
@@ -197,6 +201,86 @@ export function checkCouncilAuthorization(round, act, council, user) {
     authorized: false,
     reason: 'Bạn không phải thành viên của Hội đồng này.'
   };
+}
+
+export function resolveCouncilScorerId(council, auth, actor = getEffectiveActor()) {
+  const member = council?.membersBySlot?.[auth?.slotKey];
+  return member?.memberId || member?.memberEmail || actor?.uid || actor?.email || '';
+}
+
+function applyCouncilLiveSnapshot(round, activityId, councilId, live) {
+  if (!round || !live) return;
+  const activity = (round.activities || []).find(item => item.id === activityId);
+  const council = (activity?.councils || []).find(item => item.id === councilId);
+  if (!activity || !council) return;
+  if (council.status !== 'finalized' && council.status !== 'completed') {
+    council.status = live.status || council.status;
+  }
+  council.liveTimer = live.liveTimer || council.liveTimer;
+  council.timerSettings = live.timerSettings || council.timerSettings;
+  (activity.councilStudentAssignments || []).forEach(assignment => {
+    const status = live.presentationStatuses?.[assignment.studentId];
+    if (assignment.councilId === councilId && ['waiting', 'presenting', 'presented'].includes(status)) {
+      assignment.presentationStatus = status;
+    }
+  });
+}
+
+function councilLiveDocRef(roundId, activityId, councilId) {
+  return doc(db, 'graduationRounds', roundId, 'councilLive', `${activityId}_${councilId}`);
+}
+
+async function ensureCouncilLiveMembershipIndex(roundId, activityId, council) {
+  // Act-as demotes the UI role, but the real authenticated administrator still
+  // needs to seed the narrow membership index for a legacy council.
+  if ((!state.isAdmin && !state.realIsAdmin) || !council) return;
+  const members = Object.entries(council.membersBySlot || {}).map(([role, member]) => ({ role, member }));
+  if (council.chairEmail && !members.some(({ member }) => member?.memberEmail === council.chairEmail)) {
+    members.push({ role: 'chair', member: { memberEmail: council.chairEmail } });
+  }
+  await Promise.all(members.map(async ({ role, member }) => {
+    const memberEmail = String(member?.memberEmail || member?.email || '').toLowerCase().trim();
+    if (!memberEmail) return;
+    const membershipId = `${activityId}_${council.id}_${memberEmail}`;
+    await setDoc(doc(db, 'graduationRounds', roundId, 'councilMemberships', membershipId), {
+      roundId,
+      activityId,
+      councilId: council.id,
+      memberEmail,
+      role,
+      active: true,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  }));
+}
+
+async function persistCouncilLiveState(round, activityId, councilId) {
+  const activity = (round?.activities || []).find(item => item.id === activityId);
+  const council = (activity?.councils || []).find(item => item.id === councilId);
+  if (!round || !activity || !council) return false;
+  const presentationStatuses = {};
+  (activity.councilStudentAssignments || []).forEach(assignment => {
+    if (assignment.councilId === councilId) presentationStatuses[assignment.studentId] = assignment.presentationStatus || 'waiting';
+  });
+  const live = {
+    activityId,
+    councilId,
+    status: council.status || 'preparing',
+    presentationStatuses,
+    liveTimer: council.liveTimer || {},
+    timerSettings: council.timerSettings || {},
+    updatedAt: Date.now(),
+    updatedBy: getEffectiveActor().email || ''
+  };
+  try {
+    await setDoc(councilLiveDocRef(round.id, activityId, councilId), live, { merge: true });
+    state.activeCouncilLiveSnapshot = live;
+    return true;
+  } catch (err) {
+    console.error('Council live state write failed:', err);
+    showToast('Không đồng bộ được lượt trình bày. Vui lòng thử lại.', 'error');
+    return false;
+  }
 }
 
 export function getRequiredScorers(council, act) {
@@ -252,6 +336,17 @@ window.openCouncilWorkspace = async function(roundId, activityId, councilId, aut
     councilId,
     auth: authCheck
   };
+  await ensureCouncilLiveMembershipIndex(roundId, activityId, council).catch(err => console.warn('Council membership index notice:', err));
+  state.activeCouncilLiveSnapshot = null;
+  try {
+    const liveSnap = await getDoc(councilLiveDocRef(roundId, activityId, councilId));
+    if (liveSnap.exists()) {
+      state.activeCouncilLiveSnapshot = liveSnap.data();
+      applyCouncilLiveSnapshot(targetRound, activityId, councilId, state.activeCouncilLiveSnapshot);
+    }
+  } catch (err) {
+    console.warn('Council live state load notice:', err);
+  }
 
   state.councilLocalDrafts = state.councilLocalDrafts || {};
   state.councilScores = state.councilScores || {};
@@ -296,6 +391,13 @@ window.openCouncilWorkspace = async function(roundId, activityId, councilId, aut
 window.handleCouncilDirectLogout = async function() {
   const confirmed = await showConfirm('Đăng xuất', 'Bạn muốn đăng xuất khỏi phiên chấm Hội đồng?', { confirmText: 'Đăng xuất' });
   if (confirmed) {
+    stopCouncilTimerAlarm();
+    if (state.activeCouncilUnsubscribe) state.activeCouncilUnsubscribe();
+    if (state.activeCouncilScoresUnsubscribe) state.activeCouncilScoresUnsubscribe();
+    if (state.activeCouncilLiveUnsubscribe) state.activeCouncilLiveUnsubscribe();
+    state.activeCouncilUnsubscribe = null;
+    state.activeCouncilScoresUnsubscribe = null;
+    state.activeCouncilLiveUnsubscribe = null;
     closeCouncilMemberMenu();
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem('pendingCouncilCode');
@@ -303,6 +405,7 @@ window.handleCouncilDirectLogout = async function() {
       sessionStorage.removeItem('directCouncilCode');
     }
     state.isCouncilDirectMode = false;
+    document.documentElement.classList.remove('council-direct-entry');
     if (typeof document !== 'undefined' && document.body) {
       document.body.classList.remove('council-standalone-active');
     }
@@ -325,6 +428,14 @@ window.closeCouncilWorkspace = function() {
     try { state.activeCouncilUnsubscribe(); } catch (e) {}
     state.activeCouncilUnsubscribe = null;
   }
+  if (state.activeCouncilScoresUnsubscribe) {
+    try { state.activeCouncilScoresUnsubscribe(); } catch (e) {}
+    state.activeCouncilScoresUnsubscribe = null;
+  }
+  if (state.activeCouncilLiveUnsubscribe) {
+    try { state.activeCouncilLiveUnsubscribe(); } catch (e) {}
+    state.activeCouncilLiveUnsubscribe = null;
+  }
   if (state.councilTimer?.intervalId) {
     clearInterval(state.councilTimer.intervalId);
     state.councilTimer.intervalId = null;
@@ -332,6 +443,7 @@ window.closeCouncilWorkspace = function() {
   if (state.councilTimer) {
     state.councilTimer.isRunning = false;
   }
+  stopCouncilTimerAlarm();
   document.getElementById('modal-council-workspace')?.classList.add('hidden');
 
   // Seamless live auto-update of outer defense list
@@ -348,6 +460,42 @@ function setupCouncilRealtimeSync(roundId, activityId, councilId) {
     state.activeCouncilUnsubscribe();
     state.activeCouncilUnsubscribe = null;
   }
+  if (state.activeCouncilScoresUnsubscribe) {
+    state.activeCouncilScoresUnsubscribe();
+    state.activeCouncilScoresUnsubscribe = null;
+  }
+  if (state.activeCouncilLiveUnsubscribe) {
+    state.activeCouncilLiveUnsubscribe();
+    state.activeCouncilLiveUnsubscribe = null;
+  }
+
+  state.activeCouncilLiveUnsubscribe = onSnapshot(councilLiveDocRef(roundId, activityId, councilId), (snap) => {
+    if (!snap.exists()) return;
+    state.activeCouncilLiveSnapshot = snap.data();
+    const round = (state.rounds || []).find(item => item.id === roundId);
+    const previousStatus = (round?.activities || []).find(item => item.id === activityId)?.councils?.find(item => item.id === councilId)?.status;
+    applyCouncilLiveSnapshot(round, activityId, councilId, state.activeCouncilLiveSnapshot);
+    const activity = (round?.activities || []).find(item => item.id === activityId);
+    const council = (activity?.councils || []).find(item => item.id === councilId);
+    if (council) syncLiveTimerFromCouncil(council);
+    if (previousStatus !== council?.status) renderCouncilWorkspaceFull();
+    else renderCouncilWorkspacePartialSync();
+  }, (err) => console.warn('Realtime council live listener notice:', err));
+
+  const scoreQuery = query(
+    collection(db, 'graduationRounds', roundId, 'reviewDecisions'),
+    where('councilId', '==', councilId)
+  );
+  state.activeCouncilScoresUnsubscribe = onSnapshot(scoreQuery, (snap) => {
+    snap.docs.forEach(scoreDoc => {
+      const data = scoreDoc.data();
+      if (data.activityId !== activityId || !data.studentId || !data.scorerId) return;
+      const key = `${data.activityId}_${data.councilId}_${data.studentId}_${data.scorerId}`;
+      state.councilScores[key] = data;
+    });
+    renderCouncilWorkspacePartialSync();
+    renderScoringSection();
+  }, (err) => console.warn('Realtime council scores listener notice:', err));
 
   try {
     const roundRef = doc(db, 'graduationRounds', roundId);
@@ -358,10 +506,13 @@ function setupCouncilRealtimeSync(roundId, activityId, councilId) {
       // Update in state.rounds
       const rIdx = (state.rounds || []).findIndex(r => r.id === roundId);
       if (rIdx >= 0) state.rounds[rIdx] = updatedData;
+      applyCouncilLiveSnapshot(updatedData, activityId, councilId, state.activeCouncilLiveSnapshot);
 
       // Update nested scores if present
       if (updatedData.councilScores) {
-        state.councilScores = { ...(state.councilScores || {}), ...updatedData.councilScores };
+        // reviewDecisions is the durable score source. The legacy round cache can
+        // lag behind a freshly saved council member score, especially during act-as.
+        state.councilScores = { ...updatedData.councilScores, ...(state.councilScores || {}) };
       }
 
       // Sync council live timer across all connected members
@@ -452,6 +603,8 @@ function renderCouncilWorkspaceFull() {
   const memberRoleText = auth.roleName || 'Thành viên';
 
   const roleBadge = document.getElementById('cws-my-role-badge');
+  const memberHeading = document.getElementById('cws-member-heading');
+  if (memberHeading) memberHeading.textContent = memberDisplayName || 'Thành viên hội đồng';
   if (roleBadge) {
     roleBadge.className = 'badge bg-indigo-500/25 text-indigo-200 border border-indigo-500/30 font-bold text-[9px] sm:text-[10px] px-1.5 py-0.5';
     roleBadge.textContent = memberRoleText;
@@ -480,13 +633,17 @@ function renderCouncilWorkspaceFull() {
       const finBtn = document.getElementById('btn-finalize-council-session');
       const reopenBtn = document.getElementById('btn-reopen-council-session');
       const cStat = council.status || 'preparing';
+      const mayEnd = Boolean(auth.isAdmin || auth.isChair);
 
-      if (startBtn) startBtn.classList.toggle('hidden', cStat !== 'preparing');
-      if (endBtn) endBtn.classList.toggle('hidden', cStat !== 'active' && cStat !== 'ongoing');
+      if (startBtn) startBtn.classList.toggle('hidden', cStat !== 'preparing' || (!auth.isAdmin && !auth.isSecretary && !auth.isChair));
+      const showEnd = mayEnd && (cStat === 'active' || cStat === 'ongoing');
+      document.getElementById('cws-end-session-footer')?.classList.toggle('hidden', !showEnd);
+      if (endBtn) endBtn.classList.toggle('hidden', !showEnd);
       if (finBtn) finBtn.classList.toggle('hidden', cStat !== 'ended' || (!auth.isAdmin && !auth.isChair));
       if (reopenBtn) reopenBtn.classList.toggle('hidden', cStat !== 'finalized' || !auth.isAdmin);
     } else {
       sessionControls.classList.add('hidden');
+      document.getElementById('cws-end-session-footer')?.classList.add('hidden');
     }
   }
 
@@ -543,9 +700,22 @@ export function syncLiveTimerFromCouncil(council) {
   };
   const timer = state.councilTimer;
 
-  if (!liveTimer) return;
+  timer.shortAddSeconds = council?.timerSettings?.shortAddSeconds || 30;
+  timer.longAddSeconds = council?.timerSettings?.longAddSeconds || 60;
+  timer.soundChoice = council?.timerSettings?.soundChoice || 1;
 
-  timer.durationSeconds = liveTimer.durationSeconds || (15 * 60);
+  if (!liveTimer) {
+    if (timer.intervalId) clearInterval(timer.intervalId);
+    timer.intervalId = null;
+    timer.durationSeconds = council?.timerSettings?.durationSeconds || 900;
+    timer.remainingSeconds = timer.durationSeconds;
+    timer.isRunning = false;
+    timer.studentId = null;
+    stopCouncilTimerAlarm();
+    return;
+  }
+
+  timer.durationSeconds = liveTimer.durationSeconds || council?.timerSettings?.durationSeconds || (15 * 60);
   timer.studentId = liveTimer.studentId || null;
 
   if (liveTimer.isRunning && liveTimer.startedAt) {
@@ -581,30 +751,31 @@ async function broadcastCouncilLiveTimer() {
   const council = (act?.councils || []).find(c => c.id === councilId);
   if (!council) return;
 
-  const timer = state.councilTimer || {};
-  const actor = getEffectiveActor();
-  const uEmail = actor.email || 'user';
-
-  council.liveTimer = {
-    durationSeconds: timer.durationSeconds || (15 * 60),
-    remainingSeconds: timer.remainingSeconds != null ? timer.remainingSeconds : (timer.durationSeconds || (15 * 60)),
-    startedAt: timer.isRunning ? Date.now() : null,
-    isRunning: Boolean(timer.isRunning),
-    studentId: timer.studentId || state.activeCouncilSelectedStudentId || null,
-    updatedAt: Date.now(),
-    updatedBy: uEmail
-  };
-
-  try {
-    if (typeof persistActivityCouncilChanges === 'function') {
-      await persistActivityCouncilChanges(targetRound);
-    }
-  } catch (err) {
-    console.warn('Broadcast live timer notice:', err);
-  }
+  writeCouncilTimerSnapshot(council);
+  await persistCouncilLiveState(targetRound, activityId, councilId);
 }
 
-export function initPresentationTimer(sid = null) {
+function writeCouncilTimerSnapshot(council) {
+  const timer = state.councilTimer || {};
+  council.timerSettings = {
+    durationSeconds: timer.durationSeconds || 900,
+    shortAddSeconds: timer.shortAddSeconds || 30,
+    longAddSeconds: timer.longAddSeconds || 60,
+    soundChoice: timer.soundChoice || 1
+  };
+  council.liveTimer = {
+    durationSeconds: council.timerSettings.durationSeconds,
+    remainingSeconds: timer.remainingSeconds ?? council.timerSettings.durationSeconds,
+    startedAt: timer.isRunning ? Date.now() : null,
+    isRunning: Boolean(timer.isRunning),
+    studentId: timer.studentId || null,
+    updatedAt: Date.now(),
+    updatedBy: getEffectiveActor().email || 'user'
+  };
+}
+
+export function initPresentationTimer(sid = null, shouldBroadcast = true) {
+  stopCouncilTimerAlarm();
   state.councilTimer = state.councilTimer || {};
   if (state.councilTimer.intervalId) {
     clearInterval(state.councilTimer.intervalId);
@@ -616,7 +787,7 @@ export function initPresentationTimer(sid = null) {
   state.councilTimer.isRunning = true;
   state.councilTimer.intervalId = setInterval(onPresentationTimerTick, 1000);
   renderPresentationTimerUI();
-  broadcastCouncilLiveTimer();
+  if (shouldBroadcast) broadcastCouncilLiveTimer();
 }
 
 function onPresentationTimerTick() {
@@ -630,6 +801,117 @@ function onPresentationTimerTick() {
   }
   renderPresentationTimerUI();
 }
+
+let councilAlarmInterval = null;
+let councilAlarmContext = null;
+let councilAlarmDismissed = false;
+let councilAlarmPreviewTimeout = null;
+let councilAlarmPreviewing = false;
+
+const councilAlarmPatterns = [
+  [660, 880], [740, 740, 988], [523, 659, 784], [440, 392, 330],
+  [880, 988, 880, 988], [523, 523], [523, 659, 784, 1047],
+  [784, 587, 784, 587], [660], [880, 880, 1109, 880]
+];
+
+function unlockCouncilAudio() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+  councilAlarmContext = councilAlarmContext || new AudioContextClass();
+  if (councilAlarmContext.state === 'suspended') councilAlarmContext.resume().catch(() => {});
+}
+
+function playCouncilAlarmPattern(soundChoice) {
+  unlockCouncilAudio();
+  if (!councilAlarmContext) return;
+  const pattern = councilAlarmPatterns[Math.max(0, Math.min(9, Number(soundChoice) - 1))] || councilAlarmPatterns[0];
+  const toneLength = pattern.length === 1 ? 1.15 : Math.min(0.55, 1.7 / pattern.length);
+  pattern.forEach((frequency, index) => {
+    const startAt = councilAlarmContext.currentTime + index * (toneLength + 0.08);
+    const oscillator = councilAlarmContext.createOscillator();
+    const gain = councilAlarmContext.createGain();
+    oscillator.type = Number(soundChoice) === 10 ? 'square' : 'sine';
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.065, startAt + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + toneLength);
+    oscillator.connect(gain).connect(councilAlarmContext.destination);
+    oscillator.start(startAt);
+    oscillator.stop(startAt + toneLength + 0.02);
+  });
+}
+
+function startCouncilTimerAlarm(soundChoice) {
+  if (councilAlarmInterval || councilAlarmDismissed) return;
+  playCouncilAlarmPattern(soundChoice);
+  councilAlarmInterval = setInterval(() => playCouncilAlarmPattern(soundChoice), 2300);
+}
+
+window.stopCouncilTimerAlarm = function() {
+  councilAlarmDismissed = true;
+  councilAlarmPreviewing = false;
+  if (councilAlarmInterval) clearInterval(councilAlarmInterval);
+  councilAlarmInterval = null;
+  if (councilAlarmPreviewTimeout) clearTimeout(councilAlarmPreviewTimeout);
+  councilAlarmPreviewTimeout = null;
+};
+
+window.toggleCouncilTimerSettings = function(forceOpen) {
+  const auth = state.activeCouncilWorkspace?.auth;
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) return;
+  const panel = document.getElementById('cws-timer-settings');
+  const trigger = document.getElementById('cws-timer-settings-trigger');
+  if (!panel) return;
+  const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', !shouldOpen);
+  trigger?.setAttribute('aria-expanded', String(shouldOpen));
+  if (shouldOpen) {
+    const timer = state.councilTimer || {};
+    document.getElementById('cws-timer-duration-input').value = Math.round((timer.durationSeconds || 900) / 60);
+    document.getElementById('cws-timer-short-add-input').value = timer.shortAddSeconds || 30;
+    document.getElementById('cws-timer-long-add-input').value = Math.round((timer.longAddSeconds || 60) / 60);
+    document.getElementById('cws-timer-sound-select').value = String(timer.soundChoice || 1);
+  }
+};
+
+window.saveCouncilTimerSettings = async function() {
+  const auth = state.activeCouncilWorkspace?.auth;
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) return;
+  const duration = Number(document.getElementById('cws-timer-duration-input')?.value);
+  const shortAdd = Number(document.getElementById('cws-timer-short-add-input')?.value);
+  const longAdd = Number(document.getElementById('cws-timer-long-add-input')?.value);
+  const sound = Number(document.getElementById('cws-timer-sound-select')?.value);
+  if (!Number.isInteger(duration) || duration < 1 || duration > 180 || !Number.isInteger(shortAdd) || shortAdd < 5 || shortAdd > 300 || !Number.isInteger(longAdd) || longAdd < 1 || longAdd > 30 || !Number.isInteger(sound) || sound < 1 || sound > 10) {
+    showToast('Thời gian hoặc âm báo không hợp lệ.', 'warning');
+    return;
+  }
+  const timer = state.councilTimer || (state.councilTimer = {});
+  if (timer.isRunning && duration * 60 !== timer.durationSeconds) {
+    showToast('Tạm dừng và đặt lại đồng hồ trước khi đổi thời lượng trình bày.', 'warning');
+    return;
+  }
+  timer.durationSeconds = duration * 60;
+  if (!timer.isRunning) timer.remainingSeconds = timer.durationSeconds;
+  timer.shortAddSeconds = shortAdd;
+  timer.longAddSeconds = longAdd * 60;
+  timer.soundChoice = sound;
+  councilAlarmDismissed = false;
+  renderPresentationTimerUI();
+  await broadcastCouncilLiveTimer();
+  toggleCouncilTimerSettings(false);
+  showToast('Đã lưu cài đặt đồng hồ hội đồng.', 'success');
+};
+
+window.previewCouncilTimerSound = function() {
+  const auth = state.activeCouncilWorkspace?.auth;
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) return;
+  unlockCouncilAudio();
+  stopCouncilTimerAlarm();
+  councilAlarmDismissed = false;
+  councilAlarmPreviewing = true;
+  startCouncilTimerAlarm(Number(document.getElementById('cws-timer-sound-select')?.value || 1));
+  councilAlarmPreviewTimeout = setTimeout(stopCouncilTimerAlarm, 7000);
+};
 
 export function renderPresentationTimerUI() {
   const display = document.getElementById('cws-timer-display');
@@ -656,6 +938,11 @@ export function renderPresentationTimerUI() {
   const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 
   display.textContent = formatted;
+  if (timer.isRunning && totalSec <= 0 && isManager) startCouncilTimerAlarm(timer.soundChoice || 1);
+  if ((totalSec > 0 || !timer.isRunning) && !councilAlarmPreviewing) {
+    if (councilAlarmInterval) stopCouncilTimerAlarm();
+    if (totalSec > 0) councilAlarmDismissed = false;
+  }
 
   // Visual cues based on remaining time
   if (totalSec <= 0) {
@@ -668,7 +955,7 @@ export function renderPresentationTimerUI() {
       statusEl.textContent = 'HẾT GIỜ';
     }
   } else if (totalSec <= 180) {
-    display.className = 'font-mono font-black text-sm sm:text-base text-amber-400 tracking-wider animate-pulse';
+    display.className = 'font-mono font-black text-sm sm:text-base text-rose-300 tracking-wider animate-pulse';
     if (timerPill) {
       timerPill.className = 'flex items-center gap-1.5 bg-amber-950/70 border border-amber-500/70 px-2 sm:px-2.5 py-1 rounded-xl shadow-xs transition-colors';
     }
@@ -677,18 +964,18 @@ export function renderPresentationTimerUI() {
       statusEl.textContent = '<3p';
     }
   } else {
-    display.className = 'font-mono font-black text-sm sm:text-base text-emerald-400 tracking-wider';
+    display.className = 'font-mono font-black text-sm sm:text-base text-rose-300 tracking-wider';
     if (timerPill) {
-      timerPill.className = 'flex items-center gap-1.5 bg-slate-800/95 border border-slate-700/80 px-2 sm:px-2.5 py-1 rounded-xl shadow-xs transition-colors';
+      timerPill.className = 'flex items-center gap-1.5 bg-rose-950/70 border border-rose-600/70 px-2 sm:px-2.5 py-1 rounded-xl shadow-xs transition-colors';
     }
     if (statusEl) {
-      statusEl.className = 'hidden sm:inline-block badge bg-slate-700 text-emerald-300 font-bold text-[9px] px-1 py-0.5';
-      statusEl.textContent = timer.isRunning ? 'Đang đếm' : 'Tạm dừng';
+      statusEl.className = 'hidden sm:inline-block badge bg-rose-900 text-rose-100 font-bold text-[9px] px-1 py-0.5';
+      statusEl.textContent = timer.isRunning ? 'Đang đếm' : 'Sẵn sàng';
     }
   }
 
   if (toggleText) {
-    toggleText.textContent = timer.isRunning ? '⏸' : '▶';
+    toggleText.textContent = timer.isRunning ? 'Tạm dừng' : 'Bắt đầu';
   }
   if (toggleBtn) {
     toggleBtn.className = timer.isRunning
@@ -728,19 +1015,8 @@ window.promptCustomPresentationTimer = async function() {
     showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
     return;
   }
-  const curMins = Math.floor((state.councilTimer?.durationSeconds || 900) / 60);
-  const input = window.prompt('Nhập thời lượng báo cáo mong muốn (số phút, từ 1 đến 180):', String(curMins));
-  if (input === null) {
-    renderPresentationTimerUI();
-    return;
-  }
-  const mins = parseInt(input.trim(), 10);
-  if (isNaN(mins) || mins <= 0 || mins > 180) {
-    showToast('Vui lòng nhập số phút hợp lệ (1 - 180 phút)!', 'error');
-    renderPresentationTimerUI();
-    return;
-  }
-  setCustomPresentationTimer(mins);
+  toggleCouncilTimerSettings(true);
+  document.getElementById('cws-timer-duration-input')?.focus();
 };
 
 window.setCustomPresentationTimer = async function(mins) {
@@ -769,14 +1045,8 @@ window.promptCustomAddTimerMinutes = async function() {
     showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
     return;
   }
-  const input = window.prompt('Nhập số phút muốn cộng thêm cho sinh viên (từ 1 đến 60 phút):', '3');
-  if (input === null) return;
-  const mins = parseInt(input.trim(), 10);
-  if (isNaN(mins) || mins <= 0 || mins > 60) {
-    showToast('Vui lòng nhập số phút cộng thêm hợp lệ (1 - 60 phút)!', 'error');
-    return;
-  }
-  await addPresentationTimerMinutes(mins);
+  toggleCouncilTimerSettings(true);
+  document.getElementById('cws-timer-long-add-input')?.focus();
 };
 
 window.togglePresentationTimer = async function() {
@@ -794,11 +1064,26 @@ window.togglePresentationTimer = async function() {
   const timer = state.councilTimer;
   if (timer.isRunning) {
     timer.isRunning = false;
+    stopCouncilTimerAlarm();
     if (timer.intervalId) {
       clearInterval(timer.intervalId);
       timer.intervalId = null;
     }
   } else {
+    const sid = state.activeCouncilSelectedStudentId;
+    const { roundId, activityId, councilId } = state.activeCouncilWorkspace || {};
+    const round = (state.rounds || []).find(r => r.id === roundId);
+    const act = (round?.activities || []).find(a => a.id === activityId);
+    const selected = (act?.councilStudentAssignments || []).find(a => a.councilId === councilId && a.studentId === sid);
+    if (!selected) {
+      showToast('Vui lòng chọn sinh viên trước khi bấm giờ.', 'warning');
+      return;
+    }
+    if (selected.presentationStatus !== 'presenting') {
+      await startStudentPresentation(sid);
+      return;
+    }
+    councilAlarmDismissed = false;
     timer.isRunning = true;
     if (!timer.intervalId) {
       timer.intervalId = setInterval(onPresentationTimerTick, 1000);
@@ -847,21 +1132,23 @@ window.setPresentationTimerPreset = async function(secStr) {
   showToast(`Đã đổi thời gian báo cáo thành ${Math.floor(sec / 60)} phút.`, 'info');
 };
 
-window.resetPresentationTimer = async function() {
+window.resetPresentationTimer = async function(shouldBroadcast = true) {
   const auth = state.activeCouncilWorkspace?.auth;
   if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
     showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
     return;
   }
   state.councilTimer = state.councilTimer || {};
+  stopCouncilTimerAlarm();
   if (state.councilTimer.intervalId) {
     clearInterval(state.councilTimer.intervalId);
     state.councilTimer.intervalId = null;
   }
   state.councilTimer.remainingSeconds = state.councilTimer.durationSeconds || (15 * 60);
   state.councilTimer.isRunning = false;
+  state.councilTimer.studentId = null;
   renderPresentationTimerUI();
-  await broadcastCouncilLiveTimer();
+  if (shouldBroadcast === true) await broadcastCouncilLiveTimer();
   showToast('Đã đặt lại bộ đếm thời gian.', 'info');
 };
 
@@ -901,7 +1188,7 @@ function renderCouncilStudentList() {
     return;
   }
 
-  const myScorerId = getEffectiveActor().uid || getEffectiveActor().email;
+  const myScorerId = resolveCouncilScorerId(council, auth);
   const scoringEnabled = Boolean(act.scoringConfig?.enabled);
 
   container.innerHTML = councilStudents.map((asgn, index) => {
@@ -1114,6 +1401,19 @@ window.selectCouncilStudent = function(studentId, forceMobileGradingTab = false,
   }).finally(() => { councilStudentTransitioning = false; });
 };
 
+window.addCouncilTimerQuickTime = async function(kind) {
+  const auth = state.activeCouncilWorkspace?.auth;
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) return;
+  const timer = state.councilTimer || (state.councilTimer = {});
+  const seconds = kind === 'short' ? (timer.shortAddSeconds || 30) : (timer.longAddSeconds || 60);
+  timer.remainingSeconds = Math.max(0, timer.remainingSeconds || 0) + seconds;
+  councilAlarmDismissed = false;
+  stopCouncilTimerAlarm();
+  councilAlarmDismissed = false;
+  renderPresentationTimerUI();
+  await broadcastCouncilLiveTimer();
+};
+
 function closeCouncilMemberMenu() {
   const menu = document.getElementById('cws-member-menu');
   const trigger = document.getElementById('cws-member-menu-trigger');
@@ -1177,6 +1477,12 @@ function updateCouncilSelectedStudentSurface() {
     badge.className = presentation.className;
     badge.textContent = presentation.text;
   }
+  document.getElementById('cws-timer-settings-trigger')?.classList.toggle('hidden', !isManager);
+  document.getElementById('cws-timer-readonly-icon')?.classList.toggle('hidden', isManager);
+  const shortAddBtn = document.getElementById('cws-timer-short-add-btn');
+  const longAddBtn = document.getElementById('cws-timer-long-add-btn');
+  if (shortAddBtn) shortAddBtn.textContent = `+${timer.shortAddSeconds || 30}s`;
+  if (longAddBtn) longAddBtn.textContent = `+${Math.round((timer.longAddSeconds || 60) / 60)}p`;
 }
 
 function renderCouncilSelectedStudentDetails() {
@@ -1400,13 +1706,27 @@ function renderSecretaryControls() {
   const btnWrap = document.getElementById('cws-secretary-buttons');
   if (!container || !btnWrap) return;
 
-  // Only Secretary or Admin
-  if (!auth.isAdmin && !auth.isSecretary) {
+  // Chair, secretary (including minutes secretary), or admin may run the presentation.
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
     container.classList.add('hidden');
     return;
   }
 
   const sid = state.activeCouncilSelectedStudentId;
+  const studentSelect = document.getElementById('cws-presentation-student-select');
+  if (studentSelect) {
+    const assignments = (act?.councilStudentAssignments || [])
+      .filter(a => a.councilId === councilId)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    studentSelect.replaceChildren(...assignments.map(a => {
+      const option = document.createElement('option');
+      option.value = a.studentId;
+      option.textContent = `#${a.order || '?'} · ${a.studentId}`;
+      return option;
+    }));
+    studentSelect.value = sid || '';
+  }
+  unlockCouncilAudio();
   const asgn = (act?.councilStudentAssignments || []).find(a => a.councilId === councilId && a.studentId === sid);
   if (!asgn) {
     container.classList.add('hidden');
@@ -1417,6 +1737,7 @@ function renderSecretaryControls() {
 
   if (asgn.presentationStatus === 'presenting') {
     btnWrap.innerHTML = `
+      <button type="button" onclick="advanceCouncilPresentation()" class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs">SV tiếp theo →</button>
       <button type="button" onclick="finishStudentPresentation('${sid}')" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
         <span>✓ Hoàn tất lượt</span>
       </button>
@@ -1469,17 +1790,45 @@ window.startStudentPresentation = async function(targetSid) {
   }
 
   const targetAsgn = assignments.find(a => a.councilId === councilId && a.studentId === targetSid);
-  if (targetAsgn) {
-    targetAsgn.presentationStatus = 'presenting';
-  }
+  if (!targetAsgn) return;
+  targetAsgn.presentationStatus = 'presenting';
 
   // Start presentation countdown timer
-  initPresentationTimer(targetSid);
+  initPresentationTimer(targetSid, false);
+  writeCouncilTimerSnapshot(council);
 
-  await persistActivityCouncilChanges(targetRound);
+  if (!await persistCouncilLiveState(targetRound, activityId, councilId)) return;
   renderCouncilWorkspacePartialSync();
   renderSecretaryControls();
   showToast(`Đã bắt đầu lượt trình bày của sinh viên #${targetAsgn?.order || ''}`, 'success');
+};
+
+window.advanceCouncilPresentation = async function() {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) return;
+  const round = (state.rounds || []).find(r => r.id === roundId);
+  const act = (round?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!act || !council) return;
+  const { current, next } = getNextCouncilPresentation(act.councilStudentAssignments, councilId);
+  if (!current) {
+    showToast('Chưa có sinh viên đang trình bày để chốt lượt.', 'warning');
+    return;
+  }
+  unlockCouncilAudio();
+  current.presentationStatus = 'presented';
+  if (next) {
+    next.presentationStatus = 'presenting';
+    state.activeCouncilSelectedStudentId = next.studentId;
+    initPresentationTimer(next.studentId, false);
+  } else {
+    await resetPresentationTimer(false);
+  }
+  writeCouncilTimerSnapshot(council);
+  if (!await persistCouncilLiveState(round, activityId, councilId)) return;
+  if (next) renderCouncilSelectedStudentDetails();
+  renderCouncilWorkspacePartialSync();
+  showToast(next ? `Đã chốt lượt #${current.order || ''} và bắt đầu SV #${next.order || ''}.` : 'Đã chốt lượt trình bày cuối cùng.', 'success');
 };
 
 window.finishStudentPresentation = async function(sid) {
@@ -1490,6 +1839,7 @@ window.finishStudentPresentation = async function(sid) {
   }
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
   if (!act) return;
 
   const asgn = (act.councilStudentAssignments || []).find(a => a.councilId === councilId && a.studentId === sid);
@@ -1498,9 +1848,10 @@ window.finishStudentPresentation = async function(sid) {
   }
 
   // Stop timer
-  resetPresentationTimer();
+  await resetPresentationTimer(false);
+  if (council) writeCouncilTimerSnapshot(council);
 
-  await persistActivityCouncilChanges(targetRound);
+  if (!await persistCouncilLiveState(targetRound, activityId, councilId)) return;
   renderCouncilWorkspacePartialSync();
   renderSecretaryControls();
   showToast('✓ Đã hoàn tất lượt trình bày của sinh viên.', 'info');
@@ -1514,6 +1865,7 @@ window.resetStudentPresentation = async function(sid) {
   }
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
   if (!act) return;
 
   const asgn = (act.councilStudentAssignments || []).find(a => a.councilId === councilId && a.studentId === sid);
@@ -1522,9 +1874,12 @@ window.resetStudentPresentation = async function(sid) {
   }
 
   // Reset timer
-  resetPresentationTimer();
+  if (state.councilTimer?.studentId === sid) {
+    await resetPresentationTimer(false);
+    if (council) writeCouncilTimerSnapshot(council);
+  }
 
-  await persistActivityCouncilChanges(targetRound);
+  if (!await persistCouncilLiveState(targetRound, activityId, councilId)) return;
   renderCouncilWorkspacePartialSync();
   renderSecretaryControls();
 };
@@ -1542,7 +1897,7 @@ window.startCouncilSession = async function() {
   if (!council) return;
 
   council.status = 'active';
-  await persistActivityCouncilChanges(targetRound);
+  if (!await persistCouncilLiveState(targetRound, activityId, councilId)) return;
   renderCouncilWorkspaceFull();
   showToast(`Hội đồng "${council.name}" đã bắt đầu làm việc!`, 'success');
 };
@@ -1590,7 +1945,7 @@ window.endCouncilSession = async function() {
 
   council.status = 'ended';
   council.endedAt = new Date().toISOString();
-  await persistActivityCouncilChanges(targetRound);
+  if (!await persistCouncilLiveState(targetRound, activityId, councilId)) return;
   renderCouncilWorkspaceFull();
   showToast(`Đã kết thúc phiên làm việc của Hội đồng "${council.name}".`, 'info');
 };
@@ -1600,6 +1955,7 @@ window.endCouncilSession = async function() {
 // --- SUBMODULE WINDOW BRIDGE ---
 if (typeof window !== 'undefined') {
   if (typeof checkCouncilAuthorization !== 'undefined') window.checkCouncilAuthorization = checkCouncilAuthorization;
+  window.resolveCouncilScorerId = resolveCouncilScorerId;
   if (typeof getRequiredScorers !== 'undefined') window.getRequiredScorers = getRequiredScorers;
   if (typeof getGuestScorers !== 'undefined') window.getGuestScorers = getGuestScorers;
   if (typeof openCouncilWorkspace !== 'undefined') window.openCouncilWorkspace = openCouncilWorkspace;

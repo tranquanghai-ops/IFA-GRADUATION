@@ -745,6 +745,42 @@ async function persistActivityCouncilChanges(targetRound) {
       activities: targetRound.activities,
       updatedAt: serverTimestamp()
     });
+    // Keep authorization indexes aligned with every council/member/student edit.
+    // The live presentation rules consult these small documents, not the large
+    // round document. Removed members must be revoked, not merely omitted.
+    const activityId = state.activeCouncilManagement?.activityId;
+    const activity = (targetRound.activities || []).find(item => item.id === activityId);
+    if (activity) {
+      const expectedMembers = new Map();
+      for (const council of (activity.councils || [])) {
+        for (const [role, member] of Object.entries(council.membersBySlot || {})) {
+          const memberEmail = String(member?.memberEmail || member?.email || '').toLowerCase().trim();
+          if (!memberEmail) continue;
+          const id = `${activity.id}_${council.id}_${memberEmail}`;
+          expectedMembers.set(id, { roundId, activityId: activity.id, councilId: council.id, memberEmail, role, active: true, updatedAt: new Date().toISOString() });
+        }
+        const chairEmail = String(council.chairEmail || '').toLowerCase().trim();
+        if (chairEmail && !expectedMembers.has(`${activity.id}_${council.id}_${chairEmail}`)) {
+          const id = `${activity.id}_${council.id}_${chairEmail}`;
+          expectedMembers.set(id, { roundId, activityId: activity.id, councilId: council.id, memberEmail: chairEmail, role: 'chair', active: true, updatedAt: new Date().toISOString() });
+        }
+      }
+      const membershipCollection = collection(db, 'graduationRounds', roundId, 'councilMemberships');
+      const currentMembers = await getDocs(query(membershipCollection, where('activityId', '==', activity.id)));
+      await Promise.all(currentMembers.docs.filter(snapshot => !expectedMembers.has(snapshot.id)).map(snapshot => deleteDoc(snapshot.ref)));
+      await Promise.all([...expectedMembers].map(([id, data]) => setDoc(doc(membershipCollection, id), data)));
+
+      const expectedStudents = new Map();
+      for (const assignment of (activity.councilStudentAssignments || [])) {
+        if (!assignment.councilId || !assignment.studentId) continue;
+        const id = `${activity.id}_${assignment.studentId}`;
+        expectedStudents.set(id, { roundId, activityId: activity.id, councilId: assignment.councilId, studentId: String(assignment.studentId), active: true, updatedAt: new Date().toISOString() });
+      }
+      const assignmentCollection = collection(db, 'graduationRounds', roundId, 'councilStudentAssignments');
+      const currentStudents = await getDocs(query(assignmentCollection, where('activityId', '==', activity.id)));
+      await Promise.all(currentStudents.docs.filter(snapshot => !expectedStudents.has(snapshot.id)).map(snapshot => deleteDoc(snapshot.ref)));
+      await Promise.all([...expectedStudents].map(([id, data]) => setDoc(doc(assignmentCollection, id), data)));
+    }
   } catch (err) {
     console.error('Lỗi lưu thay đổi Hội đồng:', err);
     showToast('Lỗi lưu dữ liệu: ' + err.message, 'error');
