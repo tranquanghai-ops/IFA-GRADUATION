@@ -42,7 +42,21 @@ assert.match(read('templates/modals/grading/modal-activity-councils.html'), /GV 
 assert.match(read('templates/modals/grading/modal-activity-councils.html'), /council-student-subtabs/);
 assert.match(read('templates/modals/grading/modal-activity-councils.html'), /max-w-6xl/);
 assert.match(read('templates/modals/grading/modal-council-workspace.html'), /z-\[75\]/);
-assert.match(read('templates/modals/grading/modal-edit-council.html'), /z-\[80\]/);
-assert.match(read('templates/modals/grading/modal-edit-council.html'), /council-conflict-warning/);
+const rubricsWorkspace = read('js/grading/rubrics-workspace.js');
+assert.match(rubricsWorkspace, /council-standalone-active/);
+assert.match(rubricsWorkspace, /handleCouncilDirectLogout/);
+assert.match(rubricsWorkspace, /isDirectMode/);
+assert.match(rubricsWorkspace, /role:\s*'member'/);
+assert.match(rubricsWorkspace, /isAdmin:\s*false/);
+
+const stylesCss = read('styles.css');
+assert.match(stylesCss, /body\.council-standalone-active/);
+assert.match(stylesCss, /#app-header/);
+
+const authJs = read('js/auth.js');
+assert.match(authJs, /checkAndHandlePendingCouncilDirectLink/);
+assert.match(authJs, /council-standalone-active/);
+assert.match(authJs, /handleLogout/);
 
 console.log('Current regression checks passed.');
+

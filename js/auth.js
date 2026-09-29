@@ -154,6 +154,9 @@ export async function setupAuthListener() {
       const promptCode = document.getElementById('login-council-prompt-code');
       if (hdParam) {
         sessionStorage.setItem('pendingCouncilCode', hdParam);
+        sessionStorage.setItem('councilDirectMode', 'true');
+        sessionStorage.setItem('directCouncilCode', hdParam);
+        state.isCouncilDirectMode = true;
         if (promptCard) {
           if (promptCode) promptCode.textContent = hdParam;
           promptCard.classList.remove('hidden');
@@ -162,6 +165,7 @@ export async function setupAuthListener() {
         promptCard.classList.add('hidden');
       }
 
+      document.body.classList.remove('council-standalone-active');
       document.getElementById('login-required-section').classList.remove('hidden');
       document.getElementById('view-student').classList.add('hidden');
       document.getElementById('view-supervisor').classList.add('hidden');
@@ -175,7 +179,7 @@ export async function setupAuthListener() {
 export function checkAndHandlePendingCouncilDirectLink() {
   try {
     const urlParams = new URLSearchParams(window.location.search);
-    const hdCode = urlParams.get('hd') || urlParams.get('c') || sessionStorage.getItem('pendingCouncilCode');
+    const hdCode = urlParams.get('hd') || urlParams.get('c') || sessionStorage.getItem('pendingCouncilCode') || sessionStorage.getItem('directCouncilCode');
     if (!hdCode) return;
 
     const cleanCode = String(hdCode).trim().toLowerCase();
@@ -203,9 +207,14 @@ export function checkAndHandlePendingCouncilDirectLink() {
     }
 
     if (foundCouncil && foundRound && foundAct) {
+      state.isCouncilDirectMode = true;
+      sessionStorage.setItem('councilDirectMode', 'true');
+      sessionStorage.setItem('directCouncilCode', cleanCode);
       sessionStorage.removeItem('pendingCouncilCode');
+      document.body.classList.add('council-standalone-active');
+
       if (window.history && window.history.replaceState) {
-        window.history.replaceState({}, document.title, window.location.pathname);
+        window.history.replaceState({}, document.title, window.location.pathname + `?hd=${foundCouncil.shortCode || foundCouncil.code || cleanCode}`);
       }
       setTimeout(() => {
         if (typeof window.openCouncilWorkspace === 'function') {
@@ -219,6 +228,21 @@ export function checkAndHandlePendingCouncilDirectLink() {
   }
 }
 window.checkAndHandlePendingCouncilDirectLink = checkAndHandlePendingCouncilDirectLink;
+
+export async function handleLogout() {
+  try {
+    sessionStorage.removeItem('pendingCouncilCode');
+    sessionStorage.removeItem('councilDirectMode');
+    sessionStorage.removeItem('directCouncilCode');
+    state.isCouncilDirectMode = false;
+    document.body.classList.remove('council-standalone-active');
+    await signOut(auth);
+  } catch (e) {
+    console.warn('Signout notice:', e);
+  }
+  window.location.href = window.location.origin;
+}
+window.handleLogout = handleLogout;
 
 export async function resolveActualRoles(user) {
   if (!user) {
@@ -803,10 +827,7 @@ document.getElementById('btn-header-login')?.addEventListener('click', async () 
   }
 });
 
-document.getElementById('btn-logout')?.addEventListener('click', async () => {
-  await signOut(auth);
-  window.location.reload();
-});
+document.getElementById('btn-logout')?.addEventListener('click', handleLogout);
 
 document.getElementById('input-topic-title')?.addEventListener('input', e => {
   const len = e.target.value.length;

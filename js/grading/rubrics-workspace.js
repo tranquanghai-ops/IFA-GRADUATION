@@ -100,22 +100,7 @@ export function checkCouncilAuthorization(round, act, council, user) {
   if (!round || !act || !council) return { authorized: false, reason: 'Không tìm thấy dữ liệu Hội đồng' };
   
   const actor = user || getEffectiveActor();
-
-  // Real Admin without impersonation has full access
-  if (actor.isAdmin && !actor.impersonating) {
-    return {
-      authorized: true,
-      role: 'admin',
-      roleName: 'Quản trị viên',
-      slotKey: null,
-      canScore: true,
-      isSecretary: true,
-      isChair: true,
-      isAdmin: true,
-      canCalibrate: true,
-      canFinalize: true
-    };
-  }
+  const isDirectMode = Boolean(state.isCouncilDirectMode || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('councilDirectMode') === 'true'));
 
   if (!actor || !actor.email) {
     return { authorized: false, reason: 'Vui lòng đăng nhập để truy cập Hội đồng.' };
@@ -152,12 +137,43 @@ export function checkCouncilAuthorization(round, act, council, user) {
           canScore: true,
           isSecretary: isSec,
           isChair: isChair,
-          isAdmin: false,
-          canCalibrate: isChair,
-          canFinalize: isChair
+          isAdmin: isDirectMode ? false : Boolean(actor.isAdmin && !actor.impersonating),
+          canCalibrate: isDirectMode ? false : isChair,
+          canFinalize: isDirectMode ? false : isChair
         };
       }
     }
+  }
+
+  // Real Admin handling:
+  // If in direct council mode (?hd=CODE), Admin acts STRICTLY as a normal council member with zero extra powers!
+  if (actor.isAdmin && !actor.impersonating) {
+    if (isDirectMode) {
+      return {
+        authorized: true,
+        role: 'member',
+        roleName: 'Thành viên Hội đồng',
+        slotKey: 'member_evaluator',
+        canScore: true,
+        isSecretary: false,
+        isChair: false,
+        isAdmin: false,
+        canCalibrate: false,
+        canFinalize: false
+      };
+    }
+    return {
+      authorized: true,
+      role: 'admin',
+      roleName: 'Quản trị viên',
+      slotKey: null,
+      canScore: true,
+      isSecretary: true,
+      isChair: true,
+      isAdmin: true,
+      canCalibrate: true,
+      canFinalize: true
+    };
   }
 
   // Student is strictly denied
@@ -186,6 +202,11 @@ window.openCouncilWorkspace = async function(roundId, activityId, councilId, aut
   if (!targetRound || !act || !council) {
     showToast('Không tìm thấy thông tin Hội đồng được yêu cầu.', 'error');
     return;
+  }
+
+  const isDirectMode = Boolean(state.isCouncilDirectMode || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('councilDirectMode') === 'true'));
+  if (isDirectMode && typeof document !== 'undefined' && document.body) {
+    document.body.classList.add('council-standalone-active');
   }
 
   // AUTHORIZATION CHECK
@@ -247,7 +268,32 @@ window.openCouncilWorkspace = async function(roundId, activityId, councilId, aut
   setupCouncilRealtimeSync(roundId, activityId, councilId);
 };
 
+window.handleCouncilDirectLogout = async function() {
+  if (confirm('Bạn có chắc chắn muốn đăng xuất khỏi phiên chấm Hội đồng?')) {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('pendingCouncilCode');
+      sessionStorage.removeItem('councilDirectMode');
+      sessionStorage.removeItem('directCouncilCode');
+    }
+    state.isCouncilDirectMode = false;
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.classList.remove('council-standalone-active');
+    }
+    if (typeof window.handleLogout === 'function') {
+      await window.handleLogout();
+    } else {
+      window.location.href = window.location.origin;
+    }
+  }
+};
+
 window.closeCouncilWorkspace = function() {
+  const isDirectMode = Boolean(state.isCouncilDirectMode || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('councilDirectMode') === 'true'));
+  if (isDirectMode) {
+    window.handleCouncilDirectLogout();
+    return;
+  }
+
   if (state.activeCouncilUnsubscribe) {
     try { state.activeCouncilUnsubscribe(); } catch (e) {}
     state.activeCouncilUnsubscribe = null;
@@ -397,6 +443,30 @@ function renderCouncilWorkspaceFull() {
     } else {
       sessionControls.classList.add('hidden');
     }
+  }
+
+  // Direct Council Link Mode Header Actions
+  const isDirectMode = Boolean(state.isCouncilDirectMode || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('councilDirectMode') === 'true'));
+  const directActions = document.getElementById('cws-direct-user-actions');
+  const normalClose = document.getElementById('btn-cws-normal-close');
+  const directEmail = document.getElementById('cws-direct-user-email');
+
+  if (isDirectMode) {
+    if (directActions) {
+      directActions.classList.remove('hidden');
+      directActions.classList.add('flex');
+    }
+    if (normalClose) normalClose.classList.add('hidden');
+    if (directEmail) {
+      const email = getEffectiveActor()?.email || state.user?.email || '';
+      directEmail.textContent = email;
+    }
+  } else {
+    if (directActions) {
+      directActions.classList.add('hidden');
+      directActions.classList.remove('flex');
+    }
+    if (normalClose) normalClose.classList.remove('hidden');
   }
 
   renderCouncilStudentList();
@@ -1316,6 +1386,7 @@ if (typeof window !== 'undefined') {
   if (typeof getGuestScorers !== 'undefined') window.getGuestScorers = getGuestScorers;
   if (typeof openCouncilWorkspace !== 'undefined') window.openCouncilWorkspace = openCouncilWorkspace;
   if (typeof closeCouncilWorkspace !== 'undefined') window.closeCouncilWorkspace = closeCouncilWorkspace;
+  if (typeof handleCouncilDirectLogout !== 'undefined') window.handleCouncilDirectLogout = handleCouncilDirectLogout;
   if (typeof setupCouncilRealtimeSync !== 'undefined') window.setupCouncilRealtimeSync = setupCouncilRealtimeSync;
   if (typeof loadCouncilScores !== 'undefined') window.loadCouncilScores = loadCouncilScores;
   if (typeof renderCouncilWorkspaceFull !== 'undefined') window.renderCouncilWorkspaceFull = renderCouncilWorkspaceFull;

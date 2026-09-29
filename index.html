@@ -5475,7 +5475,15 @@
               <span>🔓 Mở lại Hội đồng</span>
             </button>
           </div>
-          <button type="button" onclick="closeCouncilWorkspace()" class="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors">✕ Đóng</button>
+          <!-- Direct Council Link Mode User Badge & Logout -->
+          <div id="cws-direct-user-actions" class="hidden items-center gap-2">
+            <span id="cws-direct-user-email" class="text-xs text-slate-500 font-medium max-w-[170px] truncate hidden sm:inline"></span>
+            <button type="button" id="btn-cws-direct-logout" onclick="handleCouncilDirectLogout()" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer" title="Đăng xuất khỏi phiên chấm Hội đồng">
+              <span>🚪 Đăng xuất</span>
+            </button>
+          </div>
+
+          <button type="button" id="btn-cws-normal-close" onclick="closeCouncilWorkspace()" class="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer">✕ Đóng</button>
         </div>
       </div>
 
