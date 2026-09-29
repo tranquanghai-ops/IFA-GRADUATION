@@ -338,16 +338,28 @@ window.toggleTopicPreviewEditMode = function(isEdit = true) {
   const footerNote = document.getElementById('topic-preview-footer-note');
 
   if (isEdit) {
-    if (titleTextEl) titleTextEl.classList.add('hidden');
-    if (titleEditWrap) titleEditWrap.classList.remove('hidden');
+    if (titleTextEl) {
+      titleTextEl.classList.add('hidden');
+      titleTextEl.style.display = 'none';
+    }
+    if (titleEditWrap) {
+      titleEditWrap.classList.remove('hidden');
+      titleEditWrap.style.display = 'block';
+    }
     if (titleInput) {
       const currentTitle = modal._currentRegistration?.topicTitle || (titleTextEl?.textContent !== '--' ? titleTextEl?.textContent : '') || '';
       titleInput.value = currentTitle;
       setTimeout(() => titleInput.focus(), 100);
     }
 
-    if (descTextEl) descTextEl.classList.add('hidden');
-    if (descEditWrap) descEditWrap.classList.remove('hidden');
+    if (descTextEl) {
+      descTextEl.classList.add('hidden');
+      descTextEl.style.display = 'none';
+    }
+    if (descEditWrap) {
+      descEditWrap.classList.remove('hidden');
+      descEditWrap.style.display = 'block';
+    }
     if (descInput) {
       const currentDesc = modal._currentRegistration?.topicDescription || (descTextEl?.textContent !== '--' ? descTextEl?.textContent : '') || '';
       descInput.value = currentDesc;
@@ -366,11 +378,23 @@ window.toggleTopicPreviewEditMode = function(isEdit = true) {
       footerNote.textContent = '✏️ Chế độ sửa: Chỉ mở khóa chỉnh sửa Tên đề tài và Mô tả định hướng thiết kế. Các thông tin hành chính khác được bảo lưu.';
     }
   } else {
-    if (titleTextEl) titleTextEl.classList.remove('hidden');
-    if (titleEditWrap) titleEditWrap.classList.add('hidden');
+    if (titleTextEl) {
+      titleTextEl.classList.remove('hidden');
+      titleTextEl.style.display = '';
+    }
+    if (titleEditWrap) {
+      titleEditWrap.classList.add('hidden');
+      titleEditWrap.style.display = 'none';
+    }
 
-    if (descTextEl) descTextEl.classList.remove('hidden');
-    if (descEditWrap) descEditWrap.classList.add('hidden');
+    if (descTextEl) {
+      descTextEl.classList.remove('hidden');
+      descTextEl.style.display = '';
+    }
+    if (descEditWrap) {
+      descEditWrap.classList.add('hidden');
+      descEditWrap.style.display = 'none';
+    }
 
     if (btnEdit) btnEdit.classList.toggle('hidden', !isStudent);
     if (btnSave) btnSave.classList.add('hidden');

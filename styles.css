@@ -117,9 +117,21 @@ body {
 
 @media print {
   body * {
+    visibility: hidden;
+  }
+  .hidden,
+  .no-print,
+  #topic-preview-doc-title-edit-wrap,
+  #topic-preview-doc-title-edit-wrap *,
+  #topic-preview-doc-desc-edit-wrap,
+  #topic-preview-doc-desc-edit-wrap *,
+  textarea,
+  button {
+    display: none !important;
     visibility: hidden !important;
   }
-  #topic-preview-paper, #topic-preview-paper * {
+  #topic-preview-paper,
+  #topic-preview-paper *:not(.hidden):not(.no-print):not(#topic-preview-doc-title-edit-wrap):not(#topic-preview-doc-title-edit-wrap *):not(#topic-preview-doc-desc-edit-wrap):not(#topic-preview-doc-desc-edit-wrap *) {
     visibility: visible !important;
   }
   #modal-supervisor-topic-preview {

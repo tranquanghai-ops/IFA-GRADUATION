@@ -113,6 +113,13 @@ window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
     return;
   }
 
+  // Clone paper and strip all edit wraps, textareas, notes, and hidden elements before printing
+  const paperClone = paper.cloneNode(true);
+  const elementsToRemove = paperClone.querySelectorAll(
+    '#topic-preview-doc-title-edit-wrap, #topic-preview-doc-desc-edit-wrap, .hidden, .no-print, textarea, button'
+  );
+  elementsToRemove.forEach(el => el.remove());
+
   const printFrame = document.createElement('iframe');
   printFrame.style.position = 'fixed';
   printFrame.style.right = '0';
@@ -152,10 +159,14 @@ window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
           td.has-value {
             border-bottom: 0 !important;
           }
+          .hidden, .no-print, #topic-preview-doc-title-edit-wrap, #topic-preview-doc-desc-edit-wrap, textarea {
+            display: none !important;
+            visibility: hidden !important;
+          }
         </style>
       </head>
       <body>
-        ${paper.outerHTML}
+        ${paperClone.outerHTML}
       </body>
     </html>
   `);
@@ -181,7 +192,9 @@ window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
       window.print();
     }
     setTimeout(() => {
-      printFrame.remove();
+      if (printFrame && printFrame.parentNode) {
+        printFrame.remove();
+      }
     }, 2000);
   }, 250);
 };
