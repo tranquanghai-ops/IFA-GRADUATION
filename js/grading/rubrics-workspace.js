@@ -447,10 +447,11 @@ function renderCouncilWorkspaceFull() {
   const actor = getEffectiveActor();
   const councilMember = council.membersBySlot?.[auth.slotKey];
   const memberDisplayName = councilMember?.memberName || councilMember?.name || actor?.name || actor?.displayName || state.user?.displayName || '';
+  const memberRoleText = auth.roleName || 'Thành viên';
 
   const roleBadge = document.getElementById('cws-my-role-badge');
   if (roleBadge) {
-    roleBadge.textContent = auth.roleName || 'Thành viên';
+    roleBadge.textContent = memberRoleText;
   }
 
   const headerMemberBadge = document.getElementById('cws-member-header-badge');
@@ -463,14 +464,9 @@ function renderCouncilWorkspaceFull() {
     }
   }
 
-  const mobileMemberLine = document.getElementById('cws-mobile-member-line');
-  if (mobileMemberLine) {
-    if (memberDisplayName) {
-      mobileMemberLine.textContent = `👤 ${memberDisplayName} (${auth.roleName || 'Thành viên'})`;
-      mobileMemberLine.classList.remove('hidden');
-    } else {
-      mobileMemberLine.classList.add('hidden');
-    }
+  const memberInfoText = document.getElementById('cws-member-info-text');
+  if (memberInfoText) {
+    memberInfoText.textContent = memberDisplayName ? `${memberDisplayName} (${memberRoleText})` : memberRoleText;
   }
 
   // Session Controls (Secretary / Chair / Admin)
