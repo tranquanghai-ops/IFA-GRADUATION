@@ -55,8 +55,12 @@ test('timer offers two adjustable increments and ten repeating alert patterns', 
 
 test('mobile council header keeps member identity and timer on separate rows', () => {
   const styles = read('styles.css');
+  const workspace = read('js/grading/rubrics-workspace.js');
   assert.match(styles, /#modal-council-workspace \.cws-header-layout \{\s*display: grid;/);
   assert.match(styles, /#cws-header-timer-container \{\s*grid-column: 1 \/ -1;\s*grid-row: 2;/);
+  const studentSurface = workspace.split('function updateCouncilSelectedStudentSurface()')[1].split('function renderCouncilSelectedStudentDetails()')[0];
+  assert.doesNotMatch(studentSurface, /\bisManager\b|\btimer\b/);
+  assert.match(workspace.split('export function renderPresentationTimerUI()')[1], /cws-timer-settings-trigger/);
 });
 
 test('council edits refresh live authorization indexes and revoke removed members', () => {

@@ -931,6 +931,12 @@ export function renderPresentationTimerUI() {
     isRunning: false
   };
   const timer = state.councilTimer;
+  document.getElementById('cws-timer-settings-trigger')?.classList.toggle('hidden', !isManager);
+  document.getElementById('cws-timer-readonly-icon')?.classList.toggle('hidden', isManager);
+  const shortAddBtn = document.getElementById('cws-timer-short-add-btn');
+  const longAddBtn = document.getElementById('cws-timer-long-add-btn');
+  if (shortAddBtn) shortAddBtn.textContent = `+${timer.shortAddSeconds || 30}s`;
+  if (longAddBtn) longAddBtn.textContent = `+${Math.round((timer.longAddSeconds || 60) / 60)}p`;
 
   const totalSec = timer.remainingSeconds != null ? timer.remainingSeconds : (15 * 60);
   const mins = Math.floor(Math.max(0, totalSec) / 60);
@@ -1477,12 +1483,6 @@ function updateCouncilSelectedStudentSurface() {
     badge.className = presentation.className;
     badge.textContent = presentation.text;
   }
-  document.getElementById('cws-timer-settings-trigger')?.classList.toggle('hidden', !isManager);
-  document.getElementById('cws-timer-readonly-icon')?.classList.toggle('hidden', isManager);
-  const shortAddBtn = document.getElementById('cws-timer-short-add-btn');
-  const longAddBtn = document.getElementById('cws-timer-long-add-btn');
-  if (shortAddBtn) shortAddBtn.textContent = `+${timer.shortAddSeconds || 30}s`;
-  if (longAddBtn) longAddBtn.textContent = `+${Math.round((timer.longAddSeconds || 60) / 60)}p`;
 }
 
 function renderCouncilSelectedStudentDetails() {
