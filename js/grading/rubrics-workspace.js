@@ -454,19 +454,14 @@ function renderCouncilWorkspaceFull() {
     roleBadge.textContent = memberRoleText;
   }
 
-  const headerMemberBadge = document.getElementById('cws-member-header-badge');
-  if (headerMemberBadge) {
+  const mobileMemberLine = document.getElementById('cws-mobile-member-line');
+  if (mobileMemberLine) {
     if (memberDisplayName) {
-      headerMemberBadge.textContent = `• ${memberDisplayName}`;
-      headerMemberBadge.classList.remove('hidden');
+      mobileMemberLine.textContent = `👤 ${memberDisplayName}`;
+      mobileMemberLine.classList.remove('hidden');
     } else {
-      headerMemberBadge.classList.add('hidden');
+      mobileMemberLine.classList.add('hidden');
     }
-  }
-
-  const memberInfoText = document.getElementById('cws-member-info-text');
-  if (memberInfoText) {
-    memberInfoText.textContent = memberDisplayName ? `${memberDisplayName} (${memberRoleText})` : memberRoleText;
   }
 
   // Session Controls (Secretary / Chair / Admin)
