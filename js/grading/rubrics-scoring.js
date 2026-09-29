@@ -70,21 +70,90 @@ function renderScoringSection() {
 
   let inputHtml = '';
   if (mode === 'letter') {
-    const opts = act.scoringConfig.letterOptions || [];
+    const opts = (act.scoringConfig.letterOptions && act.scoringConfig.letterOptions.length > 0)
+      ? act.scoringConfig.letterOptions
+      : (typeof DEFAULT_LETTER_GRADE_SCALE !== 'undefined' ? DEFAULT_LETTER_GRADE_SCALE : []);
+
+    // Helper for rendering a single letter button
+    const renderLetterBtn = (o) => {
+      if (!o) return '';
+      const isSelected = String(currentVal) === String(o.key) || String(currentVal) === String(o.code);
+      return `
+        <button type="button" ${isCompleted ? 'disabled' : ''} onclick="onSelectLetterScore('${o.key}')" class="p-2 sm:p-2.5 rounded-xl border text-center transition-all ${isSelected ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500 font-black text-emerald-950 shadow-xs' : 'bg-white border-slate-200 hover:border-slate-300 font-semibold text-slate-700 hover:bg-slate-50'} ${isCompleted ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}">
+          <span class="text-sm sm:text-base block font-mono font-black text-emerald-700">${o.key}</span>
+          <span class="text-[10px] sm:text-[11px] block mt-0.5 text-slate-600 truncate">${o.label || o.description || ''}</span>
+        </button>
+      `;
+    };
+
+    // Find top tier A++ / A+++
+    const appOpt = opts.find(o => String(o.key).includes('++') || String(o.key).includes('+++') || String(o.code).includes('++'));
+    
+    // Group A tier (ordered: A-, A, A+)
+    const aOrder = ['A-', 'A', 'A+'];
+    const aOpts = aOrder.map(k => opts.find(o => o.key === k || o.code === k)).filter(Boolean);
+    // If standard keys not found, fallback to any A
+    const allA = opts.filter(o => o !== appOpt && (String(o.key).startsWith('A') || String(o.code).startsWith('A')));
+    const finalAOpts = aOpts.length > 0 ? aOpts : allA;
+
+    // Group B tier (ordered: B-, B, B+)
+    const bOrder = ['B-', 'B', 'B+'];
+    const bOpts = bOrder.map(k => opts.find(o => o.key === k || o.code === k)).filter(Boolean);
+    const allB = opts.filter(o => String(o.key).startsWith('B') || String(o.code).startsWith('B'));
+    const finalBOpts = bOpts.length > 0 ? bOpts : allB;
+
+    // Group C tier (ordered: C-, C, C+)
+    const cOrder = ['C-', 'C', 'C+'];
+    const cOpts = cOrder.map(k => opts.find(o => o.key === k || o.code === k)).filter(Boolean);
+    const allC = opts.filter(o => String(o.key).startsWith('C') || String(o.code).startsWith('C'));
+    const finalCOpts = cOpts.length > 0 ? cOpts : allC;
+
+    // Any other tiers (D, F, etc.)
+    const usedSet = new Set([appOpt, ...finalAOpts, ...finalBOpts, ...finalCOpts].filter(Boolean));
+    const otherOpts = opts.filter(o => !usedSet.has(o));
+
     inputHtml = `
-      <div>
-        <label class="font-bold text-slate-800 text-xs block mb-1.5">Mức điểm / Đánh giá (*):</label>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          ${opts.map(o => {
-            const isSelected = String(currentVal) === String(o.key);
-            return `
-              <button type="button" ${isCompleted ? 'disabled' : ''} onclick="onSelectLetterScore('${o.key}')" class="p-2.5 rounded-xl border text-left transition-all ${isSelected ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500 font-black text-emerald-950' : 'bg-white border-slate-200 hover:border-slate-300 font-semibold text-slate-700'} ${isCompleted ? 'opacity-80 cursor-not-allowed' : ''}">
-                <span class="text-sm block font-mono font-black text-emerald-700">${o.key}</span>
-                <span class="text-[11px] block mt-0.5">${o.label}</span>
-              </button>
-            `;
-          }).join('')}
-        </div>
+      <div class="space-y-2">
+        <label class="font-bold text-slate-800 text-xs block mb-1">Mức điểm / Đánh giá (*):</label>
+        
+        <!-- ROW 1: A++ / A+++ (FULL WIDTH) -->
+        ${appOpt ? `
+          <div class="w-full">
+            <button type="button" ${isCompleted ? 'disabled' : ''} onclick="onSelectLetterScore('${appOpt.key}')" class="w-full p-2.5 sm:p-3 rounded-xl border text-center transition-all flex items-center justify-center gap-3 ${String(currentVal) === String(appOpt.key) ? 'bg-emerald-100 border-emerald-500 ring-2 ring-emerald-500 font-black text-emerald-950 shadow-xs' : 'bg-emerald-50/50 border-emerald-200 hover:border-emerald-300 font-bold text-emerald-900 hover:bg-emerald-100/50'} ${isCompleted ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}">
+              <span class="text-base font-mono font-black text-emerald-800">${appOpt.key}</span>
+              <span class="text-xs font-bold text-emerald-950">${appOpt.label || 'Xuất sắc'}</span>
+            </button>
+          </div>
+        ` : ''}
+
+        <!-- ROW 2: A-, A, A+ (3 COLUMNS) -->
+        ${finalAOpts.length > 0 ? `
+          <div class="grid grid-cols-3 gap-2">
+            ${finalAOpts.map(o => renderLetterBtn(o)).join('')}
+          </div>
+        ` : ''}
+
+        <!-- ROW 3: B-, B, B+ (3 COLUMNS) -->
+        ${finalBOpts.length > 0 ? `
+          <div class="grid grid-cols-3 gap-2">
+            ${finalBOpts.map(o => renderLetterBtn(o)).join('')}
+          </div>
+        ` : ''}
+
+        <!-- ROW 4: C-, C, C+ (3 COLUMNS) -->
+        ${finalCOpts.length > 0 ? `
+          <div class="grid grid-cols-3 gap-2">
+            ${finalCOpts.map(o => renderLetterBtn(o)).join('')}
+          </div>
+        ` : ''}
+
+        <!-- OTHER ROWS (D, F, etc.) -->
+        ${otherOpts.length > 0 ? `
+          <div class="grid grid-cols-3 gap-2">
+            ${otherOpts.map(o => renderLetterBtn(o)).join('')}
+          </div>
+        ` : ''}
+
         <input type="hidden" id="cws-score-input-letter" value="${currentVal}">
       </div>
     `;
@@ -181,13 +250,14 @@ function renderScoringSection() {
         <div class="flex items-center gap-2">
           ${batchFinalizeBtnHtml}
           ${!councilEnded ? `
-            <button type="button" onclick="reopenCurrentScore()" class="px-3 py-1.5 bg-white hover:bg-slate-100 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-xs">
+            <button type="button" onclick="reopenCurrentScore()" class="px-3 py-1.5 bg-white hover:bg-slate-100 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-xs cursor-pointer">
               ✏️ Mở lại để sửa
             </button>
           ` : ''}
         </div>
       </div>
     `;
+  } else {
     actionsHtml = `
       <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
         <div class="flex items-center gap-2">
@@ -210,9 +280,6 @@ function renderScoringSection() {
       <h3 class="font-black text-sm text-slate-900 tracking-tight flex items-center gap-1.5">
         <span>📝</span> PHIẾU CHẤM ĐIỂM CỦA BẠN
       </h3>
-      <span class="badge bg-slate-100 text-slate-600 font-bold text-[10px]">
-        Vai trò: ${auth.roleName}
-      </span>
     </div>
 
     ${inputHtml}

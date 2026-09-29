@@ -149,20 +149,22 @@ export async function setupAuthListener() {
 
       // Check URL for ?hd= or ?c= to display council login banner
       const urlParams = new URLSearchParams(window.location.search);
-      const hdParam = urlParams.get('hd') || urlParams.get('c');
+      const hdParam = urlParams.get('hd') || urlParams.get('c') || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('pendingCouncilCode') : null);
       const promptCard = document.getElementById('login-council-prompt-card');
-      const promptCode = document.getElementById('login-council-prompt-code');
+      const standardInst = document.getElementById('login-standard-instruction');
+      const councilInst = document.getElementById('login-council-instruction');
       if (hdParam) {
         sessionStorage.setItem('pendingCouncilCode', hdParam);
         sessionStorage.setItem('councilDirectMode', 'true');
         sessionStorage.setItem('directCouncilCode', hdParam);
         state.isCouncilDirectMode = true;
-        if (promptCard) {
-          if (promptCode) promptCode.textContent = hdParam;
-          promptCard.classList.remove('hidden');
-        }
-      } else if (promptCard) {
-        promptCard.classList.add('hidden');
+        if (standardInst) standardInst.classList.add('hidden');
+        if (councilInst) councilInst.classList.remove('hidden');
+        if (promptCard) promptCard.classList.remove('hidden');
+      } else {
+        if (standardInst) standardInst.classList.remove('hidden');
+        if (councilInst) councilInst.classList.add('hidden');
+        if (promptCard) promptCard.classList.add('hidden');
       }
 
       document.body.classList.remove('council-standalone-active');

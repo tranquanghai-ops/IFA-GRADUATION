@@ -97,6 +97,7 @@ export const findStudentInRound = (sid, roundId) => {
 };
 
 if (typeof window !== 'undefined') {
+  if (typeof initCouncilTouchSwipeListeners !== 'undefined') window.initCouncilTouchSwipeListeners = initCouncilTouchSwipeListeners;
   window.getStudentFullProfile = getStudentFullProfile;
   window.findStudentInRound = findStudentInRound;
 }
@@ -442,10 +443,34 @@ function renderCouncilWorkspaceFull() {
     }
   }
 
-  // Role Badge
+  // Role & Member Badges
+  const actor = getEffectiveActor();
+  const councilMember = council.membersBySlot?.[auth.slotKey];
+  const memberDisplayName = councilMember?.memberName || councilMember?.name || actor?.name || actor?.displayName || state.user?.displayName || '';
+
   const roleBadge = document.getElementById('cws-my-role-badge');
   if (roleBadge) {
     roleBadge.textContent = auth.roleName || 'Thành viên';
+  }
+
+  const headerMemberBadge = document.getElementById('cws-member-header-badge');
+  if (headerMemberBadge) {
+    if (memberDisplayName) {
+      headerMemberBadge.textContent = `• ${memberDisplayName}`;
+      headerMemberBadge.classList.remove('hidden');
+    } else {
+      headerMemberBadge.classList.add('hidden');
+    }
+  }
+
+  const mobileMemberLine = document.getElementById('cws-mobile-member-line');
+  if (mobileMemberLine) {
+    if (memberDisplayName) {
+      mobileMemberLine.textContent = `👤 ${memberDisplayName} (${auth.roleName || 'Thành viên'})`;
+      mobileMemberLine.classList.remove('hidden');
+    } else {
+      mobileMemberLine.classList.add('hidden');
+    }
   }
 
   // Session Controls (Secretary / Chair / Admin)
@@ -1131,6 +1156,11 @@ function renderCouncilSelectedStudentDetails() {
       ` : ''}
     </div>
 
+    <div class="md:hidden pt-1.5 flex items-center justify-between text-[10px] text-slate-400 font-medium border-t border-slate-200/70 select-none">
+      <span>👈 Vuốt phải: SV trước</span>
+      <span>Vuốt trái: SV tiếp theo 👉</span>
+    </div>
+
     ${asgn?.presentationStatus === 'presented' ? (() => {
       const prelim = getPreliminarySummary(sid, roundId);
       if (prelim && prelim.average !== null) {
@@ -1169,6 +1199,54 @@ function renderCouncilSelectedStudentDetails() {
 
   // Render Admin Monitor
   renderAdminMonitor();
+
+  // Initialize Touch Swipe Listeners for smooth mobile swipe navigation
+  if (typeof initCouncilTouchSwipeListeners === 'function') {
+    initCouncilTouchSwipeListeners();
+  }
+}
+
+export function initCouncilTouchSwipeListeners() {
+  const targetCard = document.getElementById('cws-selected-student-card');
+  if (!targetCard || targetCard._swipeListenersAttached) return;
+  targetCard._swipeListenersAttached = true;
+
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+
+  targetCard.addEventListener('touchstart', (e) => {
+    if (e.touches && e.touches.length === 1) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchStartTime = Date.now();
+    }
+  }, { passive: true });
+
+  targetCard.addEventListener('touchend', (e) => {
+    if (e.changedTouches && e.changedTouches.length === 1) {
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+      const elapsed = Date.now() - touchStartTime;
+
+      // Threshold: at least 45px horizontal movement, mostly horizontal, within 700ms
+      if (Math.abs(deltaX) >= 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && elapsed < 700) {
+        if (deltaX < 0) {
+          // Swiped left -> Next student
+          if (typeof window.navigateCouncilNextStudent === 'function') {
+            window.navigateCouncilNextStudent();
+          }
+        } else {
+          // Swiped right -> Previous student
+          if (typeof window.navigateCouncilPrevStudent === 'function') {
+            window.navigateCouncilPrevStudent();
+          }
+        }
+      }
+    }
+  }, { passive: true });
 }
 
 function formatStudentSupervisorsForDisplay(reg, hideSupervisor = false) {
