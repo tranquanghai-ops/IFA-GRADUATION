@@ -219,7 +219,7 @@ function renderScoringSection() {
 
     <div>
       <label class="font-bold text-slate-800 text-xs block mb-1">Nhận xét chuyên môn (không bắt buộc):</label>
-      <textarea id="cws-score-comment" rows="3" ${isCompleted ? 'disabled' : ''} oninput="onScoreCommentChange(this.value)" placeholder="Góp ý chuyên môn, ưu khuyết điểm cho sinh viên..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs ${isCompleted ? 'bg-slate-100 text-slate-600' : 'bg-white focus:ring-2 focus:ring-blue-500'}">${escapeHtml(currentComment)}</textarea>
+      <textarea id="cws-score-comment" rows="4" ${isCompleted ? 'disabled' : ''} oninput="onScoreCommentChange(this.value)" placeholder="Góp ý chuyên môn, ưu khuyết điểm cho sinh viên..." class="w-full p-3 border border-slate-300 rounded-xl text-xs resize-y min-h-[100px] ${isCompleted ? 'bg-slate-100 text-slate-600' : 'bg-white focus:ring-2 focus:ring-blue-500'}" style="resize: vertical; min-height: 100px;">${escapeHtml(currentComment)}</textarea>
     </div>
 
     ${actionsHtml}
