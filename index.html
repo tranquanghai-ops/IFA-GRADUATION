@@ -181,7 +181,15 @@
         <p class="text-xs text-slate-500 leading-relaxed">
           Đăng nhập bằng tài khoản email trường <strong>@student.tdtu.edu.vn</strong> (Sinh viên) hoặc <strong>@tdtu.edu.vn</strong> (Giảng viên / Quản trị) để tiếp tục.
         </p>
-        <button id="btn-login-main" class="w-full py-3 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+        <div id="login-council-prompt-card" class="hidden p-3.5 bg-indigo-50 border border-indigo-200 rounded-2xl text-left text-xs text-indigo-950 space-y-1 shadow-2xs">
+          <div class="font-bold flex items-center gap-1.5 text-indigo-900">
+            <span>🏛️</span> <span>Truy cập phòng chấm Hội đồng</span>
+          </div>
+          <p class="text-[11px] text-indigo-700 leading-relaxed">
+            Đăng nhập tài khoản Google của Thầy/Cô để vào thẳng không gian chấm điểm Hội đồng (<span id="login-council-prompt-code" class="font-mono font-bold text-indigo-900">--</span>).
+          </p>
+        </div>
+        <button id="btn-login-main" class="w-full py-3 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer">
           <span>Đăng nhập với Google TDTU</span>
         </button>
       </div>
@@ -5151,10 +5159,17 @@
 
           <!-- Phân công Thành viên Hội đồng theo các Slot -->
           <div>
-            <label class="font-bold text-slate-800 block mb-1.5 flex items-center justify-between">
-              <span>Phân công Thành viên Hội đồng</span>
-              <span id="council-conflict-warning" class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md font-semibold hidden">⚠️ Đã ẩn GV bận ở HĐ khác</span>
-            </label>
+            <div class="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+              <label class="font-bold text-slate-800 flex items-center gap-1.5">
+                <span>👥</span> Phân công Thành viên Hội đồng
+              </label>
+              <div class="flex items-center gap-2">
+                <span id="council-conflict-warning" class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md font-semibold hidden">⚠️ Đã ẩn GV bận ở HĐ khác</span>
+                <button type="button" onclick="quickAddCouncilMemberSlot()" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 shadow-2xs transition-all flex items-center gap-1 cursor-pointer" title="Thêm nhanh thêm vị trí Ủy viên vào Hội đồng">
+                  <span class="font-black text-sm leading-none">+</span> <span>Thêm nhanh thành viên</span>
+                </button>
+              </div>
+            </div>
             <div id="council-members-form-container" class="space-y-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl">
               <!-- Rendered dynamically based on activity.councilStructure.slots -->
             </div>
@@ -5464,11 +5479,21 @@
         </div>
       </div>
 
+      <!-- Mobile / Tablet Tab Switcher (Visible only on screens < md) -->
+      <div id="cws-mobile-tab-bar" class="md:hidden flex items-center border-b border-slate-200 bg-slate-100 p-1.5 gap-1 shrink-0">
+        <button type="button" id="btn-cws-tab-students" onclick="switchCouncilWorkspaceMobileTab('students')" class="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-white shadow-xs text-indigo-900 border border-indigo-200 flex items-center justify-center gap-1.5 transition-all">
+          <span>👥</span> <span>Danh sách SV</span> (<span id="cws-mobile-student-count-badge">0</span>)
+        </button>
+        <button type="button" id="btn-cws-tab-grading" onclick="switchCouncilWorkspaceMobileTab('grading')" class="flex-1 py-2 px-3 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition-all">
+          <span>📝</span> <span>Chấm điểm</span>: <span id="cws-mobile-active-name" class="truncate max-w-[120px] ml-0.5">--</span>
+        </button>
+      </div>
+
       <!-- Main Body: 2 Columns Responsive -->
       <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
         
         <!-- LEFT COLUMN: DANH SÁCH SINH VIÊN -->
-        <div class="w-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col bg-slate-50/40 shrink-0">
+        <div id="cws-col-students" class="w-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col bg-slate-50/40 shrink-0">
           <div class="p-3 border-b border-slate-200 bg-white space-y-2">
             <div class="flex items-center justify-between text-xs">
               <span class="font-bold text-slate-800 flex items-center gap-1.5">
@@ -5485,8 +5510,21 @@
         </div>
 
         <!-- RIGHT COLUMN: WORKSPACE FOR SELECTED STUDENT -->
-        <div class="flex-1 flex flex-col overflow-y-auto p-4 sm:p-6 space-y-4 bg-white">
+        <div id="cws-col-grading" class="flex-1 hidden md:flex flex-col overflow-y-auto p-4 sm:p-6 space-y-4 bg-white">
           
+          <!-- MOBILE STUDENT STEPPER BAR (< md) -->
+          <div class="flex items-center justify-between p-2.5 bg-slate-100/90 border border-slate-200 rounded-xl md:hidden text-xs">
+            <button type="button" onclick="navigateCouncilPrevStudent()" class="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 shadow-2xs flex items-center gap-1 cursor-pointer">
+              <span>← SV trước</span>
+            </button>
+            <button type="button" onclick="switchCouncilWorkspaceMobileTab('students')" class="font-bold text-indigo-900 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg text-[11px] cursor-pointer">
+              <span id="cws-mobile-student-indicator">SV -- / --</span> ▾
+            </button>
+            <button type="button" onclick="navigateCouncilNextStudent()" class="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 shadow-2xs flex items-center gap-1 cursor-pointer">
+              <span>SV tiếp theo →</span>
+            </button>
+          </div>
+
           <!-- BANNER: HỘI ĐỒNG HIỆN ĐANG TRÌNH BÀY -->
           <div id="cws-presenting-banner" class="hidden p-3.5 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-center justify-between shadow-xs">
             <div class="flex items-center gap-3">

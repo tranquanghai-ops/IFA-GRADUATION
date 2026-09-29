@@ -751,6 +751,8 @@ function renderCouncilStudentList() {
 
   const countBadge = document.getElementById('cws-student-count-badge');
   if (countBadge) countBadge.textContent = councilStudents.length;
+  const mobileCountBadge = document.getElementById('cws-mobile-student-count-badge');
+  if (mobileCountBadge) mobileCountBadge.textContent = councilStudents.length;
 
   const presentingAsgn = councilStudents.find(a => a.presentationStatus === 'presenting');
   const presentingInd = document.getElementById('cws-presenting-indicator');
@@ -832,7 +834,72 @@ window.filterCouncilWorkspaceStudents = function(q) {
 };
 
 // 5. SELECT STUDENT & FLEXIBLE NAVIGATION (CRITICAL BUSINESS RULE)
-window.selectCouncilStudent = function(studentId) {
+window.switchCouncilWorkspaceMobileTab = function(tab = 'grading') {
+  const colStudents = document.getElementById('cws-col-students');
+  const colGrading = document.getElementById('cws-col-grading');
+  const btnStudents = document.getElementById('btn-cws-tab-students');
+  const btnGrading = document.getElementById('btn-cws-tab-grading');
+
+  if (!colStudents || !colGrading) return;
+
+  if (tab === 'students') {
+    colStudents.classList.remove('hidden');
+    colGrading.classList.add('hidden');
+    colGrading.classList.remove('flex');
+
+    if (btnStudents) {
+      btnStudents.className = 'flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-white shadow-xs text-indigo-900 border border-indigo-200 flex items-center justify-center gap-1.5 transition-all';
+    }
+    if (btnGrading) {
+      btnGrading.className = 'flex-1 py-2 px-3 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition-all';
+    }
+  } else {
+    colStudents.classList.add('hidden');
+    colGrading.classList.remove('hidden');
+    colGrading.classList.add('flex');
+
+    if (btnStudents) {
+      btnStudents.className = 'flex-1 py-2 px-3 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition-all';
+    }
+    if (btnGrading) {
+      btnGrading.className = 'flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-white shadow-xs text-indigo-900 border border-indigo-200 flex items-center justify-center gap-1.5 transition-all';
+    }
+  }
+};
+
+window.navigateCouncilPrevStudent = function() {
+  const { roundId, activityId, councilId } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const assignments = (act?.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+  if (assignments.length === 0) return;
+
+  const currentSid = state.activeCouncilSelectedStudentId;
+  const currentIndex = assignments.findIndex(a => a.studentId === currentSid);
+  const prevIndex = (currentIndex > 0) ? currentIndex - 1 : assignments.length - 1;
+  const prevSid = assignments[prevIndex]?.studentId;
+  if (prevSid) {
+    selectCouncilStudent(prevSid, true);
+  }
+};
+
+window.navigateCouncilNextStudent = function() {
+  const { roundId, activityId, councilId } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const assignments = (act?.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+  if (assignments.length === 0) return;
+
+  const currentSid = state.activeCouncilSelectedStudentId;
+  const currentIndex = assignments.findIndex(a => a.studentId === currentSid);
+  const nextIndex = (currentIndex >= 0 && currentIndex < assignments.length - 1) ? currentIndex + 1 : 0;
+  const nextSid = assignments[nextIndex]?.studentId;
+  if (nextSid) {
+    selectCouncilStudent(nextSid, true);
+  }
+};
+
+window.selectCouncilStudent = function(studentId, forceMobileGradingTab = false) {
   // PRESERVE UNSAVED INPUTS from current student (including rubric components)
   const oldSid = state.activeCouncilSelectedStudentId;
   if (oldSid && oldSid !== studentId) {
@@ -871,6 +938,11 @@ window.selectCouncilStudent = function(studentId) {
 
   renderCouncilStudentList();
   renderCouncilSelectedStudentDetails();
+
+  // On mobile/tablet screens (< md / 768px), auto-switch to grading tab
+  if (window.innerWidth < 768 || forceMobileGradingTab) {
+    switchCouncilWorkspaceMobileTab('grading');
+  }
 };
 
 window.goToCurrentPresentingStudent = function() {
@@ -880,7 +952,7 @@ window.goToCurrentPresentingStudent = function() {
   const assignments = act?.councilStudentAssignments || [];
   const pres = assignments.find(a => a.councilId === councilId && a.presentationStatus === 'presenting');
   if (pres) {
-    selectCouncilStudent(pres.studentId);
+    selectCouncilStudent(pres.studentId, true);
   } else {
     showToast('Hội đồng hiện chưa có sinh viên nào đang trình bày.', 'info');
   }
@@ -911,6 +983,19 @@ function renderCouncilSelectedStudentDetails() {
   const sName = sObj?.fullName || sObj?.studentName || sObj?.name || sid;
   const sTopic = sObj?.topicTitle || sObj?.topic || '--';
   const hideSupervisor = Boolean(act?.hideSupervisorInCouncil || council?.hideSupervisorInCouncil);
+
+  // Update mobile active student header indicators
+  const mobileNameEl = document.getElementById('cws-mobile-active-name');
+  if (mobileNameEl) mobileNameEl.textContent = sName;
+
+  const councilStudents = (act?.councilStudentAssignments || [])
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const sIndex = councilStudents.findIndex(a => a.studentId === sid);
+  const mobileIndicatorEl = document.getElementById('cws-mobile-student-indicator');
+  if (mobileIndicatorEl) {
+    mobileIndicatorEl.textContent = `SV ${sIndex >= 0 ? sIndex + 1 : '--'} / ${councilStudents.length}`;
+  }
 
   // Format Official Supervisors
   const supervisorsHtml = hideSupervisor

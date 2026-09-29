@@ -112,6 +112,11 @@ export async function setupAuthListener() {
         // Tái đồng bộ view sau khi đã có dữ liệu đợt
         await switchView(state.currentView || initView);
 
+        // Tự động kiểm tra và chuyển thẳng vào phòng chấm Hội đồng nếu có liên kết ?hd=
+        setTimeout(() => {
+          checkAndHandlePendingCouncilDirectLink();
+        }, 300);
+
       } catch (err) {
         console.error('[IFA-Graduation] Startup error:', err);
       } finally {
@@ -141,6 +146,22 @@ export async function setupAuthListener() {
       if (gBanner) gBanner.classList.add('hidden');
       await resolveActualRoles(null);
       updateAuthUI();
+
+      // Check URL for ?hd= or ?c= to display council login banner
+      const urlParams = new URLSearchParams(window.location.search);
+      const hdParam = urlParams.get('hd') || urlParams.get('c');
+      const promptCard = document.getElementById('login-council-prompt-card');
+      const promptCode = document.getElementById('login-council-prompt-code');
+      if (hdParam) {
+        sessionStorage.setItem('pendingCouncilCode', hdParam);
+        if (promptCard) {
+          if (promptCode) promptCode.textContent = hdParam;
+          promptCard.classList.remove('hidden');
+        }
+      } else if (promptCard) {
+        promptCard.classList.add('hidden');
+      }
+
       document.getElementById('login-required-section').classList.remove('hidden');
       document.getElementById('view-student').classList.add('hidden');
       document.getElementById('view-supervisor').classList.add('hidden');
@@ -150,6 +171,54 @@ export async function setupAuthListener() {
     }
   });
 }
+
+export function checkAndHandlePendingCouncilDirectLink() {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hdCode = urlParams.get('hd') || urlParams.get('c') || sessionStorage.getItem('pendingCouncilCode');
+    if (!hdCode) return;
+
+    const cleanCode = String(hdCode).trim().toLowerCase();
+    let foundRound = null, foundAct = null, foundCouncil = null;
+
+    for (const r of (state.rounds || [])) {
+      if (r.deleted) continue;
+      for (const a of (r.activities || [])) {
+        for (const c of (a.councils || [])) {
+          if (
+            (c.shortCode && c.shortCode.toLowerCase() === cleanCode) ||
+            (c.code && c.code.toLowerCase() === cleanCode) ||
+            (c.id && c.id.toLowerCase() === cleanCode) ||
+            (c.slug && c.slug.toLowerCase() === cleanCode)
+          ) {
+            foundRound = r;
+            foundAct = a;
+            foundCouncil = c;
+            break;
+          }
+        }
+        if (foundCouncil) break;
+      }
+      if (foundCouncil) break;
+    }
+
+    if (foundCouncil && foundRound && foundAct) {
+      sessionStorage.removeItem('pendingCouncilCode');
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      setTimeout(() => {
+        if (typeof window.openCouncilWorkspace === 'function') {
+          window.openCouncilWorkspace(foundRound.id, foundAct.id, foundCouncil.id);
+          showToast(`🏛️ Đã vào phòng chấm Hội đồng: ${foundCouncil.name}`, 'success');
+        }
+      }, 350);
+    }
+  } catch (err) {
+    console.warn('[IFA-Graduation] Pending council direct link notice:', err);
+  }
+}
+window.checkAndHandlePendingCouncilDirectLink = checkAndHandlePendingCouncilDirectLink;
 
 export async function resolveActualRoles(user) {
   if (!user) {

@@ -37,11 +37,21 @@
         </div>
       </div>
 
+      <!-- Mobile / Tablet Tab Switcher (Visible only on screens < md) -->
+      <div id="cws-mobile-tab-bar" class="md:hidden flex items-center border-b border-slate-200 bg-slate-100 p-1.5 gap-1 shrink-0">
+        <button type="button" id="btn-cws-tab-students" onclick="switchCouncilWorkspaceMobileTab('students')" class="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-white shadow-xs text-indigo-900 border border-indigo-200 flex items-center justify-center gap-1.5 transition-all">
+          <span>👥</span> <span>Danh sách SV</span> (<span id="cws-mobile-student-count-badge">0</span>)
+        </button>
+        <button type="button" id="btn-cws-tab-grading" onclick="switchCouncilWorkspaceMobileTab('grading')" class="flex-1 py-2 px-3 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition-all">
+          <span>📝</span> <span>Chấm điểm</span>: <span id="cws-mobile-active-name" class="truncate max-w-[120px] ml-0.5">--</span>
+        </button>
+      </div>
+
       <!-- Main Body: 2 Columns Responsive -->
       <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
         
         <!-- LEFT COLUMN: DANH SÁCH SINH VIÊN -->
-        <div class="w-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col bg-slate-50/40 shrink-0">
+        <div id="cws-col-students" class="w-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col bg-slate-50/40 shrink-0">
           <div class="p-3 border-b border-slate-200 bg-white space-y-2">
             <div class="flex items-center justify-between text-xs">
               <span class="font-bold text-slate-800 flex items-center gap-1.5">
@@ -58,8 +68,21 @@
         </div>
 
         <!-- RIGHT COLUMN: WORKSPACE FOR SELECTED STUDENT -->
-        <div class="flex-1 flex flex-col overflow-y-auto p-4 sm:p-6 space-y-4 bg-white">
+        <div id="cws-col-grading" class="flex-1 hidden md:flex flex-col overflow-y-auto p-4 sm:p-6 space-y-4 bg-white">
           
+          <!-- MOBILE STUDENT STEPPER BAR (< md) -->
+          <div class="flex items-center justify-between p-2.5 bg-slate-100/90 border border-slate-200 rounded-xl md:hidden text-xs">
+            <button type="button" onclick="navigateCouncilPrevStudent()" class="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 shadow-2xs flex items-center gap-1 cursor-pointer">
+              <span>← SV trước</span>
+            </button>
+            <button type="button" onclick="switchCouncilWorkspaceMobileTab('students')" class="font-bold text-indigo-900 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg text-[11px] cursor-pointer">
+              <span id="cws-mobile-student-indicator">SV -- / --</span> ▾
+            </button>
+            <button type="button" onclick="navigateCouncilNextStudent()" class="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 shadow-2xs flex items-center gap-1 cursor-pointer">
+              <span>SV tiếp theo →</span>
+            </button>
+          </div>
+
           <!-- BANNER: HỘI ĐỒNG HIỆN ĐANG TRÌNH BÀY -->
           <div id="cws-presenting-banner" class="hidden p-3.5 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-center justify-between shadow-xs">
             <div class="flex items-center gap-3">

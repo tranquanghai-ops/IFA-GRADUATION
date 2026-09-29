@@ -181,7 +181,15 @@
         <p class="text-xs text-slate-500 leading-relaxed">
           Đăng nhập bằng tài khoản email trường <strong>@student.tdtu.edu.vn</strong> (Sinh viên) hoặc <strong>@tdtu.edu.vn</strong> (Giảng viên / Quản trị) để tiếp tục.
         </p>
-        <button id="btn-login-main" class="w-full py-3 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+        <div id="login-council-prompt-card" class="hidden p-3.5 bg-indigo-50 border border-indigo-200 rounded-2xl text-left text-xs text-indigo-950 space-y-1 shadow-2xs">
+          <div class="font-bold flex items-center gap-1.5 text-indigo-900">
+            <span>🏛️</span> <span>Truy cập phòng chấm Hội đồng</span>
+          </div>
+          <p class="text-[11px] text-indigo-700 leading-relaxed">
+            Đăng nhập tài khoản Google của Thầy/Cô để vào thẳng không gian chấm điểm Hội đồng (<span id="login-council-prompt-code" class="font-mono font-bold text-indigo-900">--</span>).
+          </p>
+        </div>
+        <button id="btn-login-main" class="w-full py-3 bg-tdtu-blue hover:bg-tdtu-dark text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer">
           <span>Đăng nhập với Google TDTU</span>
         </button>
       </div>

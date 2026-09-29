@@ -207,6 +207,85 @@ export function getConflictingCouncilMembersForSlot(act, editingCouncilId, targe
   return busyMembers;
 }
 
+export function generateCouncilShortCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+window.generateCouncilShortCode = generateCouncilShortCode;
+
+function getCurrentCouncilFormMembers(act) {
+  const slots = act.councilStructure?.slots || [];
+  const currentMembers = {};
+  slots.forEach(s => {
+    const isGuest = document.getElementById(`chk-guest-${s.key}`)?.checked === true;
+    if (isGuest) {
+      currentMembers[s.key] = {
+        type: 'guest',
+        isExternalGuest: true,
+        memberName: document.getElementById(`slot-guest-name-${s.key}`)?.value?.trim() || '',
+        memberEmail: document.getElementById(`slot-guest-email-${s.key}`)?.value?.trim().toLowerCase() || '',
+        organization: document.getElementById(`slot-guest-org-${s.key}`)?.value?.trim() || '',
+        role: s.label || s.name || 'Khách mời',
+        slotKey: s.key
+      };
+    } else {
+      const supId = document.getElementById(`slot-sup-${s.key}`)?.value || '';
+      currentMembers[s.key] = {
+        type: 'internal',
+        isExternalGuest: false,
+        memberId: supId,
+        role: s.label || s.name || 'Ủy viên',
+        slotKey: s.key
+      };
+    }
+  });
+  return currentMembers;
+}
+window.getCurrentCouncilFormMembers = getCurrentCouncilFormMembers;
+
+window.quickAddCouncilMemberSlot = function() {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const currentMembers = getCurrentCouncilFormMembers(act);
+
+  act.councilStructure = act.councilStructure || { slots: [] };
+  const memberSlots = act.councilStructure.slots.filter(s => s.key.startsWith('member') || (s.label && s.label.includes('Ủy viên')));
+  const nextNumber = memberSlots.length + 1;
+  const newKey = `member_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
+
+  act.councilStructure.slots.push({
+    key: newKey,
+    label: 'Ủy viên',
+    name: `Ủy viên Hội đồng (${nextNumber})`,
+    type: 'optional',
+    removable: true
+  });
+
+  renderCouncilMembersFormSlots(act, currentMembers);
+  showToast(`✓ Đã thêm vị trí "Ủy viên Hội đồng (${nextNumber})"!`, 'success');
+};
+
+window.quickRemoveCouncilMemberSlot = function(slotKey) {
+  const { roundId, activityId } = state.activeCouncilManagement;
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const currentMembers = getCurrentCouncilFormMembers(act);
+  delete currentMembers[slotKey];
+
+  act.councilStructure.slots = (act.councilStructure.slots || []).filter(s => s.key !== slotKey);
+  renderCouncilMembersFormSlots(act, currentMembers);
+  showToast('Đã xóa vị trí thành viên.', 'info');
+};
+
 function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
   const container = document.getElementById('council-members-form-container');
   if (!container) return;
@@ -237,6 +316,7 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
     const memberId = assigned.memberId || '';
     const memberName = assigned.memberName || '';
     const isGuest = (assigned.type === 'guest');
+    const isRemovable = Boolean(s.removable || s.type === 'optional' || s.key.startsWith('member_'));
 
     // Filter supervisors who are not busy in overlapping councils (or already assigned in this specific slot)
     const availableSupervisors = supervisors.filter(sup => {
@@ -246,15 +326,20 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
     });
 
     return `
-      <div class="p-2.5 bg-white border border-slate-200 rounded-xl space-y-1.5">
+      <div class="p-2.5 bg-white border border-slate-200 rounded-xl space-y-1.5" id="slot-container-${s.key}">
         <div class="flex items-center justify-between">
           <label class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
             <span>👤</span> ${s.name || s.label} <span class="text-indigo-600 font-mono text-[10px]">(${s.label || s.key})</span>
           </label>
-          <label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer">
-            <input type="checkbox" id="chk-guest-${s.key}" ${isGuest ? 'checked' : ''} onchange="toggleSlotGuestInput('${s.key}', this.checked)" class="rounded text-tdtu-blue">
-            <span>Khách mời ngoài</span>
-          </label>
+          <div class="flex items-center gap-2">
+            <label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer">
+              <input type="checkbox" id="chk-guest-${s.key}" ${isGuest ? 'checked' : ''} onchange="toggleSlotGuestInput('${s.key}', this.checked)" class="rounded text-tdtu-blue">
+              <span>Khách mời ngoài</span>
+            </label>
+            ${isRemovable ? `
+              <button type="button" onclick="quickRemoveCouncilMemberSlot('${s.key}')" class="text-rose-500 hover:text-rose-700 font-bold text-xs p-0.5" title="Xóa vị trí này">✕</button>
+            ` : ''}
+          </div>
         </div>
 
         <!-- Supervisor dropdown -->
@@ -287,26 +372,7 @@ window.onCouncilDateTimeInputsChange = function() {
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
   if (!act) return;
 
-  const slots = act.councilStructure?.slots || [];
-  const currentMembers = {};
-  slots.forEach(s => {
-    const isGuest = document.getElementById(`chk-guest-${s.key}`)?.checked === true;
-    if (isGuest) {
-      currentMembers[s.key] = {
-        type: 'guest',
-        memberName: document.getElementById(`slot-guest-name-${s.key}`)?.value?.trim() || '',
-        memberEmail: document.getElementById(`slot-guest-email-${s.key}`)?.value?.trim().toLowerCase() || '',
-        organization: document.getElementById(`slot-guest-org-${s.key}`)?.value?.trim() || ''
-      };
-    } else {
-      const supId = document.getElementById(`slot-sup-${s.key}`)?.value || '';
-      currentMembers[s.key] = {
-        type: 'internal',
-        memberId: supId
-      };
-    }
-  });
-
+  const currentMembers = getCurrentCouncilFormMembers(act);
   renderCouncilMembersFormSlots(act, currentMembers);
 };
 
@@ -475,8 +541,10 @@ window.saveCouncil = async function(e) {
     return;
   }
 
-  const slug = id ? ((act.councils || []).find(c => c.id === id)?.slug || slugify(name)) : ('c-' + slugify(name) + '-' + Date.now().toString(36).substr(-4));
+  const existingCouncil = (act.councils || []).find(c => c.id === id);
+  const slug = id ? (existingCouncil?.slug || slugify(name)) : ('c-' + slugify(name) + '-' + Date.now().toString(36).substr(-4));
   const councilId = id || ('council_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
+  const shortCode = existingCouncil?.shortCode || existingCouncil?.code || generateCouncilShortCode();
 
   const driveFolderId = document.getElementById('council-form-drive-folder-id')?.value?.trim() || null;
   const driveFolderName = document.getElementById('council-form-drive-folder-name')?.value?.trim() || name;
@@ -486,6 +554,7 @@ window.saveCouncil = async function(e) {
 
   const councilData = {
     id: councilId,
+    shortCode,
     slug,
     name,
     room,
@@ -505,7 +574,7 @@ window.saveCouncil = async function(e) {
   act.councils = act.councils || [];
   const existingIdx = act.councils.findIndex(c => c.id === councilId);
   if (existingIdx >= 0) {
-    act.councils[existingIdx] = councilData;
+    act.councils[existingIdx] = { ...act.councils[existingIdx], ...councilData };
   } else {
     councilData.createdAt = councilData.updatedAt;
     act.councils.push(councilData);
@@ -577,7 +646,8 @@ window.saveGuestSlot = async function() {
     key,
     label,
     name,
-    type: 'guest'
+    type: 'guest',
+    removable: true
   });
 
   await persistActivityCouncilChanges(targetRound);
@@ -621,13 +691,48 @@ window.deleteGuestSlot = async function(slotKey) {
 };
 
 // --- LINK COPIERS ---
-window.copyCouncilLink = async function(activitySlug, councilSlug) {
-  const { roundId } = state.activeCouncilManagement;
-  const targetRound = (state.rounds || []).find(r => r.id === roundId);
-  const rCode = targetRound?.slug || targetRound?.shortCode || roundId;
-  const link = `${window.location.origin}${window.location.pathname}?x=${encodeURIComponent(rCode)}&a=${encodeURIComponent(activitySlug)}&c=${encodeURIComponent(councilSlug)}`;
+window.copyCouncilLink = async function(activitySlug, councilSlug, councilId = null) {
+  let targetCouncil = null;
+  let targetRound = null;
+  let targetAct = null;
 
-  await copyLinkWithFallback(link, 'liên kết hội đồng');
+  // Search across loaded rounds
+  for (const r of (state.rounds || [])) {
+    if (r.deleted) continue;
+    for (const a of (r.activities || [])) {
+      const c = (a.councils || []).find(x => 
+        (councilId && x.id === councilId) ||
+        (councilSlug && (x.slug === councilSlug || x.id === councilSlug || x.shortCode === councilSlug)) ||
+        (activitySlug && (a.slug === activitySlug || a.id === activitySlug) && (x.slug === councilSlug || x.id === councilSlug))
+      );
+      if (c) {
+        targetCouncil = c;
+        targetRound = r;
+        targetAct = a;
+        break;
+      }
+    }
+    if (targetCouncil) break;
+  }
+
+  if (!targetCouncil) {
+    const { roundId, activityId } = state.activeCouncilManagement || {};
+    targetRound = (state.rounds || []).find(r => r.id === roundId);
+    targetAct = (targetRound?.activities || []).find(a => a.id === activityId || a.slug === activitySlug);
+    targetCouncil = (targetAct?.councils || []).find(c => c.slug === councilSlug || c.id === councilSlug || (councilId && c.id === councilId));
+  }
+
+  if (targetCouncil && !targetCouncil.shortCode) {
+    targetCouncil.shortCode = generateCouncilShortCode();
+    if (targetRound) {
+      persistActivityCouncilChanges(targetRound).catch(() => {});
+    }
+  }
+
+  const hdCode = targetCouncil?.shortCode || targetCouncil?.code || councilSlug;
+  const link = `${window.location.origin}/?hd=${encodeURIComponent(hdCode)}`;
+
+  await copyLinkWithFallback(link, `link Hội đồng (${targetCouncil?.name || 'HĐ'})`);
 };
 
 // --- PERSISTENCE HELPER ---

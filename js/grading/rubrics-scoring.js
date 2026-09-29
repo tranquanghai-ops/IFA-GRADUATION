@@ -865,16 +865,21 @@ function renderAdminMonitor() {
   `;
 }
 
-// 14. URL DIRECT NAVIGATION LISTENER (?x=&a=&c=)
+// 14. URL DIRECT NAVIGATION LISTENER (?hd= or ?x=&a=&c=)
 window.addEventListener('load', () => {
   setTimeout(() => {
     try {
+      if (typeof window.checkAndHandlePendingCouncilDirectLink === 'function') {
+        window.checkAndHandlePendingCouncilDirectLink();
+      }
+
       const params = new URLSearchParams(window.location.search);
+      const hdCode = params.get('hd');
       const xCode = params.get('x') || params.get('round');
       const aCode = params.get('a');
       const cCode = params.get('c');
 
-      if (xCode && aCode && cCode && state.rounds && state.rounds.length > 0) {
+      if (!hdCode && xCode && aCode && cCode && state.rounds && state.rounds.length > 0) {
         const targetRound = state.rounds.find(r => !r.deleted && (r.shortCode === xCode || r.roundName === xCode || r.id === xCode || r.slug === xCode));
         if (targetRound) {
           const act = (targetRound.activities || []).find(a => a.id === aCode || a.slug === aCode);
@@ -889,7 +894,7 @@ window.addEventListener('load', () => {
     } catch (e) {
       console.warn('URL council direct navigation notice:', e);
     }
-  }, 1500);
+  }, 1200);
 });
 
 // --- SUBMODULE WINDOW BRIDGE ---

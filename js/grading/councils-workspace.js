@@ -239,8 +239,8 @@ function renderCouncilCards(act) {
 
         <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
-            <button type="button" onclick="copyCouncilLink('${act.slug}', '${c.slug || c.id}')" class="text-slate-500 hover:text-indigo-600 font-semibold text-[11px] flex items-center gap-1" title="Sao chép link trực tiếp đến Hội đồng này">
-              <span>🔗 Link</span>
+            <button type="button" onclick="copyCouncilLink('${act.slug}', '${c.slug || c.id}', '${c.id}')" class="text-slate-500 hover:text-indigo-600 font-semibold text-[11px] flex items-center gap-1" title="Sao chép link rút gọn đến Hội đồng này (?hd=...)">
+              <span>🔗 Link HĐ</span>
             </button>
             ${c.driveFolderUrl ? `
               <a href="${c.driveFolderUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 font-semibold text-[11px] flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 shadow-2xs transition-colors" title="Mở thư mục Google Drive của Hội đồng">
@@ -1390,7 +1390,7 @@ window.filterAdminRoundCouncils = function(roundId = null) {
 
           <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-1.5">
-              <button type="button" onclick="copyCouncilLink('${act.slug}', '${c.slug || c.id}')" class="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold" title="Sao chép link trực tiếp đến Hội đồng này">🔗</button>
+              <button type="button" onclick="copyCouncilLink('${act.slug}', '${c.slug || c.id}', '${c.id}')" class="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold" title="Sao chép link rút gọn đến Hội đồng này (?hd=...)">🔗</button>
               ${c.driveFolderUrl ? `
                 <a href="${c.driveFolderUrl}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold border border-blue-200 transition-colors flex items-center gap-1" title="Mở Drive Hội đồng">
                   <span>📁 Drive</span>
