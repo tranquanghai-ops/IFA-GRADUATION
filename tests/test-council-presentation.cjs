@@ -78,9 +78,10 @@ test('completed student scores get a blue list card and readable grade', () => {
   assert.match(workspace, /scoreStatus = 'completed';/);
   assert.match(workspace, /data-score-status="\$\{scoreStatus\}"/);
   assert.match(workspace, /cws-list-score-badge[^`]*<strong>Điểm \$\{scoreText\}<\/strong><small>\(chính thức\)<\/small>/);
-  assert.match(styles, /\.cws-student-list-card\[data-score-status="completed"\] \{ background-color: #eff6ff;/);
+  assert.match(workspace, /card\.dataset\.scoreStatus = score\?\.status === 'completed' \? 'completed' : 'none';/);
+  assert.match(styles, /\.cws-student-list-card\[data-score-status="completed"\],\s*\.cws-student-score-card\[data-score-status="completed"\] \{ background-color: #eff6ff;/);
   assert.match(styles, /\.cws-list-score-badge strong \{ font-size: 13px; font-weight: 800;/);
-  assert.ok(styles.indexOf('.cws-student-list-card[data-presentation-state="presenting"] { background-color: #ecfdf5;') > styles.indexOf('.cws-student-list-card[data-score-status="completed"]'));
+  assert.ok(styles.lastIndexOf('.cws-student-score-card[data-presentation-state="presenting"] { background-color: #ecfdf5;') > styles.indexOf('.cws-student-score-card[data-score-status="completed"]'));
 });
 
 test('all council members receive live presentation and timer updates without a reload', () => {

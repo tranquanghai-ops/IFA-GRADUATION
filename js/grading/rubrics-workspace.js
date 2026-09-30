@@ -1291,6 +1291,7 @@ function renderCouncilStudentList() {
       </div>
     `;
   }).join('');
+  updateCouncilSelectedStudentSurface();
 }
 
 window.filterCouncilWorkspaceStudents = function(q) {
@@ -1519,17 +1520,22 @@ function getCouncilPresentationBadge(status) {
 
 function updateCouncilSelectedStudentSurface() {
   const card = document.getElementById('cws-student-score-card');
-  const { roundId, activityId, councilId } = state.activeCouncilWorkspace || {};
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
   const round = (state.rounds || []).find(r => r.id === roundId);
   const act = (round?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
   const students = (act?.councilStudentAssignments || [])
     .filter(a => a.councilId === councilId)
     .sort((a, b) => (a.order || 0) - (b.order || 0));
   const index = students.findIndex(a => a.studentId === state.activeCouncilSelectedStudentId);
   const status = students[index]?.presentationStatus || 'waiting';
   if (card) {
+    const scorerId = council ? resolveCouncilScorerId(council, auth) : '';
+    const scoreKey = `${activityId}_${councilId}_${state.activeCouncilSelectedStudentId}_${scorerId}`;
+    const score = act?.scoringConfig?.enabled ? state.councilScores?.[scoreKey] : null;
     card.dataset.tone = index % 2 === 1 ? 'even' : 'odd';
     card.dataset.presentationState = status;
+    card.dataset.scoreStatus = score?.status === 'completed' ? 'completed' : 'none';
   }
   const badge = document.getElementById('cws-student-presentation-badge');
   if (badge) {

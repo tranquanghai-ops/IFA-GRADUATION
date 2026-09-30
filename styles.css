@@ -546,8 +546,10 @@ body.council-standalone-active #modal-confirm {
 .cws-student-score-card[data-presentation-state="presenting"] { background-color: #ecfdf5; border-color: #6ee7b7; }
 .cws-student-list-card[data-presentation-state="presented"],
 .cws-student-score-card[data-presentation-state="presented"] { background-color: #e2e8f0; border-color: #94a3b8; }
-.cws-student-list-card[data-score-status="completed"] { background-color: #eff6ff; border-color: #bfdbfe; }
-.cws-student-list-card[data-presentation-state="presenting"] { background-color: #ecfdf5; border-color: #6ee7b7; }
+.cws-student-list-card[data-score-status="completed"],
+.cws-student-score-card[data-score-status="completed"] { background-color: #eff6ff; border-color: #bfdbfe; }
+.cws-student-list-card[data-presentation-state="presenting"],
+.cws-student-score-card[data-presentation-state="presenting"] { background-color: #ecfdf5; border-color: #6ee7b7; }
 .cws-list-score-badge { display: inline-flex; align-items: baseline; justify-content: flex-end; flex-wrap: wrap; column-gap: 4px; text-align: right; line-height: 1.3; }
 .cws-list-score-badge strong { font-size: 13px; font-weight: 800; white-space: nowrap; }
 .cws-list-score-badge small { font-size: 10px; font-weight: 700; white-space: nowrap; }
