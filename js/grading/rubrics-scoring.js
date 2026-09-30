@@ -3,6 +3,7 @@
  */
 import { DEFAULT_LETTER_GRADE_SCALE, normalizeLetterGradeOptions } from '../planning/activities-manager.js';
 import { getCouncilMemberScorerId, getCouncilMemberSlots } from './council-score-helpers.js';
+import { normalizeBoundedScoreInput } from './council-score-input.js';
 
 function getActiveCouncilScorerId() {
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
@@ -178,15 +179,15 @@ function renderScoringSection() {
         compSum += Number(cVal);
       }
       return `
-        <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-          <div class="flex items-center justify-between">
-            <label class="font-bold text-slate-800 text-xs">${crit.label} <span class="text-indigo-600 font-mono text-[11px]">(tối đa ${crit.maxScore}đ)</span></label>
-            <div class="flex items-center gap-1.5">
-              <input type="number" id="cws-rubric-input-${crit.key}" data-crit-key="${crit.key}" data-max-score="${crit.maxScore}" value="${cVal}" min="0" max="${crit.maxScore}" step="0.1" ${isCompleted ? 'disabled' : ''} oninput="onRubricComponentChange('${crit.key}', this.value)" placeholder="0 – ${crit.maxScore}" class="w-24 p-1.5 border border-slate-300 rounded-lg text-xs font-mono font-bold text-right ${isCompleted ? 'bg-slate-100' : 'bg-white focus:ring-2 focus:ring-indigo-500'}">
-              <span class="text-[11px] text-slate-500 font-mono font-bold">/${crit.maxScore}</span>
-            </div>
+        <div class="cws-rubric-row p-3 bg-slate-50 border border-slate-200 rounded-xl">
+          <div class="min-w-0">
+            <label for="cws-rubric-input-${crit.key}" class="font-bold text-slate-800 text-sm">${crit.label}</label>
+            ${crit.description ? `<p class="text-xs text-slate-600 mt-1">${crit.description}</p>` : ''}
           </div>
-          ${crit.description ? `<p class="text-[10px] text-slate-500">${crit.description}</p>` : ''}
+          <div class="cws-rubric-entry">
+            <input type="number" id="cws-rubric-input-${crit.key}" data-crit-key="${crit.key}" data-max-score="${crit.maxScore}" value="${cVal}" min="0" max="${crit.maxScore}" step="0.1" ${isCompleted ? 'disabled' : ''} oninput="onRubricComponentChange('${crit.key}', this.value)" placeholder="0 – ${crit.maxScore}" class="w-full min-w-0 p-2 border border-slate-300 rounded-lg text-sm font-mono font-bold text-right ${isCompleted ? 'bg-slate-100' : 'bg-white focus:ring-2 focus:ring-indigo-500'}">
+            <span class="text-xs text-slate-600 font-mono font-bold whitespace-nowrap">/${crit.maxScore} điểm</span>
+          </div>
         </div>
       `;
     }).join('');
@@ -197,7 +198,7 @@ function renderScoringSection() {
     inputHtml = `
       <div class="space-y-3">
         <div class="flex items-center justify-between flex-wrap gap-1">
-          <label class="font-bold text-slate-800 text-xs">Chấm điểm theo Rubric Bảo vệ (Defense Rubric):</label>
+          <label class="font-bold text-slate-800 text-sm">Chấm điểm theo Rubric Bảo vệ (Defense Rubric):</label>
           <button type="button" ${isCompleted ? 'disabled' : ''} onclick="syncRubricSumToTotal()" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold border border-indigo-200 transition-colors">
             ∑ Cộng tiêu chí vào Điểm tổng
           </button>
@@ -207,23 +208,21 @@ function renderScoringSection() {
           ${compRows}
         </div>
 
-        <div class="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-center justify-between">
-          <div>
-            <span class="font-bold text-indigo-950 text-xs block">Điểm Tổng kết Bảo vệ (*):</span>
-            <span class="text-[10px] text-indigo-700">Tổng các tiêu chí: <strong id="cws-rubric-comp-sum">${compSum.toFixed(2)}</strong></span>
+        <div class="cws-rubric-row p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl">
+          <div class="min-w-0">
+            <label for="cws-score-input-numeric" class="font-bold text-indigo-950 text-sm block">Điểm Tổng kết Bảo vệ (*):</label>
+            <span class="text-xs text-indigo-700">Tổng các tiêu chí: <strong id="cws-rubric-comp-sum">${compSum.toFixed(2)}</strong></span>
           </div>
-          <div class="flex items-center gap-2">
-            <input type="number" id="cws-score-input-numeric" value="${currentVal}" min="0" max="10" step="0.1" oninput="onScoreInputChange(this.value)" ${isCompleted ? 'disabled' : ''} placeholder="0 – 10" class="w-28 p-2 border border-slate-300 rounded-xl font-mono text-sm font-black text-slate-900 text-right ${isCompleted ? 'bg-slate-100' : 'bg-white focus:ring-2 focus:ring-blue-500'}">
-            <span class="text-xs text-slate-500 font-semibold">/ 10 điểm</span>
+          <div class="cws-rubric-entry">
+            <input type="number" id="cws-score-input-numeric" value="${currentVal}" min="0" max="10" step="0.1" oninput="onScoreInputChange(this.value)" ${isCompleted ? 'disabled' : ''} placeholder="0 – 10" class="w-full min-w-0 p-2 border border-rose-200 rounded-xl font-mono text-base font-black text-rose-700 text-right ${isCompleted ? 'bg-slate-100' : 'bg-white focus:ring-2 focus:ring-rose-500'}">
+            <span class="text-xs text-slate-600 font-mono font-bold whitespace-nowrap">/10 điểm</span>
           </div>
         </div>
 
-        ${hasMismatch ? `
-          <div id="cws-rubric-mismatch-warning" class="p-2.5 bg-amber-100/70 border border-amber-300 rounded-xl text-amber-900 text-xs font-semibold flex items-center gap-2">
+          <div id="cws-rubric-mismatch-warning" class="${hasMismatch ? '' : 'hidden'} p-2.5 bg-amber-100/70 border border-amber-300 rounded-xl text-amber-900 text-sm font-semibold flex items-center gap-2">
             <span>⚠️</span>
-            <span>Tổng tiêu chí (${compSum.toFixed(2)}) chưa khớp với Điểm tổng (${totalValNum})! Vui lòng bấm "Cộng tiêu chí vào Điểm tổng" hoặc điều chỉnh trước khi hoàn tất.</span>
+            <span id="cws-rubric-mismatch-text">Tổng tiêu chí (${compSum.toFixed(2)}) chưa khớp với Điểm tổng (${totalValNum})! Vui lòng bấm "Cộng tiêu chí vào Điểm tổng" hoặc điều chỉnh trước khi hoàn tất.</span>
           </div>
-        ` : ''}
       </div>
     `;
   } else {
@@ -231,12 +230,12 @@ function renderScoringSection() {
     inputHtml = `
       <div>
         <div class="flex items-center justify-between mb-1">
-          <label class="font-bold text-slate-800 text-xs">Điểm đánh giá (*) [Thang điểm ${nCfg.min} – ${nCfg.max}]:</label>
-          <span class="text-[11px] text-slate-400 font-mono">Bước điểm: ${nCfg.step}</span>
+          <label for="cws-score-input-numeric" class="font-bold text-slate-800 text-sm">Điểm đánh giá (*) [Thang điểm ${nCfg.min} – ${nCfg.max}]:</label>
+          <span class="text-xs text-slate-500 font-mono">Bước điểm: ${nCfg.step}</span>
         </div>
         <div class="flex items-center gap-3">
-          <input type="number" id="cws-score-input-numeric" value="${currentVal}" min="${nCfg.min}" max="${nCfg.max}" step="${nCfg.step}" oninput="onScoreInputChange(this.value)" ${isCompleted ? 'disabled' : ''} placeholder="${nCfg.min} – ${nCfg.max}" class="w-36 p-2 border border-slate-300 rounded-xl font-mono text-sm font-black text-slate-900 ${isCompleted ? 'bg-slate-100' : 'bg-white focus:ring-2 focus:ring-blue-500'}">
-          <span class="text-xs text-slate-500 font-semibold">/ ${nCfg.max} điểm</span>
+          <input type="number" id="cws-score-input-numeric" value="${currentVal}" min="${nCfg.min}" max="${nCfg.max}" step="${nCfg.step}" oninput="onScoreInputChange(this.value)" ${isCompleted ? 'disabled' : ''} placeholder="${nCfg.min} – ${nCfg.max}" class="w-36 p-2 border border-rose-200 rounded-xl font-mono text-base font-black text-rose-700 ${isCompleted ? 'bg-slate-100' : 'bg-white focus:ring-2 focus:ring-rose-500'}">
+          <span class="text-sm text-slate-600 font-semibold">/ ${nCfg.max} điểm</span>
         </div>
       </div>
     `;
@@ -273,7 +272,7 @@ function renderScoringSection() {
 
   container.innerHTML = `
     <div class="flex items-center justify-between">
-      <h3 class="font-black text-sm text-slate-900 tracking-tight flex items-center gap-1.5">
+      <h3 class="font-black text-base text-slate-900 tracking-tight flex items-center gap-1.5">
         <span>📝</span> PHIẾU CHẤM ĐIỂM CỦA BẠN
       </h3>
     </div>
@@ -281,8 +280,8 @@ function renderScoringSection() {
     ${inputHtml}
 
     <div>
-      <label class="font-bold text-slate-800 text-xs block mb-1">Nhận xét chuyên môn (không bắt buộc):</label>
-      <textarea id="cws-score-comment" rows="4" ${isCompleted ? 'disabled' : ''} oninput="onScoreCommentChange(this.value)" placeholder="Góp ý chuyên môn, ưu khuyết điểm cho sinh viên..." class="w-full p-3 border border-slate-300 rounded-xl text-xs resize-y min-h-[100px] ${isCompleted ? 'bg-slate-100 text-slate-600' : 'bg-white focus:ring-2 focus:ring-blue-500'}" style="resize: vertical; min-height: 100px;">${escapeHtml(currentComment)}</textarea>
+      <label class="font-bold text-slate-800 text-sm block mb-1">Nhận xét chuyên môn (không bắt buộc):</label>
+      <textarea id="cws-score-comment" rows="4" ${isCompleted ? 'disabled' : ''} oninput="onScoreCommentChange(this.value)" placeholder="Góp ý chuyên môn, ưu khuyết điểm cho sinh viên..." class="w-full p-3 border border-slate-300 rounded-xl text-sm resize-y min-h-[100px] ${isCompleted ? 'bg-slate-100 text-slate-600' : 'bg-white focus:ring-2 focus:ring-blue-500'}" style="resize: vertical; min-height: 100px;">${escapeHtml(currentComment)}</textarea>
     </div>
 
     ${actionsHtml}
@@ -301,9 +300,18 @@ window.onSelectLetterScore = function(key) {
 window.onScoreInputChange = function(val) {
   const sid = state.activeCouncilSelectedStudentId;
   if (!sid) return;
+  const numericInput = document.getElementById('cws-score-input-numeric');
+  if (numericInput) {
+    const minScore = Number(numericInput.min);
+    const maxScore = Number(numericInput.max);
+    const bounded = normalizeBoundedScoreInput(val, minScore, maxScore);
+    if (bounded !== val) numericInput.value = bounded;
+    val = numericInput.value;
+  }
   state.councilLocalDrafts = state.councilLocalDrafts || {};
   state.councilLocalDrafts[sid] = state.councilLocalDrafts[sid] || {};
   state.councilLocalDrafts[sid].value = val;
+  window.updateCouncilRubricScoreFeedback?.();
   renderCouncilStudentList();
 };
 

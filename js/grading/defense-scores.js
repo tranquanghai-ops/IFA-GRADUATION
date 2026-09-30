@@ -1,11 +1,19 @@
 // ============================================================================
 import { getCouncilMemberScorerId, getCouncilMemberSlots } from './council-score-helpers.js';
+import { normalizeBoundedScoreInput } from './council-score-input.js';
 // v2.0.0-beta.1: RUBRIC EVENT HANDLERS & OFFICIAL DEFENSE SCORE & CALIBRATION
 // ============================================================================
 
 window.onRubricComponentChange = function(critKey, val) {
   const sid = state.activeCouncilSelectedStudentId;
   if (!sid) return;
+  const input = document.getElementById(`cws-rubric-input-${critKey}`);
+  const maxScore = Number(input?.dataset.maxScore);
+  if (input && Number.isFinite(maxScore)) {
+    const bounded = normalizeBoundedScoreInput(val, 0, maxScore);
+    if (bounded !== val) input.value = bounded;
+    val = input.value;
+  }
   state.councilLocalDrafts = state.councilLocalDrafts || {};
   state.councilLocalDrafts[sid] = state.councilLocalDrafts[sid] || {};
   state.councilLocalDrafts[sid].components = state.councilLocalDrafts[sid].components || {};
@@ -16,7 +24,10 @@ window.onRubricComponentChange = function(critKey, val) {
     state.councilLocalDrafts[sid].components[critKey] = Number(val);
   }
 
-  // Update live component sum display
+  window.updateCouncilRubricScoreFeedback();
+};
+
+window.updateCouncilRubricScoreFeedback = function() {
   const inputs = document.querySelectorAll('input[data-crit-key]');
   let sum = 0;
   inputs.forEach(inp => {
@@ -29,12 +40,12 @@ window.onRubricComponentChange = function(critKey, val) {
 
   const totalInput = document.getElementById('cws-score-input-numeric');
   const warnEl = document.getElementById('cws-rubric-mismatch-warning');
-  if (totalInput) {
+  if (totalInput && warnEl) {
     const curTot = parseFloat(totalInput.value);
-    if (!isNaN(curTot)) {
-      const mismatch = Math.abs(sum - curTot) >= 0.000001;
-      if (warnEl) warnEl.classList.toggle('hidden', !mismatch);
-    }
+    const mismatch = !isNaN(curTot) && Math.abs(sum - curTot) >= 0.000001;
+    warnEl.classList.toggle('hidden', !mismatch);
+    const message = document.getElementById('cws-rubric-mismatch-text');
+    if (message && mismatch) message.textContent = `Tổng tiêu chí (${sum.toFixed(2)}) chưa khớp với Điểm tổng (${curTot}). Vui lòng bấm "Cộng tiêu chí vào Điểm tổng" hoặc điều chỉnh trước khi hoàn tất.`;
   }
 };
 
@@ -50,6 +61,11 @@ window.syncRubricSumToTotal = function() {
 
   const totalInput = document.getElementById('cws-score-input-numeric');
   if (totalInput) {
+    const maxTotal = Number(totalInput.max) || 10;
+    if (sum > maxTotal) {
+      showToast(`Tổng điểm thành phần vượt quá ${maxTotal}. Vui lòng điều chỉnh trước khi cộng.`, 'warning');
+      return;
+    }
     totalInput.value = sum.toFixed(2);
     onScoreInputChange(totalInput.value);
   }

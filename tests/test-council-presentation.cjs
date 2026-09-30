@@ -182,3 +182,13 @@ test('a completed student remains official after selection changes', () => {
   assert.match(scoring, /const isCompleted = savedScore\?\.status === 'completed';/);
   assert.match(scoring, /delete state\.councilLocalDrafts\[sid\];/);
 });
+
+test('numeric council scores are bounded as soon as they are entered', async () => {
+  const { normalizeBoundedScoreInput } = await import('../js/grading/council-score-input.js');
+  assert.equal(normalizeBoundedScoreInput('5', 0, 4), '4');
+  assert.equal(normalizeBoundedScoreInput('16', 0, 10), '10');
+  assert.equal(normalizeBoundedScoreInput('-1', 0, 4), '0');
+  assert.equal(normalizeBoundedScoreInput('1.5', 0, 4), '1.5');
+  assert.equal(normalizeBoundedScoreInput('', 0, 4), '');
+  assert.equal(normalizeBoundedScoreInput('invalid', 0, 4), '');
+});
