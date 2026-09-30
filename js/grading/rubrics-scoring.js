@@ -66,7 +66,7 @@ function renderScoringSection() {
   });
 
   const batchFinalizeBtnHtml = councilDraftsCount > 0 ? `
-    <button type="button" onclick="batchFinalizeAllCouncilScores()" class="px-3.5 py-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5" title="Hoàn tất và nộp tất cả ${councilDraftsCount} phiếu điểm đang lưu tạm trong hội đồng này">
+    <button type="button" onclick="batchFinalizeAllCouncilScores()" class="cws-score-action w-full sm:w-auto px-3.5 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5" title="Hoàn tất và nộp tất cả ${councilDraftsCount} phiếu điểm đang lưu tạm trong hội đồng này">
       <span>✓ Hoàn tất chấm tất cả</span>
       <span class="px-1.5 py-0.2 bg-white/20 rounded-full text-[10px] font-mono">${councilDraftsCount}</span>
     </button>
@@ -254,7 +254,7 @@ function renderScoringSection() {
         <span class="font-bold text-emerald-800 text-xs flex items-center gap-1.5">
           <span>✓</span> Bạn đã hoàn tất chấm lúc ${fmt24h(savedScore.completedAt || savedScore.updatedAt)}
         </span>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center justify-center gap-2 flex-wrap w-full sm:w-auto">
           ${batchFinalizeBtnHtml}
           ${!councilEnded ? `
             <button type="button" onclick="reopenCurrentScore()" class="px-3 py-1.5 bg-white hover:bg-slate-100 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-xs cursor-pointer">
@@ -266,18 +266,11 @@ function renderScoringSection() {
     `;
   } else {
     actionsHtml = `
-      <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-        <div class="flex items-center gap-2">
-          <span id="cws-score-draft-time" class="text-[11px] text-slate-400 font-mono">
-            ${savedScore?.status === 'draft' ? `Đã tự động lưu nháp lúc ${fmt24h(savedScore.updatedAt)}` : 'Hệ thống tự động lưu nháp khi chọn/nhập'}
-          </span>
-          ${batchFinalizeBtnHtml}
-        </div>
-        <div class="flex items-center gap-2">
-          <button type="button" onclick="saveCurrentScore(true)" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer">
-            <span>✓</span> <span>Hoàn tất chấm</span>
-          </button>
-        </div>
+      <div class="flex flex-col items-center gap-2 pt-2 border-t border-slate-100">
+        <button type="button" onclick="saveCurrentScore(true)" class="cws-score-action w-full sm:w-auto px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer">
+          <span>✓</span> <span>Hoàn tất chấm SV này</span>
+        </button>
+        ${batchFinalizeBtnHtml}
       </div>
     `;
   }

@@ -60,7 +60,19 @@ test('mobile council header keeps member identity and timer on separate rows', (
   assert.match(styles, /#cws-header-timer-container \{\s*grid-column: 1 \/ -1;\s*grid-row: 2;/);
   const studentSurface = workspace.split('function updateCouncilSelectedStudentSurface()')[1].split('function renderCouncilSelectedStudentDetails()')[0];
   assert.doesNotMatch(studentSurface, /\bisManager\b|\btimer\b/);
-  assert.match(workspace.split('export function renderPresentationTimerUI()')[1], /cws-timer-settings-trigger/);
+  assert.match(workspace.split('export function renderPresentationTimerUI()')[1], /timerPill\.disabled = !isManager/);
+  assert.match(read('templates/modals/grading/modal-council-workspace.html'), /id="cws-header-timer-pill" onclick="toggleCouncilTimerSettings\(\)"/);
+});
+
+test('mobile council presentation shows student identity and focused completion actions', () => {
+  const workspace = read('js/grading/rubrics-workspace.js');
+  const scoring = read('js/grading/rubrics-scoring.js');
+  const template = read('templates/modals/grading/modal-council-workspace.html');
+  assert.doesNotMatch(template, /DANH SÁCH BÁO CÁO/);
+  assert.match(workspace, /Đề tài: \$\{escapeHtml\(sTopic\)\}/);
+  assert.match(workspace, /option\.textContent = `#\$\{a\.order \|\| '\?'\} · \$\{profile\?/);
+  assert.match(scoring, /Hoàn tất chấm SV này/);
+  assert.doesNotMatch(scoring, /Hệ thống tự động lưu nháp khi chọn\/nhập/);
 });
 
 test('council edits refresh live authorization indexes and revoke removed members', () => {

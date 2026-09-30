@@ -513,8 +513,16 @@ body.council-standalone-active #modal-confirm {
 
 .cws-member-menu-anchor { position: relative; min-width: 0; }
 .cws-header-layout { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
-.cws-header-identity { grid-column: 1; grid-row: 1; }
+.cws-header-identity { grid-column: 1 / -1; grid-row: 1; justify-content: center; padding: 0 38px; }
 .cws-header-actions { grid-column: 2; grid-row: 1; }
+.cws-identity-line { justify-content: center; text-align: center; font-size: 13px; line-height: 1.3; }
+.cws-status-anchor { position: relative; display: inline-flex; align-items: center; }
+.cws-status-dot { display: inline-block; width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid #fff; cursor: pointer; box-shadow: 0 0 0 2px rgba(255,255,255,.24); }
+.cws-status-dot.is-active { background: #22c55e; }
+.cws-status-dot.is-stopped { background: #ef4444; }
+.cws-status-details { position: absolute; z-index: 85; top: calc(100% + 10px); right: 0; width: 215px; padding: 9px 11px; border-radius: 9px; border: 1px solid #cbd5e1; background: white; color: #0f172a; font-size: 12px; font-weight: 600; box-shadow: 0 12px 25px rgba(15,23,42,.25); text-align: left; }
+#cws-header-timer-pill:focus-visible, .cws-status-dot:focus-visible { outline: 2px solid #93c5fd; outline-offset: 3px; }
+.cws-list-topic { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 #cws-header-timer-container { grid-column: 1 / -1; grid-row: 2; justify-content: center; padding-top: 5px; }
 .cws-member-menu-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 5px; max-width: 100%; padding: 3px 5px; border-radius: 6px; }
 .cws-member-menu-trigger:hover, .cws-member-menu-trigger[aria-expanded="true"] { background: rgba(255,255,255,.12); }
@@ -551,9 +559,10 @@ body.council-standalone-active #modal-confirm {
   }
 
   #modal-council-workspace .cws-header-identity {
-    grid-column: 1;
+    grid-column: 1 / -1;
     grid-row: 1;
     min-width: 0;
+    padding: 0 28px;
   }
 
   #modal-council-workspace .cws-header-actions {
@@ -576,12 +585,9 @@ body.council-standalone-active #modal-confirm {
 
   .cws-member-menu { left: 0; transform: none; }
 
-  #cws-council-status-badge,
-  #cws-my-role-badge {
-    flex: none;
-    width: auto;
-    white-space: nowrap;
-  }
+  .cws-identity-line { gap: 3px; font-size: 11px; }
+  .cws-member-menu-trigger { font-size: 11px; padding: 2px; }
+  .cws-status-details { right: -20px; }
 
   #cws-header-timer-container,
   #modal-council-workspace .cws-header-actions,

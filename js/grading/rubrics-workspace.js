@@ -574,26 +574,21 @@ function renderCouncilWorkspaceFull() {
   if (!targetRound || !act || !council) return;
 
   // Header Elements
-  document.getElementById('cws-council-name').textContent = council.name;
+  document.getElementById('cws-council-name').textContent = String(council.name || '').match(/(?:HĐ|Hội đồng)\s*(\d+)/i)?.[1] || council.name || '';
   document.getElementById('cws-council-meta').textContent = `📍 Phòng: ${council.room || 'Đang cập nhật'} • 📅 ${council.date || '--'} (${council.startTime || '--'} – ${council.endTime || '--'})`;
 
   // Status Badge (v2.0.0-beta.1: preparing -> active -> ended -> finalized)
   const statusBadge = document.getElementById('cws-council-status-badge');
   if (statusBadge) {
     const cStat = council.status || 'preparing';
-    if (cStat === 'active' || cStat === 'ongoing') {
-      statusBadge.className = 'badge bg-emerald-500 text-white font-bold text-[9px] sm:text-[10px] animate-pulse px-1.5 py-0.5';
-      statusBadge.textContent = '● Đang diễn ra';
-    } else if (cStat === 'ended') {
-      statusBadge.className = 'badge bg-amber-500 text-slate-950 font-bold text-[9px] sm:text-[10px] px-1.5 py-0.5';
-      statusBadge.textContent = '⏸ Đã kết thúc';
-    } else if (cStat === 'finalized' || cStat === 'completed') {
-      statusBadge.className = 'badge bg-slate-700 text-slate-200 font-bold text-[9px] sm:text-[10px] px-1.5 py-0.5';
-      statusBadge.textContent = '🔒 Đã chốt điểm';
-    } else {
-      statusBadge.className = 'badge bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[9px] sm:text-[10px] px-1.5 py-0.5';
-      statusBadge.textContent = 'Chuẩn bị';
-    }
+    const active = cStat === 'active' || cStat === 'ongoing';
+    const statusText = active ? 'Hội đồng đang diễn ra.' : cStat === 'ended' ? 'Hội đồng đã kết thúc.' : (cStat === 'finalized' || cStat === 'completed') ? 'Hội đồng đã chốt điểm.' : 'Hội đồng chưa bắt đầu.';
+    statusBadge.className = `cws-status-dot ${active ? 'is-active' : 'is-stopped'}`;
+    statusBadge.setAttribute('aria-label', `Xem trạng thái: ${statusText}`);
+    statusBadge.setAttribute('title', statusText);
+    statusBadge.setAttribute('aria-expanded', 'false');
+    const details = document.getElementById('cws-status-details');
+    if (details) { details.textContent = statusText; details.classList.add('hidden'); }
   }
 
   // Role & Member Badges
@@ -606,8 +601,7 @@ function renderCouncilWorkspaceFull() {
   const memberHeading = document.getElementById('cws-member-heading');
   if (memberHeading) memberHeading.textContent = memberDisplayName || 'Thành viên hội đồng';
   if (roleBadge) {
-    roleBadge.className = 'badge bg-indigo-500/25 text-indigo-200 border border-indigo-500/30 font-bold text-[9px] sm:text-[10px] px-1.5 py-0.5';
-    roleBadge.textContent = memberRoleText;
+    roleBadge.textContent = memberRoleText.replace('Hội đồng', 'hội đồng');
   }
 
   const mobileMemberLine = document.getElementById('cws-mobile-member-line');
@@ -856,11 +850,19 @@ window.stopCouncilTimerAlarm = function() {
   councilAlarmPreviewTimeout = null;
 };
 
+window.toggleCouncilStatusDetails = function() {
+  const details = document.getElementById('cws-status-details');
+  const button = document.getElementById('cws-council-status-badge');
+  if (!details || !button) return;
+  const open = details.classList.toggle('hidden') === false;
+  button.setAttribute('aria-expanded', String(open));
+};
+
 window.toggleCouncilTimerSettings = function(forceOpen) {
   const auth = state.activeCouncilWorkspace?.auth;
   if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) return;
   const panel = document.getElementById('cws-timer-settings');
-  const trigger = document.getElementById('cws-timer-settings-trigger');
+  const trigger = document.getElementById('cws-header-timer-pill');
   if (!panel) return;
   const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : panel.classList.contains('hidden');
   panel.classList.toggle('hidden', !shouldOpen);
@@ -931,8 +933,7 @@ export function renderPresentationTimerUI() {
     isRunning: false
   };
   const timer = state.councilTimer;
-  document.getElementById('cws-timer-settings-trigger')?.classList.toggle('hidden', !isManager);
-  document.getElementById('cws-timer-readonly-icon')?.classList.toggle('hidden', isManager);
+  if (timerPill) { timerPill.disabled = !isManager; timerPill.classList.toggle('cursor-pointer', isManager); timerPill.classList.toggle('cursor-default', !isManager); }
   const shortAddBtn = document.getElementById('cws-timer-short-add-btn');
   const longAddBtn = document.getElementById('cws-timer-long-add-btn');
   if (shortAddBtn) shortAddBtn.textContent = `+${timer.shortAddSeconds || 30}s`;
@@ -1170,8 +1171,6 @@ function renderCouncilStudentList() {
     .filter(a => a.councilId === councilId)
     .sort((a, b) => (a.order || 0) - (b.order || 0));
 
-  const countBadge = document.getElementById('cws-student-count-badge');
-  if (countBadge) countBadge.textContent = councilStudents.length;
   const mobileCountBadge = document.getElementById('cws-mobile-student-count-badge');
   if (mobileCountBadge) mobileCountBadge.textContent = councilStudents.length;
 
@@ -1201,6 +1200,7 @@ function renderCouncilStudentList() {
     const sid = asgn.studentId;
     const sObj = getStudentFullProfile(sid, act, council, targetRound);
     const sName = sObj?.fullName || sObj?.studentName || sObj?.name || sid;
+    const sTopic = sObj?.topicTitle || sObj?.topic || '';
     const isSelected = (sid === state.activeCouncilSelectedStudentId);
     const isPresenting = (asgn.presentationStatus === 'presenting');
     const isPresented = (asgn.presentationStatus === 'presented');
@@ -1233,15 +1233,15 @@ function renderCouncilStudentList() {
     const selectedRing = isPresenting ? 'ring-emerald-500' : isPresented ? 'ring-slate-500' : 'ring-indigo-500';
     return `
       <div onclick="selectCouncilStudent('${sid}')" data-tone="${index % 2 === 0 ? 'odd' : 'even'}" data-presentation-state="${presentationState}" class="cws-student-list-card p-2.5 rounded-xl border border-slate-200 transition-all cursor-pointer hover:border-slate-400 ${isSelected ? `ring-2 ${selectedRing} shadow-xs` : ''}">
-        <div class="flex items-center justify-between gap-1">
-          <span class="font-mono font-bold text-xs ${isSelected ? 'text-indigo-900' : 'text-slate-600'}">#${asgn.order || '--'}</span>
+        <div class="flex items-center justify-between gap-1.5">
+          <div class="flex items-center gap-1.5 min-w-0"><span class="font-mono font-bold text-xs shrink-0 ${isSelected ? 'text-indigo-900' : 'text-slate-600'}">#${asgn.order || '--'}</span><span class="font-bold text-slate-900 text-xs truncate">${escapeHtml(sName)}</span></div>
           ${presBadge}
         </div>
-        <div class="font-bold text-slate-900 text-xs truncate mt-0.5">${sName}</div>
         <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono mt-0.5">
-          <span>${sid}</span>
+          <span>${escapeHtml(sid)}</span>
           ${scoreBadge}
         </div>
+        ${sTopic ? `<div class="cws-list-topic mt-1 text-[11px] text-slate-600" title="${escapeHtml(sTopic)}">Đề tài: ${escapeHtml(sTopic)}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -1538,9 +1538,9 @@ function renderCouncilSelectedStudentDetails() {
         <div class="flex items-center gap-2 flex-wrap">
           <span class="font-mono font-black text-xs px-2 py-0.5 bg-white border border-slate-300 rounded-lg">#${asgn?.order || '--'}</span>
           <h2 class="font-black text-base sm:text-lg text-slate-900">${sName}</h2>
+          <span class="font-mono text-[11px] text-slate-500 font-bold">MSSV: ${sid}</span>
           ${statusBadgeHtml}
         </div>
-        <p class="font-mono text-xs text-slate-500 mt-0.5 font-bold">MSSV: ${sid}</p>
       </div>
     </div>
 
@@ -1721,7 +1721,8 @@ function renderSecretaryControls() {
     studentSelect.replaceChildren(...assignments.map(a => {
       const option = document.createElement('option');
       option.value = a.studentId;
-      option.textContent = `#${a.order || '?'} · ${a.studentId}`;
+      const profile = getStudentFullProfile(a.studentId, act, null, targetRound);
+      option.textContent = `#${a.order || '?'} · ${profile?.fullName || profile?.studentName || profile?.name || a.studentId}`;
       return option;
     }));
     studentSelect.value = sid || '';
@@ -1737,10 +1738,10 @@ function renderSecretaryControls() {
 
   if (asgn.presentationStatus === 'presenting') {
     btnWrap.innerHTML = `
-      <button type="button" onclick="advanceCouncilPresentation()" class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs">SV tiếp theo →</button>
       <button type="button" onclick="finishStudentPresentation('${sid}')" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1">
         <span>✓ Hoàn tất lượt</span>
       </button>
+      <button type="button" onclick="advanceCouncilPresentation()" class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs">SV tiếp theo →</button>
       <button type="button" onclick="resetStudentPresentation('${sid}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold" title="Đặt lại trạng thái Chờ">
         ↺
       </button>
