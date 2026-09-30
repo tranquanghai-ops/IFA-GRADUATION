@@ -454,21 +454,31 @@ window.saveCurrentScore = async function(isCompleted) {
     completedAt: isCompleted ? (existing.completedAt || new Date().toISOString()) : null
   };
 
-  // Persist first: a failed write must never look like a completed score.
+  // The review decision is the authoritative score. A legacy admin cache
+  // failure must never be reported as a failed score write.
   try {
-    const roundRef = doc(db, 'graduationRounds', roundId);
     const decRef = doc(db, 'graduationRounds', roundId, 'reviewDecisions', scoreKey);
     await setDoc(decRef, scoreRecord, { merge: true });
-
-    // Admin cache remains compatible with legacy reports. FieldPath keeps IDs
-    // containing periods (email addresses) as a single map key.
-    if (state.isAdmin) {
-      await updateDoc(roundRef, new window.FieldPath('councilScores', scoreKey), scoreRecord, 'updatedAt', serverTimestamp()).catch(err => console.warn('Council score cache notice:', err));
-    }
   } catch (err) {
     console.error('Persist council score failed:', err);
-    showToast('Không lưu được điểm. Vui lòng thử lại; kết quả chưa được ghi nhận.', 'error');
+    const reason = err?.code === 'permission-denied'
+      ? 'Tài khoản hiện tại không có quyền ghi điểm cho hội đồng này.'
+      : err?.code === 'unavailable'
+        ? 'Không kết nối được Firestore. Vui lòng kiểm tra mạng.'
+        : err?.code === 'invalid-argument'
+          ? `Dữ liệu điểm không hợp lệ: ${err.message || err.code}`
+          : `Chi tiết: ${err?.code || err?.message || 'Không xác định'}`;
+    showToast(`Không lưu được điểm; kết quả chưa được ghi nhận. ${reason}`, 'error', 9000);
     return;
+  }
+
+  if (state.isAdmin) {
+    try {
+      const roundRef = doc(db, 'graduationRounds', roundId);
+      await updateDoc(roundRef, new window.FieldPath('councilScores', scoreKey), scoreRecord, 'updatedAt', serverTimestamp());
+    } catch (err) {
+      console.warn('Council score cache notice:', err);
+    }
   }
 
   state.councilScores[scoreKey] = scoreRecord;
@@ -512,13 +522,18 @@ window.reopenCurrentScore = async function() {
   try {
     const decRef = doc(db, 'graduationRounds', roundId, 'reviewDecisions', scoreKey);
     await setDoc(decRef, draftScore, { merge: true });
-    if (state.isAdmin) {
-      const roundRef = doc(db, 'graduationRounds', roundId);
-      await updateDoc(roundRef, new window.FieldPath('councilScores', scoreKey), draftScore, 'updatedAt', serverTimestamp()).catch(err => console.warn('Council score cache notice:', err));
-    }
   } catch (err) {
+    console.error('Reopen council score failed:', err);
     showToast('Không mở lại được phiếu điểm. Vui lòng thử lại.', 'error');
     return;
+  }
+  if (state.isAdmin) {
+    try {
+      const roundRef = doc(db, 'graduationRounds', roundId);
+      await updateDoc(roundRef, new window.FieldPath('councilScores', scoreKey), draftScore, 'updatedAt', serverTimestamp());
+    } catch (err) {
+      console.warn('Council score cache notice:', err);
+    }
   }
   state.councilScores[scoreKey] = draftScore;
 
@@ -677,7 +692,7 @@ window.batchFinalizeAllCouncilScores = async function() {
       state.councilScores = state.councilScores || {};
       state.councilScores[item.scoreKey] = scoreRecord;
       if (state.councilLocalDrafts) delete state.councilLocalDrafts[item.sid];
-      batchUpdates.push(new window.FieldPath('councilScores', item.scoreKey), scoreRecord);
+      if (state.isAdmin) batchUpdates.push(item.scoreKey, scoreRecord);
       successCount++;
     } catch (err) {
       console.warn('Council batch score failed:', err);
@@ -686,7 +701,11 @@ window.batchFinalizeAllCouncilScores = async function() {
 
   if (state.isAdmin && batchUpdates.length > 0) {
     try {
-      await updateDoc(roundRef, ...batchUpdates, 'updatedAt', serverTimestamp());
+      const fieldUpdates = [];
+      for (let i = 0; i < batchUpdates.length; i += 2) {
+        fieldUpdates.push(new window.FieldPath('councilScores', batchUpdates[i]), batchUpdates[i + 1]);
+      }
+      await updateDoc(roundRef, ...fieldUpdates, 'updatedAt', serverTimestamp());
     } catch (err) { console.warn('Council batch cache notice:', err); }
   }
 
