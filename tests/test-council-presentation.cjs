@@ -78,7 +78,7 @@ test('letter scale has no A++ and caps A+ conversion at 9.5', () => {
   assert.doesNotMatch(config.split('export const DEFAULT_LETTER_GRADE_SCALE = [')[1].split('];')[0], /key: 'A\+\+'/);
   assert.match(config, /key: 'A\+',\s+code: 'A\+',\s+label: 'Xuất sắc',\s+numericValue: 9\.5/);
   assert.match(config, /export function normalizeLetterGradeOptions/);
-  assert.match(scoring, /const opts = rawOpts\.filter\(o => !\/\^A/);
+  assert.match(scoring, /const opts = normalizeLetterGradeOptions\(rawOpts\);/);
   assert.doesNotMatch(scoring, /appOpt/);
 });
 

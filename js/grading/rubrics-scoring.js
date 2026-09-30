@@ -1,6 +1,8 @@
 /**
  * IFA+ Graduation — Council Live Scoring & Admin Monitor Submodule
  */
+import { DEFAULT_LETTER_GRADE_SCALE, normalizeLetterGradeOptions } from '../planning/activities-manager.js';
+
 function getActiveCouncilScorerId() {
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
   const round = (state.rounds || []).find(r => r.id === roundId);
@@ -80,13 +82,13 @@ function renderScoringSection() {
     const rawOpts = (act.scoringConfig.letterOptions && act.scoringConfig.letterOptions.length > 0)
       ? act.scoringConfig.letterOptions
       : (typeof DEFAULT_LETTER_GRADE_SCALE !== 'undefined' ? DEFAULT_LETTER_GRADE_SCALE : []);
-    const opts = rawOpts.filter(o => !/^A\+{2,}$/i.test(String(o.key || o.code || '').trim()));
+    const opts = normalizeLetterGradeOptions(rawOpts);
 
     // Helper for rendering a single letter button
     const renderLetterBtn = (o) => {
       if (!o) return '';
       const isSelected = String(currentVal) === String(o.key) || String(currentVal) === String(o.code);
-      const standardLabel = (typeof DEFAULT_LETTER_GRADE_SCALE !== 'undefined' ? DEFAULT_LETTER_GRADE_SCALE : []).find(item => item.key === String(o.key || o.code))?.label;
+      const standardLabel = DEFAULT_LETTER_GRADE_SCALE.find(item => item.key === String(o.key || o.code))?.label;
       return `
         <button type="button" ${isCompleted ? 'disabled' : ''} onclick="onSelectLetterScore('${o.key}')" class="p-2 sm:p-2.5 rounded-xl border text-center transition-all ${isSelected ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500 font-black text-emerald-950 shadow-xs' : 'bg-white border-slate-200 hover:border-slate-300 font-semibold text-slate-700 hover:bg-slate-50'} ${isCompleted ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}">
           <span class="text-sm sm:text-base block font-mono font-black text-emerald-700">${o.key}</span>
