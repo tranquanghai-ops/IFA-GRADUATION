@@ -77,9 +77,10 @@ function renderScoringSection() {
 
   let inputHtml = '';
   if (mode === 'letter') {
-    const opts = (act.scoringConfig.letterOptions && act.scoringConfig.letterOptions.length > 0)
+    const rawOpts = (act.scoringConfig.letterOptions && act.scoringConfig.letterOptions.length > 0)
       ? act.scoringConfig.letterOptions
       : (typeof DEFAULT_LETTER_GRADE_SCALE !== 'undefined' ? DEFAULT_LETTER_GRADE_SCALE : []);
+    const opts = rawOpts.filter(o => !/^A\+{2,}$/i.test(String(o.key || o.code || '').trim()));
 
     // Helper for rendering a single letter button
     const renderLetterBtn = (o) => {
@@ -88,19 +89,16 @@ function renderScoringSection() {
       return `
         <button type="button" ${isCompleted ? 'disabled' : ''} onclick="onSelectLetterScore('${o.key}')" class="p-2 sm:p-2.5 rounded-xl border text-center transition-all ${isSelected ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500 font-black text-emerald-950 shadow-xs' : 'bg-white border-slate-200 hover:border-slate-300 font-semibold text-slate-700 hover:bg-slate-50'} ${isCompleted ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}">
           <span class="text-sm sm:text-base block font-mono font-black text-emerald-700">${o.key}</span>
-          <span class="text-[10px] sm:text-[11px] block mt-0.5 text-slate-600 truncate">${o.label || o.description || ''}</span>
+          <span class="text-[10px] sm:text-[11px] block mt-0.5 text-slate-600 truncate">${String(o.key || o.code).toUpperCase() === 'A+' ? 'Xuất sắc' : (o.label || o.description || '')}</span>
         </button>
       `;
     };
 
-    // Find top tier A++ / A+++
-    const appOpt = opts.find(o => String(o.key).includes('++') || String(o.key).includes('+++') || String(o.code).includes('++'));
-    
     // Group A tier (ordered: A-, A, A+)
     const aOrder = ['A-', 'A', 'A+'];
     const aOpts = aOrder.map(k => opts.find(o => o.key === k || o.code === k)).filter(Boolean);
     // If standard keys not found, fallback to any A
-    const allA = opts.filter(o => o !== appOpt && (String(o.key).startsWith('A') || String(o.code).startsWith('A')));
+    const allA = opts.filter(o => String(o.key).startsWith('A') || String(o.code).startsWith('A'));
     const finalAOpts = aOpts.length > 0 ? aOpts : allA;
 
     // Group B tier (ordered: B-, B, B+)
@@ -116,24 +114,14 @@ function renderScoringSection() {
     const finalCOpts = cOpts.length > 0 ? cOpts : allC;
 
     // Any other tiers (D, F, etc.)
-    const usedSet = new Set([appOpt, ...finalAOpts, ...finalBOpts, ...finalCOpts].filter(Boolean));
+    const usedSet = new Set([...finalAOpts, ...finalBOpts, ...finalCOpts].filter(Boolean));
     const otherOpts = opts.filter(o => !usedSet.has(o));
 
     inputHtml = `
       <div class="space-y-2">
         <label class="font-bold text-slate-800 text-xs block mb-1">Mức điểm / Đánh giá (*):</label>
         
-        <!-- ROW 1: A++ / A+++ (FULL WIDTH) -->
-        ${appOpt ? `
-          <div class="w-full">
-            <button type="button" ${isCompleted ? 'disabled' : ''} onclick="onSelectLetterScore('${appOpt.key}')" class="w-full p-2.5 sm:p-3 rounded-xl border text-center transition-all flex items-center justify-center gap-3 ${String(currentVal) === String(appOpt.key) ? 'bg-emerald-100 border-emerald-500 ring-2 ring-emerald-500 font-black text-emerald-950 shadow-xs' : 'bg-emerald-50/50 border-emerald-200 hover:border-emerald-300 font-bold text-emerald-900 hover:bg-emerald-100/50'} ${isCompleted ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}">
-              <span class="text-base font-mono font-black text-emerald-800">${appOpt.key}</span>
-              <span class="text-xs font-bold text-emerald-950">${appOpt.label || 'Xuất sắc'}</span>
-            </button>
-          </div>
-        ` : ''}
-
-        <!-- ROW 2: A-, A, A+ (3 COLUMNS) -->
+        <!-- A-, A, A+ (3 COLUMNS) -->
         ${finalAOpts.length > 0 ? `
           <div class="grid grid-cols-3 gap-2">
             ${finalAOpts.map(o => renderLetterBtn(o)).join('')}
@@ -428,7 +416,7 @@ window.saveCurrentScore = async function(isCompleted) {
     selectedLetterCode = String(val);
     const letterOpt = (act.scoringConfig?.letterOptions || []).find(o => String(o.key) === selectedLetterCode || String(o.code) === selectedLetterCode);
     if (letterOpt && typeof letterOpt.numericValue === 'number') {
-      selectedLetterNumericValue = letterOpt.numericValue;
+      selectedLetterNumericValue = Math.min(letterOpt.numericValue, 9.5);
     }
   }
 
@@ -646,7 +634,7 @@ window.batchFinalizeAllCouncilScores = async function() {
       selectedLetterCode = String(item.value);
       const letterOpt = (act.scoringConfig?.letterOptions || []).find(o => String(o.key) === selectedLetterCode || String(o.code) === selectedLetterCode);
       if (letterOpt && typeof letterOpt.numericValue === 'number') {
-        selectedLetterNumericValue = letterOpt.numericValue;
+        selectedLetterNumericValue = Math.min(letterOpt.numericValue, 9.5);
       }
     }
 

@@ -341,8 +341,7 @@ export function generateUniqueSlug(title, existingActivities = []) {
 }
 
 export const DEFAULT_LETTER_GRADE_SCALE = [
-  { id: 'opt_app', key: 'A++', code: 'A++', label: 'Xuất sắc',       numericValue: 10.0, description: 'Xuất sắc' },
-  { id: 'opt_ap',  key: 'A+',  code: 'A+',  label: 'Rất tốt',        numericValue: 9.5,  description: 'Rất tốt' },
+  { id: 'opt_ap',  key: 'A+',  code: 'A+',  label: 'Xuất sắc',       numericValue: 9.5,  description: 'Xuất sắc' },
   { id: 'opt_a',   key: 'A',   code: 'A',   label: 'Tốt',            numericValue: 9.0,  description: 'Tốt' },
   { id: 'opt_am',  key: 'A-',  code: 'A-',  label: 'Khá tốt',        numericValue: 8.5,  description: 'Khá tốt' },
   { id: 'opt_bp',  key: 'B+',  code: 'B+',  label: 'Khá',            numericValue: 8.0,  description: 'Khá' },
@@ -355,6 +354,14 @@ export const DEFAULT_LETTER_GRADE_SCALE = [
   { id: 'opt_d',   key: 'D',   code: 'D',   label: 'Chưa đạt',       numericValue: 4.5,  description: 'Chưa đạt' },
   { id: 'opt_dm',  key: 'D-',  code: 'D-',  label: 'Kém',            numericValue: 4.0,  description: 'Kém' }
 ];
+
+export function normalizeLetterGradeOptions(options) {
+  return (Array.isArray(options) ? options : DEFAULT_LETTER_GRADE_SCALE)
+    .filter(option => !/^A\+{2,}$/i.test(String(option.key || option.code || '').trim()))
+    .map(option => (String(option.key || option.code || '').trim().toUpperCase() === 'A+')
+      ? { ...option, label: 'Xuất sắc', description: 'Xuất sắc', numericValue: 9.5 }
+      : { ...option, numericValue: typeof option.numericValue === 'number' ? Math.min(option.numericValue, 9.5) : option.numericValue });
+}
 
 export function isActivityPublished(activity) {
   if (!activity) return false;
@@ -395,9 +402,9 @@ export function normalizeActivity(a, roundId, idx = 0) {
     rubric: (Array.isArray(a.scoringConfig.rubric) && a.scoringConfig.rubric.length > 0)
       ? a.scoringConfig.rubric
       : defaultDefenseRubric,
-    letterOptions: (Array.isArray(a.scoringConfig.letterOptions) && a.scoringConfig.letterOptions.length > 0)
+    letterOptions: normalizeLetterGradeOptions((Array.isArray(a.scoringConfig.letterOptions) && a.scoringConfig.letterOptions.length > 0)
       ? a.scoringConfig.letterOptions
-      : defaultLetterOptions,
+      : defaultLetterOptions),
     numericConfig: {
       min: typeof a.scoringConfig.numericConfig?.min === 'number' ? a.scoringConfig.numericConfig.min : 0,
       max: typeof a.scoringConfig.numericConfig?.max === 'number' ? a.scoringConfig.numericConfig.max : 10,
@@ -794,9 +801,9 @@ window.editActivityModal = function(actId) {
     if (document.getElementById('activity-scoring-max')) document.getElementById('activity-scoring-max').value = act.scoringConfig.numericConfig.max ?? 10;
     if (document.getElementById('activity-scoring-step')) document.getElementById('activity-scoring-step').value = act.scoringConfig.numericConfig.step ?? 0.1;
   }
-  state._currentActivityLetterOptions = Array.isArray(act.scoringConfig?.letterOptions) && act.scoringConfig.letterOptions.length > 0
+  state._currentActivityLetterOptions = normalizeLetterGradeOptions(Array.isArray(act.scoringConfig?.letterOptions) && act.scoringConfig.letterOptions.length > 0
     ? JSON.parse(JSON.stringify(act.scoringConfig.letterOptions))
-    : JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE));
+    : JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE)));
   state._currentActivityRubric = Array.isArray(act.scoringConfig?.rubric) && act.scoringConfig.rubric.length > 0
     ? JSON.parse(JSON.stringify(act.scoringConfig.rubric))
     : [
@@ -889,9 +896,9 @@ window.copyActivityModal = function(actId) {
     if (document.getElementById('activity-scoring-max')) document.getElementById('activity-scoring-max').value = act.scoringConfig.numericConfig.max ?? 10;
     if (document.getElementById('activity-scoring-step')) document.getElementById('activity-scoring-step').value = act.scoringConfig.numericConfig.step ?? 0.1;
   }
-  state._currentActivityLetterOptions = Array.isArray(act.scoringConfig?.letterOptions) && act.scoringConfig.letterOptions.length > 0
+  state._currentActivityLetterOptions = normalizeLetterGradeOptions(Array.isArray(act.scoringConfig?.letterOptions) && act.scoringConfig.letterOptions.length > 0
     ? JSON.parse(JSON.stringify(act.scoringConfig.letterOptions))
-    : JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE));
+    : JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE)));
   state._currentActivityRubric = Array.isArray(act.scoringConfig?.rubric) && act.scoringConfig.rubric.length > 0
     ? JSON.parse(JSON.stringify(act.scoringConfig.rubric))
     : [

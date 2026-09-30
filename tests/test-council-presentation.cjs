@@ -57,11 +57,29 @@ test('mobile council header keeps member identity and timer on separate rows', (
   const styles = read('styles.css');
   const workspace = read('js/grading/rubrics-workspace.js');
   assert.match(styles, /#modal-council-workspace \.cws-header-layout \{\s*display: grid;/);
-  assert.match(styles, /#cws-header-timer-container \{\s*grid-column: 1 \/ -1;\s*grid-row: 2;/);
+  assert.match(styles, /#modal-council-workspace #cws-header-timer-container \{\s*grid-column: 1 \/ -1;\s*grid-row: 2;/);
   const studentSurface = workspace.split('function updateCouncilSelectedStudentSurface()')[1].split('function renderCouncilSelectedStudentDetails()')[0];
   assert.doesNotMatch(studentSurface, /\bisManager\b|\btimer\b/);
   assert.match(workspace.split('export function renderPresentationTimerUI()')[1], /timerPill\.disabled = !isManager/);
   assert.match(read('templates/modals/grading/modal-council-workspace.html'), /id="cws-header-timer-pill" onclick="toggleCouncilTimerSettings\(\)"/);
+});
+
+test('desktop council layout centers timer and gives student list more width', () => {
+  const template = read('templates/modals/grading/modal-council-workspace.html');
+  const styles = read('styles.css');
+  assert.match(template, /id="cws-col-students" class="[^"]*lg:w-\[30rem\] xl:w-\[34rem\]/);
+  assert.match(styles, /#modal-council-workspace \.cws-header-layout \{ display: grid;/);
+  assert.match(styles, /#modal-council-workspace #cws-header-timer-container \{ grid-column: 1 \/ -1; grid-row: 2; justify-content: center;/);
+});
+
+test('letter scale has no A++ and caps A+ conversion at 9.5', () => {
+  const config = read('js/planning/activities-manager.js');
+  const scoring = read('js/grading/rubrics-scoring.js');
+  assert.doesNotMatch(config.split('export const DEFAULT_LETTER_GRADE_SCALE = [')[1].split('];')[0], /key: 'A\+\+'/);
+  assert.match(config, /key: 'A\+',\s+code: 'A\+',\s+label: 'Xuất sắc',\s+numericValue: 9\.5/);
+  assert.match(config, /export function normalizeLetterGradeOptions/);
+  assert.match(scoring, /const opts = rawOpts\.filter\(o => !\/\^A/);
+  assert.doesNotMatch(scoring, /appOpt/);
 });
 
 test('mobile council presentation shows student identity and focused completion actions', () => {

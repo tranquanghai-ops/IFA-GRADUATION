@@ -138,7 +138,7 @@ window.saveRubricCriterion = function() {
       state._currentActivityRubric[idx] = {
         ...state._currentActivityRubric[idx],
         key,
-        label,
+        label: key === 'A+' ? 'Xuất sắc' : label,
         maxScore,
         description: desc
       };
@@ -148,7 +148,7 @@ window.saveRubricCriterion = function() {
     state._currentActivityRubric.push({
       id: newId,
       key,
-      label,
+      label: key === 'A+' ? 'Xuất sắc' : label,
       maxScore,
       description: desc,
       order: state._currentActivityRubric.length + 1
@@ -190,12 +190,12 @@ window.renderActivityLetterOptions = function() {
 };
 
 window.resetDefaultLetterOptions = async function() {
-  if (!await showConfirm('Khôi phục thang điểm chữ', 'Thao tác sẽ thay thế danh sách mức điểm chữ hiện tại bằng bộ mặc định đầy đủ 13 mức (A++ → D-). Bạn có muốn tiếp tục?', { confirmText: 'Khôi phục' })) {
+  if (!await showConfirm('Khôi phục thang điểm chữ', 'Thao tác sẽ thay thế danh sách mức điểm chữ hiện tại bằng bộ mặc định 12 mức (A+ → D-). Bạn có muốn tiếp tục?', { confirmText: 'Khôi phục' })) {
     return;
   }
   state._currentActivityLetterOptions = JSON.parse(JSON.stringify(DEFAULT_LETTER_GRADE_SCALE));
   renderActivityLetterOptions();
-  showToast('Đã khôi phục bộ 13 mức điểm chữ mặc định (A++ → D-)!', 'success');
+  showToast('Đã khôi phục bộ 12 mức điểm chữ mặc định (A+ → D-)!', 'success');
 };
 
 window.openAddLetterOptionModal = function() {
@@ -240,10 +240,14 @@ window.saveLetterOption = function() {
     showToast('Vui lòng nhập đầy đủ Mã mức điểm và Nhãn hiển thị', 'warning');
     return;
   }
+  if (/^A\+{2,}$/.test(key)) {
+    showToast('A+ là mức cao nhất; không còn mức A++.', 'warning');
+    return;
+  }
 
   const numericValue = parseFloat(numRaw);
-  if (isNaN(numericValue) || numericValue < 0 || numericValue > 10) {
-    showToast('Vui lòng nhập Điểm quy đổi hợp lệ từ 0 đến 10 (ví dụ: 10, 9.5, 8.0...)', 'warning');
+  if (isNaN(numericValue) || numericValue < 0 || numericValue > 9.5 || (key === 'A+' && numericValue !== 9.5)) {
+    showToast('Điểm chữ quy đổi tối đa là 9,5; A+ phải tương ứng 9,5 điểm.', 'warning');
     document.getElementById('letter-option-numeric')?.focus();
     return;
   }

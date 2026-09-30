@@ -4750,7 +4750,7 @@
                           <span class="text-[10px] text-blue-600 block">(Điểm quy đổi chỉ hiển thị cho Quản trị viên)</span>
                         </div>
                         <div class="flex items-center gap-1.5">
-                          <button type="button" onclick="resetDefaultLetterOptions()" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-[11px] font-bold" title="Khôi phục thang chuẩn A++ → D">↺ Khôi phục mặc định</button>
+                          <button type="button" onclick="resetDefaultLetterOptions()" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-[11px] font-bold" title="Khôi phục thang chuẩn A+ → D-">↺ Khôi phục mặc định</button>
                           <button type="button" onclick="openAddLetterOptionModal()" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shadow-xs">+ Thêm mức điểm</button>
                         </div>
                       </div>
@@ -5291,7 +5291,7 @@
         <input type="hidden" id="letter-option-id">
         <div>
           <label class="font-bold text-slate-700 block mb-1">Mã mức điểm (Key/Code) <span class="text-rose-500">*</span></label>
-          <input type="text" id="letter-option-key" placeholder="Ví dụ: A++, A+, A, B..." class="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold font-mono uppercase">
+          <input type="text" id="letter-option-key" placeholder="Ví dụ: A+, A, B..." class="w-full p-2 border border-slate-300 rounded-lg text-xs font-bold font-mono uppercase">
         </div>
         <div>
           <label class="font-bold text-slate-700 block mb-1">Nhãn hiển thị (Label) <span class="text-rose-500">*</span></label>
@@ -5552,7 +5552,7 @@
     <div class="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
       
       <!-- LEFT COLUMN: DANH SÁCH SINH VIÊN -->
-      <div id="cws-col-students" class="w-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-slate-200 hidden md:flex flex-col bg-slate-50/40 shrink-0 overflow-hidden">
+      <div id="cws-col-students" class="w-full md:w-80 lg:w-[30rem] xl:w-[34rem] border-b md:border-b-0 md:border-r border-slate-200 hidden md:flex flex-col bg-slate-50/40 shrink-0 overflow-hidden">
         <div class="p-2.5 sm:p-3 border-b border-slate-200 bg-white space-y-2 shrink-0">
           <span id="cws-presenting-indicator" class="text-[10px] font-bold text-emerald-600 hidden">● 1 đang trình bày</span>
           <input type="text" id="cws-student-search" oninput="filterCouncilWorkspaceStudents(this.value)" placeholder="Tìm MSSV, họ tên, đề tài..." class="w-full p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
