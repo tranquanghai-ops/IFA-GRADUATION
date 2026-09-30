@@ -33,6 +33,8 @@ export function getStudentFullProfile(sid, arg2 = null, arg3 = null, arg4 = null
 
   const cachedList = state.councilStudentsByRound?.[roundId] || currentRound?.councilStudents || [];
   const cachedStudent = cachedList.find(s => (s.studentId === cleanId || s.mssv === cleanId || s.studentId === sid || s.mssv === sid));
+  const councilAssignment = (actObj?.councilStudentAssignments || []).find(a =>
+    String(a.studentId || '').trim().toUpperCase() === cleanId && (!councilObj || a.councilId === councilObj.id));
 
   const off = (currentRound?.officialAssignments || []).find(a => (a.studentId === cleanId || a.mssv === cleanId || a.id === cleanId || a.studentId === sid));
   const reg = (currentRound?.registrations || []).find(r => (r.studentId === cleanId || r.mssv === cleanId || r.id === cleanId || r.studentId === sid));
@@ -44,6 +46,7 @@ export function getStudentFullProfile(sid, arg2 = null, arg3 = null, arg4 = null
   let sObj = {
     studentId: cleanId,
     mssv: cleanId,
+    ...(councilAssignment || {}),
     ...(cachedStudent || {}),
     ...(el || {}),
     ...(cStudent || {}),
@@ -199,12 +202,16 @@ export function checkCouncilAuthorization(round, act, council, user) {
   // Student is strictly denied
   return {
     authorized: false,
-    reason: 'Bạn không phải thành viên của Hội đồng này.'
+    reason: `Tài khoản đang đăng nhập (${userEmail}) chưa được phân vào Hội đồng này. Vui lòng đổi sang email đã được phân công.`
   };
 }
 
 export function resolveCouncilScorerId(council, auth, actor = getEffectiveActor()) {
   const member = council?.membersBySlot?.[auth?.slotKey];
+  // Guest scores must use an identity the security rules can verify directly.
+  if (actor?.email && !String(actor.email).toLowerCase().endsWith('@tdtu.edu.vn')) {
+    return String(actor.email).toLowerCase().trim();
+  }
   return member?.memberId || member?.memberEmail || actor?.uid || actor?.email || '';
 }
 
@@ -301,19 +308,21 @@ window.openCouncilWorkspace = async function(roundId, activityId, councilId, aut
 
   if (!targetRound || !act || !council) {
     showToast('Không tìm thấy thông tin Hội đồng được yêu cầu.', 'error');
-    return;
+    return false;
   }
 
   const isDirectMode = Boolean(state.isCouncilDirectMode || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('councilDirectMode') === 'true'));
-  if (isDirectMode && typeof document !== 'undefined' && document.body) {
-    document.body.classList.add('council-standalone-active');
-  }
 
   // AUTHORIZATION CHECK
   const authCheck = checkCouncilAuthorization(targetRound, act, council, getEffectiveActor());
   if (!authCheck.authorized) {
+    document.documentElement.classList.remove('council-direct-entry');
+    document.body?.classList.remove('council-standalone-active');
     showToast(authCheck.reason || 'Bạn không có quyền truy cập Hội đồng này.', 'error');
-    return;
+    return false;
+  }
+  if (isDirectMode && typeof document !== 'undefined' && document.body) {
+    document.body.classList.add('council-standalone-active');
   }
 
   // Ensure faculty dataset is loaded for student names, topics & supervisor resolution
@@ -328,6 +337,29 @@ window.openCouncilWorkspace = async function(roundId, activityId, councilId, aut
     await window.loadCouncilRoundStudents(roundId).catch(() => {});
   } else if (typeof loadCouncilRoundStudents === 'function') {
     await loadCouncilRoundStudents(roundId).catch(() => {});
+  }
+
+  // External council members cannot list full student records. Read only the
+  // minimal, council-scoped profiles prepared by the administrator.
+  if (!state.isAdmin && !state.isSupervisor) {
+    const assigned = (act.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+    const profiles = await Promise.all(assigned.map(async assignment => {
+      try {
+        const snap = await getDoc(doc(db, 'graduationRounds', roundId, 'councilStudentAssignments', `${activityId}_${assignment.studentId}`));
+        return snap.exists() ? snap.data() : null;
+      } catch (err) {
+        console.warn('Council student profile unavailable:', assignment.studentId, err?.code || err);
+        return null;
+      }
+    }));
+    state.councilStudentsByRound = state.councilStudentsByRound || {};
+    const existing = state.councilStudentsByRound[roundId] || [];
+    const byId = new Map(existing.map(student => [String(student.studentId || student.mssv).toUpperCase(), student]));
+    profiles.filter(Boolean).forEach(profile => {
+      const key = String(profile.studentId).toUpperCase();
+      byId.set(key, { ...(byId.get(key) || {}), ...profile });
+    });
+    state.councilStudentsByRound[roundId] = [...byId.values()];
   }
 
   state.activeCouncilWorkspace = {
@@ -386,6 +418,7 @@ window.openCouncilWorkspace = async function(roundId, activityId, councilId, aut
 
   // Real-time Firestore Listener
   setupCouncilRealtimeSync(roundId, activityId, councilId);
+  return true;
 };
 
 window.handleCouncilDirectLogout = async function() {
@@ -482,14 +515,16 @@ function setupCouncilRealtimeSync(roundId, activityId, councilId) {
     else renderCouncilWorkspacePartialSync();
   }, (err) => console.warn('Realtime council live listener notice:', err));
 
+  const actorEmail = String(getEffectiveActor()?.email || '').toLowerCase().trim();
+  const guestScoreOnly = !state.isAdmin && !actorEmail.endsWith('@tdtu.edu.vn');
   const scoreQuery = query(
     collection(db, 'graduationRounds', roundId, 'reviewDecisions'),
-    where('councilId', '==', councilId)
+    guestScoreOnly ? where('scorerEmail', '==', actorEmail) : where('councilId', '==', councilId)
   );
   state.activeCouncilScoresUnsubscribe = onSnapshot(scoreQuery, (snap) => {
     snap.docs.forEach(scoreDoc => {
       const data = scoreDoc.data();
-      if (data.activityId !== activityId || !data.studentId || !data.scorerId) return;
+      if (data.activityId !== activityId || data.councilId !== councilId || !data.studentId || !data.scorerId) return;
       const key = `${data.activityId}_${data.councilId}_${data.studentId}_${data.scorerId}`;
       state.councilScores[key] = data;
     });
@@ -548,14 +583,17 @@ async function loadCouncilScores(roundId, activityId, councilId) {
 
   // Best effort query subcollection reviewDecisions
   try {
+    const actorEmail = String(getEffectiveActor()?.email || '').toLowerCase().trim();
+    const guestScoreOnly = !state.isAdmin && !actorEmail.endsWith('@tdtu.edu.vn');
     const q = query(
       collection(db, 'graduationRounds', roundId, 'reviewDecisions'),
-      where('councilId', '==', councilId)
+      guestScoreOnly ? where('scorerEmail', '==', actorEmail) : where('councilId', '==', councilId)
     );
     const snap = await getDocs(q);
     if (snap && !snap.empty) {
       snap.docs.forEach(d => {
         const data = d.data();
+        if (data.activityId !== activityId || data.councilId !== councilId || !data.studentId || !data.scorerId) return;
         const k = `${data.activityId}_${data.councilId}_${data.studentId}_${data.scorerId}`;
         state.councilScores[k] = data;
       });
@@ -1621,7 +1659,7 @@ export function initCouncilTouchSwipeListeners() {
 
   targetCard.addEventListener('touchstart', (e) => {
     if (e.touches && e.touches.length === 1) {
-      if (e.target.closest('input, textarea, select, button, label')) {
+      if (e.target.closest('input, textarea, select, label')) {
         touchStartX = null;
         return;
       }
@@ -1641,6 +1679,9 @@ export function initCouncilTouchSwipeListeners() {
 
       // Threshold: at least 45px horizontal movement, mostly horizontal, within 700ms
       if (Math.abs(deltaX) >= 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && elapsed < 700) {
+        // A horizontal gesture that starts on a grade button is navigation,
+        // not a tap that should change the score.
+        if (e.target.closest('button')) e.preventDefault();
         if (deltaX < 0) {
           // Swiped left -> Next student
           if (typeof window.navigateCouncilNextStudent === 'function') {
@@ -1654,7 +1695,7 @@ export function initCouncilTouchSwipeListeners() {
         }
       }
     }
-  }, { passive: true });
+  }, { passive: false });
 }
 
 function formatStudentSupervisorsForDisplay(reg, hideSupervisor = false) {

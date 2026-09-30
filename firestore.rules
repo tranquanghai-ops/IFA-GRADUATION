@@ -139,8 +139,22 @@ service cloud.firestore {
 
       // Quyết định xét duyệt của GVHD từng vòng
       match /reviewDecisions/{decisionId} {
-        allow read: if admin() || staff();
-        allow create, update: if admin() || (staff() && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy));
+        allow read: if admin() || staff()
+          || (signedIn() && resource.data.keys().hasAll(['scorerEmail']) && resource.data.scorerEmail == email());
+        allow create: if admin() || (staff() && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy))
+          || (signedIn() && !staff()
+            && validGuestCouncilDecision(request.resource.data, decisionId)
+            && isCouncilMember(request.resource.data.activityId, request.resource.data.councilId, email())
+            && isStudentInCouncil(request.resource.data.activityId, request.resource.data.councilId, request.resource.data.studentId));
+        allow update: if admin() || (staff() && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy))
+          || (signedIn() && !staff()
+            && resource.data.scorerEmail == email()
+            && validGuestCouncilDecision(request.resource.data, decisionId)
+            && request.resource.data.activityId == resource.data.activityId
+            && request.resource.data.councilId == resource.data.councilId
+            && request.resource.data.studentId == resource.data.studentId
+            && isCouncilMember(resource.data.activityId, resource.data.councilId, email())
+            && isStudentInCouncil(resource.data.activityId, resource.data.councilId, resource.data.studentId));
         allow delete: if admin();
       }
 
@@ -280,6 +294,19 @@ service cloud.firestore {
           && get(councilStudentDoc(actId, stId)).data.councilId == cId
           && (!get(councilStudentDoc(actId, stId)).data.keys().hasAll(['active']) || get(councilStudentDoc(actId, stId)).data.active == true);
       }
+      function validGuestCouncilDecision(data, decisionId) {
+        return data.keys().hasAll(['activityId', 'councilId', 'studentId', 'scorerId', 'scorerEmail', 'decidedBy', 'mode', 'value', 'status'])
+          && data.keys().hasOnly(['activityId', 'councilId', 'studentId', 'scorerId', 'scorerEmail', 'scorerName', 'decidedBy', 'supervisorEmail', 'slotKey', 'role', 'mode', 'value', 'selectedLetterCode', 'selectedLetterNumericValue', 'numericValue', 'components', 'comment', 'status', 'createdAt', 'updatedAt', 'completedAt'])
+          && data.activityId is string && data.councilId is string && data.studentId is string
+          && data.scorerId == email() && data.scorerEmail == email() && data.decidedBy == email()
+          && decisionId == data.activityId + '_' + data.councilId + '_' + data.studentId + '_' + email()
+          && data.mode in ['numeric', 'letter', 'defense_rubric']
+          && ((data.mode == 'letter' && data.value is string && data.value.size() <= 10)
+            || (data.mode != 'letter' && data.value is number && data.value >= 0 && data.value <= 10))
+          && data.status in ['draft', 'completed']
+          && (!data.keys().hasAll(['comment']) || (data.comment is string && data.comment.size() <= 3000))
+          && (!data.keys().hasAll(['numericValue']) || (data.numericValue is number && data.numericValue >= 0 && data.numericValue <= 10));
+      }
       function councilAccessDoc(actId, cId) {
         return /databases/$(database)/documents/graduationRounds/$(roundId)/councilAccess/$(actId + '_' + cId);
       }
@@ -309,7 +336,8 @@ service cloud.firestore {
       }
 
       match /councilStudentAssignments/{assignmentId} {
-        allow read: if admin() || staff() || (student() && email().matches('^' + resource.data.studentId + '@student\\.tdtu\\.edu\\.vn$'));
+        allow read: if admin() || staff() || (student() && email().matches('^' + resource.data.studentId + '@student\\.tdtu\\.edu\\.vn$'))
+          || (signedIn() && isCouncilMember(resource.data.activityId, resource.data.councilId, email()));
         allow write: if admin();
       }
 

@@ -113,3 +113,25 @@ test('council edits refresh live authorization indexes and revoke removed member
   assert.match(editor, /currentStudents\.docs\.filter\(snapshot => !expectedStudents\.has\(snapshot\.id\)\)/);
   assert.match(workspace, /\(!state\.isAdmin && !state\.realIsAdmin\)/);
 });
+
+test('guest council profiles are scoped and swipes work across grade buttons', () => {
+  const editor = read('js/grading/councils-editor.js');
+  const workspace = read('js/grading/rubrics-workspace.js');
+  const template = read('templates/modals/grading/modal-council-workspace.html');
+  assert.match(editor, /fullName: profile\.fullName/);
+  assert.match(editor, /topicTitle: profile\.topicTitle/);
+  assert.match(workspace, /councilStudentAssignments', `\$\{activityId\}_\$\{assignment\.studentId\}`/);
+  assert.match(workspace, /profiles\.filter\(Boolean\)/);
+  assert.match(template, /id="cws-student-score-card"[\s\S]*id="cws-scoring-section"/);
+  assert.match(workspace, /e\.target\.closest\('input, textarea, select, label'\)/);
+  assert.match(workspace, /if \(e\.target\.closest\('button'\)\) e\.preventDefault\(\)/);
+});
+
+test('direct council entry only reports success after authorization and shows a usable page on denial', () => {
+  const auth = read('js/auth.js');
+  const workspace = read('js/grading/rubrics-workspace.js');
+  assert.match(auth, /if \(councilDirectOpenKey === openKey\) return/);
+  assert.match(auth, /const opened = await window\.openCouncilWorkspace/);
+  assert.match(auth, /if \(opened\) showToast/);
+  assert.match(workspace, /document\.documentElement\.classList\.remove\('council-direct-entry'\)/);
+});

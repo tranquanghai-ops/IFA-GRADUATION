@@ -132,6 +132,7 @@ export async function setupAuthListener() {
       }
 
     } else {
+      councilDirectOpenKey = '';
       clearTimeout(safetyTimer);
       if (unsubscribeSettings) {
         try { unsubscribeSettings(); } catch (e) {}
@@ -180,6 +181,7 @@ export async function setupAuthListener() {
   });
 }
 
+let councilDirectOpenKey = '';
 export function checkAndHandlePendingCouncilDirectLink() {
   try {
     const urlParams = new URLSearchParams(window.location.search);
@@ -211,19 +213,26 @@ export function checkAndHandlePendingCouncilDirectLink() {
     }
 
     if (foundCouncil && foundRound && foundAct) {
+      const openKey = `${foundRound.id}_${foundAct.id}_${foundCouncil.id}`;
+      if (councilDirectOpenKey === openKey) return;
+      councilDirectOpenKey = openKey;
       state.isCouncilDirectMode = true;
       sessionStorage.setItem('councilDirectMode', 'true');
       sessionStorage.setItem('directCouncilCode', cleanCode);
       sessionStorage.removeItem('pendingCouncilCode');
-      document.body.classList.add('council-standalone-active');
-
       if (window.history && window.history.replaceState) {
         window.history.replaceState({}, document.title, window.location.pathname + `?hd=${foundCouncil.shortCode || foundCouncil.code || cleanCode}`);
       }
-      setTimeout(() => {
+      setTimeout(async () => {
         if (typeof window.openCouncilWorkspace === 'function') {
-          window.openCouncilWorkspace(foundRound.id, foundAct.id, foundCouncil.id);
-          showToast(`🏛️ Đã vào phòng chấm Hội đồng: ${foundCouncil.name}`, 'success');
+          try {
+            const opened = await window.openCouncilWorkspace(foundRound.id, foundAct.id, foundCouncil.id);
+            if (opened) showToast(`🏛️ Đã vào phòng chấm Hội đồng: ${foundCouncil.name}`, 'success');
+          } catch (err) {
+            councilDirectOpenKey = '';
+            console.error('Council direct entry failed:', err);
+            showToast('Không mở được phòng chấm Hội đồng. Vui lòng thử lại.', 'error');
+          }
         }
       }, 350);
     }

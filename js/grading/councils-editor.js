@@ -771,10 +771,29 @@ async function persistActivityCouncilChanges(targetRound) {
       await Promise.all([...expectedMembers].map(([id, data]) => setDoc(doc(membershipCollection, id), data)));
 
       const expectedStudents = new Map();
+      if (typeof window.loadCouncilRoundStudents === 'function') {
+        await window.loadCouncilRoundStudents(roundId).catch(() => {});
+      }
       for (const assignment of (activity.councilStudentAssignments || [])) {
         if (!assignment.councilId || !assignment.studentId) continue;
         const id = `${activity.id}_${assignment.studentId}`;
-        expectedStudents.set(id, { roundId, activityId: activity.id, councilId: assignment.councilId, studentId: String(assignment.studentId), active: true, updatedAt: new Date().toISOString() });
+        const profile = typeof window.getStudentFullProfile === 'function'
+          ? window.getStudentFullProfile(assignment.studentId, activity, null, targetRound)
+          : (state.councilStudentsByRound?.[roundId] || []).find(s => s.studentId === assignment.studentId) || {};
+        expectedStudents.set(id, {
+          roundId,
+          activityId: activity.id,
+          councilId: assignment.councilId,
+          studentId: String(assignment.studentId),
+          fullName: profile.fullName || profile.studentName || '',
+          topicTitle: profile.topicTitle || '',
+          supervisorName: profile.acceptedSupervisorName || profile.supervisorName || '',
+          officialSupervisors: (profile.officialSupervisors || []).map(s => ({
+            supervisorName: s.supervisorName || '', role: s.role || ''
+          })),
+          active: true,
+          updatedAt: new Date().toISOString()
+        });
       }
       const assignmentCollection = collection(db, 'graduationRounds', roundId, 'councilStudentAssignments');
       const currentStudents = await getDocs(query(assignmentCollection, where('activityId', '==', activity.id)));
