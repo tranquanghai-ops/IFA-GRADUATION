@@ -72,6 +72,28 @@ test('desktop council layout centers timer and gives student list more width', (
   assert.match(styles, /#modal-council-workspace #cws-header-timer-container \{ grid-column: 1 \/ -1; grid-row: 2; justify-content: center;/);
 });
 
+test('completed student scores get a blue list card and readable grade', () => {
+  const workspace = read('js/grading/rubrics-workspace.js');
+  const styles = read('styles.css');
+  assert.match(workspace, /scoreStatus = 'completed';/);
+  assert.match(workspace, /data-score-status="\$\{scoreStatus\}"/);
+  assert.match(workspace, /cws-list-score-badge[^`]*<strong>Điểm \$\{scoreText\}<\/strong><small>\(chính thức\)<\/small>/);
+  assert.match(styles, /\.cws-student-list-card\[data-score-status="completed"\] \{ background-color: #eff6ff;/);
+  assert.match(styles, /\.cws-list-score-badge strong \{ font-size: 13px; font-weight: 800;/);
+  assert.ok(styles.indexOf('.cws-student-list-card[data-presentation-state="presenting"] { background-color: #ecfdf5;') > styles.indexOf('.cws-student-list-card[data-score-status="completed"]'));
+});
+
+test('all council members receive live presentation and timer updates without a reload', () => {
+  const workspace = read('js/grading/rubrics-workspace.js');
+  const rules = read('firestore.rules');
+  assert.match(workspace, /activeCouncilLiveUnsubscribe = onSnapshot\(councilLiveDocRef/);
+  assert.match(workspace, /applyCouncilLiveSnapshot\(round, activityId, councilId, state\.activeCouncilLiveSnapshot\)/);
+  assert.match(workspace, /syncLiveTimerFromCouncil\(council\)/);
+  assert.match(workspace, /renderCouncilWorkspacePartialSync\(\)/);
+  assert.match(rules, /allow read: if admin\(\) \|\| staff\(\)[\s\S]*isCouncilMember\(resource\.data\.activityId, resource\.data\.councilId, email\(\)\)/);
+  assert.match(rules, /allow update: if admin\(\) \|\| \(staff\(\)/);
+});
+
 test('letter scale has no A++ and caps A+ conversion at 9.5', () => {
   const config = read('js/planning/activities-manager.js');
   const scoring = read('js/grading/rubrics-scoring.js');

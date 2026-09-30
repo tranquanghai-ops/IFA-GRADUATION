@@ -348,7 +348,13 @@ service cloud.firestore {
 
       // Isolated live presentation/timer state. Staff cannot edit the round document.
       match /councilLive/{liveId} {
-        allow read: if admin() || staff();
+        // External guests may observe only the council to which an admin assigned them.
+        // They still cannot operate the timer or change presentation statuses.
+        allow read: if admin() || staff()
+          || (signedIn()
+            && resource.data.keys().hasAll(['activityId', 'councilId'])
+            && liveId == resource.data.activityId + '_' + resource.data.councilId
+            && isCouncilMember(resource.data.activityId, resource.data.councilId, email()));
         allow create: if admin() || (staff()
           && request.resource.data.keys().hasOnly(['activityId', 'councilId', 'status', 'presentationStatuses', 'liveTimer', 'timerSettings', 'updatedAt', 'updatedBy'])
           && request.resource.data.activityId is string

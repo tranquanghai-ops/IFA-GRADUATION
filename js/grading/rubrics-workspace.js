@@ -1254,6 +1254,7 @@ function renderCouncilStudentList() {
 
     // Scoring status badge for this member
     let scoreBadge = '';
+    let scoreStatus = 'none';
     if (scoringEnabled) {
       const scoreKey = `${activityId}_${councilId}_${sid}_${myScorerId}`;
       const myScore = state.councilScores?.[scoreKey];
@@ -1261,12 +1262,14 @@ function renderCouncilStudentList() {
       const scoreValue = myScore?.status === 'completed'
         ? myScore.value
         : (localValue !== undefined && localValue !== '' ? localValue : myScore?.value);
-      const scoreText = scoreValue !== undefined && scoreValue !== null && scoreValue !== '' ? `Điểm ${escapeHtml(String(scoreValue))}` : '';
+      const scoreText = scoreValue !== undefined && scoreValue !== null && scoreValue !== '' ? escapeHtml(String(scoreValue)) : '';
 
       if (myScore?.status === 'completed') {
-        scoreBadge = `<span class="text-[10px] text-emerald-700 font-bold">${scoreText} (chính thức)</span>`;
+        scoreStatus = 'completed';
+        scoreBadge = `<span class="cws-list-score-badge text-emerald-800"><strong>Điểm ${scoreText}</strong><small>(chính thức)</small></span>`;
       } else if (scoreText) {
-        scoreBadge = `<span class="text-[10px] text-amber-600 font-bold">${scoreText} (nháp)</span>`;
+        scoreStatus = 'draft';
+        scoreBadge = `<span class="cws-list-score-badge text-amber-800"><strong>Điểm ${scoreText}</strong><small>(nháp)</small></span>`;
       } else {
         scoreBadge = '<span class="text-[10px] text-slate-400">Chưa chấm</span>';
       }
@@ -1275,7 +1278,7 @@ function renderCouncilStudentList() {
     const presentationState = isPresenting ? 'presenting' : isPresented ? 'presented' : 'waiting';
     const selectedRing = isPresenting ? 'ring-emerald-500' : isPresented ? 'ring-slate-500' : 'ring-indigo-500';
     return `
-      <div onclick="selectCouncilStudent('${sid}')" data-tone="${index % 2 === 0 ? 'odd' : 'even'}" data-presentation-state="${presentationState}" class="cws-student-list-card p-2.5 rounded-xl border border-slate-200 transition-all cursor-pointer hover:border-slate-400 ${isSelected ? `ring-2 ${selectedRing} shadow-xs` : ''}">
+      <div onclick="selectCouncilStudent('${sid}')" data-tone="${index % 2 === 0 ? 'odd' : 'even'}" data-presentation-state="${presentationState}" data-score-status="${scoreStatus}" class="cws-student-list-card p-2.5 rounded-xl border border-slate-200 transition-all cursor-pointer hover:border-slate-400 ${isSelected ? `ring-2 ${selectedRing} shadow-xs` : ''}">
         <div class="flex items-center justify-between gap-1.5">
           <div class="flex items-center gap-1.5 min-w-0"><span class="font-mono font-bold text-xs shrink-0 ${isSelected ? 'text-indigo-900' : 'text-slate-600'}">#${asgn.order || '--'}</span><span class="font-bold text-slate-900 text-xs truncate">${escapeHtml(sName)}</span></div>
           ${presBadge}

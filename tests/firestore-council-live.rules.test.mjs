@@ -11,6 +11,8 @@ const path = `graduationRounds/${roundId}/councilLive/${activityId}_${councilId}
 const secretary = 'secretary@tdtu.edu.vn';
 const chair = 'chair@tdtu.edu.vn';
 const member = 'member@tdtu.edu.vn';
+const guest = 'guest@example.com';
+const otherGuest = 'other-guest@example.com';
 const outsider = 'other@tdtu.edu.vn';
 const actor = email => ({ email, email_verified: true });
 const payload = email => ({
@@ -30,7 +32,7 @@ before(async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await setDoc(doc(db, `graduationRounds/${roundId}`), { status: 'open' });
-    for (const [email, role] of [[secretary, 'secretary'], [chair, 'chair'], [member, 'member']]) {
+    for (const [email, role] of [[secretary, 'secretary'], [chair, 'chair'], [member, 'member'], [guest, 'guest']]) {
       await setDoc(doc(db, `graduationRounds/${roundId}/councilMemberships/${activityId}_${councilId}_${email}`), {
         activityId, councilId, memberEmail: email, role, active: true
       });
@@ -50,6 +52,26 @@ test('secretary may start and update a presentation but ordinary members may not
   await assertFails(updateDoc(doc(outsiderDb, path), { 'presentationStatuses.s1': 'waiting', updatedBy: outsider }));
   const snap = await assertSucceeds(getDoc(doc(memberDb, path)));
   assert.equal(snap.data().presentationStatuses.s1, 'presented');
+});
+
+test('assigned external guest sees live presentation and timer changes without write access', async () => {
+  const chairDb = env.authenticatedContext(chair, actor(chair)).firestore();
+  const guestDb = env.authenticatedContext(guest, actor(guest)).firestore();
+  const otherGuestDb = env.authenticatedContext(otherGuest, actor(otherGuest)).firestore();
+  await assertSucceeds(setDoc(doc(chairDb, path), payload(chair)));
+  let snap = await assertSucceeds(getDoc(doc(guestDb, path)));
+  assert.equal(snap.data().presentationStatuses.s1, 'presenting');
+  assert.equal(snap.data().liveTimer.isRunning, true);
+  await assertSucceeds(updateDoc(doc(chairDb, path), {
+    presentationStatuses: { s1: 'presented', s2: 'presenting' },
+    liveTimer: { isRunning: true, startedAt: Date.now(), remainingSeconds: 600, studentId: 's2' },
+    updatedBy: chair
+  }));
+  snap = await assertSucceeds(getDoc(doc(guestDb, path)));
+  assert.equal(snap.data().presentationStatuses.s2, 'presenting');
+  assert.equal(snap.data().liveTimer.studentId, 's2');
+  await assertFails(updateDoc(doc(guestDb, path), { 'presentationStatuses.s2': 'presented', updatedBy: guest }));
+  await assertFails(getDoc(doc(otherGuestDb, path)));
 });
 
 test('only chair may end the council', async () => {
