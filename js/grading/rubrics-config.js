@@ -138,7 +138,7 @@ window.saveRubricCriterion = function() {
       state._currentActivityRubric[idx] = {
         ...state._currentActivityRubric[idx],
         key,
-        label: key === 'A+' ? 'Xuất sắc' : label,
+        label,
         maxScore,
         description: desc
       };
@@ -148,7 +148,7 @@ window.saveRubricCriterion = function() {
     state._currentActivityRubric.push({
       id: newId,
       key,
-      label: key === 'A+' ? 'Xuất sắc' : label,
+      label,
       maxScore,
       description: desc,
       order: state._currentActivityRubric.length + 1
@@ -260,7 +260,7 @@ window.saveLetterOption = function() {
         id,
         key,
         code: key,
-        label,
+        label: key === 'A+' ? 'Xuất sắc' : label,
         numericValue: Number(numericValue.toFixed(2)),
         description: desc
       };
@@ -271,7 +271,7 @@ window.saveLetterOption = function() {
       id: newId,
       key,
       code: key,
-      label,
+      label: key === 'A+' ? 'Xuất sắc' : label,
       numericValue: Number(numericValue.toFixed(2)),
       description: desc
     });
