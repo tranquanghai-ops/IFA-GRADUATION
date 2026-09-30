@@ -86,10 +86,11 @@ function renderScoringSection() {
     const renderLetterBtn = (o) => {
       if (!o) return '';
       const isSelected = String(currentVal) === String(o.key) || String(currentVal) === String(o.code);
+      const standardLabel = (typeof DEFAULT_LETTER_GRADE_SCALE !== 'undefined' ? DEFAULT_LETTER_GRADE_SCALE : []).find(item => item.key === String(o.key || o.code))?.label;
       return `
         <button type="button" ${isCompleted ? 'disabled' : ''} onclick="onSelectLetterScore('${o.key}')" class="p-2 sm:p-2.5 rounded-xl border text-center transition-all ${isSelected ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500 font-black text-emerald-950 shadow-xs' : 'bg-white border-slate-200 hover:border-slate-300 font-semibold text-slate-700 hover:bg-slate-50'} ${isCompleted ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}">
           <span class="text-sm sm:text-base block font-mono font-black text-emerald-700">${o.key}</span>
-          <span class="text-[10px] sm:text-[11px] block mt-0.5 text-slate-600 truncate">${String(o.key || o.code).toUpperCase() === 'A+' ? 'Xuất sắc' : (o.label || o.description || '')}</span>
+          <span class="text-[10px] sm:text-[11px] block mt-0.5 text-slate-600 truncate">${standardLabel || o.label || o.description || ''}</span>
         </button>
       `;
     };
@@ -115,7 +116,10 @@ function renderScoringSection() {
 
     // Any other tiers (D, F, etc.)
     const usedSet = new Set([...finalAOpts, ...finalBOpts, ...finalCOpts].filter(Boolean));
-    const otherOpts = opts.filter(o => !usedSet.has(o));
+    const otherOpts = opts.filter(o => !usedSet.has(o)).sort((a, b) => {
+      const order = ['D-', 'D', 'D+'];
+      return order.indexOf(String(a.key || a.code)) - order.indexOf(String(b.key || b.code));
+    });
 
     inputHtml = `
       <div class="space-y-2">
@@ -296,6 +300,7 @@ window.onScoreInputChange = function(val) {
   state.councilLocalDrafts = state.councilLocalDrafts || {};
   state.councilLocalDrafts[sid] = state.councilLocalDrafts[sid] || {};
   state.councilLocalDrafts[sid].value = val;
+  renderCouncilStudentList();
 };
 
 window.onScoreCommentChange = function(comm) {
@@ -434,12 +439,12 @@ window.saveCurrentScore = async function(isCompleted) {
     role: auth.role || 'member',
     mode,
     value: (mode === 'numeric' || mode === 'defense_rubric') ? parseFloat(val) : String(val),
-    selectedLetterCode,
-    selectedLetterNumericValue,
-    numericValue: (mode === 'numeric' || mode === 'defense_rubric')
-      ? parseFloat(val)
-      : (typeof selectedLetterNumericValue === 'number' ? selectedLetterNumericValue : undefined),
-    components: mode === 'defense_rubric' ? components : undefined,
+    ...(mode === 'letter' ? { selectedLetterCode } : {}),
+    ...(typeof selectedLetterNumericValue === 'number' ? { selectedLetterNumericValue } : {}),
+    ...((mode === 'numeric' || mode === 'defense_rubric')
+      ? { numericValue: parseFloat(val) }
+      : (typeof selectedLetterNumericValue === 'number' ? { numericValue: selectedLetterNumericValue } : {})),
+    ...(mode === 'defense_rubric' ? { components } : {}),
     comment: String(comment || '').trim(),
     status: isCompleted ? 'completed' : 'draft',
     createdAt: existing.createdAt || new Date().toISOString(),
@@ -651,12 +656,12 @@ window.batchFinalizeAllCouncilScores = async function() {
       role: auth?.role || 'member',
       mode,
       value: (mode === 'numeric' || mode === 'defense_rubric') ? parseFloat(item.value) : String(item.value),
-      selectedLetterCode,
-      selectedLetterNumericValue,
-      numericValue: (mode === 'numeric' || mode === 'defense_rubric')
-        ? parseFloat(item.value)
-        : (typeof selectedLetterNumericValue === 'number' ? selectedLetterNumericValue : undefined),
-      components: mode === 'defense_rubric' ? item.components : undefined,
+      ...(mode === 'letter' ? { selectedLetterCode } : {}),
+      ...(typeof selectedLetterNumericValue === 'number' ? { selectedLetterNumericValue } : {}),
+      ...((mode === 'numeric' || mode === 'defense_rubric')
+        ? { numericValue: parseFloat(item.value) }
+        : (typeof selectedLetterNumericValue === 'number' ? { numericValue: selectedLetterNumericValue } : {})),
+      ...(mode === 'defense_rubric' ? { components: item.components || {} } : {}),
       comment: String(item.comment || '').trim(),
       status: 'completed',
       createdAt: item.existing?.createdAt || now,

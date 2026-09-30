@@ -1218,12 +1218,14 @@ function renderCouncilStudentList() {
     if (scoringEnabled) {
       const scoreKey = `${activityId}_${councilId}_${sid}_${myScorerId}`;
       const myScore = state.councilScores?.[scoreKey];
-      const hasDraft = Boolean(state.councilLocalDrafts?.[sid]);
+      const localValue = state.councilLocalDrafts?.[sid]?.value;
+      const scoreValue = localValue !== undefined && localValue !== '' ? localValue : myScore?.value;
+      const scoreText = scoreValue !== undefined && scoreValue !== null && scoreValue !== '' ? `Điểm ${escapeHtml(String(scoreValue))}` : '';
 
-      if (myScore?.status === 'completed') {
-        scoreBadge = '<span class="text-[10px] text-emerald-700 font-bold">✓ Bạn đã chấm</span>';
-      } else if (myScore?.status === 'draft' || hasDraft) {
-        scoreBadge = '<span class="text-[10px] text-amber-600 font-bold">● Đã lưu tạm</span>';
+      if (myScore?.status === 'completed' && localValue === undefined) {
+        scoreBadge = `<span class="text-[10px] text-emerald-700 font-bold">${scoreText} (chính thức)</span>`;
+      } else if (scoreText) {
+        scoreBadge = `<span class="text-[10px] text-amber-600 font-bold">${scoreText} (nháp)</span>`;
       } else {
         scoreBadge = '<span class="text-[10px] text-slate-400">Chưa chấm</span>';
       }

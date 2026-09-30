@@ -345,22 +345,30 @@ export const DEFAULT_LETTER_GRADE_SCALE = [
   { id: 'opt_a',   key: 'A',   code: 'A',   label: 'Tốt',            numericValue: 9.0,  description: 'Tốt' },
   { id: 'opt_am',  key: 'A-',  code: 'A-',  label: 'Khá tốt',        numericValue: 8.5,  description: 'Khá tốt' },
   { id: 'opt_bp',  key: 'B+',  code: 'B+',  label: 'Khá',            numericValue: 8.0,  description: 'Khá' },
-  { id: 'opt_b',   key: 'B',   code: 'B',   label: 'Khá',            numericValue: 7.5,  description: 'Khá' },
-  { id: 'opt_bm',  key: 'B-',  code: 'B-',  label: 'Trung bình khá', numericValue: 7.0,  description: 'Trung bình khá' },
+  { id: 'opt_b',   key: 'B',   code: 'B',   label: 'Trung bình khá', numericValue: 7.5,  description: 'Trung bình khá' },
+  { id: 'opt_bm',  key: 'B-',  code: 'B-',  label: 'Trung bình',     numericValue: 7.0,  description: 'Trung bình' },
   { id: 'opt_cp',  key: 'C+',  code: 'C+',  label: 'Trung bình',     numericValue: 6.5,  description: 'Trung bình' },
-  { id: 'opt_c',   key: 'C',   code: 'C',   label: 'Đạt',            numericValue: 6.0,  description: 'Đạt' },
-  { id: 'opt_cm',  key: 'C-',  code: 'C-',  label: 'Trung bình yếu', numericValue: 5.5,  description: 'Trung bình yếu' },
-  { id: 'opt_dp',  key: 'D+',  code: 'D+',  label: 'Yếu',            numericValue: 5.0,  description: 'Yếu' },
-  { id: 'opt_d',   key: 'D',   code: 'D',   label: 'Chưa đạt',       numericValue: 4.5,  description: 'Chưa đạt' },
-  { id: 'opt_dm',  key: 'D-',  code: 'D-',  label: 'Kém',            numericValue: 4.0,  description: 'Kém' }
+  { id: 'opt_c',   key: 'C',   code: 'C',   label: 'Trung bình yếu', numericValue: 6.0,  description: 'Trung bình yếu' },
+  { id: 'opt_cm',  key: 'C-',  code: 'C-',  label: 'Yếu',            numericValue: 5.5,  description: 'Yếu' },
+  { id: 'opt_dm',  key: 'D-',  code: 'D-',  label: 'Quá yếu',        numericValue: 4.0,  description: 'Quá yếu' },
+  { id: 'opt_d',   key: 'D',   code: 'D',   label: 'Yếu',            numericValue: 4.5,  description: 'Yếu' },
+  { id: 'opt_dp',  key: 'D+',  code: 'D+',  label: 'Kém',            numericValue: 5.0,  description: 'Kém' }
 ];
+
+const STANDARD_LETTER_GRADE_LABELS = Object.fromEntries(DEFAULT_LETTER_GRADE_SCALE.map(option => [option.key, option.label]));
 
 export function normalizeLetterGradeOptions(options) {
   return (Array.isArray(options) ? options : DEFAULT_LETTER_GRADE_SCALE)
     .filter(option => !/^A\+{2,}$/i.test(String(option.key || option.code || '').trim()))
-    .map(option => (String(option.key || option.code || '').trim().toUpperCase() === 'A+')
-      ? { ...option, label: 'Xuất sắc', description: 'Xuất sắc', numericValue: 9.5 }
-      : { ...option, numericValue: typeof option.numericValue === 'number' ? Math.min(option.numericValue, 9.5) : option.numericValue });
+    .map(option => {
+      const code = String(option.key || option.code || '').trim().toUpperCase();
+      const label = STANDARD_LETTER_GRADE_LABELS[code];
+      return {
+        ...option,
+        ...(label ? { label, description: label } : {}),
+        numericValue: code === 'A+' ? 9.5 : (typeof option.numericValue === 'number' ? Math.min(option.numericValue, 9.5) : option.numericValue)
+      };
+    });
 }
 
 export function isActivityPublished(activity) {
