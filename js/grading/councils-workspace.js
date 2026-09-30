@@ -166,8 +166,9 @@ function renderCouncilCards(act) {
 
     // Member slot fulfillment
     const membersBySlot = c.membersBySlot || {};
-    const effectiveSlots = (slots && slots.length > 0)
-      ? [...slots]
+    const councilSlots = Array.isArray(c.memberSlots) ? c.memberSlots : slots;
+    const effectiveSlots = (councilSlots && councilSlots.length > 0)
+      ? [...councilSlots]
       : [
           { key: 'chair', label: 'Chủ tịch', name: 'Chủ tịch Hội đồng' },
           { key: 'member', label: 'Ủy viên', name: 'Ủy viên Hội đồng' },
@@ -1365,7 +1366,7 @@ window.filterAdminRoundCouncils = function(roundId = null) {
       if (c.status === 'ongoing') statusBadge = '<span class="badge bg-emerald-100 text-emerald-800 font-bold">● Đang diễn ra</span>';
       else if (c.status === 'completed') statusBadge = '<span class="badge bg-slate-200 text-slate-600 font-bold">✓ Đã kết thúc</span>';
 
-      const effectiveSlots = [...slots];
+      const effectiveSlots = [...(Array.isArray(c.memberSlots) ? c.memberSlots : slots)];
       const knownKeys = new Set(effectiveSlots.map(s => s.key));
       Object.keys(membersBySlot).forEach(k => {
         if (!knownKeys.has(k)) {

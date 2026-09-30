@@ -2,6 +2,7 @@
  * IFA+ Graduation — Council Live Scoring & Admin Monitor Submodule
  */
 import { DEFAULT_LETTER_GRADE_SCALE, normalizeLetterGradeOptions } from '../planning/activities-manager.js';
+import { getCouncilMemberScorerId, getCouncilMemberSlots } from './council-score-helpers.js';
 
 function getActiveCouncilScorerId() {
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
@@ -47,12 +48,13 @@ function renderScoringSection() {
   const myScorerId = getActiveCouncilScorerId();
   const scoreKey = `${activityId}_${councilId}_${sid}_${myScorerId}`;
   const savedScore = state.councilScores?.[scoreKey];
+  if (savedScore?.status === 'completed') delete state.councilLocalDrafts?.[sid];
   const draft = state.councilLocalDrafts?.[sid];
 
   // Resolve current working values
   const currentVal = draft?.value !== undefined ? draft.value : (savedScore?.value ?? '');
   const currentComment = draft?.comment !== undefined ? draft.comment : (savedScore?.comment ?? '');
-  const isCompleted = (savedScore?.status === 'completed' && !draft);
+  const isCompleted = savedScore?.status === 'completed';
   const councilEnded = (council.status === 'ended' || council.status === 'completed');
 
   // Count draft scores across all students assigned to this council for current scorer
@@ -62,7 +64,7 @@ function renderScoringSection() {
     const k = `${activityId}_${councilId}_${asgn.studentId}_${myScorerId}`;
     const sc = state.councilScores?.[k];
     const hasLocalDraft = Boolean(state.councilLocalDrafts?.[asgn.studentId]?.value !== undefined || state.councilLocalDrafts?.[asgn.studentId]?.components);
-    if (sc?.status === 'draft' || hasLocalDraft) {
+    if (sc?.status === 'draft' || (sc?.status !== 'completed' && hasLocalDraft)) {
       councilDraftsCount++;
     }
   });
@@ -742,7 +744,7 @@ function renderScorersProgress() {
   }
   container.classList.remove('hidden');
 
-  const slots = act.councilStructure?.slots || [];
+  const slots = getCouncilMemberSlots(council, act);
   const membersBySlot = council.membersBySlot || {};
   const myUserId = getActiveCouncilScorerId();
 
@@ -757,7 +759,7 @@ function renderScorersProgress() {
   const itemsHtml = slots.map(s => {
     const assigned = membersBySlot[s.key];
     const isAssigned = Boolean(assigned && (assigned.memberId || assigned.memberName));
-    const scorerId = assigned?.memberId || assigned?.memberEmail || assigned?.memberName;
+    const scorerId = getCouncilMemberScorerId(assigned);
     const scoreKey = scorerId ? `${activityId}_${councilId}_${sid}_${scorerId}` : null;
     const score = scoreKey ? state.councilScores?.[scoreKey] : null;
 

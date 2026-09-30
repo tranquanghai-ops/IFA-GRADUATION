@@ -135,3 +135,27 @@ test('direct council entry only reports success after authorization and shows a 
   assert.match(auth, /if \(opened\) showToast/);
   assert.match(workspace, /document\.documentElement\.classList\.remove\('council-direct-entry'\)/);
 });
+
+test('guest score identity matches saved email and council slots are isolated', async () => {
+  const { getCouncilMemberScorerId, getCouncilMemberSlots } = await import('../js/grading/council-score-helpers.js');
+  const activity = { councilStructure: { slots: [{ key: 'chair', type: 'mandatory' }] } };
+  const first = { memberSlots: [...activity.councilStructure.slots, { key: 'guest1', type: 'guest' }] };
+  const second = { memberSlots: [...activity.councilStructure.slots, { key: 'guest2', type: 'guest' }, { key: 'guest3', type: 'guest' }] };
+  assert.equal(getCouncilMemberScorerId({ type: 'guest', memberId: 'ext_foo', memberEmail: 'Foo@Example.com' }), 'foo@example.com');
+  assert.equal(getCouncilMemberScorerId({ type: 'internal', memberId: 'staff-1', memberEmail: 'staff@tdtu.edu.vn' }), 'staff-1');
+  assert.equal(getCouncilMemberSlots(first, activity).length, 2);
+  assert.equal(getCouncilMemberSlots(second, activity).length, 3);
+  assert.equal(activity.councilStructure.slots.length, 1);
+  const editor = read('js/grading/councils-editor.js');
+  assert.match(editor, /memberSlots: slots\.map\(slot => \(\{ \.\.\.slot \}\)\)/);
+  assert.doesNotMatch(editor.split('window.quickAddCouncilMemberSlot')[1].split('window.quickRemoveCouncilMemberSlot')[0], /act\.councilStructure\.slots\.push/);
+});
+
+test('a completed student remains official after selection changes', () => {
+  const workspace = read('js/grading/rubrics-workspace.js');
+  const scoring = read('js/grading/rubrics-scoring.js');
+  assert.match(workspace, /if \(savedScore\?\.status === 'completed'\) \{\s*delete state\.councilLocalDrafts\?\.\[oldSid\]/);
+  assert.match(workspace, /if \(myScore\?\.status === 'completed'\)/);
+  assert.match(scoring, /const isCompleted = savedScore\?\.status === 'completed';/);
+  assert.match(scoring, /delete state\.councilLocalDrafts\[sid\];/);
+});

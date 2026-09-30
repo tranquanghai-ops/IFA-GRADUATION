@@ -1,3 +1,4 @@
+import { getCouncilMemberScorerId, getCouncilMemberSlots } from './council-score-helpers.js';
 
 // --- Module Bridges ---
 const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
@@ -258,15 +259,11 @@ window.exportActivityCouncilsToExcel = function() {
   const mode = document.querySelector('input[name="export_scores_mode"]:checked')?.value || 'selected';
   const wb = XLSX.utils.book_new();
 
-  // SAME COLUMN STRUCTURE ACROSS ALL COUNCILS IN ACTIVITY
-  const slots = act.councilStructure?.slots || [];
-  const headerRow = ['STT', 'MSSV', 'Họ và tên'];
-  slots.forEach(s => {
-    headerRow.push(`${s.label || s.name}${s.type === 'guest' ? ' (Khách)' : ''}`);
-  });
-  headerRow.push('Điểm chính thức');
-
   act.councils.forEach(council => {
+    const slots = getCouncilMemberSlots(council, act);
+    const headerRow = ['STT', 'MSSV', 'Họ và tên'];
+    slots.forEach(s => headerRow.push(`${s.label || s.name}${s.type === 'guest' ? ' (Khách)' : ''}`));
+    headerRow.push('Điểm chính thức');
     const cSheetName = sanitizeSheetName(council.name || council.id);
     const asgns = (act.councilStudentAssignments || [])
       .filter(a => a.councilId === council.id)
@@ -285,7 +282,7 @@ window.exportActivityCouncilsToExcel = function() {
 
       slots.forEach(s => {
         const assigned = council.membersBySlot?.[s.key];
-        const scorerId = assigned?.memberId || assigned?.memberEmail || assigned?.memberName;
+        const scorerId = getCouncilMemberScorerId(assigned);
         const scoreKey = scorerId ? `${act.id}_${council.id}_${sid}_${scorerId}` : null;
         const score = scoreKey ? state.councilScores?.[scoreKey] : null;
 
@@ -339,7 +336,7 @@ window.exportSingleCouncilToExcel = function() {
   const mode = document.querySelector('input[name="export_scores_mode"]:checked')?.value || 'selected';
   const wb = XLSX.utils.book_new();
 
-  const slots = act.councilStructure?.slots || [];
+  const slots = getCouncilMemberSlots(council, act);
   const headerRow = ['STT', 'MSSV', 'Họ và tên'];
   slots.forEach(s => {
     headerRow.push(`${s.label || s.name}${s.type === 'guest' ? ' (Khách)' : ''}`);
@@ -363,7 +360,7 @@ window.exportSingleCouncilToExcel = function() {
 
     slots.forEach(s => {
       const assigned = council.membersBySlot?.[s.key];
-      const scorerId = assigned?.memberId || assigned?.memberEmail || assigned?.memberName;
+      const scorerId = getCouncilMemberScorerId(assigned);
       const scoreKey = scorerId ? `${act.id}_${council.id}_${sid}_${scorerId}` : null;
       const score = scoreKey ? state.councilScores?.[scoreKey] : null;
 

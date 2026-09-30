@@ -1,4 +1,5 @@
 import { getNextCouncilPresentation } from './council-presentation-state.js';
+import { getCouncilMemberScorerId, getCouncilMemberSlots } from './council-score-helpers.js';
 
 // --- Module Bridges ---
 export const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : (reg?.officialSupervisors || []));
@@ -291,12 +292,12 @@ async function persistCouncilLiveState(round, activityId, councilId) {
 }
 
 export function getRequiredScorers(council, act) {
-  const slots = act?.councilStructure?.slots || [];
+  const slots = getCouncilMemberSlots(council, act);
   return slots.filter(s => s.type === 'mandatory');
 }
 
 export function getGuestScorers(council, act) {
-  const slots = act?.councilStructure?.slots || [];
+  const slots = getCouncilMemberSlots(council, act);
   return slots.filter(s => s.type === 'guest');
 }
 
@@ -1257,10 +1258,12 @@ function renderCouncilStudentList() {
       const scoreKey = `${activityId}_${councilId}_${sid}_${myScorerId}`;
       const myScore = state.councilScores?.[scoreKey];
       const localValue = state.councilLocalDrafts?.[sid]?.value;
-      const scoreValue = localValue !== undefined && localValue !== '' ? localValue : myScore?.value;
+      const scoreValue = myScore?.status === 'completed'
+        ? myScore.value
+        : (localValue !== undefined && localValue !== '' ? localValue : myScore?.value);
       const scoreText = scoreValue !== undefined && scoreValue !== null && scoreValue !== '' ? `Điểm ${escapeHtml(String(scoreValue))}` : '';
 
-      if (myScore?.status === 'completed' && localValue === undefined) {
+      if (myScore?.status === 'completed') {
         scoreBadge = `<span class="text-[10px] text-emerald-700 font-bold">${scoreText} (chính thức)</span>`;
       } else if (scoreText) {
         scoreBadge = `<span class="text-[10px] text-amber-600 font-bold">${scoreText} (nháp)</span>`;
@@ -1393,7 +1396,15 @@ window.selectCouncilStudent = function(studentId, forceMobileGradingTab = false,
     const currentVal = valInput ? valInput.value : (letInput ? letInput.value : state.councilLocalDrafts?.[oldSid]?.value);
     const currentComm = commentInput ? commentInput.value : (state.councilLocalDrafts?.[oldSid]?.comment || '');
 
-    if (currentVal !== undefined && currentVal !== '' || currentComm || (components && Object.keys(components).length > 0)) {
+    const { activityId, councilId } = state.activeCouncilWorkspace || {};
+    const round = (state.rounds || []).find(r => r.id === state.activeCouncilWorkspace?.roundId);
+    const activity = (round?.activities || []).find(a => a.id === activityId);
+    const council = (activity?.councils || []).find(c => c.id === councilId);
+    const scorerId = council ? resolveCouncilScorerId(council, state.activeCouncilWorkspace?.auth) : '';
+    const savedScore = state.councilScores?.[`${activityId}_${councilId}_${oldSid}_${scorerId}`];
+    if (savedScore?.status === 'completed') {
+      delete state.councilLocalDrafts?.[oldSid];
+    } else if ((currentVal !== undefined && currentVal !== '') || currentComm || (components && Object.keys(components).length > 0)) {
       state.councilLocalDrafts = state.councilLocalDrafts || {};
       state.councilLocalDrafts[oldSid] = {
         value: currentVal,
@@ -1967,7 +1978,7 @@ window.endCouncilSession = async function() {
     for (const s of reqSlots) {
       const assignedMem = council.membersBySlot?.[s.key];
       if (assignedMem && (assignedMem.memberId || assignedMem.memberEmail)) {
-        const scorerId = assignedMem.memberId || assignedMem.memberEmail;
+        const scorerId = getCouncilMemberScorerId(assignedMem);
         const k = `${activityId}_${councilId}_${asgn.studentId}_${scorerId}`;
         const sc = state.councilScores?.[k];
         if (sc?.status !== 'completed') {

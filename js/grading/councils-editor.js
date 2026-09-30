@@ -1,6 +1,15 @@
 /**
  * IFA+ Graduation — Council CRUD, Slots & Guest Member Configuration
  */
+let councilFormSlots = [];
+function setCouncilFormSlots(council, act) {
+  councilFormSlots = (Array.isArray(council?.memberSlots) ? council.memberSlots : (act.councilStructure?.slots || [])).map(slot => ({ ...slot }));
+  Object.entries(council?.membersBySlot || {}).forEach(([key, member]) => {
+    if (!councilFormSlots.some(slot => slot.key === key)) {
+      councilFormSlots.push({ key, label: member.role || 'Thành viên', name: member.role || 'Thành viên Hội đồng', type: member.type === 'guest' ? 'guest' : 'mandatory', removable: true });
+    }
+  });
+}
 window.openCreateCouncilModal = async function() {
   const { roundId, activityId } = state.activeCouncilManagement;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
@@ -41,6 +50,7 @@ window.openCreateCouncilModal = async function() {
   }
 
   await ensureSupervisorsMasterLoaded().catch(error => console.warn('[Council] Lecturer directory load notice:', error));
+  setCouncilFormSlots(null, act);
   renderCouncilMembersFormSlots(act, {});
 
   document.getElementById('modal-edit-council')?.classList.remove('hidden');
@@ -97,6 +107,7 @@ window.editCouncilModal = async function(councilId) {
   }
 
   await ensureSupervisorsMasterLoaded().catch(error => console.warn('[Council] Lecturer directory load notice:', error));
+  setCouncilFormSlots(council, act);
   renderCouncilMembersFormSlots(act, council.membersBySlot || {});
 
   document.getElementById('modal-edit-council')?.classList.remove('hidden');
@@ -135,6 +146,7 @@ window.copyCouncil = async function(councilId) {
   }
 
   await ensureSupervisorsMasterLoaded().catch(error => console.warn('[Council] Lecturer directory load notice:', error));
+  setCouncilFormSlots(council, act);
   renderCouncilMembersFormSlots(act, council.membersBySlot || {});
 
   document.getElementById('modal-edit-council')?.classList.remove('hidden');
@@ -218,7 +230,7 @@ export function generateCouncilShortCode() {
 window.generateCouncilShortCode = generateCouncilShortCode;
 
 function getCurrentCouncilFormMembers(act) {
-  const slots = act.councilStructure?.slots || [];
+  const slots = councilFormSlots;
   const currentMembers = {};
   slots.forEach(s => {
     const isGuest = document.getElementById(`chk-guest-${s.key}`)?.checked === true;
@@ -247,7 +259,7 @@ function getCurrentCouncilFormMembers(act) {
 }
 window.getCurrentCouncilFormMembers = getCurrentCouncilFormMembers;
 
-window.quickAddCouncilMemberSlot = function() {
+window.quickAddCouncilMemberSlot = function(kind = 'internal') {
   const { roundId, activityId } = state.activeCouncilManagement;
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
@@ -255,21 +267,20 @@ window.quickAddCouncilMemberSlot = function() {
 
   const currentMembers = getCurrentCouncilFormMembers(act);
 
-  act.councilStructure = act.councilStructure || { slots: [] };
-  const memberSlots = act.councilStructure.slots.filter(s => s.key.startsWith('member') || (s.label && s.label.includes('Ủy viên')));
+  const memberSlots = councilFormSlots.filter(s => s.key.startsWith('member') || (s.label && s.label.includes('Ủy viên')));
   const nextNumber = memberSlots.length + 1;
   const newKey = `member_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
 
-  act.councilStructure.slots.push({
+  councilFormSlots.push({
     key: newKey,
-    label: 'Ủy viên',
-    name: `Ủy viên Hội đồng (${nextNumber})`,
-    type: 'optional',
+    label: kind === 'guest' ? 'Khách mời' : 'Ủy viên',
+    name: kind === 'guest' ? `Khách mời (${nextNumber})` : `Ủy viên Hội đồng (${nextNumber})`,
+    type: kind === 'guest' ? 'guest' : 'mandatory',
     removable: true
   });
 
   renderCouncilMembersFormSlots(act, currentMembers);
-  showToast(`✓ Đã thêm vị trí "Ủy viên Hội đồng (${nextNumber})"!`, 'success');
+  showToast('Đã thêm thành viên cho riêng hội đồng này.', 'success');
 };
 
 window.quickRemoveCouncilMemberSlot = function(slotKey) {
@@ -281,7 +292,7 @@ window.quickRemoveCouncilMemberSlot = function(slotKey) {
   const currentMembers = getCurrentCouncilFormMembers(act);
   delete currentMembers[slotKey];
 
-  act.councilStructure.slots = (act.councilStructure.slots || []).filter(s => s.key !== slotKey);
+  councilFormSlots = councilFormSlots.filter(s => s.key !== slotKey);
   renderCouncilMembersFormSlots(act, currentMembers);
   showToast('Đã xóa vị trí thành viên.', 'info');
 };
@@ -306,7 +317,7 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
     }
   }
 
-  const slots = act.councilStructure?.slots || [];
+  const slots = councilFormSlots;
   const supervisors = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
     ? state.supervisorsMaster
     : (state.roundSupervisors || []);
@@ -315,8 +326,8 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
     const assigned = membersBySlot[s.key] || {};
     const memberId = assigned.memberId || '';
     const memberName = assigned.memberName || '';
-    const isGuest = (assigned.type === 'guest');
-    const isRemovable = Boolean(s.removable || s.type === 'optional' || s.key.startsWith('member_'));
+    const isGuest = (assigned.type === 'guest') || (!assigned.type && s.type === 'guest');
+    const isRemovable = Boolean(s.removable || s.type === 'optional' || s.type === 'guest' || s.key.startsWith('member_'));
 
     // Filter supervisors who are not busy in overlapping councils (or already assigned in this specific slot)
     const availableSupervisors = supervisors.filter(sup => {
@@ -454,7 +465,7 @@ window.saveCouncil = async function(e) {
   const busyMembers = getConflictingCouncilMembersForSlot(act, id, date, startTime, endTime);
 
   // Extract membersBySlot with strict email validation & duplicate checking
-  const slots = act.councilStructure?.slots || [];
+  const slots = councilFormSlots;
   const membersBySlot = {};
   const supervisors = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
     ? state.supervisorsMaster
@@ -568,6 +579,7 @@ window.saveCouncil = async function(e) {
     driveFolderName,
     driveFolderUrl,
     membersBySlot,
+    memberSlots: slots.map(slot => ({ ...slot })),
     updatedAt: new Date().toISOString()
   };
 
@@ -847,7 +859,7 @@ function renderEffectiveCouncilMembershipNotice(act) {
     const members = Object.values(c.membersBySlot || {});
     const myMembership = members.find(m => String(m.memberEmail || '').toLowerCase().trim() === userEmail);
     if (myMembership) {
-      const slotObj = (act.councilStructure?.slots || []).find(s => s.key === myMembership.slotKey);
+      const slotObj = (c.memberSlots || act.councilStructure?.slots || []).find(s => s.key === myMembership.slotKey);
       return `
           <div class="mt-2.5 p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
             <span class="font-bold text-blue-900 text-xs flex items-center gap-1.5">

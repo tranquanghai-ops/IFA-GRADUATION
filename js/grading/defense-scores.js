@@ -1,4 +1,5 @@
 // ============================================================================
+import { getCouncilMemberScorerId, getCouncilMemberSlots } from './council-score-helpers.js';
 // v2.0.0-beta.1: RUBRIC EVENT HANDLERS & OFFICIAL DEFENSE SCORE & CALIBRATION
 // ============================================================================
 
@@ -72,7 +73,7 @@ export function resolveScoreNumericValue(score, act) {
 
 export function getOfficialDefenseScore(studentId, council, act, round) {
   if (!council || !act) return { score: null, isComplete: false, count: 0, mandatoryComplete: false };
-  const slots = act.councilStructure?.slots || [];
+  const slots = getCouncilMemberSlots(council, act);
   const membersBySlot = council.membersBySlot || {};
   const activityId = act.id;
   const councilId = council.id;
@@ -85,7 +86,7 @@ export function getOfficialDefenseScore(studentId, council, act, round) {
 
   for (const s of slots) {
     const assigned = membersBySlot[s.key];
-    const scorerId = assigned?.memberId || assigned?.memberEmail || assigned?.memberName;
+    const scorerId = getCouncilMemberScorerId(assigned);
     if (!scorerId) continue;
     const scoreKey = `${activityId}_${councilId}_${studentId}_${scorerId}`;
     const score = state.councilScores?.[scoreKey];
@@ -152,7 +153,7 @@ window.finalizeCouncilSession = async function() {
     let missingForStudent = false;
     for (const s of reqSlots) {
       const assignedMem = council.membersBySlot?.[s.key];
-      const scorerId = assignedMem?.memberId || assignedMem?.memberEmail;
+      const scorerId = getCouncilMemberScorerId(assignedMem);
       if (scorerId) {
         const k = `${activityId}_${councilId}_${sId}_${scorerId}`;
         const sc = state.councilScores?.[k];
@@ -285,7 +286,7 @@ window.renderPostCouncilSection = function() {
     .filter(a => a.councilId === councilId)
     .sort((a, b) => (a.order || 0) - (b.order || 0));
 
-  const slots = act.councilStructure?.slots || [];
+  const slots = getCouncilMemberSlots(council, act);
   const membersBySlot = council.membersBySlot || {};
 
   const rowsHtml = assignments.map(asgn => {
@@ -299,7 +300,7 @@ window.renderPostCouncilSection = function() {
 
     const cellsHtml = slots.map(s => {
       const assigned = membersBySlot[s.key];
-      const scorerId = assigned?.memberId || assigned?.memberEmail || assigned?.memberName;
+      const scorerId = getCouncilMemberScorerId(assigned);
       const scoreKey = scorerId ? `${activityId}_${councilId}_${sid}_${scorerId}` : null;
       const score = scoreKey ? state.councilScores?.[scoreKey] : null;
 

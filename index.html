@@ -5169,14 +5169,18 @@
               </label>
               <div class="flex items-center gap-2">
                 <span id="council-conflict-warning" class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md font-semibold hidden">⚠️ Đã ẩn GV bận ở HĐ khác</span>
-                <button type="button" onclick="quickAddCouncilMemberSlot()" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 shadow-2xs transition-all flex items-center gap-1 cursor-pointer" title="Thêm nhanh thêm vị trí Ủy viên vào Hội đồng">
-                  <span class="font-black text-sm leading-none">+</span> <span>Thêm nhanh thành viên</span>
+                <button type="button" onclick="quickAddCouncilMemberSlot('internal')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-200 shadow-2xs transition-all flex items-center gap-1 cursor-pointer">
+                  <span class="font-black text-sm leading-none">+</span> <span>Thêm giảng viên</span>
+                </button>
+                <button type="button" onclick="quickAddCouncilMemberSlot('guest')" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200 shadow-2xs transition-all flex items-center gap-1 cursor-pointer">
+                  <span class="font-black text-sm leading-none">+</span> <span>Thêm khách mời</span>
                 </button>
               </div>
             </div>
             <div id="council-members-form-container" class="space-y-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-              <!-- Rendered dynamically based on activity.councilStructure.slots -->
+              <!-- Rendered from slots specific to this council -->
             </div>
+            <p class="mt-1 text-[11px] text-slate-500">Thành viên thêm hoặc xóa ở đây chỉ áp dụng cho hội đồng này.</p>
           </div>
 
           <!-- Thư mục Google Drive của Hội đồng -->
