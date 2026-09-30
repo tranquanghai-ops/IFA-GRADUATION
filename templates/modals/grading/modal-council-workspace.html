@@ -80,6 +80,12 @@
           <button type="button" id="btn-cws-normal-close" onclick="closeCouncilWorkspace()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-lg text-[11px] font-bold transition-colors cursor-pointer">✕</button>
         </div>
       </div>
+      <div id="cws-secretary-actions" class="hidden cws-header-presentation mt-2 items-center justify-center gap-2" aria-label="Điều khiển lượt trình bày">
+        <label class="cws-header-student-label text-xs font-semibold text-slate-100" for="cws-presentation-student-select">Chọn SV
+          <select id="cws-presentation-student-select" onchange="selectCouncilStudent(this.value, true)" class="ml-1 max-w-[230px] rounded-lg border border-slate-500 bg-slate-800 px-2 py-1.5 text-xs text-white"></select>
+        </label>
+        <div id="cws-secretary-buttons" class="flex flex-wrap items-center justify-center gap-2"></div>
+      </div>
     </div>
 
     <!-- Mobile / Tablet Tab Switcher (Visible only on screens < md) -->
@@ -138,14 +144,6 @@
           <button type="button" onclick="goToCurrentPresentingStudent()" class="px-2.5 py-1 sm:px-3 sm:py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] sm:text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1 shrink-0 cursor-pointer">
             <span>↩ Đang trình bày</span>
           </button>
-        </div>
-
-        <div id="cws-secretary-actions" class="hidden p-3 bg-indigo-50/60 border border-indigo-200 rounded-xl flex flex-wrap items-center justify-center gap-2">
-          <span class="font-bold text-indigo-950 text-xs flex items-center gap-1.5"><span>⚡</span> Điều hành trình bày</span>
-          <label class="text-xs font-semibold text-indigo-950" for="cws-presentation-student-select">Chọn SV:
-            <select id="cws-presentation-student-select" onchange="selectCouncilStudent(this.value, true)" class="ml-1 max-w-[230px] rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs text-slate-900"></select>
-          </label>
-          <div id="cws-secretary-buttons" class="flex flex-wrap items-center justify-center gap-2 w-full"></div>
         </div>
 
         <!-- ONE STUDENT CARD: DETAILS AND PERSONAL SCORE SHEET MOVE TOGETHER -->

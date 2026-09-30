@@ -1706,8 +1706,8 @@ function renderSecretaryControls() {
   const btnWrap = document.getElementById('cws-secretary-buttons');
   if (!container || !btnWrap) return;
 
-  // Chair, secretary (including minutes secretary), or admin may run the presentation.
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
+  // Only the chair and the two secretary roles see the persistent presentation toolbar.
+  if (auth?.role === 'admin' || (!auth?.isSecretary && !auth?.isChair)) {
     container.classList.add('hidden');
     return;
   }

@@ -75,6 +75,17 @@ test('mobile council presentation shows student identity and focused completion 
   assert.doesNotMatch(scoring, /Hệ thống tự động lưu nháp khi chọn\/nhập/);
 });
 
+test('presentation controls stay in the header and are hidden from ordinary members', () => {
+  const template = read('templates/modals/grading/modal-council-workspace.html');
+  const workspace = read('js/grading/rubrics-workspace.js');
+  const styles = read('styles.css');
+  assert.ok(template.indexOf('id="cws-secretary-actions"') < template.indexOf('id="cws-mobile-tab-bar"'));
+  assert.ok(template.indexOf('id="cws-header-timer-container"') < template.indexOf('id="cws-secretary-actions"'));
+  assert.doesNotMatch(template, /Điều hành trình bày/);
+  assert.match(workspace, /auth\?\.role === 'admin' \|\| \(!auth\?\.isSecretary && !auth\?\.isChair\)/);
+  assert.match(styles, /\.cws-header-presentation:not\(\.hidden\) \{ display: flex;/);
+});
+
 test('council edits refresh live authorization indexes and revoke removed members', () => {
   const editor = read('js/grading/councils-editor.js');
   const workspace = read('js/grading/rubrics-workspace.js');

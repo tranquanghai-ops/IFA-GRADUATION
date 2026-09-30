@@ -516,6 +516,10 @@ body.council-standalone-active #modal-confirm {
 .cws-header-identity { grid-column: 1 / -1; grid-row: 1; justify-content: center; padding: 0 38px; }
 .cws-header-actions { grid-column: 2; grid-row: 1; }
 .cws-identity-line { justify-content: center; text-align: center; font-size: 13px; line-height: 1.3; }
+.cws-header-presentation:not(.hidden) { display: flex; flex-wrap: wrap; }
+.cws-header-presentation { padding: 7px 0 2px; border-top: 1px solid rgba(148,163,184,.2); }
+.cws-header-presentation #cws-secretary-buttons { width: auto; }
+.cws-header-presentation select { max-width: min(230px, 72vw); }
 .cws-status-anchor { position: relative; display: inline-flex; align-items: center; }
 .cws-status-dot { display: inline-block; width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid #fff; cursor: pointer; box-shadow: 0 0 0 2px rgba(255,255,255,.24); }
 .cws-status-dot.is-active { background: #22c55e; }
@@ -586,6 +590,10 @@ body.council-standalone-active #modal-confirm {
   .cws-member-menu { left: 0; transform: none; }
 
   .cws-identity-line { gap: 3px; font-size: 11px; }
+  .cws-header-presentation:not(.hidden) { flex-direction: column; gap: 6px; }
+  .cws-header-presentation { margin-top: 5px; padding-top: 7px; }
+  .cws-header-presentation #cws-secretary-buttons { width: 100%; }
+  .cws-header-presentation #cws-secretary-buttons button { min-height: 32px; }
   .cws-member-menu-trigger { font-size: 11px; padding: 2px; }
   .cws-status-details { right: -20px; }
 
