@@ -27,22 +27,57 @@ const ALLOWED_MIME_TYPES = new Set([
   'application/octet-stream', // Generic fallback from various client OS / browsers
 ]);
 
-const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
+const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB technical ceiling = 2,147,483,648 bytes
+const DEFAULT_BUSINESS_LIMIT_BYTES = 100 * 1024 * 1024; // 100 MB default business limit
 
 /**
- * Validates file metadata sent by the frontend.
+ * Calculates effective max file size in bytes based on business limit, bounded by 2 GiB technical ceiling.
+ * Fallback to default business limit (100 MB) if business limit is invalid/missing, never arbitrarily expanding to 2 GiB.
+ * @param {number} [businessLimit]
+ * @param {number} [defaultLimitMB=100]
+ * @returns {number}
+ */
+function getEffectiveMaxBytes(businessLimit, defaultLimitMB = 100) {
+  const fallback = (typeof defaultLimitMB === 'number' && Number.isFinite(defaultLimitMB) && defaultLimitMB > 0)
+    ? Math.floor(defaultLimitMB * 1024 * 1024)
+    : DEFAULT_BUSINESS_LIMIT_BYTES;
+
+  if (
+    typeof businessLimit === 'number' &&
+    Number.isFinite(businessLimit) &&
+    Number.isSafeInteger(businessLimit) &&
+    businessLimit > 0
+  ) {
+    return Math.min(MAX_FILE_SIZE_BYTES, businessLimit);
+  }
+  return Math.min(MAX_FILE_SIZE_BYTES, fallback);
+}
+
+/**
+ * Validates file metadata sent by frontend or backend callers.
  * @param {{ name: string, type: string, size: number }} fileMeta
+ * @param {number} [customMaxBytes]
  * @throws {ValidationError}
  */
-function validateFile(fileMeta) {
-  if (!fileMeta || typeof fileMeta.name !== 'string') {
-    throw new ValidationError('Thiếu thông tin tệp');
+function validateFile(fileMeta, customMaxBytes) {
+  if (!fileMeta || typeof fileMeta.name !== 'string' || !fileMeta.name.trim()) {
+    throw new ValidationError('Thiếu thông tin hoặc tên tệp không hợp lệ');
   }
 
-  const ext = getExtension(fileMeta.name);
+  const trimmedName = fileMeta.name.trim();
+  if (trimmedName.length > 180) {
+    throw new ValidationError('Tên tệp quá dài (tối đa 180 ký tự)');
+  }
+
+  // Reject directory traversal or control characters in filename
+  if (/[\x00-\x1f\\/]/.test(trimmedName)) {
+    throw new ValidationError('Tên tệp chứa ký tự không hợp lệ');
+  }
+
+  const ext = getExtension(trimmedName);
   if (!ALLOWED_EXTENSIONS.has(ext)) {
     throw new ValidationError(
-      'Định dạng tệp không được phép: ' + ext + '. Chấp nhận: ' + [...ALLOWED_EXTENSIONS].join(', ')
+      'Định dạng tệp không được phép: ' + (ext || '(không có phần mở rộng)') + '. Chấp nhận: ' + [...ALLOWED_EXTENSIONS].join(', ')
     );
   }
 
@@ -50,9 +85,22 @@ function validateFile(fileMeta) {
     throw new ValidationError('Loại MIME không được phép: ' + fileMeta.type);
   }
 
-  if (typeof fileMeta.size === 'number' && fileMeta.size > MAX_FILE_SIZE_BYTES) {
+  if (
+    typeof fileMeta.size !== 'number' ||
+    !Number.isFinite(fileMeta.size) ||
+    !Number.isSafeInteger(fileMeta.size) ||
+    fileMeta.size <= 0
+  ) {
+    throw new ValidationError('Dung lượng tệp không hợp lệ: phải là số nguyên dương lớn hơn 0');
+  }
+
+  const effectiveLimit = getEffectiveMaxBytes(customMaxBytes);
+  if (fileMeta.size > effectiveLimit) {
+    const limitLabel = effectiveLimit >= MAX_FILE_SIZE_BYTES
+      ? '2 GiB (2048 MB)'
+      : `${Math.round(effectiveLimit / (1024 * 1024))} MB`;
     throw new ValidationError(
-      'Tệp quá lớn: ' + Math.round(fileMeta.size / 1024 / 1024) + ' MB (tối đa 20 MB)'
+      'Dung lượng tệp không hợp lệ: ' + (fileMeta.size / (1024 * 1024)).toFixed(1) + ' MB (cho phép: 1 byte đến ' + limitLabel + ')'
     );
   }
 }
@@ -122,4 +170,12 @@ class ValidationError extends Error {
   }
 }
 
-module.exports = { validateFile, validateActivity, ValidationError, ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES };
+module.exports = {
+  validateFile,
+  validateActivity,
+  ValidationError,
+  ALLOWED_EXTENSIONS,
+  ALLOWED_MIME_TYPES,
+  MAX_FILE_SIZE_BYTES,
+  getEffectiveMaxBytes,
+};

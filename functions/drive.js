@@ -12,6 +12,7 @@
 
 const https = require('https');
 const { getSecret } = require('./secrets.js');
+const { MAX_BYTES, assertOwned } = require('./policy.js');
 
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
@@ -102,7 +103,7 @@ async function getAccessToken(config) {
 
 /**
  * Creates a resumable upload session for a file in the designated Drive folder.
- * @param {{ filename: string, mimeType: string, studentId: string, activityId: string, folderId: string }} meta
+ * @param {{ filename: string, mimeType: string, studentId: string, activityId: string, roundId?: string, folderId: string, fileSize?: number, uploadedBy?: string, uploadId?: string, origin?: string }} meta
  * @returns {string} resumable session URI (safe to return to frontend)
  */
 async function createUploadSession(meta) {
@@ -116,9 +117,21 @@ async function createUploadSession(meta) {
   // Sanitize filename to prevent path traversal
   const safeFilename = meta.filename.replace(/[\/\\?%*:|"<>]/g, '_');
 
+  const appProperties = {
+    app: 'ifa-graduation',
+    studentId: meta.studentId || '',
+    activityId: meta.activityId || '',
+    ...(meta.roundId ? { roundId: meta.roundId } : {}),
+    ...(meta.uploadedBy ? { uploadedBy: meta.uploadedBy } : { uploadedBy: meta.studentId || '' }),
+    expectedSize: String(meta.fileSize || 0),
+    expectedMime: meta.mimeType || 'application/octet-stream',
+    ...(meta.uploadId ? { uploadId: meta.uploadId } : {}),
+  };
+
   const fileMetadata = {
     name: safeFilename,
     parents: [meta.folderId],
+    appProperties,
     properties: {
       studentId: meta.studentId,
       activityId: meta.activityId,
@@ -140,7 +153,7 @@ async function createUploadSession(meta) {
         'Content-Length': Buffer.byteLength(metaStr),
         'X-Upload-Content-Type': meta.mimeType || 'application/octet-stream',
         ...(meta.fileSize ? { 'X-Upload-Content-Length': meta.fileSize } : {}),
-        'Origin': meta.origin || 'https://tknt-tdtu.web.app',
+        'Origin': meta.origin || 'https://ifa-graduation.web.app',
       },
     };
 
@@ -316,37 +329,192 @@ async function runDriveDiagnostic(folderId) {
   return report;
 }
 
+let _testDriveDriver = null;
+
+function setTestDriveDriver(driver) {
+  _testDriveDriver = driver;
+}
+
 /**
- * Deletes a file from Google Drive by its file ID.
+ * Fetches Google Drive file metadata with security properties.
+ * @param {string} fileId
+ * @returns {Promise<object|null>}
+ */
+async function getDriveFileMetadata(fileId) {
+  if (_testDriveDriver && typeof _testDriveDriver.getDriveFileMetadata === 'function') {
+    return _testDriveDriver.getDriveFileMetadata(fileId);
+  }
+  if (!fileId || typeof fileId !== 'string' || !/^[\w-]{10,200}$/.test(fileId)) {
+    throw new Error('INVALID_FILE_ID');
+  }
+  const config = await loadDriveConfig();
+  if (!config) throw new Error('Drive not configured');
+  const accessToken = await getAccessToken(config);
+
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true&fields=id,name,mimeType,size,trashed,appProperties,webViewLink,parents,createdTime`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(`Drive metadata fetch failed: HTTP ${res.status} ${errData?.error?.message || ''}`);
+  }
+  return await res.json();
+}
+
+/**
+ * Safely moves a file to Google Drive Trash (non-permanent deletion).
  * @param {string} fileId
  * @returns {Promise<boolean>}
  */
-async function deleteDriveFile(fileId) {
+async function trashDriveFile(fileId) {
+  if (_testDriveDriver && typeof _testDriveDriver.trashDriveFile === 'function') {
+    return _testDriveDriver.trashDriveFile(fileId);
+  }
   if (!fileId) return false;
   const config = await loadDriveConfig();
   if (!config) throw new Error('Drive not configured');
   const accessToken = await getAccessToken(config);
 
   const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${accessToken}` },
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ trashed: true }),
   });
 
-  if (res.status === 204 || res.status === 200 || res.status === 404) {
+  if (res.status === 200 || res.status === 204 || res.status === 404) {
     return true;
   }
   const errData = await res.json().catch(() => ({}));
-  console.error('[deleteDriveFile] Failed:', res.status, errData);
+  console.error('[trashDriveFile] Failed:', res.status, errData);
+  return false;
+}
+
+/**
+ * Verifies that a completed upload satisfies ownership, size, MIME type, folder policy, and full context.
+ * FAIL-CLOSED: Rejects if any context parameter is missing or mismatched.
+ * SECURITY: Never automatically trashes files on verification failure to prevent malicious self-deletion exploits.
+ * @param {{ fileId: string, studentId: string, activityId: string, roundId: string, uploadId: string, targetFolderId: string, effectiveBusinessLimit: number }} params
+ * @returns {Promise<object>} verified metadata
+ */
+async function verifyAndCompleteUpload({
+  fileId,
+  studentId,
+  activityId,
+  roundId,
+  uploadId,
+  targetFolderId,
+  effectiveBusinessLimit,
+}) {
+  if (!fileId || typeof fileId !== 'string') {
+    throw new Error('MISSING_FILE_ID');
+  }
+  if (!studentId || typeof studentId !== 'string') {
+    throw new Error('MISSING_STUDENT_ID');
+  }
+  if (!activityId || typeof activityId !== 'string') {
+    throw new Error('MISSING_ACTIVITY_ID');
+  }
+  if (!roundId || typeof roundId !== 'string') {
+    throw new Error('MISSING_ROUND_ID');
+  }
+  if (!uploadId || typeof uploadId !== 'string') {
+    throw new Error('MISSING_UPLOAD_ID');
+  }
+  if (!targetFolderId || typeof targetFolderId !== 'string') {
+    throw new Error('MISSING_TARGET_FOLDER_ID');
+  }
+  if (!effectiveBusinessLimit || typeof effectiveBusinessLimit !== 'number' || effectiveBusinessLimit <= 0) {
+    throw new Error('MISSING_OR_INVALID_BUSINESS_LIMIT');
+  }
+
+  const meta = await getDriveFileMetadata(fileId);
+  if (!meta) {
+    throw new Error('FILE_NOT_FOUND');
+  }
+
+  // Assert ownership: must belong to ifa-graduation and match studentId
+  const p = assertOwned(meta, studentId, true, false);
+
+  // Strict context matching
+  if (p.roundId !== roundId || p.activityId !== activityId || p.uploadId !== uploadId) {
+    throw new Error('CONTEXT_MISMATCH');
+  }
+
+  const fileSize = Number(meta.size);
+  const expectedSize = Number(p.expectedSize);
+
+  if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize !== expectedSize) {
+    throw new Error('FILE_SIZE_MISMATCH');
+  }
+
+  if (fileSize > MAX_BYTES || fileSize > effectiveBusinessLimit) {
+    throw new Error('FILE_SIZE_EXCEEDS_LIMIT');
+  }
+
+  if (meta.mimeType !== p.expectedMime) {
+    throw new Error('FILE_MIME_MISMATCH');
+  }
+
+  if (!Array.isArray(meta.parents) || !meta.parents.includes(targetFolderId)) {
+    throw new Error('INVALID_PARENT_FOLDER');
+  }
+
+  return {
+    fileId: meta.id,
+    fileName: meta.name,
+    mimeType: meta.mimeType,
+    size: fileSize,
+    viewUrl: meta.webViewLink || `https://drive.google.com/file/d/${meta.id}/view`,
+    downloadUrl: `https://drive.google.com/uc?export=download&id=${meta.id}`,
+    studentId: p.studentId,
+    activityId: p.activityId,
+    roundId: p.roundId,
+    uploadedBy: p.uploadedBy,
+    uploadId: p.uploadId,
+    targetFolderId,
+    createdTime: meta.createdTime || new Date().toISOString(),
+  };
+}
+
+/**
+ * Deletes a file by sending it to Google Drive Trash.
+ * Backward-compatible wrapper for trashDriveFile.
+ * @param {string} fileId
+ * @returns {Promise<boolean>}
+ */
+async function deleteDriveFile(fileId) {
+  return await trashDriveFile(fileId);
+}
+
+/**
+ * Helper to check if string points to a Google Doc, Sheet, Slide, or single Drive file.
+ * @param {string} str
+ * @returns {boolean}
+ */
+function isGoogleDriveDocOrFileUrl(str) {
+  if (!str || typeof str !== 'string') return false;
+  const s = str.trim();
+  if (/docs\.google\.com\/(document|spreadsheets|presentation)/i.test(s)) return true;
+  if (/\/file\/d\//i.test(s)) return true;
   return false;
 }
 
 /**
  * Extracts a Google Drive Folder ID from a URL or raw ID string.
+ * Strictly returns null if URL points to a document or single file.
  * @param {string} str
  * @returns {string|null}
  */
 function extractDriveFolderId(str) {
   if (!str || typeof str !== 'string') return null;
+  if (isGoogleDriveDocOrFileUrl(str)) return null;
   const match = str.match(/[-\w]{25,}/);
   return match ? match[0] : null;
 }
@@ -360,9 +528,26 @@ function extractDriveFolderId(str) {
  * @returns {Promise<{ ok: boolean, folderId: string, folderName: string, folderUrl: string, canAddChildren: boolean, checkMethod: string }>}
  */
 async function validateRootDriveFolder(folderIdOrUrl) {
-  const folderId = extractDriveFolderId(folderIdOrUrl);
+  if (!folderIdOrUrl || typeof folderIdOrUrl !== 'string' || !folderIdOrUrl.trim()) {
+    throw new Error('Đường dẫn hoặc Folder ID Google Drive không được để trống.');
+  }
+  const trimmed = folderIdOrUrl.trim();
+
+  // Strict check: reject Docs, Sheets, Slides, or individual Drive files
+  if (/docs\.google\.com\/(document|spreadsheets|presentation)/i.test(trimmed)) {
+    throw new Error('Đường dẫn trỏ đến tệp Google Docs/Sheets/Slides, không phải là thư mục Google Drive.');
+  }
+  if (/\/file\/d\//i.test(trimmed)) {
+    throw new Error('Đường dẫn trỏ đến một tệp Google Drive, không phải là thư mục Google Drive.');
+  }
+
+  const folderId = extractDriveFolderId(trimmed);
   if (!folderId) {
     throw new Error('Đường dẫn hoặc Folder ID Google Drive không hợp lệ (cần ít nhất 25 ký tự).');
+  }
+
+  if (_testDriveDriver && typeof _testDriveDriver.validateRootDriveFolder === 'function') {
+    return _testDriveDriver.validateRootDriveFolder(trimmed, folderId);
   }
 
   const config = await loadDriveConfig();
@@ -492,6 +677,10 @@ async function getOrCreateDriveChildFolder({ parentFolderId, folderName, folderT
     throw new Error('Tên thư mục con không hợp lệ');
   }
 
+  if (_testDriveDriver && typeof _testDriveDriver.getOrCreateDriveChildFolder === 'function') {
+    return _testDriveDriver.getOrCreateDriveChildFolder({ parentFolderId: cleanParentId, folderName: safeName, folderType });
+  }
+
   const config = await loadDriveConfig();
   if (!config) throw new Error('Hệ thống chưa cấu hình kết nối Google Drive (thiếu Secrets).');
 
@@ -568,7 +757,13 @@ module.exports = {
   loadDriveConfig,
   runDriveDiagnostic,
   deleteDriveFile,
+  trashDriveFile,
+  getDriveFileMetadata,
+  verifyAndCompleteUpload,
   extractDriveFolderId,
+  isGoogleDriveDocOrFileUrl,
   validateRootDriveFolder,
   getOrCreateDriveChildFolder,
+  setTestDriveDriver,
+  _setTestDriveDriver: setTestDriveDriver,
 };

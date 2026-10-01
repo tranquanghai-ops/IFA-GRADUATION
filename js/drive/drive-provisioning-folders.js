@@ -85,6 +85,7 @@ async function provisionRoundDriveFolders({ roundId, parentFolderId, folderNames
 function getGraduationApiBase() {
   return window.IFA_CONFIG?.graduationApiEndpoint || window.IFA_CONFIG?.driveUploadEndpoint || 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi';
 }
+window.getGraduationApiBase = getGraduationApiBase;
 
 window.testDriveFolderUrl = async function(type) {
   const inputId = type === 'round' ? 'round-drive-folder-url' : 'sub-drive-folder-url';
@@ -415,10 +416,269 @@ window.connectActivityDriveFolder = async function() {
   }
 };
 
+// =========================================================================
+// SYSTEM DRIVE ROOT CONFIGURATION CONTROLLER (IFA+ GRADUATION)
+// =========================================================================
+let _validatedGraduationDriveData = null;
 
-// ============================================================================
-// IFA+ GRADUATION BETA v2.2.0-beta.1:
-// STUDENT SUBMISSION / FILE UPLOAD + GOOGLE DRIVE READY ARCHITECTURE
-// ============================================================================
+export function getValidatedGraduationDriveData() {
+  return _validatedGraduationDriveData;
+}
 
-// 1. FILENAME RULE ENGINE & NORMALIZATION (NO AI)
+export async function loadSystemDriveConfig() {
+  const urlInput = document.getElementById('graduation-drive-root-url');
+  const statusEl = document.getElementById('graduation-drive-status');
+  const detailsBox = document.getElementById('graduation-drive-details');
+  const folderNameEl = document.getElementById('graduation-drive-folder-name');
+  const folderIdEl = document.getElementById('graduation-drive-folder-id');
+  const openLink = document.getElementById('link-open-graduation-drive');
+
+  if (!urlInput) return;
+
+  try {
+    let driveConfig = null;
+    // 1. Try reading graduationSystemConfig/drive from Firestore
+    if (typeof getDoc === 'function' && typeof doc === 'function' && typeof db !== 'undefined' && db) {
+      const snap = await getDoc(doc(db, 'graduationSystemConfig', 'drive')).catch(() => null);
+      if (snap && snap.exists()) {
+        driveConfig = snap.data();
+      }
+    }
+
+    // 2. Fallback to settings/main driveConfig
+    if (!driveConfig && typeof getDoc === 'function' && typeof doc === 'function' && typeof db !== 'undefined' && db) {
+      const snap = await getDoc(doc(db, 'settings', 'main')).catch(() => null);
+      if (snap && snap.exists()) {
+        const d = snap.data();
+        driveConfig = d.driveConfig || (d.graduationRootFolderId ? d : null);
+      }
+    }
+
+    if (driveConfig && (driveConfig.graduationRootFolderId || driveConfig.graduationRootFolderUrl)) {
+      const folderUrl = driveConfig.graduationRootFolderUrl || `https://drive.google.com/drive/folders/${driveConfig.graduationRootFolderId}`;
+      urlInput.value = folderUrl;
+      if (statusEl) {
+        statusEl.textContent = '✅ Đã cấu hình trên hệ thống';
+        statusEl.className = 'font-semibold text-emerald-600';
+      }
+      if (folderNameEl) folderNameEl.textContent = driveConfig.graduationRootFolderName || 'Google Drive DATN';
+      if (folderIdEl) folderIdEl.textContent = driveConfig.graduationRootFolderId || '--';
+      if (detailsBox) detailsBox.classList.remove('hidden');
+      if (openLink) {
+        openLink.href = folderUrl;
+        openLink.classList.remove('hidden');
+      }
+      _validatedGraduationDriveData = {
+        folderId: driveConfig.graduationRootFolderId,
+        folderName: driveConfig.graduationRootFolderName || 'Google Drive DATN',
+        folderUrl,
+      };
+    }
+  } catch (err) {
+    console.warn('[SystemSettings] loadSystemDriveConfig error:', err);
+  }
+}
+window.loadSystemDriveConfig = loadSystemDriveConfig;
+
+export async function onValidateGraduationDriveClick() {
+  const urlInput = document.getElementById('graduation-drive-root-url');
+  const btn = document.getElementById('btn-validate-graduation-drive');
+  const statusEl = document.getElementById('graduation-drive-status');
+  const detailsBox = document.getElementById('graduation-drive-details');
+  const folderNameEl = document.getElementById('graduation-drive-folder-name');
+  const folderIdEl = document.getElementById('graduation-drive-folder-id');
+  const errBox = document.getElementById('graduation-drive-error');
+  const successBox = document.getElementById('graduation-drive-success');
+  const saveBtn = document.getElementById('btn-save-graduation-drive');
+  const openLink = document.getElementById('link-open-graduation-drive');
+
+  if (errBox) errBox.classList.add('hidden');
+  if (successBox) successBox.classList.add('hidden');
+  if (detailsBox) detailsBox.classList.add('hidden');
+  if (openLink) openLink.classList.add('hidden');
+
+  const rawInput = (urlInput?.value || '').trim();
+  if (!rawInput) {
+    if (statusEl) {
+      statusEl.textContent = '⚠ Vui lòng nhập URL hoặc Folder ID của thư mục';
+      statusEl.className = 'font-semibold text-amber-600';
+    }
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ Đang kiểm tra...</span>';
+  }
+  if (statusEl) {
+    statusEl.textContent = '⏳ Đang kết nối xác thực Google Drive...';
+    statusEl.className = 'font-semibold text-blue-600';
+  }
+
+  try {
+    const idToken = state.user ? await state.user.getIdToken() : null;
+    if (!idToken) throw new Error('Phiên đăng nhập hết hạn hoặc chưa đăng nhập Admin.');
+
+    const res = await fetch(getGraduationApiBase() + '/api/graduation/admin/verify-drive-folder', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + idToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ folderUrlOrId: rawInput }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+
+    _validatedGraduationDriveData = {
+      folderId: data.folderId,
+      folderName: data.folderName || 'Thư mục Google Drive DATN',
+      folderUrl: data.folderUrl || `https://drive.google.com/drive/folders/${data.folderId}`,
+      canAddChildren: Boolean(data.canAddChildren),
+    };
+
+    if (statusEl) {
+      statusEl.textContent = '✅ Thư mục hợp lệ — Có thể sử dụng';
+      statusEl.className = 'font-semibold text-emerald-600';
+    }
+    if (folderNameEl) folderNameEl.textContent = _validatedGraduationDriveData.folderName;
+    if (folderIdEl) folderIdEl.textContent = _validatedGraduationDriveData.folderId;
+    if (detailsBox) detailsBox.classList.remove('hidden');
+
+    if (openLink) {
+      openLink.href = _validatedGraduationDriveData.folderUrl;
+      openLink.classList.remove('hidden');
+    }
+
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.className = 'px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer';
+    }
+
+    if (typeof showToast === 'function') {
+      showToast('✓ Thư mục Google Drive hợp lệ và sẵn sàng lưu cấu hình!', 'success', 3500);
+    }
+  } catch (err) {
+    _validatedGraduationDriveData = null;
+    if (statusEl) {
+      statusEl.textContent = '❌ Không hợp lệ: ' + err.message;
+      statusEl.className = 'font-semibold text-rose-600';
+    }
+    if (errBox) {
+      errBox.textContent = '❌ Lỗi kiểm tra thư mục: ' + err.message;
+      errBox.classList.remove('hidden');
+    }
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.className = 'px-5 py-2 bg-slate-300 text-slate-500 font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5 cursor-not-allowed';
+    }
+    if (typeof showToast === 'function') {
+      showToast('❌ Thư mục không hợp lệ: ' + err.message, 'error', 5000);
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>🔍</span> <span>Kiểm tra thư mục</span>';
+    }
+  }
+}
+window.onValidateGraduationDriveClick = onValidateGraduationDriveClick;
+
+export async function onSaveGraduationDriveConfigSubmit(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+
+  const errBox = document.getElementById('graduation-drive-error');
+  const successBox = document.getElementById('graduation-drive-success');
+  const saveBtn = document.getElementById('btn-save-graduation-drive');
+
+  if (errBox) errBox.classList.add('hidden');
+  if (successBox) successBox.classList.add('hidden');
+
+  if (!_validatedGraduationDriveData) {
+    if (errBox) {
+      errBox.textContent = 'Vui lòng bấm "Kiểm tra thư mục" và xác nhận hợp lệ trước khi lưu cấu hình.';
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span>⏳ Đang lưu cấu hình...</span>';
+  }
+
+  try {
+    const idToken = state.user ? await state.user.getIdToken() : null;
+    if (!idToken) throw new Error('Phiên đăng nhập hết hạn hoặc chưa đăng nhập Admin.');
+
+    const res = await fetch(getGraduationApiBase() + '/api/graduation/admin/save-drive-config', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + idToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        folderUrl: _validatedGraduationDriveData.folderUrl,
+        folderId: _validatedGraduationDriveData.folderId,
+        folderName: _validatedGraduationDriveData.folderName,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+
+    if (successBox) {
+      successBox.innerHTML = `<strong>✓ Lưu cấu hình thành công!</strong> Thư mục gốc đã được thiết lập cho toàn bộ đồ án tốt nghiệp: <span class="font-mono text-xs">${_validatedGraduationDriveData.folderId}</span>`;
+      successBox.classList.remove('hidden');
+    }
+
+    if (typeof showToast === 'function') {
+      showToast('✓ Đã lưu Cấu Hình Thư Mục Google Drive thành công!', 'success', 4000);
+    }
+  } catch (err) {
+    if (errBox) {
+      errBox.textContent = 'Lỗi lưu cấu hình: ' + err.message;
+      errBox.classList.remove('hidden');
+    }
+    if (typeof showToast === 'function') {
+      showToast('Lỗi lưu cấu hình: ' + err.message, 'error', 5000);
+    }
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<span>💾</span> <span>Lưu Cấu Hình Drive</span>';
+    }
+  }
+}
+window.onSaveGraduationDriveConfigSubmit = onSaveGraduationDriveConfigSubmit;
+
+// Reset validation state when input value changes
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    const inputEl = document.getElementById('graduation-drive-root-url');
+    if (inputEl) {
+      inputEl.addEventListener('input', () => {
+        _validatedGraduationDriveData = null;
+        const statusEl = document.getElementById('graduation-drive-status');
+        const detailsBox = document.getElementById('graduation-drive-details');
+        const openLink = document.getElementById('link-open-graduation-drive');
+        const saveBtn = document.getElementById('btn-save-graduation-drive');
+        if (statusEl) {
+          statusEl.textContent = 'Chưa kiểm tra';
+          statusEl.className = 'font-semibold text-slate-600';
+        }
+        if (detailsBox) detailsBox.classList.add('hidden');
+        if (openLink) openLink.classList.add('hidden');
+        if (saveBtn) {
+          saveBtn.disabled = true;
+          saveBtn.className = 'px-5 py-2 bg-slate-300 text-slate-500 font-bold rounded-xl text-xs shadow-xs transition flex items-center gap-1.5 cursor-not-allowed';
+        }
+      });
+    }
+  });
+}

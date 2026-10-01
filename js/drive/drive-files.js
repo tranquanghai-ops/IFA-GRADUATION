@@ -114,7 +114,22 @@ window.submitStudentFiles = async function(actId) {
     if (!uploadRes.success) {
       // HONEST ERROR REPORTING: Never fake success
       if (errBox) {
-        errBox.innerHTML = `<strong>⚠️ ${uploadRes.status === 'backendRequired' ? 'Bảo mật Google Drive:' : 'Lỗi tải lên:'}</strong><br>${uploadRes.error}`;
+        let retryBtnHtml = '';
+        if (uploadRes.canRetryComplete && typeof uploadRes.retryComplete === 'function') {
+          window._pendingRetryComplete = {
+            actId,
+            attemptNum,
+            retryComplete: uploadRes.retryComplete,
+            file,
+            valRes,
+            targetStudent,
+            userMssv,
+            round,
+            act
+          };
+          retryBtnHtml = `<div class="mt-2"><button type="button" onclick="window.retryStudentComplete('${actId}')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded font-medium text-xs shadow inline-flex items-center gap-1.5">🔄 Thử xác nhận lại (không tải lại tệp)</button></div>`;
+        }
+        errBox.innerHTML = `<strong>⚠️ ${uploadRes.status === 'backendRequired' ? 'Bảo mật Google Drive:' : 'Lỗi tải lên:'}</strong><br>${uploadRes.error}${retryBtnHtml}`;
         errBox.classList.remove('hidden');
       }
       showToast(uploadRes.error || 'Tải tệp không thành công', 'error');
@@ -153,31 +168,59 @@ window.submitStudentFiles = async function(actId) {
       submittedBy: getEffectiveActor().email || userMssv
     };
 
-    if (!round.activitySubmissions) round.activitySubmissions = {};
-    if (!round.activitySubmissions[act.id]) round.activitySubmissions[act.id] = {};
-    const existingEntry = round.activitySubmissions[act.id][userMssv] || { attempts: [] };
+    const existingEntry = round.activitySubmissions?.[act.id]?.[userMssv] || { attempts: [] };
     const newAttempts = [...(existingEntry.attempts || []), submissionMetadata];
 
-    round.activitySubmissions[act.id][userMssv] = {
-      currentSubmission: submissionMetadata,
-      attempts: newAttempts
-    };
+    // Call authenticated backend to persist submission via Service Account (FAIL-CLOSED)
+    const endpoint = (typeof getGraduationApiBase === 'function') ? getGraduationApiBase() : (window.IFA_CONFIG?.graduationApiEndpoint || window.IFA_CONFIG?.driveUploadEndpoint || 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi');
+    const idToken = state.user ? await state.user.getIdToken() : null;
 
-    // Save metadata to Firestore round document
-    try {
-      const roundRef = doc(db, 'graduationRounds', round.id);
-      await updateDoc(roundRef, {
-        [`activitySubmissions.${act.id}.${userMssv}`]: {
-          currentSubmission: submissionMetadata,
-          attempts: newAttempts
-        },
-        updatedAt: serverTimestamp()
-      });
-    } catch (e) {
-      console.warn('Could not update Firestore activitySubmissions directly:', e);
+    if (!endpoint || !idToken) {
+      throw new Error('Chưa cấu hình endpoint backend hoặc chưa đăng nhập hợp lệ.');
     }
 
-    showToast(`✅ Nộp bài thành công! Mã biên nhận: ${receiptId}`, 'success');
+    const submitRes = await fetch(endpoint + '/api/graduation/submit-activity', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + idToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        roundId: round.id,
+        activityId: act.id,
+        studentId: userMssv,
+        studentName: targetStudent.studentName,
+        files: [
+          {
+            originalName: file.name,
+            validatedName: valRes.expectedFilename,
+            size: file.size,
+            mimeType: file.type || 'application/octet-stream',
+            storageProvider: uploadRes.storageProvider || 'google_drive',
+            providerFileId: uploadRes.providerFileId,
+            providerUrl: uploadRes.providerUrl
+          }
+        ]
+      })
+    });
+
+    const submitData = await submitRes.json().catch(() => ({}));
+    if (!submitRes.ok || !submitData.ok) {
+      throw new Error(submitData.message || submitData.error || ('Lỗi máy chủ HTTP ' + submitRes.status));
+    }
+
+    // In-memory assignment strictly AFTER backend confirms write
+    if (!round.activitySubmissions) round.activitySubmissions = {};
+    if (!round.activitySubmissions[act.id]) round.activitySubmissions[act.id] = {};
+    round.activitySubmissions[act.id][userMssv] = {
+      currentSubmission: submitData.submission,
+      attempts: submitData.attempts
+    };
+
+    showToast(`✅ Nộp bài thành công! Mã biên nhận: ${submitData.receiptId || receiptId}`, 'success');
+    if (submitData.auditLogged === false) {
+      showToast(submitData.auditWarning || 'Bài đã lưu nhưng nhật ký kiểm toán chưa ghi được.', 'warning');
+    }
     loadStudentRoundActivities(round.id);
   } catch (err) {
     console.error('Submit error:', err);
@@ -190,6 +233,112 @@ window.submitStudentFiles = async function(actId) {
     window._currentUploadAbort = null;
     if (submitBtn) {
       submitBtn.disabled = false;
+    }
+    if (progWrap) progWrap.classList.add('hidden');
+  }
+};
+
+window.retryStudentComplete = async function(actId) {
+  const pending = window._pendingRetryComplete;
+  if (!pending || pending.actId !== actId) {
+    showToast('Không tìm thấy phiên tải lên để thử lại.', 'warning');
+    return;
+  }
+  const { attemptNum, retryComplete, file, valRes, targetStudent, userMssv, round, act } = pending;
+  const submitBtn = document.getElementById(`btn-submit-${actId}`);
+  const errBox = document.getElementById(`upload-error-${actId}`);
+  const progWrap = document.getElementById(`upload-progress-wrap-${actId}`);
+  const progText = document.getElementById(`upload-progress-text-${actId}`);
+
+  try {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Đang xác nhận lại với Google Drive...';
+    }
+    if (progWrap) progWrap.classList.remove('hidden');
+    if (progText) progText.textContent = 'Đang xác nhận hoàn tất tệp với máy chủ...';
+    if (errBox) errBox.classList.add('hidden');
+
+    const uploadRes = await retryComplete();
+    if (!uploadRes || !uploadRes.success) {
+      const err = uploadRes?.error || 'Xác nhận lại không thành công';
+      if (errBox) {
+        let retryBtnHtml = '';
+        if (uploadRes?.canRetryComplete && typeof uploadRes.retryComplete === 'function') {
+          pending.retryComplete = uploadRes.retryComplete;
+          retryBtnHtml = `<div class="mt-2"><button type="button" onclick="window.retryStudentComplete('${actId}')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded font-medium text-xs shadow inline-flex items-center gap-1.5">🔄 Thử xác nhận lại (không tải lại tệp)</button></div>`;
+        }
+        errBox.innerHTML = `<strong>⚠️ Lỗi xác nhận tệp:</strong><br>${err}${retryBtnHtml}`;
+        errBox.classList.remove('hidden');
+      }
+      showToast(err, 'error');
+      return;
+    }
+
+    // Success! Clear pending
+    delete window._pendingRetryComplete;
+
+    // Proceed to submit metadata to backend
+    const receiptId = 'REC-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    const endpoint = (typeof getGraduationApiBase === 'function') ? getGraduationApiBase() : (window.IFA_CONFIG?.graduationApiEndpoint || window.IFA_CONFIG?.driveUploadEndpoint || 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi');
+    const idToken = state.user ? await state.user.getIdToken() : null;
+    if (!endpoint || !idToken) {
+      throw new Error('Chưa cấu hình endpoint backend hoặc chưa đăng nhập hợp lệ.');
+    }
+
+    const submitRes = await fetch(endpoint + '/api/graduation/submit-activity', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + idToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        roundId: round.id,
+        activityId: act.id,
+        studentId: userMssv,
+        studentName: targetStudent.studentName,
+        files: [
+          {
+            originalName: file.name,
+            validatedName: valRes.expectedFilename,
+            size: file.size,
+            mimeType: file.type || 'application/octet-stream',
+            storageProvider: uploadRes.storageProvider || 'google_drive',
+            providerFileId: uploadRes.providerFileId,
+            providerUrl: uploadRes.providerUrl
+          }
+        ]
+      })
+    });
+
+    const submitData = await submitRes.json().catch(() => ({}));
+    if (!submitRes.ok || !submitData.ok) {
+      throw new Error(submitData.message || submitData.error || ('Lỗi máy chủ HTTP ' + submitRes.status));
+    }
+
+    if (!round.activitySubmissions) round.activitySubmissions = {};
+    if (!round.activitySubmissions[act.id]) round.activitySubmissions[act.id] = {};
+    round.activitySubmissions[act.id][userMssv] = {
+      currentSubmission: submitData.submission,
+      attempts: submitData.attempts
+    };
+
+    showToast(`✅ Nộp bài thành công! Mã biên nhận: ${submitData.receiptId || receiptId}`, 'success');
+    if (submitData.auditLogged === false) {
+      showToast(submitData.auditWarning || 'Bài đã lưu nhưng nhật ký kiểm toán chưa ghi được.', 'warning');
+    }
+    loadStudentRoundActivities(round.id);
+  } catch (err) {
+    console.error('Retry complete error:', err);
+    if (errBox) {
+      errBox.innerHTML = `<strong>⚠️ Lỗi hệ thống:</strong><br>${err.message || 'Quá trình xác nhận bị gián đoạn'}`;
+      errBox.classList.remove('hidden');
+    }
+    showToast('Lỗi khi xác nhận: ' + (err.message || 'Không xác định'), 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = `📤 Nộp bài (Lần ${attemptNum}/${valRes.rules.totalAllowedAttempts})`;
     }
     if (progWrap) progWrap.classList.add('hidden');
   }
@@ -214,71 +363,57 @@ window.withdrawStudentSubmission = async function(actId, attemptNum, optRoundId)
 
   const confirmed = await showConfirm(
     'Xác nhận rút bài nộp?',
-    'Tệp trên Google Drive sẽ được tự động xóa để giải phóng dung lượng. Bài nộp này sẽ chuyển sang trạng thái "Đã rút" và bạn có thể nộp lại nếu còn lượt.',
+    'Tệp trên Google Drive sẽ được tự động chuyển vào Thùng rác để giải phóng dung lượng. Bài nộp này sẽ chuyển sang trạng thái "Đã rút" và bạn có thể nộp lại nếu còn lượt.',
     { confirmText: 'Rút bài nộp', cancelText: 'Hủy', danger: true }
   );
   if (!confirmed) return;
 
   try {
-    showToast('Đang xử lý rút bài và xóa tệp Drive...', 'info');
+    showToast('Đang xử lý rút bài trên hệ thống...', 'info');
 
-    const withdrawnSubmission = {
-      ...subEntry.currentSubmission,
-      status: 'withdrawn',
-      withdrawnAt: new Date().toISOString()
-    };
-
-    const updatedAttempts = (subEntry.attempts || []).map(att => {
-      if (att.receiptId === withdrawnSubmission.receiptId || (!att.receiptId && att.attempt === attemptNum)) {
-        return { ...att, status: 'withdrawn', withdrawnAt: new Date().toISOString() };
-      }
-      return att;
-    });
-
-    // Call backend to delete file from Google Drive
-    const endpoint = window.IFA_CONFIG?.driveUploadEndpoint;
+    // Call authenticated backend to withdraw via Service Account (FAIL-CLOSED)
+    const endpoint = (typeof getGraduationApiBase === 'function') ? getGraduationApiBase() : (window.IFA_CONFIG?.graduationApiEndpoint || window.IFA_CONFIG?.driveUploadEndpoint || 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi');
     const idToken = state.user ? await state.user.getIdToken() : null;
-    const filesToDelete = (subEntry.currentSubmission.files || []).filter(f => f.providerFileId && f.storageProvider === 'google_drive');
 
-    if (endpoint && idToken && filesToDelete.length > 0) {
-      for (const f of filesToDelete) {
-        try {
-          const delRes = await fetch(endpoint + '/api/graduation/delete-file', {
-            method: 'POST',
-            headers: {
-              'Authorization': 'Bearer ' + idToken,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ fileId: f.providerFileId })
-          });
-          console.log('[withdraw] Delete Drive file response status:', delRes.status);
-        } catch (errDel) {
-          console.warn('[withdraw] Error deleting file from Drive:', errDel);
-        }
-      }
+    if (!endpoint || !idToken) {
+      throw new Error('Chưa cấu hình endpoint backend hoặc chưa đăng nhập hợp lệ.');
     }
 
+    const withdrawRes = await fetch(endpoint + '/api/graduation/withdraw-activity', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + idToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        roundId: round.id,
+        activityId: actId,
+        studentId: userMssv,
+        attemptNum: attemptNum
+      })
+    });
+
+    const withdrawData = await withdrawRes.json().catch(() => ({}));
+    if (!withdrawRes.ok || !withdrawData.ok) {
+      throw new Error(withdrawData.message || withdrawData.error || ('Lỗi máy chủ HTTP ' + withdrawRes.status));
+    }
+
+    // In-memory assignment strictly AFTER backend confirms write
     if (!round.activitySubmissions) round.activitySubmissions = {};
     if (!round.activitySubmissions[actId]) round.activitySubmissions[actId] = {};
     round.activitySubmissions[actId][userMssv] = {
-      currentSubmission: withdrawnSubmission,
-      attempts: updatedAttempts
+      currentSubmission: withdrawData.submission,
+      attempts: withdrawData.attempts
     };
 
-    try {
-      const roundRef = doc(db, 'graduationRounds', round.id);
-      await updateDoc(roundRef, {
-        [`activitySubmissions.${actId}.${userMssv}`]: {
-          currentSubmission: withdrawnSubmission,
-          attempts: updatedAttempts
-        },
-        updatedAt: serverTimestamp()
-      });
-    } catch (e) {
-      console.warn('[withdraw] Could not update Firestore directly:', e);
+    if (withdrawData.driveCleaned) {
+      showToast('✅ Đã rút bài nộp và chuyển tệp vào Thùng rác Google Drive.', 'success');
+    } else {
+      showToast('⚠️ Bài nộp đã được rút trên hệ thống. ' + (withdrawData.driveWarning || 'Tệp Google Drive chưa được xóa hoàn toàn.'), 'warning');
     }
-
-    showToast('Đã rút bài nộp và xóa tệp thành công!', 'success');
+    if (withdrawData.auditLogged === false) {
+      showToast(withdrawData.auditWarning || 'Bài đã rút nhưng nhật ký kiểm toán chưa ghi được.', 'warning');
+    }
     loadStudentRoundActivities(round.id);
   } catch (err) {
     console.error('Withdraw error:', err);

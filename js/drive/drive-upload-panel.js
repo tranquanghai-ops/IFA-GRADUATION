@@ -1,6 +1,8 @@
 /**
  * IFA+ Graduation — Drive Upload Providers & Student Submission Panel
  */
+import { uploadFileToDriveResumable } from './upload-protocol.js';
+
 window.uploadProvider = {
   async upload({ file, student, activity, round, attempt, onProgress, abortSignal }) {
     const providerType = activity?.submissionConfig?.storageProvider || 'google_drive';
@@ -27,7 +29,9 @@ window.GoogleDriveTrustedUploader = {
         error: '[CHẾ ĐỘ CHỈ ĐỌC] Không thể tải tệp lên trong chế độ đóng vai.'
       };
     }
-    const endpoint = window.IFA_CONFIG?.driveUploadEndpoint;
+    const endpoint = (typeof getGraduationApiBase === 'function')
+      ? getGraduationApiBase()
+      : (window.IFA_CONFIG?.graduationApiEndpoint || window.IFA_CONFIG?.driveUploadEndpoint || 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi');
     if (!endpoint) {
       return {
         success: false,
@@ -41,6 +45,11 @@ window.GoogleDriveTrustedUploader = {
         return { success: false, error: 'Chưa đăng nhập. Vui lòng tải lại trang và đăng nhập lại.' };
       }
 
+      const uploadId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : ('up-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
+
+      // 1. Create upload session (server-derived folder, no client folder IDOR)
       const sessionRes = await fetch(endpoint + '/api/graduation/upload-session', {
         method: 'POST',
         headers: {
@@ -51,7 +60,7 @@ window.GoogleDriveTrustedUploader = {
           activityId: activity.id,
           roundId: round.id,
           studentId: student.studentId || student.mssv,
-          folderId: activity?.submissionConfig?.driveFolderId || activity?.driveFolderId || round?.driveRootFolderId || '1M37ovlEHS3ufftFPZHGj1mQWec7r8Tj7',
+          uploadId,
           file: {
             name: file.name,
             type: file.type || 'application/octet-stream',
@@ -71,51 +80,89 @@ window.GoogleDriveTrustedUploader = {
         return { success: false, error: 'Không thể tạo phiên tải lên (Session URI rỗng).' };
       }
 
-      return await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', sessionUri, true);
-        xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      // 2. Resumable Chunked Upload Engine (32 MiB chunks, 256 KiB alignment, auto resume/retry)
+      const uploaderFn = (typeof uploadFileToDriveResumable === 'function')
+        ? uploadFileToDriveResumable
+        : window.DriveUploadProtocol?.uploadFileToDriveResumable;
 
-        if (abortSignal) {
-          abortSignal.addEventListener('abort', () => {
-            xhr.abort();
-            resolve({ success: false, error: 'Đã hủy tải lên.' });
-          });
-        }
+      if (!uploaderFn) {
+        throw new Error('Upload protocol engine chưa được nạp.');
+      }
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable && onProgress) {
-            const pct = Math.round((e.loaded / e.total) * 100);
-            onProgress(pct);
+      const driveResult = await uploaderFn(sessionUri, file, {
+        signal: abortSignal,
+        onProgress: (state) => {
+          if (typeof onProgress === 'function') {
+            onProgress(state.percent, state.message);
           }
-        };
+        },
+      });
 
-        xhr.onload = () => {
-          if (xhr.status === 200 || xhr.status === 201 || xhr.status === 308) {
-            let resObj = {};
-            try { resObj = JSON.parse(xhr.responseText); } catch (e) {}
-            resolve({
+      if (!driveResult?.fileId) {
+        return { success: false, error: 'Không nhận được mã tệp Google Drive sau khi tải lên.' };
+      }
+
+      // 3. Complete & Verify upload integrity on backend
+      const performComplete = async () => {
+        const freshToken = state.user ? await state.user.getIdToken() : idToken;
+        const completeRes = await fetch(endpoint + '/api/graduation/complete', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + freshToken,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fileId: driveResult.fileId,
+            activityId: activity.id,
+            roundId: round.id,
+            uploadId,
+          }),
+          signal: abortSignal,
+        });
+
+        const completeData = await completeRes.json().catch(() => ({}));
+        if (!completeRes.ok) {
+          throw new Error(completeData.error || `Xác nhận tệp Drive thất bại (HTTP ${completeRes.status}).`);
+        }
+        return completeData.file || {};
+      };
+
+      try {
+        const verified = await performComplete();
+        return {
+          success: true,
+          status: 'submitted',
+          providerFileId: verified.fileId || driveResult.fileId,
+          providerUrl: verified.viewUrl || `https://drive.google.com/file/d/${driveResult.fileId}/view`,
+          downloadUrl: verified.downloadUrl || null,
+          storageProvider: 'google_drive',
+        };
+      } catch (completeErr) {
+        return {
+          success: false,
+          canRetryComplete: true,
+          driveFileId: driveResult.fileId,
+          uploadId,
+          retryComplete: async () => {
+            const verifiedRetry = await performComplete();
+            return {
               success: true,
               status: 'submitted',
-              providerFileId: resObj.id || 'drive_file_unknown',
-              providerUrl: resObj.id ? `https://drive.google.com/file/d/${resObj.id}/view` : null,
-              storageProvider: 'google_drive'
-            });
-          } else {
-            resolve({ success: false, error: `Lỗi lưu trữ Drive (${xhr.status}).` });
-          }
+              providerFileId: verifiedRetry.fileId || driveResult.fileId,
+              providerUrl: verifiedRetry.viewUrl || `https://drive.google.com/file/d/${driveResult.fileId}/view`,
+              downloadUrl: verifiedRetry.downloadUrl || null,
+              storageProvider: 'google_drive',
+            };
+          },
+          error: completeErr.message || 'Xác nhận tệp Drive thất bại sau khi tải lên.',
         };
-
-        xhr.onerror = (e) => {
-          console.error('[GoogleDriveTrustedUploader] XHR error:', e, xhr.status, xhr.statusText);
-          resolve({ success: false, error: 'Lỗi mạng khi tải lên Drive.' });
-        };
-        xhr.send(file);
-      });
+      }
     } catch (err) {
-      if (err.name === 'AbortError') return { success: false, error: 'Đã hủy tải lên.' };
+      if (err.name === 'AbortError' || err.code === 'UPLOAD_CANCELLED') {
+        return { success: false, error: 'Đã hủy tải lên.' };
+      }
       console.error('[GoogleDriveTrustedUploader] error:', err);
-      return { success: false, error: 'Lỗi hệ thống trong quá trình tải lên.' };
+      return { success: false, error: err.message || 'Lỗi hệ thống trong quá trình tải lên.' };
     }
   }
 };

@@ -118,6 +118,11 @@ export async function loadAdminSystemSettings() {
     }
 
     updateSettingsActAsSessionUI();
+
+    // Load Google Drive root folder configuration
+    if (typeof window.loadSystemDriveConfig === 'function') {
+      await window.loadSystemDriveConfig();
+    }
   } catch (e) {
     console.warn('[SystemSettings] Error loading settings:', e);
   }
