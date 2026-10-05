@@ -210,21 +210,25 @@ function renderAdminEligibleStudentsTable() {
       const fallback = effective?.acceptedSupervisorName || effective?.assignedSupervisorName || effective?.supervisorName || registration?.acceptedSupervisorName;
       if (fallback) names.push(fallback);
     }
-    const topic = String(registration?.topicTitle || registration?.topic || '').trim();
+    const topic = String(registration?.topicTitle || registration?.topic || published?.topicTitle || draft?.topicTitle || '').trim();
+    const rawTopicStatus = registration?.topicApprovalStatus || registration?.approvalStatus || published?.topicApprovalStatus || draft?.topicApprovalStatus;
+    const topicApprovalStatus = rawTopicStatus || (topic ? 'pending' : '');
     const preferences = !directAssignment && !names.length && Array.isArray(registration?.preferences)
       ? registration.preferences.slice().sort((a, b) => Number(a.rank) - Number(b.rank))
         .map(pref => `NV${pref.rank}: ${pref.supervisorName || pref.name || ''}`).filter(item => !item.endsWith(': '))
       : [];
-    return { topic, names, preferences };
+    return { topic, names, preferences, topicApprovalStatus, registration };
   };
 
   const filtered = mergedList.filter(s => {
     if (!searchTerm) return true;
     const nameText = typeof s.resolvedName === 'string' ? s.resolvedName.replace(/<[^>]*>/g, '').toLowerCase() : '';
     const status = getStudentStatus(s);
+    const statusText = status.topicApprovalStatus === 'approved' ? 'đã duyệt da duyet' : (status.topicApprovalStatus === 'rejected' ? 'yêu cầu sửa yeu cau sua' : (status.topic ? 'chờ duyệt cho duyet đang chờ duyệt dang cho duyet' : 'chưa đăng ký chua dang ky'));
     return (s.studentId || '').toLowerCase().includes(searchTerm) ||
       nameText.includes(searchTerm) ||
       status.topic.toLowerCase().includes(searchTerm) ||
+      statusText.includes(searchTerm) ||
       status.names.join(' ').toLowerCase().includes(searchTerm) ||
       status.preferences.join(' ').toLowerCase().includes(searchTerm) ||
       (s.resolvedClass || '').toLowerCase().includes(searchTerm);
@@ -243,6 +247,17 @@ function renderAdminEligibleStudentsTable() {
         ? `<div class="mt-1 text-[11px] text-slate-600">${status.preferences.map(escapeHtml).join(' · ')}</div>`
         : (directAssignment ? '<div class="mt-1 text-[11px] text-slate-500">GVHD: Chưa phân công</div>' : ''));
     
+    let topicBadge = '';
+    if (status.topic) {
+      if (status.topicApprovalStatus === 'approved') {
+        topicBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">✓ Đã duyệt</span>';
+      } else if (status.topicApprovalStatus === 'rejected') {
+        topicBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">✕ Yêu cầu sửa</span>';
+      } else {
+        topicBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">⏳ Chờ duyệt</span>';
+      }
+    }
+
     const activityBadge = typeof window.renderUserActivityBadge === 'function'
       ? window.renderUserActivityBadge(s.studentId)
       : '<span class="text-slate-400 text-xs">--</span>';
@@ -254,7 +269,13 @@ function renderAdminEligibleStudentsTable() {
         <div class="font-bold text-slate-800">${s.isMissingInfo ? s.resolvedName : escapeHtml(s.resolvedName)}</div>
         ${!s.isFoundInMaster && !s.isMissingInfo ? '<span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-slate-100 text-slate-500">Từ file nhập</span>' : ''}
       </td>
-      <td class="p-3 min-w-[260px]"><div class="font-bold ${status.topic ? 'text-blue-900' : 'text-slate-500 italic'}">${status.topic ? escapeHtml(status.topic) : 'Sinh viên chưa đăng ký đề tài'}</div>${supervisorLine}</td>
+      <td class="p-3 min-w-[260px]">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="font-bold ${status.topic ? 'text-blue-900' : 'text-slate-500 italic'}">${status.topic ? escapeHtml(status.topic) : 'Sinh viên chưa đăng ký đề tài'}</span>
+          ${topicBadge}
+        </div>
+        ${supervisorLine}
+      </td>
       <td class="p-3 font-mono text-slate-700">${String(s.resolvedClass).includes('<span') ? s.resolvedClass : escapeHtml(s.resolvedClass)}</td>
       <td class="p-3 text-slate-700">${escapeHtml(s.resolvedMajor)}</td>
       <td class="p-3"><span class="badge badge-open">Đủ ĐK</span></td>

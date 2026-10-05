@@ -5603,8 +5603,8 @@
       </div>
     </div>
 
-    <!-- Mobile / Tablet Tab Switcher (Visible only on screens < md) -->
-    <div id="cws-mobile-tab-bar" class="md:hidden flex items-center border-b border-slate-200 bg-slate-100 p-1 gap-1 shrink-0">
+    <!-- Mobile / Tablet Tab Switcher (Hidden to keep mobile focused on the unified student card) -->
+    <div id="cws-mobile-tab-bar" class="hidden md:hidden flex items-center border-b border-slate-200 bg-slate-100 p-1 gap-1 shrink-0">
       <button type="button" id="btn-cws-tab-students" onclick="switchCouncilWorkspaceMobileTab('students')" class="flex-1 py-1.5 px-2 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1 transition-all cursor-pointer">
         <span>👥</span> <span>Danh sách SV</span> (<span id="cws-mobile-student-count-badge">0</span>)
       </button>
@@ -5616,7 +5616,7 @@
     <!-- Main Body: 2 Columns Responsive -->
     <div class="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
       
-      <!-- LEFT COLUMN: DANH SÁCH SINH VIÊN -->
+      <!-- LEFT COLUMN: DANH SÁCH SINH VIÊN (Visible on md+ desktop/tablet) -->
       <div id="cws-col-students" class="w-full md:w-80 lg:w-[30rem] xl:w-[34rem] border-b md:border-b-0 md:border-r border-slate-200 hidden md:flex flex-col bg-slate-50/40 shrink-0 overflow-hidden">
         <div class="p-2.5 sm:p-3 border-b border-slate-200 bg-white space-y-2 shrink-0">
           <span id="cws-presenting-indicator" class="text-[10px] font-bold text-emerald-600 hidden">● 1 đang trình bày</span>
@@ -5636,9 +5636,9 @@
           <button type="button" onclick="navigateCouncilPrevStudent()" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 shadow-2xs flex items-center gap-1 cursor-pointer">
             <span>← Trước</span>
           </button>
-          <button type="button" onclick="switchCouncilWorkspaceMobileTab('students')" class="font-bold text-indigo-900 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-lg text-[11px] cursor-pointer">
-            <span id="cws-mobile-student-indicator">SV -- / --</span> ▾
-          </button>
+          <span class="font-bold text-indigo-900 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-lg text-[11px] shadow-2xs">
+            <span id="cws-mobile-student-indicator">SV -- / --</span>
+          </span>
           <button type="button" onclick="navigateCouncilNextStudent()" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 shadow-2xs flex items-center gap-1 cursor-pointer">
             <span>Sau →</span>
           </button>

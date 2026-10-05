@@ -81,5 +81,11 @@ assert.match(authJs, /checkAndHandlePendingCouncilDirectLink/);
 assert.match(authJs, /council-standalone-active/);
 assert.match(authJs, /handleLogout/);
 
+const studentEligibility = read('js/students/student-eligibility-admin.js');
+assert.match(studentEligibility, /topicApprovalStatus/);
+assert.match(studentEligibility, /✓ Đã duyệt/);
+assert.match(studentEligibility, /⏳ Chờ duyệt/);
+assert.match(studentEligibility, /✕ Yêu cầu sửa/);
+
 console.log('Current regression checks passed.');
 
