@@ -163,7 +163,11 @@ service cloud.firestore {
         allow get: if admin() 
           || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$'))
           || staff()
-          || (signedIn() && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(email())));
+          || (signedIn()
+            && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId))
+            && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.assignmentStatus == 'published'
+            && (email() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.supervisorEmails
+              || email().lower() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.supervisorEmails));
         allow list: if admin() || staff();
 
         allow create: if (admin())
@@ -210,22 +214,23 @@ service cloud.firestore {
                 || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt));
 
         allow update: if (admin())
-          || (staff()
-            && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(email()))
+          || (signedIn()
             && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId))
             && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.assignmentStatus == 'published'
-            && email() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.supervisorEmails
+            && (email() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.supervisorEmails
+              || email().lower() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.supervisorEmails)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'topicApprovalStatus', 'topicApprovalNote', 'topicReviewedAt',
               'topicReviewedBy', 'topicTitleHistory', 'updatedAt'
             ])
-            && request.resource.data.topicApprovalStatus in ['approved', 'rejected']
+            && request.resource.data.topicApprovalStatus in ['approved', 'rejected', 'pending']
             && request.resource.data.topicApprovalNote is string
             && request.resource.data.topicApprovalNote.size() <= 1000
             && request.resource.data.topicReviewedAt is timestamp
-            && request.resource.data.topicReviewedBy == email()
+            && (request.resource.data.topicReviewedBy == email() || request.resource.data.topicReviewedBy.lower() == email().lower())
             && request.resource.data.topicTitleHistory is list
             && request.resource.data.topicTitleHistory.size() <= 50
+            && (!request.resource.data.keys().hasAll(['updatedAt']) || request.resource.data.updatedAt is timestamp)
             && request.resource.data.topicTitle == resource.data.topicTitle
             && request.resource.data.studentId == resource.data.studentId)
           || (student()

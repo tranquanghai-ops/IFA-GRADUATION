@@ -103,6 +103,13 @@ test('Header mới và navigation vẫn nguyên vẹn', () => {
   assert.match(html, /id="global-impersonation-banner"/);
 });
 
+test('Rules cho phép GVHD duyệt đề tài qua officialAssignments đã published và không dùng supervisors/email', () => {
+  assert.doesNotMatch(rules, /supervisors\/\$\(email\(\)\)/);
+  assert.match(rules, /request\.resource\.data\.topicApprovalStatus in \['approved', 'rejected', 'pending'\]/);
+  assert.match(rules, /officialAssignments\/\$\(studentId\)\)\.data\.supervisorEmails/);
+  assert.match(rules, /email\(\)\.lower\(\) in get\(\/databases\/\$\(database\)\/documents\/graduationRounds\/\$\(roundId\)\/officialAssignments\/\$\(studentId\)\)\.data\.supervisorEmails/);
+});
+
 let passed = 0;
 for (const item of tests) {
   try {
