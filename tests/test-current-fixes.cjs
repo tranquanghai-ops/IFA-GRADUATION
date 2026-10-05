@@ -110,7 +110,7 @@ assert.doesNotMatch(modalTopicPreview, /id="btn-topic-preview-save-edit"/);
 assert.match(modalTopicPreview, /id="btn-topic-preview-footer-cancel-edit"[\s\S]*?id="btn-topic-preview-footer-save"/);
 assert.match(modalTopicPreview, /id="btn-topic-preview-footer-save"[\s\S]*?<span>💾<\/span> <span>Lưu & Gửi GVHD duyệt lại<\/span>/);
 // Check colon spacing and normal font weight in modal preview
-assert.match(modalTopicPreview, /HỌ VÀ TÊN:<\/span> <span id="topic-preview-doc-name" style="font-weight:normal;"/);
+assert.match(modalTopicPreview, /HỌ VÀ TÊN\s*:<\/span> <span id="topic-preview-doc-name" style="font-weight:normal;"/);
 assert.match(modalTopicPreview, /MSSV:<\/span> <span id="topic-preview-doc-mssv" style="font-weight:normal;"/);
 assert.match(modalTopicPreview, /id="topic-preview-doc-sup-name" style="font-weight:normal;/);
 assert.match(modalTopicPreview, /id="topic-preview-version-selector-wrap"/);
@@ -121,11 +121,12 @@ assert.match(supervisorTopics, /btnSaveBottom\.innerHTML = '<span>💾<\/span> <
 assert.match(supervisorTopics, /window\.toggleModalVersionDropdown = function/);
 
 // PDF export assertions: bold: false for all names and labels, colon spacing, supervisor name in bottom row
-assert.match(studentTopicPdf, /text: 'HỌ VÀ TÊN: ', bold: false/);
+assert.match(studentTopicPdf, /text: 'HỌ VÀ TÊN\s*: ', bold: false/);
 assert.match(studentTopicPdf, /text: supervisorName \|\| '', bold: false, fontSize: 12/);
 assert.match(studentTopicPdf, /text: identity\.fullName \|\| '', bold: false, fontSize: 12/);
 assert.match(studentTopicPdf, /layout: 'noBorders'/);
 assert.match(studentTopicPdf, /function getApprovedTopicVersions/);
+assert.match(studentTopicPdf, /ensureTimesFontLoaded/);
 
 const impersonationModal = read('js/impersonation/impersonation-modal.js');
 assert.match(impersonationModal, /state\.adminReviewData\?\.roundId === r\.id/);
@@ -141,8 +142,8 @@ const roundsLoader = read('js/rounds/rounds-loader.js');
 assert.match(roundsLoader, /w-18 h-18 sm:w-20 sm:h-20 rounded-2xl border-2 border-white\/40 object-cover/);
 
 // 2 & 3. PDF Centered lines & Clean signature block (no 'Đã duyệt đề tài')
-assert.match(studentTopicPdf, /x2: 90, y2: 0, lineWidth: 0\.8/);
-assert.match(studentTopicPdf, /x2: 135, y2: 0, lineWidth: 0\.8/);
+assert.match(studentTopicPdf, /widths: \['\*', 120, '\*'\]/);
+assert.match(studentTopicPdf, /widths: \['\*', 130, '\*'\]/);
 assert.doesNotMatch(studentTopicPdf, /Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN[\s\S]*?\(Đã duyệt đề tài\)/);
 
 // 4. Thẻ sự kiện sắp tới hạn có màu cam nhạt nổi bật
@@ -150,19 +151,28 @@ const timelineRoadmap = read('js/planning/timeline-roadmap.js');
 assert.match(timelineRoadmap, /border-amber-400 bg-amber-50\/85 ring-2 ring-amber-400\/60 shadow-md/);
 assert.match(timelineRoadmap, /⚡ Sắp tới/);
 
-// 5. Thẻ sinh viên màu xanh dương nhạt, xen kẽ đậm nhạt (Zebra striping)
+// 5. Thẻ sinh viên màu xanh dương nhạt, xen kẽ đậm nhạt, bỏ thẻ GVHD chính, tên SV lên trước
 const supervisorPortalStudents = read('js/supervisors/supervisor-portal-students.js');
 assert.match(supervisorPortalStudents, /filtered\.map\(\(st, index\) =>/);
 assert.match(supervisorPortalStudents, /bg-sky-50\/70 border-sky-200\/80/);
 assert.match(supervisorPortalStudents, /bg-blue-100\/60 border-blue-200/);
+assert.doesNotMatch(supervisorPortalStudents, /roleBadge/);
+assert.match(supervisorPortalStudents, /MSSV:\s*\$\{studentId\}/);
 
-// 6. Bỏ chữ Beta và đưa phiên bản về V1.0.1
+// 6. Bỏ chữ Beta, đưa phiên bản V1.0.1 xuống cuối cùng và thêm dòng Build by
 const indexHtml = read('index.html');
-assert.match(indexHtml, /<span class="ifa-version-badge">V1\.0\.1<\/span>/);
+assert.match(indexHtml, /id="app-footer"/);
+assert.match(indexHtml, /Phiên bản V1\.0\.1/);
+assert.match(indexHtml, /Build by:\s*<strong>ThS\.\s*NCS\.\s*Trần Quang Hải<\/strong>/);
+assert.doesNotMatch(indexHtml, /id="ifa-header-title-row"[\s\S]*?<span class="ifa-version-badge">/);
 assert.match(indexHtml, /<title>IFA\+ Graduation — Đăng ký & Xét duyệt GVHD Đồ án Tốt nghiệp<\/title>/);
 assert.doesNotMatch(indexHtml, /<title>IFA\+ Graduation Beta/);
 
-// 7. Admin & GVHD vào trang chủ (/) mặc định là Cổng GVHD, bỏ /supervisor/
+// 7. Desktop mốc kế hoạch mở rộng thoáng mắt
+const roundsTimelinePreview = read('js/rounds/rounds-timeline-preview.js');
+assert.match(roundsTimelinePreview, /max-w-3xl lg:max-w-4xl/);
+
+// 8. Admin & GVHD vào trang chủ (/) mặc định là Cổng GVHD, bỏ /supervisor/
 assert.match(authJs, /\(isAdmin \|\| isSupervisor\) && !state\.impersonation[\s\S]*?state\.currentView = 'supervisor'/);
 const coreJs = read('js/core.js');
 assert.match(coreJs, /path\.includes\('\/supervisor'\)[\s\S]*?window\.history\.replaceState\(null, '', '\/'\)/);

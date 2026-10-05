@@ -38,6 +38,10 @@
   <!-- pdfmake for the official student topic-registration form -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.10/vfs_fonts.js"></script>
+  <!-- Google Fonts: Tinos (Times New Roman Metric-Compatible for Official A4 Documents) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-blue-100 selection:text-blue-900">
@@ -90,7 +94,6 @@
           <div class="ifa-header-copy">
             <div class="ifa-header-title-row">
               <span class="ifa-header-title">IFA+ Graduation</span>
-              <span class="ifa-version-badge">__APP_VERSION__</span>
             </div>
             <p class="ifa-header-subtitle">Quản lý Đồ án Tốt nghiệp</p>
             <p class="ifa-header-faculty">Khoa Mỹ thuật Công nghiệp</p>
@@ -249,6 +252,17 @@
 <!-- PARTIAL:templates/modals/shared/modal-topic-preview.html -->
 
   </main>
+
+  <!-- APP GLOBAL FOOTER -->
+  <footer id="app-footer" class="mt-auto py-4 border-t border-slate-200/90 bg-white/70 backdrop-blur-xs text-center text-xs text-slate-500 shadow-2xs">
+    <div class="w-full max-w-[1920px] 2xl:max-w-full mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3">
+      <span class="font-extrabold text-tdtu-blue tracking-wide">IFA+ Graduation</span>
+      <span class="hidden sm:inline text-slate-300">•</span>
+      <span class="font-bold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">Phiên bản __APP_VERSION__</span>
+      <span class="hidden sm:inline text-slate-300">•</span>
+      <span class="font-semibold text-slate-700">Build by: <strong>ThS. NCS. Trần Quang Hải</strong></span>
+    </div>
+  </footer>
 
   <!-- TOAST CONTAINER -->
   <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>

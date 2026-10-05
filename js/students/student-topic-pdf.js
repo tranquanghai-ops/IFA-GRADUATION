@@ -251,6 +251,82 @@ export function getCleanRegistrationAddress(st, studentObj = null) {
 }
 window.getCleanRegistrationAddress = getCleanRegistrationAddress;
 
+let _timesFontLoadedPromise = null;
+async function ensureTimesFontLoaded() {
+  if (typeof window === 'undefined') return false;
+  if (window.pdfMake?.fonts?.Times && window.pdfMake?.vfs?.['times-regular.ttf']) {
+    return true;
+  }
+  if (!_timesFontLoadedPromise) {
+    _timesFontLoadedPromise = (async () => {
+      try {
+        if (!window.pdfMake) {
+          console.warn('[PDF] pdfMake is not loaded yet');
+          return false;
+        }
+
+        const toBase64 = (buf) => {
+          const bytes = new Uint8Array(buf);
+          let binary = '';
+          const len = bytes.byteLength;
+          const chunkSize = 0x8000;
+          for (let i = 0; i < len; i += chunkSize) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+          }
+          return btoa(binary);
+        };
+
+        const fetchFont = async (localPath, fallbackCdnUrl) => {
+          try {
+            const res = await fetch(localPath);
+            if (res.ok) {
+              const buf = await res.arrayBuffer();
+              return toBase64(buf);
+            }
+          } catch (e) {
+            // fallback
+          }
+          if (fallbackCdnUrl) {
+            const res = await fetch(fallbackCdnUrl);
+            if (res.ok) {
+              const buf = await res.arrayBuffer();
+              return toBase64(buf);
+            }
+          }
+          throw new Error(`Failed to load font from ${localPath} or CDN`);
+        };
+
+        const [regB64, boldB64, italB64, boldItalB64] = await Promise.all([
+          fetchFont('/fonts/times-regular.ttf', 'https://fonts.gstatic.com/s/tinos/v26/buE4poGnedXvwgX8.ttf'),
+          fetchFont('/fonts/times-bold.ttf', 'https://fonts.gstatic.com/s/tinos/v26/buE1poGnedXvwj1AW0Fp.ttf'),
+          fetchFont('/fonts/times-italic.ttf', 'https://fonts.gstatic.com/s/tinos/v26/buE2poGnedXvwjX-fmE.ttf'),
+          fetchFont('/fonts/times-bolditalic.ttf', 'https://fonts.gstatic.com/s/tinos/v26/buEzpoGnedXvwjX-Rt1s0Co.ttf')
+        ]);
+
+        window.pdfMake.vfs = window.pdfMake.vfs || {};
+        window.pdfMake.vfs['times-regular.ttf'] = regB64;
+        window.pdfMake.vfs['times-bold.ttf'] = boldB64;
+        window.pdfMake.vfs['times-italic.ttf'] = italB64;
+        window.pdfMake.vfs['times-bolditalic.ttf'] = boldItalB64;
+
+        window.pdfMake.fonts = window.pdfMake.fonts || {};
+        window.pdfMake.fonts.Times = {
+          normal: 'times-regular.ttf',
+          bold: 'times-bold.ttf',
+          italics: 'times-italic.ttf',
+          bolditalics: 'times-bolditalic.ttf'
+        };
+        return true;
+      } catch (err) {
+        console.warn('[PDF] Unable to embed Times font into pdfMake, falling back to default:', err);
+        return false;
+      }
+    })();
+  }
+  return await _timesFontLoadedPromise;
+}
+window.ensureTimesFontLoaded = ensureTimesFontLoaded;
+
 window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
   const paper = document.getElementById('topic-preview-paper');
   if (!paper) {
@@ -260,10 +336,10 @@ window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
     return;
   }
 
-  // Clone paper and strip all edit wraps, textareas, notes, and hidden elements before printing
+  // Clone paper and strip all edit wraps, textareas, notes, and supervisor approval status before printing
   const paperClone = paper.cloneNode(true);
   const elementsToRemove = paperClone.querySelectorAll(
-    '#topic-preview-doc-title-edit-wrap, #topic-preview-doc-desc-edit-wrap, .hidden, .no-print, textarea, button'
+    '#topic-preview-doc-title-edit-wrap, #topic-preview-doc-desc-edit-wrap, #topic-preview-doc-sup-status, .hidden, .no-print, textarea, button'
   );
   elementsToRemove.forEach(el => el.remove());
 
@@ -290,19 +366,15 @@ window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
           }
           * {
             box-sizing: border-box;
-            font-family: 'Times New Roman', Times, serif !important;
+            font-family: 'Times New Roman', 'Tinos', Times, serif !important;
           }
           body {
             margin: 0;
             padding: 0;
             background: #fff;
             color: #000;
-            font-size: 13pt;
+            font-size: 12pt;
             line-height: 1.4;
-          }
-          #topic-preview-doc-sup-status {
-            color: #047857 !important;
-            font-weight: bold;
           }
           table {
             border-collapse: collapse;
@@ -310,7 +382,7 @@ window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
           td.has-value {
             border-bottom: 0 !important;
           }
-          .hidden, .no-print, #topic-preview-doc-title-edit-wrap, #topic-preview-doc-desc-edit-wrap, textarea {
+          .hidden, .no-print, #topic-preview-doc-title-edit-wrap, #topic-preview-doc-desc-edit-wrap, #topic-preview-doc-sup-status, textarea {
             display: none !important;
             visibility: hidden !important;
           }
@@ -350,7 +422,7 @@ window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
   }, 250);
 };
 
-window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null, targetVersion = null) {
+window.downloadOfficialTopicRegistrationPdf = async function(targetStudentId = null, targetVersion = null) {
   let reg = null;
   let identity = null;
 
@@ -408,6 +480,10 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null, t
     return;
   }
 
+  // Ensure Times New Roman / Tinos TTF fonts are loaded into pdfMake
+  const fontReady = await ensureTimesFontLoaded();
+  const pdfFont = (fontReady && window.pdfMake?.fonts?.Times) ? 'Times' : 'Roboto';
+
   identity = identity || getRegistrationStudentIdentity();
   const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(identity.mssv) : null;
   const round = state.activeRound || {};
@@ -425,7 +501,6 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null, t
     reg.topicApprovalStatus === 'approved' ||
     reg.approvalStatus === 'approved'
   );
-  let isApprovedForVersion = isDirectlyApproved;
 
   if (targetVersion) {
     const matched = approvedList.find(item => Number(item.version) === Number(targetVersion));
@@ -433,9 +508,6 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null, t
       activeVersion = Number(matched.version);
       activeTitle = matched.title || activeTitle;
       activeDesc = String(matched.topicDescription || activeDesc).trim();
-      isApprovedForVersion = true;
-    } else {
-      isApprovedForVersion = isDirectlyApproved && (Number(targetVersion) === activeVersion);
     }
   } else if (!isDirectlyApproved && approvedList.length > 0) {
     const latest = approvedList[approvedList.length - 1];
@@ -443,7 +515,6 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null, t
       activeVersion = Number(latest.version);
       activeTitle = latest.title || activeTitle;
       activeDesc = String(latest.topicDescription || activeDesc).trim();
-      isApprovedForVersion = true;
     }
   }
 
@@ -455,157 +526,179 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null, t
   const normalizedRoundLabel = roundLabel.toUpperCase().replace(/\s+/g, ' ').trim();
   const roundHeadingMatch = normalizedRoundLabel.match(/^(.*?)(?:\s*-\s*)?(ĐỢT\s+.+)$/);
   const programHeading = roundHeadingMatch?.[1] || 'ĐỒ ÁN TỐT NGHIỆP/ĐỒ ÁN TỔNG HỢP';
-  const roundHeading = roundHeadingMatch?.[2] || (round.roundName ? `ĐỢT ${round.roundName}` : '');
+  const roundHeading = roundHeadingMatch?.[2] || (round.roundName ? (String(round.roundName).toUpperCase().startsWith('ĐỢT') ? round.roundName.toUpperCase() : `ĐỢT ${round.roundName.toUpperCase()}`) : '');
   const descriptionText = activeDesc || '';
   const studentClass = reg.currentClass || reg.studentClass || reg.className || studentObj?.className || studentObj?.studentClass || '--';
   const studentAddress = getCleanRegistrationAddress(reg, studentObj);
 
   const docDefinition = {
     pageSize: 'A4',
-    pageMargins: [54, 36, 54, 36],
-    defaultStyle: { font: 'Roboto', fontSize: 12, lineHeight: 1.2 },
+    pageMargins: [54, 38, 54, 38],
+    defaultStyle: { font: pdfFont, fontSize: 12, lineHeight: 1.25 },
     content: [
       {
         columns: [
           {
-            width: '46%',
+            width: '48%',
             stack: [
-              { text: 'TRƯỜNG ĐẠI HỌC TÔN ĐỨC THẮNG', fontSize: 10.5, alignment: 'center' },
-              { text: 'KHOA MỸ THUẬT CÔNG NGHIỆP', fontSize: 10.5, bold: true, alignment: 'center', margin: [0, 2, 0, 4] },
+              { text: 'TRƯỜNG ĐẠI HỌC TÔN ĐỨC THẮNG', fontSize: 10, alignment: 'center' },
+              { text: 'KHOA MỸ THUẬT CÔNG NGHIỆP', fontSize: 10, bold: true, alignment: 'center', margin: [0, 2, 0, 3] },
               {
-                columns: [
-                  { text: '', width: '*' },
-                  { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 90, y2: 0, lineWidth: 0.8 }], width: 90 },
-                  { text: '', width: '*' }
-                ],
-                margin: [0, 1, 0, 0]
+                table: {
+                  widths: ['*', 120, '*'],
+                  body: [
+                    [
+                      { text: '', border: [false, false, false, false] },
+                      { text: '', border: [false, true, false, false] },
+                      { text: '', border: [false, false, false, false] }
+                    ]
+                  ]
+                },
+                layout: {
+                  defaultBorder: false,
+                  paddingLeft: () => 0,
+                  paddingRight: () => 0,
+                  paddingTop: () => 0,
+                  paddingBottom: () => 0
+                }
               }
             ]
           },
           {
-            width: '54%',
+            width: '52%',
             stack: [
-              { text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', fontSize: 10.5, bold: true, alignment: 'center' },
-              { text: 'Độc lập - Tự do - Hạnh phúc', fontSize: 10.5, bold: true, alignment: 'center', margin: [0, 2, 0, 4] },
+              { text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', fontSize: 10, bold: true, alignment: 'center' },
+              { text: 'Độc lập - Tự do - Hạnh phúc', fontSize: 10, bold: true, alignment: 'center', margin: [0, 2, 0, 3] },
               {
-                columns: [
-                  { text: '', width: '*' },
-                  { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 135, y2: 0, lineWidth: 0.8 }], width: 135 },
-                  { text: '', width: '*' }
-                ],
-                margin: [0, 1, 0, 0]
+                table: {
+                  widths: ['*', 130, '*'],
+                  body: [
+                    [
+                      { text: '', border: [false, false, false, false] },
+                      { text: '', border: [false, true, false, false] },
+                      { text: '', border: [false, false, false, false] }
+                    ]
+                  ]
+                },
+                layout: {
+                  defaultBorder: false,
+                  paddingLeft: () => 0,
+                  paddingRight: () => 0,
+                  paddingTop: () => 0,
+                  paddingBottom: () => 0
+                }
               }
             ]
           }
         ],
-        margin: [0, 0, 0, 20]
+        margin: [0, 0, 0, 18]
       },
-      { text: 'PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC', bold: true, fontSize: 15, alignment: 'center' },
-      { text: 'ĐỒ ÁN TỐT NGHIỆP/ĐỒ ÁN TỔNG HỢP', bold: true, fontSize: 13.5, alignment: 'center', margin: [0, 2, 0, 0] },
+      { text: 'PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC', bold: true, fontSize: 14, alignment: 'center' },
+      { text: programHeading, bold: true, fontSize: 13, alignment: 'center', margin: [0, 3, 0, 0] },
       ...(roundHeading
-        ? [{ text: roundHeading, bold: true, italics: true, fontSize: 13.5, alignment: 'center', margin: [0, 2, 0, 18] }]
-        : [{ text: '', margin: [0, 0, 0, 18] }]),
+        ? [{ text: roundHeading, bold: true, fontSize: 13, alignment: 'center', margin: [0, 2, 0, 16] }]
+        : [{ text: '', margin: [0, 0, 0, 16] }]),
 
-      // Thông tin sinh viên (inline, không bị cách xa, không bold nhãn & giá trị)
+      // Thông tin sinh viên (inline, không bold nhãn & giá trị)
       {
         columns: [
           {
             width: '60%',
             text: [
-              { text: 'HỌ VÀ TÊN: ', bold: false },
-              { text: identity.fullName || '', bold: false }
+              { text: 'HỌ VÀ TÊN : ', bold: false, fontSize: 12 },
+              { text: identity.fullName || '', bold: false, fontSize: 12 }
             ]
           },
           {
             width: '40%',
             text: [
-              { text: 'MSSV: ', bold: false },
-              { text: identity.mssv || '', bold: false }
+              { text: 'MSSV: ', bold: false, fontSize: 12 },
+              { text: identity.mssv || '', bold: false, fontSize: 12 }
             ]
           }
         ],
-        margin: [0, 0, 0, 8]
+        margin: [0, 0, 0, 7]
       },
       {
         columns: [
           {
             width: '46%',
             text: [
-              { text: 'LỚP: ', bold: false },
-              { text: studentClass, bold: false }
+              { text: 'LỚP : ', bold: false, fontSize: 12 },
+              { text: studentClass, bold: false, fontSize: 12 }
             ]
           },
           {
             width: '54%',
             text: [
-              { text: 'NGÀNH: ', bold: false },
-              { text: reg.major || identity.major || 'Thiết kế nội thất', bold: false }
+              { text: 'NGÀNH: ', bold: false, fontSize: 12 },
+              { text: reg.major || identity.major || 'Thiết kế nội thất', bold: false, fontSize: 12 }
             ]
           }
         ],
-        margin: [0, 0, 0, 8]
+        margin: [0, 0, 0, 7]
       },
       {
         text: [
-          { text: 'EMAIL: ', bold: false },
-          { text: reg.personalEmail || identity.email || '', bold: false }
+          { text: 'EMAIL: ', bold: false, fontSize: 12 },
+          { text: reg.personalEmail || identity.email || '', bold: false, fontSize: 12 }
         ],
-        margin: [0, 0, 0, 8]
+        margin: [0, 0, 0, 7]
       },
       {
         text: [
-          { text: 'ĐIỆN THOẠI: ', bold: false },
-          { text: reg.studentPhone || '', bold: false }
+          { text: 'ĐIỆN THOẠI: ', bold: false, fontSize: 12 },
+          { text: reg.studentPhone || '', bold: false, fontSize: 12 }
         ],
-        margin: [0, 0, 0, 8]
+        margin: [0, 0, 0, 7]
       },
       {
         text: [
-          { text: 'ĐỊA CHỈ: ', bold: false },
-          { text: studentAddress, bold: false }
+          { text: 'ĐỊA CHỈ : ', bold: false, fontSize: 12 },
+          { text: studentAddress, bold: false, fontSize: 12 }
         ],
-        margin: [0, 0, 0, 8]
+        margin: [0, 0, 0, 7]
       },
       {
         columns: [
           {
             width: '46%',
             text: [
-              { text: 'MÔN HỌC: ', bold: false },
-              { text: reg.courseName || reg.projectType || 'Đồ án tốt nghiệp', bold: false }
+              { text: 'MÔN HỌC: ', bold: false, fontSize: 12 },
+              { text: reg.courseName || reg.projectType || 'Đồ án tốt nghiệp', bold: false, fontSize: 12 }
             ]
           },
           {
             width: '34%',
             text: [
-              { text: 'MÃ MÔN HỌC: ', bold: false },
-              { text: reg.courseCode || '', bold: false }
+              { text: 'MÃ MÔN HỌC: ', bold: false, fontSize: 12 },
+              { text: reg.courseCode || '', bold: false, fontSize: 12 }
             ]
           },
           {
             width: '20%',
             text: [
-              { text: 'NHÓM: ', bold: false },
-              { text: reg.courseGroup || '1', bold: false }
+              { text: 'NHÓM: ', bold: false, fontSize: 12 },
+              { text: reg.courseGroup || '1', bold: false, fontSize: 12 }
             ]
           }
         ],
-        margin: [0, 0, 0, 14]
+        margin: [0, 0, 0, 12]
       },
       {
         text: `Đăng ký đề tài chính thức lần thứ : ${activeVersion}`,
         italics: true,
         fontSize: 12,
         alignment: 'center',
-        margin: [0, 0, 0, 14]
+        margin: [0, 0, 0, 12]
       },
       {
         text: [
-          { text: 'TÊN ĐỀ TÀI : ', bold: false },
-          { text: activeTitle || '', bold: false }
+          { text: 'TÊN ĐỀ TÀI : ', bold: true, fontSize: 12 },
+          { text: activeTitle || '', bold: false, fontSize: 12 }
         ],
         lineHeight: 1.35,
-        margin: [0, 0, 0, 14]
+        margin: [0, 0, 0, 12]
       },
       {
         text: 'MÔ TẢ CHI TIẾT ĐỊNH HƯỚNG THIẾT KẾ CỦA ĐỀ TÀI :',
@@ -641,7 +734,7 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null, t
               {
                 stack: [
                   { text: `Tp.HCM, ngày ${dd} tháng ${mm} năm ${yyyy}`, italics: true, fontSize: 11, alignment: 'center' },
-                  { text: 'NGƯỜI ĐĂNG KÝ', bold: true, fontSize: 12, alignment: 'center', margin: [0, 3, 0, 0] },
+                  { text: 'NGƯỜI ĐĂNG KÝ', bold: true, fontSize: 12, alignment: 'center', margin: [0, 2, 0, 0] },
                   { text: '(ký và ghi rõ họ tên)', italics: true, fontSize: 10, alignment: 'center', margin: [0, 1, 0, 0] }
                 ]
               }
@@ -674,7 +767,8 @@ export {
   getApprovedTopicVersions,
   populateRegistrationStudentForm,
   collectOfficialFormFields,
-  validateOfficialFormFields
+  validateOfficialFormFields,
+  ensureTimesFontLoaded
 };
 
 if (typeof window !== 'undefined') {
@@ -686,4 +780,5 @@ if (typeof window !== 'undefined') {
   window.populateRegistrationStudentForm = populateRegistrationStudentForm;
   window.collectOfficialFormFields = collectOfficialFormFields;
   window.validateOfficialFormFields = validateOfficialFormFields;
+  window.ensureTimesFontLoaded = ensureTimesFontLoaded;
 }

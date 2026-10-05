@@ -170,9 +170,6 @@ window.renderSupervisorAssignedStudents = function() {
       return (isMe || state.isAdmin) && s.role === 'primary';
     });
 
-    const roleBadge = isPrimary
-      ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">GVHD chính</span>'
-      : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800 border border-indigo-300">GVHD 2</span>';
 
     // Next milestone & submission check
     const activities = Array.isArray(round?.activities) ? round.activities : [];
@@ -212,18 +209,17 @@ window.renderSupervisorAssignedStudents = function() {
       <div class="card-surface p-4 sm:p-5 rounded-2xl border ${cardToneClass} shadow-2xs hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <!-- Left: Student Identity & Flush-left Topic Info -->
         <div class="space-y-3 min-w-0 flex-1">
-          <!-- Row 1: Student Identity (Avatar inline with Name, MSSV & Class) -->
+          <!-- Row 1: Student Identity (Name on top, then MSSV & Class below) -->
           <div class="flex items-center gap-3 min-w-0">
             <img src="${studentAvatarUrl}" class="w-12 h-12 rounded-xl object-cover border border-sky-300/60 shadow-xs shrink-0 bg-white" alt="Avatar">
             <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-0.5">
-                ${roleBadge}
-                ${!hasRegistration ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Chưa đăng ký đề tài</span>' : ''}
-                <span class="font-mono text-xs font-bold text-tdtu-blue bg-white/90 px-2 py-0.5 rounded-lg border border-blue-200 shadow-2xs">${studentId}</span>
-                <span class="text-slate-400 text-xs hidden sm:inline">•</span>
-                <span class="text-xs text-slate-500 font-medium truncate">Lớp: ${className}</span>
-              </div>
               <h3 class="text-sm sm:text-base font-black text-slate-900 leading-snug truncate">${name}</h3>
+              <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-0.5 text-xs text-slate-600">
+                ${!hasRegistration ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Chưa đăng ký đề tài</span>' : ''}
+                <span class="font-bold text-tdtu-blue font-mono">MSSV: ${studentId}</span>
+                <span class="text-slate-400">•</span>
+                <span class="text-slate-600 font-medium truncate">Lớp: ${className}</span>
+              </div>
             </div>
           </div>
 

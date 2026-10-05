@@ -175,10 +175,20 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
   dialog.id = 'student-timeline-event-dialog';
   dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
-  dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Chi tiết sự kiện" class="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
-    <div class="flex items-start justify-between gap-3"><div><div class="text-[11px] font-bold uppercase text-blue-700">${activity ? 'Mốc kế hoạch' : 'Sự kiện trong tuần'}</div><h3 class="mt-1 text-lg font-black text-slate-900">${escapeHtml(event.title)}</h3></div><button type="button" onclick="closeStudentTimelineEvent()" class="rounded-lg bg-slate-100 px-3 py-1.5 text-lg text-slate-600" aria-label="Đóng">×</button></div>
-    <div class="mt-4 space-y-2 text-sm text-slate-700"><div>🕒 ${activity ? escapeHtml(fmtActivityTime(activity.startAt, activity.endAt)) : escapeHtml(event.startDate === event.endDate ? event.startDate : `${event.startDate} – ${event.endDate}`)}</div>${activity?.location ? `<div>📍 ${escapeHtml(activity.location)}</div>` : ''}${activity?.isTentative ? '<div class="text-amber-700">Thời gian dự kiến</div>' : ''}</div>
-    ${details ? `<div class="rich-rendered-content mt-4 border-t border-slate-200 pt-4 text-sm leading-relaxed text-slate-700">${details}</div>` : ''}
+  dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Chi tiết mốc kế hoạch" class="w-full max-w-3xl lg:max-w-4xl max-h-[88vh] overflow-y-auto rounded-2xl sm:rounded-3xl bg-white p-6 sm:p-8 shadow-2xl transition-all">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <div class="text-xs font-black uppercase tracking-wider text-blue-700">${activity ? 'Mốc kế hoạch' : 'Sự kiện trong tuần'}</div>
+        <h3 class="mt-1 text-lg sm:text-xl font-black text-slate-900 leading-snug">${escapeHtml(event.title)}</h3>
+      </div>
+      <button type="button" onclick="closeStudentTimelineEvent()" class="rounded-xl bg-slate-100 hover:bg-slate-200 px-3.5 py-1.5 text-xl font-bold text-slate-600 transition-colors cursor-pointer shrink-0" aria-label="Đóng">×</button>
+    </div>
+    <div class="mt-4 space-y-2 text-sm sm:text-base text-slate-700 bg-slate-50/80 p-4 rounded-xl border border-slate-200/80">
+      <div class="flex items-center gap-2"><span>🕒</span> <span>${activity ? escapeHtml(fmtActivityTime(activity.startAt, activity.endAt)) : escapeHtml(event.startDate === event.endDate ? event.startDate : `${event.startDate} – ${event.endDate}`)}</span></div>
+      ${activity?.location ? `<div class="flex items-center gap-2"><span>📍</span> <span>${escapeHtml(activity.location)}</span></div>` : ''}
+      ${activity?.isTentative ? '<div class="text-amber-700 font-semibold text-xs sm:text-sm">⚠️ Thời gian dự kiến</div>' : ''}
+    </div>
+    ${details ? `<div class="rich-rendered-content mt-5 border-t border-slate-200 pt-5 text-sm sm:text-base leading-relaxed text-slate-800">${details}</div>` : ''}
   </div>`;
   document.body.appendChild(dialog);
   dialog.querySelector('button')?.focus();
