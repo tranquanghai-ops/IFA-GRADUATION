@@ -20,7 +20,7 @@ export function isSystemOwner(user = null) {
 window.isSystemOwner = isSystemOwner;
 
 export async function setupAuthListener() {
-  showLoading('Đang khởi tạo IFA+ Graduation Beta...');
+  showLoading('Đang khởi tạo IFA+ Graduation...');
 
   // Fallback an toàn: Loading overlay bắt buộc phải ẩn sau tối đa 6 giây
   const safetyTimer = setTimeout(() => {
@@ -75,21 +75,17 @@ export async function setupAuthListener() {
 
         // 2. Kích hoạt ngay view ban đầu để UI hiển thị tức thì
         const detectedPortal = getCurrentPortal();
-        let initView = state.currentView || state.actualRole || 'student';
-        if (detectedPortal === 'admin' && (state.isAdmin || state.impersonation)) {
-          initView = 'admin';
-        } else if (detectedPortal === 'supervisor' && (state.isSupervisor || state.isAdmin)) {
-          initView = 'supervisor';
-        } else if (detectedPortal === 'assessment') {
-          initView = 'assessment';
-        } else {
-          // If at root /graduation/ and user is supervisor -> default to 'supervisor'
-          if (state.actualRole === 'supervisor' && !state.impersonation) {
-            initView = 'supervisor';
-          } else if (state.actualRole === 'admin' && !state.impersonation) {
+        let initView = state.currentView;
+        if (!initView) {
+          if (detectedPortal === 'admin' && (state.isAdmin || state.impersonation)) {
             initView = 'admin';
+          } else if (detectedPortal === 'assessment') {
+            initView = 'assessment';
+          } else if ((state.isSupervisor || state.isAdmin) && !state.impersonation) {
+            // Chủ sở hữu, admin, quản trị viên, GVHD khi vào trang chủ (/) đều mặc định hiển thị Cổng GVHD vì vẫn phải HDTN
+            initView = 'supervisor';
           } else {
-            initView = 'student';
+            initView = state.actualRole || 'student';
           }
         }
         await switchView(initView);
@@ -326,17 +322,27 @@ export async function resolveActualRoles(user) {
     state.actualRole = 'student';
   }
 
-  // Determine currentView: URL param override if permitted, otherwise default to actualRole
+  // Determine currentView: URL param override if permitted
+  // Khi chủ sở hữu, admin, quản trị viên, GVHD vào trang chủ (/) thì phải là trang của GVHD vì admin vẫn phải HDTN
   const urlParams = new URLSearchParams(window.location.search);
   const viewParam = urlParams.get('view');
+  const detectedPortal = (typeof getCurrentPortal === 'function') ? getCurrentPortal() : 'student';
+
   if (viewParam === 'admin' && isAdmin) {
     state.currentView = 'admin';
   } else if (viewParam === 'supervisor' && (isSupervisor || isAdmin)) {
     state.currentView = 'supervisor';
   } else if (viewParam === 'student') {
     state.currentView = 'student';
+  } else if (detectedPortal === 'admin' && (isAdmin || state.impersonation)) {
+    state.currentView = 'admin';
+  } else if (detectedPortal === 'assessment') {
+    state.currentView = 'assessment';
+  } else if ((isAdmin || isSupervisor) && !state.impersonation) {
+    // Mặc định Cổng GVHD cho Chủ sở hữu, Admin và Giảng viên khi truy cập trang chủ (/)
+    state.currentView = 'supervisor';
   } else {
-    state.currentView = state.actualRole;
+    state.currentView = state.actualRole || 'student';
   }
   state.role = state.currentView;
 }

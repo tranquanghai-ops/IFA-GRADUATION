@@ -143,7 +143,7 @@ window.renderSupervisorAssignedStudents = function() {
   if (emptyCard) emptyCard.classList.add('hidden');
 
   // Render 1 Student = 1 Horizontal Card (IFAA Style)
-  container.innerHTML = filtered.map(st => {
+  container.innerHTML = filtered.map((st, index) => {
     const studentId = st.studentId || st.id || '';
     const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(studentId) : null;
     const name = st.studentName || studentObj?.fullName || studentObj?.name || `Sinh viên ${studentId}`;
@@ -201,18 +201,25 @@ window.renderSupervisorAssignedStudents = function() {
       ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-tdtu-blue border border-blue-200 shadow-2xs">📄 Phiếu ĐK lần ${latestApprovedVer}</span>`
       : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">📄 Lần ${topicVersion}</span>`;
 
+    // Màu xanh dương nhạt thay vì màu trắng, 2 SV gần nhau chuyển sắc đậm nhạt (Zebra alternating)
+    const isEven = (index % 2 === 0);
+    const cardToneClass = isEven
+      ? 'bg-sky-50/70 border-sky-200/80 hover:bg-sky-50 hover:border-tdtu-blue/50'
+      : 'bg-blue-100/60 border-blue-200 hover:bg-blue-100/80 hover:border-tdtu-blue/60';
+    const dividerClass = isEven ? 'border-sky-200/70' : 'border-blue-200/80';
+
     return `
-      <div class="card-surface p-4 sm:p-5 bg-white rounded-2xl border border-slate-200 hover:border-tdtu-blue/40 shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="card-surface p-4 sm:p-5 rounded-2xl border ${cardToneClass} shadow-2xs hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <!-- Left: Student Identity & Flush-left Topic Info -->
         <div class="space-y-3 min-w-0 flex-1">
           <!-- Row 1: Student Identity (Avatar inline with Name, MSSV & Class) -->
           <div class="flex items-center gap-3 min-w-0">
-            <img src="${studentAvatarUrl}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0" alt="Avatar">
+            <img src="${studentAvatarUrl}" class="w-12 h-12 rounded-xl object-cover border border-sky-300/60 shadow-xs shrink-0 bg-white" alt="Avatar">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-0.5">
                 ${roleBadge}
                 ${!hasRegistration ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Chưa đăng ký đề tài</span>' : ''}
-                <span class="font-mono text-xs font-bold text-tdtu-blue bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">${studentId}</span>
+                <span class="font-mono text-xs font-bold text-tdtu-blue bg-white/90 px-2 py-0.5 rounded-lg border border-blue-200 shadow-2xs">${studentId}</span>
                 <span class="text-slate-400 text-xs hidden sm:inline">•</span>
                 <span class="text-xs text-slate-500 font-medium truncate">Lớp: ${className}</span>
               </div>
@@ -221,7 +228,7 @@ window.renderSupervisorAssignedStudents = function() {
           </div>
 
           <!-- Row 2: Flush-left Topic Info & Version Badge -->
-          <div class="pt-2 border-t border-slate-100 space-y-1.5 w-full text-left">
+          <div class="pt-2 border-t ${dividerClass} space-y-1.5 w-full text-left">
             <div class="flex flex-wrap items-center gap-2">
               <span class="text-xs font-bold text-slate-500 shrink-0">Đề tài:</span>
               <span class="text-sm sm:text-base font-black text-slate-900 leading-snug">${escapeHtml(topicTitle)}</span>
@@ -238,7 +245,7 @@ window.renderSupervisorAssignedStudents = function() {
         </div>
 
         <!-- Right / Bottom: Action Buttons (On Desktop: right side; On Mobile: bottom centered) -->
-        <div class="pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 flex items-center justify-center sm:justify-end gap-2 flex-wrap shrink-0">
+        <div class="pt-3 sm:pt-0 border-t sm:border-t-0 ${dividerClass} flex items-center justify-center sm:justify-end gap-2 flex-wrap shrink-0">
           <button type="button" onclick="openSupervisorStudentDetailModal('${studentId}', 'profile')" class="px-3.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem hồ sơ chi tiết sinh viên và đề tài">
             <span>📋</span> <span>Xem hồ sơ</span>
           </button>

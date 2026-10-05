@@ -150,5 +150,23 @@ const timelineRoadmap = read('js/planning/timeline-roadmap.js');
 assert.match(timelineRoadmap, /border-amber-400 bg-amber-50\/85 ring-2 ring-amber-400\/60 shadow-md/);
 assert.match(timelineRoadmap, /⚡ Sắp tới/);
 
+// 5. Thẻ sinh viên màu xanh dương nhạt, xen kẽ đậm nhạt (Zebra striping)
+const supervisorPortalStudents = read('js/supervisors/supervisor-portal-students.js');
+assert.match(supervisorPortalStudents, /filtered\.map\(\(st, index\) =>/);
+assert.match(supervisorPortalStudents, /bg-sky-50\/70 border-sky-200\/80/);
+assert.match(supervisorPortalStudents, /bg-blue-100\/60 border-blue-200/);
+
+// 6. Bỏ chữ Beta và đưa phiên bản về V1.0.1
+const indexHtml = read('index.html');
+assert.match(indexHtml, /<span class="ifa-version-badge">V1\.0\.1<\/span>/);
+assert.match(indexHtml, /<title>IFA\+ Graduation — Đăng ký & Xét duyệt GVHD Đồ án Tốt nghiệp<\/title>/);
+assert.doesNotMatch(indexHtml, /<title>IFA\+ Graduation Beta/);
+
+// 7. Admin & GVHD vào trang chủ (/) mặc định là Cổng GVHD, bỏ /supervisor/
+assert.match(authJs, /\(isAdmin \|\| isSupervisor\) && !state\.impersonation[\s\S]*?state\.currentView = 'supervisor'/);
+const coreJs = read('js/core.js');
+assert.match(coreJs, /path\.includes\('\/supervisor'\)[\s\S]*?window\.history\.replaceState\(null, '', '\/'\)/);
+
 console.log('Current regression checks passed.');
+
 

@@ -85,11 +85,9 @@ function getCurrentPortal() {
     }
     if (path.includes('/supervisor') || path.endsWith('/supervisor') || path.endsWith('/supervisor/') ||
         path.includes('/gvhd') || path.endsWith('/gvhd') || path.endsWith('/gvhd/')) {
-      if (path.includes('/gvhd') || path.endsWith('/gvhd') || path.endsWith('/gvhd/')) {
-        try {
-          window.history.replaceState(null, '', '/supervisor/');
-        } catch (e) {}
-      }
+      try {
+        window.history.replaceState(null, '', '/');
+      } catch (e) {}
       return 'supervisor';
     }
     if (path.includes('/assessment') || path.endsWith('/assessment') || path.endsWith('/assessment/') ||

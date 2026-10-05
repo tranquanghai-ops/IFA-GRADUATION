@@ -567,7 +567,7 @@ window.loadAdminRoundActivities = async function(roundId) {
         : '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200 shadow-sm whitespace-nowrap">📝 Bản nháp</span>';
 
       const subBadge = act.submissionEnabled
-        ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm whitespace-nowrap" title="Chức năng nộp bài (Beta)">📥 Có</span>'
+        ? '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm whitespace-nowrap" title="Chức năng nộp bài">📥 Có</span>'
         : '<span class="text-slate-300 font-bold px-2 py-1">--</span>';
 
       return `

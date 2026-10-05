@@ -39,7 +39,7 @@ while (hasMatches && depth < 10) {
   });
 }
 
-compiled = compiled.replaceAll('__APP_VERSION__', `v${appVersion}`);
+compiled = compiled.replaceAll('__APP_VERSION__', `V${appVersion}`);
 compiled = compiled.replace(/\r\n|\r/g, '\n');
 fs.writeFileSync(outputPath, compiled, 'utf8');
 console.log(`[HTML Builder] Successfully compiled index.html with ${matchCount} partials included.`);

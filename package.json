@@ -1,6 +1,6 @@
 {
   "name": "ifa-graduation",
-  "version": "2.7.3",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "scripts": {
