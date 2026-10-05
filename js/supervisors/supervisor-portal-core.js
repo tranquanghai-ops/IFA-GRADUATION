@@ -186,6 +186,9 @@ window.loadSupervisorPortalData = async function(roundId) {
   // 1. Locate current supervisor profile
   const matchingMaster = (state.supervisorsMaster || []).find(s =>
     (s.email || '').toLowerCase().trim() === emailLower ||
+    (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
+    (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower) ||
+    (s.institutionalEmail && s.institutionalEmail.toLowerCase().trim() === emailLower) ||
     (actor.uid && (s.id === actor.uid || s.supervisorId === actor.uid))
   );
   const supervisorIdentityIds = new Set([
@@ -195,6 +198,9 @@ window.loadSupervisorPortalData = async function(roundId) {
   ].filter(Boolean).map(value => String(value).trim()));
   const roundSupervisor = (state.roundSupervisors || []).find(s =>
     (s.email || '').toLowerCase().trim() === emailLower ||
+    (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
+    (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower) ||
+    (s.institutionalEmail && s.institutionalEmail.toLowerCase().trim() === emailLower) ||
     supervisorIdentityIds.has(String(s.id || '').trim()) ||
     supervisorIdentityIds.has(String(s.supervisorId || '').trim())
   );
@@ -202,6 +208,32 @@ window.loadSupervisorPortalData = async function(roundId) {
   if (!currentSup) {
     currentSup = matchingMaster;
   }
+
+  const candidateEmails = new Set([
+    emailLower,
+    currentSup?.email,
+    currentSup?.institutionalEmail,
+    currentSup?.personalEmail,
+    matchingMaster?.email,
+    matchingMaster?.personalEmail,
+    matchingMaster?.institutionalEmail,
+    roundSupervisor?.email,
+    roundSupervisor?.institutionalEmail,
+    roundSupervisor?.personalEmail,
+    ...(Array.isArray(currentSup?.emails) ? currentSup.emails : []),
+    ...(Array.isArray(matchingMaster?.emails) ? matchingMaster.emails : []),
+    ...(Array.isArray(roundSupervisor?.emails) ? roundSupervisor.emails : [])
+  ].filter(Boolean).map(e => String(e).toLowerCase().trim()));
+
+  const mySupId = currentSup?.id || currentSup?.supervisorId || matchingMaster?.id || matchingMaster?.supervisorId;
+  const supervisorIdsSet = new Set([
+    mySupId,
+    ...supervisorIdentityIds,
+    roundSupervisor?.id,
+    roundSupervisor?.supervisorId,
+    matchingMaster?.id,
+    matchingMaster?.supervisorId
+  ].filter(Boolean).map(v => String(v).trim()));
 
   // Header and Hero Information
   const greetingEl = document.getElementById('supervisor-greeting-name');
@@ -253,28 +285,70 @@ window.loadSupervisorPortalData = async function(roundId) {
   let publishedAssignments = [];
   try {
     const assignmentRef = collection(db, 'graduationRounds', roundId, 'officialAssignments');
-    let assignmentSnap;
+    let assignmentSnap = null;
+    const isStaffOrAdmin = actor.isAdmin || (actor.email && actor.email.toLowerCase().endsWith('@tdtu.edu.vn'));
+
+    // 1. Try querying with supervisor email
     try {
-      const assignmentQuery = (actor.isAdmin && !emailLower)
+      const q = (actor.isAdmin && !emailLower)
         ? query(assignmentRef, where('assignmentStatus', '==', 'published'))
         : query(
             assignmentRef,
             where('assignmentStatus', '==', 'published'),
             where('supervisorEmails', 'array-contains', emailLower)
           );
-      assignmentSnap = await getDocs(assignmentQuery);
-    } catch (qErr) {
-      console.warn('[SupervisorPortal] Specific query failed, attempting published status query:', qErr);
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        assignmentSnap = snap;
+      }
+    } catch (qErr) {}
+
+    // 2. Try other candidate emails if initial query yielded no results
+    if (!assignmentSnap || assignmentSnap.empty) {
+      const emailList = Array.from(candidateEmails).filter(e => e !== emailLower);
+      for (const candEmail of emailList) {
+        try {
+          const q = query(
+            assignmentRef,
+            where('assignmentStatus', '==', 'published'),
+            where('supervisorEmails', 'array-contains', candEmail)
+          );
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            assignmentSnap = snap;
+            break;
+          }
+        } catch (qErr) {}
+      }
+    }
+
+    // 2. If empty or failed, and user is staff or admin, query all published assignments directly
+    if (!assignmentSnap || assignmentSnap.empty) {
+      if (isStaffOrAdmin) {
+        try {
+          assignmentSnap = await getDocs(query(assignmentRef, where('assignmentStatus', '==', 'published')));
+        } catch (staffErr) {
+          console.warn('[SupervisorPortal] Query all published assignments failed:', staffErr);
+        }
+      }
+    }
+
+    // 3. Fallbacks
+    if (!assignmentSnap || assignmentSnap.empty) {
       try {
         assignmentSnap = await getDocs(query(assignmentRef, where('assignmentStatus', '==', 'published')));
       } catch (qErr2) {
-        console.warn('[SupervisorPortal] Query published assignments by status failed, fallback to getDocs:', qErr2);
-        assignmentSnap = await getDocs(assignmentRef);
+        try {
+          assignmentSnap = await getDocs(assignmentRef);
+        } catch (qErr3) {}
       }
     }
-    publishedAssignments = assignmentSnap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter(d => !d.assignmentStatus || d.assignmentStatus === 'published');
+
+    if (assignmentSnap && assignmentSnap.docs) {
+      publishedAssignments = assignmentSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(d => !d.assignmentStatus || d.assignmentStatus === 'published');
+    }
   } catch (err) {
     console.warn('[SupervisorPortal] Could not query published official assignments:', err);
   }
@@ -315,7 +389,6 @@ window.loadSupervisorPortalData = async function(roundId) {
     return eligibleMap.has(String(stId || '').trim().toUpperCase());
   };
 
-  const mySupId = currentSup?.id || currentSup?.supervisorId;
   const currentSupName = (currentSup?.name || '').toLowerCase().trim();
   const registrationsById = new Map(allRegistrations.map(r => [String(r.studentId || r.id).trim().toUpperCase(), r]));
 
@@ -323,14 +396,22 @@ window.loadSupervisorPortalData = async function(roundId) {
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(item) : [];
     if (officials.length > 0) {
       return officials.some(s => {
-        if (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) return true;
-        if (emailLower && ((s.email && s.email.toLowerCase().trim() === emailLower) || (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower))) return true;
+        const sId = String(s.supervisorId || s.id || '').trim();
+        if (sId && supervisorIdsSet.has(sId)) return true;
+        const sEmail = (s.email || s.supervisorEmail || '').toLowerCase().trim();
+        if (sEmail && candidateEmails.has(sEmail)) return true;
         if (currentSupName && s.supervisorName && s.supervisorName.toLowerCase().trim() === currentSupName) return true;
         return false;
       });
     }
-    if (mySupId && (item.acceptedSupervisorId === mySupId || item.finalSupervisorId === mySupId || item.supervisorId === mySupId)) return true;
-    if (emailLower && ((item.supervisorEmail && item.supervisorEmail.toLowerCase().trim() === emailLower) || (Array.isArray(item.supervisorEmails) && item.supervisorEmails.map(e => (e||'').toLowerCase().trim()).includes(emailLower)))) return true;
+    const itemSupId = String(item.acceptedSupervisorId || item.finalSupervisorId || item.supervisorId || '').trim();
+    if (itemSupId && supervisorIdsSet.has(itemSupId)) return true;
+
+    const itemEmail = (item.supervisorEmail || '').toLowerCase().trim();
+    if (itemEmail && candidateEmails.has(itemEmail)) return true;
+    if (Array.isArray(item.supervisorEmails) && item.supervisorEmails.some(e => candidateEmails.has((e || '').toLowerCase().trim()))) return true;
+    if (Array.isArray(item.supervisorIds) && item.supervisorIds.some(id => supervisorIdsSet.has(String(id).trim()))) return true;
+
     if (currentSupName && ((item.acceptedSupervisorName && item.acceptedSupervisorName.toLowerCase().trim() === currentSupName) || (item.supervisorName && item.supervisorName.toLowerCase().trim() === currentSupName))) return true;
     return false;
   };
@@ -415,9 +496,11 @@ window.loadSupervisorPortalData = async function(roundId) {
   displayStudents.forEach(st => {
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
     const isPrimary = officials.some(s => {
-      const isMe = (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) ||
-        (s.email && s.email.toLowerCase().trim() === emailLower) ||
-        (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower);
+      const sId = String(s.supervisorId || s.id || '').trim();
+      const sEmail = (s.email || s.supervisorEmail || '').toLowerCase().trim();
+      const isMe = (sId && supervisorIdsSet.has(sId)) ||
+        (sEmail && candidateEmails.has(sEmail)) ||
+        (currentSupName && s.supervisorName && s.supervisorName.toLowerCase().trim() === currentSupName);
       return (isMe || actor.isAdmin) && s.role === 'primary';
     });
     if (isPrimary) primaryCount++;

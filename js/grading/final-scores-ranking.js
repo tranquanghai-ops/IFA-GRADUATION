@@ -123,6 +123,11 @@ export function getFinalScore(studentId, roundId = null) {
   };
 }
 
+if (typeof window !== 'undefined') {
+  window.getStudentDefenseScore = getStudentDefenseScore;
+  window.getFinalScore = getFinalScore;
+}
+
 // 3. ADMIN FINAL SCORE CONFIG CONTROLS & VALIDATION
 window.validateFinalScoreWeights = function() {
   const wSup = parseFloat(document.getElementById('cfg-weight-supervisor')?.value) || 0;

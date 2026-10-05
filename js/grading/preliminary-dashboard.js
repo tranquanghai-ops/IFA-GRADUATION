@@ -81,6 +81,83 @@ window.switchAdminScoringSubTab = function(tabKey) {
   }
 };
 
+
+export function getScoringRoundStudents(targetRound) {
+  const roundId = targetRound?.id || state.selectedRoundId;
+  if (!roundId) return [];
+
+  // If adminReviewData belongs to this round, merge registrations, officialAssignments, eligible
+  if (state.adminReviewData && state.adminReviewData.roundId === roundId) {
+    const regs = state.adminReviewData.registrations || [];
+    const assignments = state.adminReviewData.officialAssignments || [];
+    const eligible = state.adminReviewData.eligible || [];
+
+    const studentMap = new Map();
+    // 1. From registrations
+    regs.forEach(r => {
+      const sid = String(r.studentId || r.mssv || r.id || '').trim().toUpperCase();
+      if (sid) {
+        studentMap.set(sid, {
+          ...r,
+          studentId: sid,
+          mssv: sid,
+          studentName: r.studentName || r.name || r.fullName || sid,
+          className: r.currentClass || r.studentClass || r.className || '--',
+          acceptedSupervisorName: r.acceptedSupervisorName || '',
+          topicTitle: r.topicTitle || ''
+        });
+      }
+    });
+
+    // 2. Merge with officialAssignments
+    assignments.forEach(a => {
+      const sid = String(a.studentId || a.mssv || a.id || '').trim().toUpperCase();
+      if (sid) {
+        const existing = studentMap.get(sid) || {};
+        const primary = (a.supervisors || []).find(s => s.role === 'primary') || (a.supervisors || [])[0];
+        studentMap.set(sid, {
+          ...existing,
+          ...a,
+          studentId: sid,
+          mssv: sid,
+          studentName: a.studentName || existing.studentName || existing.name || sid,
+          className: a.className || a.studentClass || existing.className || existing.currentClass || '--',
+          acceptedSupervisorName: a.acceptedSupervisorName || primary?.supervisorName || existing.acceptedSupervisorName || '',
+          topicTitle: a.topicTitle || existing.topicTitle || ''
+        });
+      }
+    });
+
+    // 3. Merge with eligible
+    eligible.forEach(e => {
+      const sid = String(e.studentId || e.mssv || e.id || '').trim().toUpperCase();
+      if (sid && !studentMap.has(sid)) {
+        studentMap.set(sid, {
+          ...e,
+          studentId: sid,
+          mssv: sid,
+          studentName: e.fullName || e.name || sid,
+          className: e.className || e.studentClass || '--',
+          topicTitle: ''
+        });
+      }
+    });
+
+    if (studentMap.size > 0) {
+      return Array.from(studentMap.values());
+    }
+  }
+
+  // Fallback if adminReviewData is not for this round:
+  if (Array.isArray(targetRound?.eligibleStudents) && targetRound.eligibleStudents.length > 0) {
+    return targetRound.eligibleStudents;
+  }
+  return [];
+}
+if (typeof window !== 'undefined') {
+  window.getScoringRoundStudents = getScoringRoundStudents;
+}
+
 window.renderAdminProgressReviewTable = function(phase) {
   const tbody = document.getElementById('admin-duyet-' + phase + '-tbody');
   if (!tbody) return;
@@ -88,9 +165,7 @@ window.renderAdminProgressReviewTable = function(phase) {
   const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
   if (!targetRound) return;
 
-  const allStudents = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
-    ? state.adminReviewData.registrations
-    : (targetRound.eligibleStudents || []);
+  const allStudents = getScoringRoundStudents(targetRound);
 
   const q = String(document.getElementById('admin-duyet-' + phase + '-search')?.value || '').toLowerCase().trim();
   const filterVal = document.getElementById('admin-duyet-' + phase + '-filter')?.value || 'all';
@@ -117,7 +192,7 @@ window.renderAdminProgressReviewTable = function(phase) {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || sid;
     const topic = s.topicTitle || '<span class="text-slate-400 italic">Chưa đăng ký đề tài</span>';
-    const supName = s.supervisorName || (targetRound.supervisors || []).find(sup => sup.id === s.supervisorId)?.name || '--';
+    const supName = s.acceptedSupervisorName || s.supervisorName || (Array.isArray(s.officialSupervisors) && s.officialSupervisors[0]?.supervisorName) || (Array.isArray(s.supervisors) && s.supervisors[0]?.supervisorName) || (targetRound.supervisors || []).find(sup => sup.id === s.supervisorId)?.name || '--';
     const reviewData = targetRound.progressReviews?.['duyet_' + phase]?.[sid] || {};
     const status = reviewData.status || 'pending';
     const score = reviewData.score !== undefined ? Number(reviewData.score).toFixed(1) : '--';
@@ -152,9 +227,7 @@ window.renderAdminDefenseScoresTable = function() {
   const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
   if (!targetRound) return;
 
-  const allStudents = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
-    ? state.adminReviewData.registrations
-    : (targetRound.eligibleStudents || []);
+  const allStudents = getScoringRoundStudents(targetRound);
 
   const q = String(document.getElementById('admin-defense-search')?.value || '').toLowerCase().trim();
 
@@ -178,12 +251,12 @@ window.renderAdminDefenseScoresTable = function() {
       ? `<span class="badge bg-emerald-50 text-emerald-800 font-bold font-mono text-xs">${Number(gvhd.score).toFixed(1)}</span>`
       : '<span class="text-slate-300 font-mono">--</span>';
 
-    const tmFinal = typeof getThesisFinalScore === 'function' ? getThesisFinalScore(sid, targetRound.id) : null;
+    const tmFinal = typeof window.getThesisFinalScore === 'function' ? window.getThesisFinalScore(sid, targetRound.id) : null;
     const tmDisplay = tmFinal !== null
       ? `<span class="badge bg-blue-50 text-blue-800 font-bold font-mono text-xs">${tmFinal.toFixed(2)}</span>`
       : '<span class="text-slate-300 font-mono">--</span>';
 
-    const defScore = typeof getStudentDefenseScore === 'function' ? getStudentDefenseScore(sid, targetRound.id) : null;
+    const defScore = typeof window.getStudentDefenseScore === 'function' ? window.getStudentDefenseScore(sid, targetRound.id) : null;
     const defDisplay = defScore !== null
       ? `<strong class="font-mono text-xs text-purple-900 bg-purple-100/80 px-2 py-0.5 rounded-lg">${defScore.toFixed(2)}</strong>`
       : '<span class="text-slate-300 font-mono">--</span>';
@@ -209,7 +282,12 @@ window.renderAdminDefenseScoresTable = function() {
   }).join('');
 };
 
-window.loadAdminScoringDashboard = async function() {
+window.loadAdminScoringDashboard = async function(targetRoundId, targetTab = 'duyet-1') {
+  const roundId = targetRoundId || state.selectedRoundId || document.getElementById('admin-scoring-round-select')?.value;
+  if (roundId) {
+    state.selectedRoundId = roundId;
+    state.activeRound = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  }
   const sel = document.getElementById('admin-scoring-round-select');
   if (sel) {
     sel.innerHTML = (state.rounds || []).map(r => 
@@ -217,11 +295,27 @@ window.loadAdminScoringDashboard = async function() {
     ).join('');
     if (state.selectedRoundId) sel.value = state.selectedRoundId;
   }
-  switchAdminScoringSubTab('duyet-1');
+
+  // Ensure review/registration data is loaded for the current roundId
+  if (state.selectedRoundId && (typeof window.loadAdminReviewData === 'function')) {
+    if (!state.adminReviewData || state.adminReviewData.roundId !== state.selectedRoundId) {
+      await window.loadAdminReviewData(state.selectedRoundId);
+    }
+  }
+
+  const activeNavBtn = document.querySelector('.ascore-nav-btn.bg-slate-900');
+  const curSubTab = targetTab || (activeNavBtn ? activeNavBtn.id.replace('ascore-tab-btn-', '') : 'duyet-1');
+  switchAdminScoringSubTab(curSubTab);
 };
 
-window.onAdminScoringRoundChange = function(roundId) {
+window.onAdminScoringRoundChange = async function(roundId) {
   state.selectedRoundId = roundId;
+  state.activeRound = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  if (roundId && typeof window.loadAdminReviewData === 'function') {
+    if (!state.adminReviewData || state.adminReviewData.roundId !== roundId) {
+      await window.loadAdminReviewData(roundId);
+    }
+  }
   const curSubTab = document.querySelector('.ascore-nav-btn.bg-slate-900')?.id?.replace('ascore-tab-btn-', '') || 'duyet-1';
   switchAdminScoringSubTab(curSubTab);
 };
@@ -233,9 +327,7 @@ window.renderAdminScoresTable = function() {
   const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
   if (!targetRound) return;
 
-  const allStudents = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
-    ? state.adminReviewData.registrations
-    : (targetRound.eligibleStudents || []);
+  const allStudents = getScoringRoundStudents(targetRound);
 
   const q = String(document.getElementById('admin-scoring-search')?.value || '').toLowerCase().trim();
   const filterVal = document.getElementById('admin-scoring-filter')?.value || 'all';
@@ -297,18 +389,21 @@ window.renderAdminScoresTable = function() {
       : '<span class="text-slate-300 font-mono">--</span>';
 
     // TM FINAL
-    const tmFinal = getThesisFinalScore(sid, targetRound.id);
+    const tmFinal = typeof window.getThesisFinalScore === 'function' ? window.getThesisFinalScore(sid, targetRound.id) : null;
     const tmFinalDisplay = tmFinal !== null
       ? `<strong class="font-mono text-xs text-blue-900 bg-blue-100/70 px-2 py-0.5 rounded-lg" title="Full precision: ${tmFinal}">${tmFinal.toFixed(2)}</strong>`
       : '<span class="text-slate-300 text-[10px] italic">Chưa đủ điểm</span>';
 
     // BẢO VỆ CHÍNH THỨC & TỔNG KẾT (v2.1.0-beta.1)
-    const defScore = getStudentDefenseScore(sid, targetRound.id);
+    const defScore = typeof window.getStudentDefenseScore === 'function' ? window.getStudentDefenseScore(sid, targetRound.id) : null;
     const defDisplay = defScore !== null
       ? `<span class="badge bg-purple-50 text-purple-900 font-bold font-mono text-xs" title="Full precision: ${defScore}">${defScore.toFixed(2)}</span>`
       : '<span class="text-slate-300 font-mono">--</span>';
 
-    const finalInfo = getFinalScore(sid, targetRound.id);
+    const finalInfo = typeof window.getFinalScore === 'function'
+      ? window.getFinalScore(sid, targetRound.id)
+      : { complete: false, missing: ['Chưa đủ điểm'], displayScore: '--' };
+
     const finalDisplay = finalInfo.complete
       ? `<strong class="font-mono text-sm text-indigo-950 bg-indigo-50/80 px-2.5 py-1 rounded-lg border border-indigo-200">${finalInfo.displayScore}</strong>`
       : `<span class="text-amber-700 font-semibold text-xs" title="${(finalInfo.missing || []).join(', ')}">Chưa đủ</span>`;

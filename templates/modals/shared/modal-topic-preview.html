@@ -20,14 +20,20 @@
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
+        <!-- Version Selector Dropdown (visible when student has multiple approved versions) -->
+        <div id="topic-preview-version-selector-wrap" class="hidden relative inline-flex items-center">
+          <button type="button" id="topic-preview-version-btn" onclick="toggleModalVersionDropdown(event)" class="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-tdtu-blue border border-blue-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Chọn phiên bản phiếu đăng ký để xem">
+            <span>📄</span>
+            <span id="topic-preview-version-btn-text">Phiếu ĐK lần 1</span>
+            <span class="text-[9px] text-blue-500">▼</span>
+          </button>
+          <div id="topic-preview-version-dropdown" class="hidden absolute right-0 top-full mt-1.5 z-50 min-w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs">
+            <!-- Items populated by JS -->
+          </div>
+        </div>
+
         <button type="button" id="btn-topic-preview-student-edit" onclick="toggleTopicPreviewEditMode(true)" class="hidden px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Chỉnh sửa tên đề tài và mô tả">
           <span>✏️</span> <span>Sửa đề tài</span>
-        </button>
-        <button type="button" id="btn-topic-preview-save-edit" onclick="saveTopicPreviewEdits()" class="hidden px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md transition flex items-center gap-1.5 cursor-pointer" title="Lưu thay đổi">
-          <span>💾</span> <span>Lưu & Gửi duyệt lại</span>
-        </button>
-        <button type="button" id="btn-topic-preview-cancel-edit" onclick="toggleTopicPreviewEditMode(false)" class="hidden px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Hủy sửa">
-          <span>✕</span> <span>Hủy sửa</span>
         </button>
         <button type="button" id="btn-topic-preview-download-pdf" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer" title="Tải file PDF chính thức">
           <span>🖨️</span> <span>Tải PDF / In</span>
@@ -67,56 +73,54 @@
 
         <!-- Student Profile Form Lines -->
         <div style="margin-bottom:16px;line-height:1.8;">
-          <table style="width:100%;border-collapse:collapse;margin-bottom:6px;table-layout:fixed;">
-            <colgroup>
-              <col style="width: 100px;">
-              <col style="width: 32%;">
-              <col style="width: 80px;">
-              <col style="width: auto;">
-            </colgroup>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
             <tr>
-              <td style="white-space:nowrap;padding-right:6px;font-weight:bold;">HỌ VÀ TÊN:</td>
-              <td id="topic-preview-doc-name">--</td>
-              <td style="white-space:nowrap;padding-left:12px;padding-right:6px;font-weight:bold;">MSSV:</td>
-              <td id="topic-preview-doc-mssv">--</td>
+              <td style="width:60%;vertical-align:top;">
+                <span style="font-weight:normal;">HỌ VÀ TÊN:</span> <span id="topic-preview-doc-name" style="font-weight:normal;">--</span>
+              </td>
+              <td style="width:40%;vertical-align:top;">
+                <span style="font-weight:normal;">MSSV:</span> <span id="topic-preview-doc-mssv" style="font-weight:normal;">--</span>
+              </td>
             </tr>
             <tr>
-              <td style="white-space:nowrap;padding-right:6px;font-weight:bold;padding-top:4px;">LỚP:</td>
-              <td style="padding-top:4px;" id="topic-preview-doc-class">--</td>
-              <td style="white-space:nowrap;padding-left:12px;padding-right:6px;font-weight:bold;padding-top:4px;">NGÀNH:</td>
-              <td style="padding-top:4px;" id="topic-preview-doc-major">--</td>
+              <td style="padding-top:4px;vertical-align:top;">
+                <span style="font-weight:normal;">LỚP:</span> <span id="topic-preview-doc-class" style="font-weight:normal;">--</span>
+              </td>
+              <td style="padding-top:4px;vertical-align:top;">
+                <span style="font-weight:normal;">NGÀNH:</span> <span id="topic-preview-doc-major" style="font-weight:normal;">--</span>
+              </td>
             </tr>
           </table>
 
           <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
             <tr>
-              <td style="width:1%;white-space:nowrap;padding-right:6px;">EMAIL:</td>
-              <td id="topic-preview-doc-email">--</td>
+              <td style="vertical-align:top;">
+                <span style="font-weight:normal;">EMAIL:</span> <span id="topic-preview-doc-email" style="font-weight:normal;">--</span>
+              </td>
             </tr>
-          </table>
-
-          <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
             <tr>
-              <td style="width:1%;white-space:nowrap;padding-right:6px;">ĐIỆN THOẠI:</td>
-              <td id="topic-preview-doc-phone">--</td>
+              <td style="padding-top:4px;vertical-align:top;">
+                <span style="font-weight:normal;">ĐIỆN THOẠI:</span> <span id="topic-preview-doc-phone" style="font-weight:normal;">--</span>
+              </td>
             </tr>
-          </table>
-
-          <table style="width:100%;border-collapse:collapse;margin-bottom:6px;">
             <tr>
-              <td style="width:1%;white-space:nowrap;padding-right:6px;">ĐỊA CHỈ:</td>
-              <td id="topic-preview-doc-address">--</td>
+              <td style="padding-top:4px;vertical-align:top;">
+                <span style="font-weight:normal;">ĐỊA CHỈ:</span> <span id="topic-preview-doc-address" style="font-weight:normal;">--</span>
+              </td>
             </tr>
           </table>
 
           <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
             <tr>
-              <td style="width:1%;white-space:nowrap;padding-right:6px;">MÔN HỌC:</td>
-              <td id="topic-preview-doc-course">--</td>
-              <td style="width:1%;white-space:nowrap;padding-left:16px;padding-right:6px;">MÃ MÔN HỌC:</td>
-              <td style="width:18%;" id="topic-preview-doc-code">--</td>
-              <td style="width:1%;white-space:nowrap;padding-left:16px;padding-right:6px;">NHÓM:</td>
-              <td style="width:8%;" id="topic-preview-doc-group">--</td>
+              <td style="width:46%;vertical-align:top;">
+                <span style="font-weight:normal;">MÔN HỌC:</span> <span id="topic-preview-doc-course" style="font-weight:normal;">--</span>
+              </td>
+              <td style="width:34%;vertical-align:top;">
+                <span style="font-weight:normal;">MÃ MÔN HỌC:</span> <span id="topic-preview-doc-code" style="font-weight:normal;">--</span>
+              </td>
+              <td style="width:20%;vertical-align:top;">
+                <span style="font-weight:normal;">NHÓM:</span> <span id="topic-preview-doc-group" style="font-weight:normal;">--</span>
+              </td>
             </tr>
           </table>
 
@@ -126,10 +130,9 @@
 
           <!-- TÊN ĐỀ TÀI -->
           <div style="margin-bottom:14px;line-height:1.5;">
-            <span style="font-weight:bold;margin-right:6px;">TÊN ĐỀ TÀI :</span>
-            <span id="topic-preview-doc-title" style="font-weight:bold;font-size:13pt;">--</span>
+            <span style="font-weight:normal;">TÊN ĐỀ TÀI :</span> <span id="topic-preview-doc-title" style="font-weight:normal;font-size:13pt;">--</span>
             <div id="topic-preview-doc-title-edit-wrap" class="hidden no-print mt-1.5" style="display:none;">
-              <textarea id="topic-preview-edit-title" rows="2" class="w-full p-2.5 bg-amber-50/70 border-2 border-amber-400 rounded-lg text-[13pt] font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" style="font-family:'Times New Roman',Times,serif;line-height:1.4;" placeholder="Thiết kế nội thất..."></textarea>
+              <textarea id="topic-preview-edit-title" rows="2" class="w-full p-2.5 bg-amber-50/70 border-2 border-amber-400 rounded-lg text-[13pt] font-normal text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" style="font-family:'Times New Roman',Times,serif;line-height:1.4;" placeholder="Thiết kế nội thất..."></textarea>
               <div class="text-[10pt] text-amber-900 font-normal italic mt-0.5">
                 💡 Tên đề tài <strong>BẮT BUỘC</strong> phải bắt đầu bằng cụm từ <strong>"Thiết kế nội thất"</strong>.
               </div>
@@ -141,11 +144,11 @@
             <div style="font-weight:bold;text-align:center;margin-bottom:8px;">
               MÔ TẢ CHI TIẾT ĐỊNH HƯỚNG THIẾT KẾ CỦA ĐỀ TÀI :
             </div>
-            <div id="topic-preview-doc-description" style="text-align:justify;min-height:80px;white-space:pre-wrap;line-height:1.5;">
+            <div id="topic-preview-doc-description" style="text-align:justify;min-height:80px;white-space:pre-wrap;line-height:1.5;font-weight:normal;">
               --
             </div>
             <div id="topic-preview-doc-desc-edit-wrap" class="hidden no-print mt-1" style="display:none;">
-              <textarea id="topic-preview-edit-description" rows="5" class="w-full p-2.5 bg-amber-50/70 border-2 border-amber-400 rounded-lg text-[13pt] text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-justify shadow-inner" style="font-family:'Times New Roman',Times,serif;line-height:1.4;" placeholder="Trình bày mục tiêu, đối tượng, không gian và định hướng thiết kế chính..."></textarea>
+              <textarea id="topic-preview-edit-description" rows="5" class="w-full p-2.5 bg-amber-50/70 border-2 border-amber-400 rounded-lg text-[13pt] font-normal text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-justify shadow-inner" style="font-family:'Times New Roman',Times,serif;line-height:1.4;" placeholder="Trình bày mục tiêu, đối tượng, không gian và định hướng thiết kế chính..."></textarea>
             </div>
           </div>
 
@@ -155,15 +158,15 @@
           </div>
 
           <!-- Khối chữ ký -->
-          <table style="width:100%;border-collapse:collapse;table-layout:fixed;text-align:center;margin-top:10px;">
+          <table style="width:100%;border-collapse:collapse;table-layout:fixed;text-align:center;margin-top:14px;">
             <tr>
-              <td style="width:55%;vertical-align:top;">
+              <td style="width:50%;vertical-align:top;padding-right:8px;">
                 <div style="font-weight:bold;font-size:11.5pt;">Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN</div>
                 <div id="topic-preview-doc-sup-status" style="margin-top:6px;font-size:11pt;font-style:italic;color:#047857;">
                   (Đã duyệt đề tài)
                 </div>
               </td>
-              <td style="width:45%;vertical-align:top;">
+              <td style="width:50%;vertical-align:top;padding-left:8px;">
                 <div id="topic-preview-doc-date" style="font-style:italic;font-size:11pt;">
                   Tp.HCM, ngày ... tháng ... năm ...
                 </div>
@@ -171,18 +174,18 @@
                 <div style="font-style:italic;font-size:10pt;">(ký và ghi rõ họ tên)</div>
               </td>
             </tr>
-            <tr style="height:65px;">
+            <tr style="height:110px;">
               <td></td>
               <td></td>
             </tr>
             <tr>
-              <td style="vertical-align:bottom;">
-                <div id="topic-preview-doc-sup-name" style="font-weight:bold;font-size:12pt;">
+              <td style="vertical-align:bottom;padding-right:8px;">
+                <div id="topic-preview-doc-sup-name" style="font-weight:normal;font-size:12pt;">
                   --
                 </div>
               </td>
-              <td style="vertical-align:bottom;">
-                <div id="topic-preview-doc-sign-student" style="font-weight:bold;font-size:12pt;">
+              <td style="vertical-align:bottom;padding-left:8px;">
+                <div id="topic-preview-doc-sign-student" style="font-weight:normal;font-size:12pt;">
                   --
                 </div>
               </td>
@@ -199,8 +202,8 @@
         <span>📌</span> <span id="topic-preview-footer-note">GVHD xem xét nội dung phiếu đăng ký và xác nhận duyệt hoặc yêu cầu chỉnh sửa.</span>
       </div>
       <div class="flex items-center gap-2 shrink-0 flex-wrap">
-        <button type="button" id="btn-topic-preview-footer-cancel-edit" onclick="toggleTopicPreviewEditMode(false)" class="hidden px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs rounded-xl transition cursor-pointer">
-          Hủy sửa
+        <button type="button" id="btn-topic-preview-footer-cancel-edit" onclick="toggleTopicPreviewEditMode(false)" class="hidden px-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer" title="Hủy sửa">
+          <span>✕</span> <span>Hủy sửa</span>
         </button>
         <button type="button" id="btn-topic-preview-footer-save" onclick="saveTopicPreviewEdits()" class="hidden px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-1.5 cursor-pointer">
           <span>💾</span> <span>Lưu & Gửi GVHD duyệt lại</span>

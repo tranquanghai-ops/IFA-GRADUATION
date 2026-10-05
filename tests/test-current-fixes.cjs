@@ -87,5 +87,68 @@ assert.match(studentEligibility, /✓ Đã duyệt/);
 assert.match(studentEligibility, /⏳ Chờ duyệt/);
 assert.match(studentEligibility, /✕ Yêu cầu sửa/);
 
+const studentTopicPdf = read('js/students/student-topic-pdf.js');
+assert.match(studentTopicPdf, /function resolveOfficialStudentFullName/);
+assert.match(studentTopicPdf, /resolveOfficialStudentFullName/);
+assert.match(studentTopicPdf, /window\.resolveOfficialStudentFullName = resolveOfficialStudentFullName/);
+
+// Verify resolveOfficialStudentFullName logic
+const topicPdfContext = {
+  state: { myRegistration: { studentName: 'Nguyễn Thanh Hằng Nga' }, impersonation: null, studentSelfProfile: null, user: null },
+  window: {}
+};
+const fnMatch = studentTopicPdf.match(/function resolveOfficialStudentFullName\([\s\S]*?\n\}\nwindow\.resolveOfficialStudentFullName/);
+assert.ok(fnMatch, 'resolveOfficialStudentFullName function body found');
+vm.runInNewContext(fnMatch[0].replace(/\nwindow\.resolveOfficialStudentFullName$/, ''), topicPdfContext);
+const resolvedName = topicPdfContext.resolveOfficialStudentFullName('12200254', { studentName: 'Nguyễn Thanh Hằng Nga' }, { fullName: 'Sinh viên 12200254', isMissing: true });
+assert.equal(resolvedName, 'Nguyễn Thanh Hằng Nga', 'resolveOfficialStudentFullName should return actual student name over placeholder');
+
+const modalTopicPreview = read('templates/modals/shared/modal-topic-preview.html');
+// Header cancel/save buttons are removed as requested, only kept in footer
+assert.doesNotMatch(modalTopicPreview, /id="btn-topic-preview-cancel-edit"/);
+assert.doesNotMatch(modalTopicPreview, /id="btn-topic-preview-save-edit"/);
+assert.match(modalTopicPreview, /id="btn-topic-preview-footer-cancel-edit"[\s\S]*?id="btn-topic-preview-footer-save"/);
+assert.match(modalTopicPreview, /id="btn-topic-preview-footer-save"[\s\S]*?<span>💾<\/span> <span>Lưu & Gửi GVHD duyệt lại<\/span>/);
+// Check colon spacing and normal font weight in modal preview
+assert.match(modalTopicPreview, /HỌ VÀ TÊN:<\/span> <span id="topic-preview-doc-name" style="font-weight:normal;"/);
+assert.match(modalTopicPreview, /MSSV:<\/span> <span id="topic-preview-doc-mssv" style="font-weight:normal;"/);
+assert.match(modalTopicPreview, /id="topic-preview-doc-sup-name" style="font-weight:normal;/);
+assert.match(modalTopicPreview, /id="topic-preview-version-selector-wrap"/);
+
+const supervisorTopics = read('js/supervisors/supervisor-portal-topics.js');
+assert.match(supervisorTopics, /const displayVersion = wasApproved \? \(currentVersion \+ 1\) : currentVersion/);
+assert.match(supervisorTopics, /btnSaveBottom\.innerHTML = '<span>💾<\/span> <span>Lưu & Gửi GVHD duyệt lại<\/span>'/);
+assert.match(supervisorTopics, /window\.toggleModalVersionDropdown = function/);
+
+// PDF export assertions: bold: false for all names and labels, colon spacing, supervisor name in bottom row
+assert.match(studentTopicPdf, /text: 'HỌ VÀ TÊN: ', bold: false/);
+assert.match(studentTopicPdf, /text: supervisorName \|\| '', bold: false, fontSize: 12/);
+assert.match(studentTopicPdf, /text: identity\.fullName \|\| '', bold: false, fontSize: 12/);
+assert.match(studentTopicPdf, /layout: 'noBorders'/);
+assert.match(studentTopicPdf, /function getApprovedTopicVersions/);
+
+const impersonationModal = read('js/impersonation/impersonation-modal.js');
+assert.match(impersonationModal, /state\.adminReviewData\?\.roundId === r\.id/);
+assert.match(impersonationModal, /const hasRealName = Boolean\(currentName && currentName\.toUpperCase\(\) !== sid/);
+assert.match(impersonationModal, /candidate\.notFoundInMaster = !hasRealName && \(state\.facultyStudentsLoaded === true\)/);
+
+const assessmentPortal = read('js/grading/assessment-portal.js');
+assert.match(assessmentPortal, /state\.adminReviewData\?\.roundId === round\.id/);
+assert.match(assessmentPortal, /state\.adminReviewData\?\.roundId === targetRound\.id/);
+
+// 1. Hình GVHD to hơn
+const roundsLoader = read('js/rounds/rounds-loader.js');
+assert.match(roundsLoader, /w-18 h-18 sm:w-20 sm:h-20 rounded-2xl border-2 border-white\/40 object-cover/);
+
+// 2 & 3. PDF Centered lines & Clean signature block (no 'Đã duyệt đề tài')
+assert.match(studentTopicPdf, /x2: 90, y2: 0, lineWidth: 0\.8/);
+assert.match(studentTopicPdf, /x2: 135, y2: 0, lineWidth: 0\.8/);
+assert.doesNotMatch(studentTopicPdf, /Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN[\s\S]*?\(Đã duyệt đề tài\)/);
+
+// 4. Thẻ sự kiện sắp tới hạn có màu cam nhạt nổi bật
+const timelineRoadmap = read('js/planning/timeline-roadmap.js');
+assert.match(timelineRoadmap, /border-amber-400 bg-amber-50\/85 ring-2 ring-amber-400\/60 shadow-md/);
+assert.match(timelineRoadmap, /⚡ Sắp tới/);
+
 console.log('Current regression checks passed.');
 

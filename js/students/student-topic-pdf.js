@@ -14,14 +14,161 @@ async function loadStudentSelfProfile(mssv) {
   return state.studentSelfProfile;
 }
 
+function resolveOfficialStudentFullName(mssv, reg = null, studentObj = null) {
+  const cleanId = String(mssv || '').trim().toUpperCase();
+  const isInvalid = (name) => {
+    if (!name) return true;
+    const s = String(name).trim();
+    if (!s || s === '--') return true;
+    const upper = s.toUpperCase();
+    if (upper === cleanId) return true;
+    if (upper === `SINH VIÊN ${cleanId}` || upper.startsWith(`SINH VIÊN ${cleanId}`)) return true;
+    if (cleanId && upper === `SINH VIÊN ${cleanId.replace(/\s+/g, '')}`) return true;
+    return false;
+  };
+
+  // 1. Direct registration studentName
+  const regName = reg?.studentName || reg?.fullName || reg?.name;
+  if (!isInvalid(regName)) return String(regName).trim();
+
+  // 2. Active impersonation target
+  if (state.impersonation?.target?.type === 'student' && (!cleanId || String(state.impersonation.target.mssv || state.impersonation.target.id).trim().toUpperCase() === cleanId)) {
+    const impName = state.impersonation.target.name || state.impersonation.target.fullName;
+    if (!isInvalid(impName)) return String(impName).trim();
+  }
+
+  // 3. Central resolveStudentName if available
+  if (typeof window.resolveStudentName === 'function') {
+    const resolved = window.resolveStudentName(cleanId, regName || '');
+    if (!isInvalid(resolved)) return String(resolved).trim();
+  }
+
+  // 4. Student self profile
+  const profName = state.studentSelfProfile?.fullName || state.studentSelfProfile?.name;
+  if (!isInvalid(profName)) return String(profName).trim();
+
+  // 5. Faculty student master (only if not missing / placeholder)
+  const fac = studentObj || (typeof window.getFacultyStudentByMssv === 'function' ? window.getFacultyStudentByMssv(cleanId) : null) || (typeof window.getFacultyStudent === 'function' ? window.getFacultyStudent(cleanId) : null);
+  if (fac && !fac.isMissing && !fac.notFoundInMaster) {
+    const fn = fac.fullName || fac.name;
+    if (!isInvalid(fn)) return String(fn).trim();
+  }
+
+  // 6. User display name
+  const disp = state.user?.displayName;
+  if (!isInvalid(disp)) return String(disp).trim();
+
+  // 7. Fallback
+  return regName || profName || (cleanId ? `Sinh viên ${cleanId}` : 'Sinh viên');
+}
+window.resolveOfficialStudentFullName = resolveOfficialStudentFullName;
+
+function resolveOfficialSupervisorName(st, fallback = 'Giảng viên Hướng dẫn') {
+  if (!st && state.myRegistration) st = state.myRegistration;
+  if (!st) return fallback;
+
+  const isInvalid = (val) => {
+    if (!val) return true;
+    const s = String(val).trim().toLowerCase();
+    return s === '' || s === '--' || s === 'giảng viên hướng dẫn' || s === 'giang vien huong dan';
+  };
+
+  // 1. Check officialSupervisors
+  const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : (Array.isArray(st.officialSupervisors) ? st.officialSupervisors : []);
+  const primary = officials.find(s => s.role === 'primary') || officials[0];
+  if (primary?.supervisorName && !isInvalid(primary.supervisorName)) {
+    return primary.supervisorName.trim();
+  }
+
+  // 2. Direct properties on registration or assignment
+  const directName = st.acceptedSupervisorName || st.supervisorName || st.finalSupervisorName;
+  if (directName && !isInvalid(directName)) {
+    return String(directName).trim();
+  }
+
+  // 3. Official assignment in state
+  const myAss = state.myOfficialAssignment;
+  const sid = st.studentId || st.mssv || st.id;
+  if (myAss && (myAss.studentId === sid || myAss.mssv === sid)) {
+    const assOfficials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(myAss) : [];
+    const assPrimary = assOfficials.find(s => s.role === 'primary') || assOfficials[0];
+    if (assPrimary?.supervisorName && !isInvalid(assPrimary.supervisorName)) {
+      return assPrimary.supervisorName.trim();
+    }
+    if (myAss.acceptedSupervisorName && !isInvalid(myAss.acceptedSupervisorName)) return myAss.acceptedSupervisorName.trim();
+    if (myAss.supervisorName && !isInvalid(myAss.supervisorName)) return myAss.supervisorName.trim();
+  }
+
+  // 4. If current actor is a supervisor
+  const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
+  const isSupervisorRole = Boolean(
+    state.currentRole === 'supervisor' ||
+    state.role === 'supervisor' ||
+    actor?.type === 'supervisor'
+  );
+  if (isSupervisorRole && (actor?.displayName || state.user?.displayName)) {
+    const d = (actor?.displayName || state.user?.displayName).trim();
+    if (!isInvalid(d)) return d;
+  }
+
+  // 5. Look in supervisors master / roundSupervisors by id or email
+  const supId = st.supervisorId || primary?.supervisorId;
+  if (supId && Array.isArray(state.roundSupervisors)) {
+    const found = state.roundSupervisors.find(s => s.id === supId || s.supervisorId === supId);
+    if (found?.name && !isInvalid(found.name)) return found.name.trim();
+    if (found?.supervisorName && !isInvalid(found.supervisorName)) return found.supervisorName.trim();
+  }
+
+  return directName && String(directName).trim() ? String(directName).trim() : fallback;
+}
+window.resolveOfficialSupervisorName = resolveOfficialSupervisorName;
+
+function getApprovedTopicVersions(reg) {
+  if (!reg) return [];
+  const history = Array.isArray(reg.topicTitleHistory) ? reg.topicTitleHistory : [];
+  const map = new Map();
+
+  history.forEach(item => {
+    if (item && item.status === 'approved') {
+      const v = Number(item.version || 1);
+      map.set(v, {
+        version: v,
+        title: item.title || reg.topicTitle || '',
+        topicDescription: item.topicDescription || reg.topicDescription || '',
+        reviewedAt: item.reviewedAt || reg.topicReviewedAt || null,
+        reviewedBy: item.reviewedBy || reg.topicReviewedBy || '',
+        status: 'approved'
+      });
+    }
+  });
+
+  const isCurrentApproved = (reg.topicApprovalStatus === 'approved' || reg.approvalStatus === 'approved');
+  const currentVersion = Number(reg.topicTitleVersion || 1);
+  if (isCurrentApproved && !map.has(currentVersion)) {
+    map.set(currentVersion, {
+      version: currentVersion,
+      title: reg.topicTitle || '',
+      topicDescription: reg.topicDescription || '',
+      reviewedAt: reg.topicReviewedAt || null,
+      reviewedBy: reg.topicReviewedBy || '',
+      status: 'approved'
+    });
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.version - b.version);
+}
+window.getApprovedTopicVersions = getApprovedTopicVersions;
+
 function getRegistrationStudentIdentity() {
-  const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
+  const mssv = state.isPreviewMode ? state.previewMssv : (state.studentMssv || state.impersonation?.target?.mssv || state.myRegistration?.studentId || state.myRegistration?.mssv);
   const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(mssv) : null;
+  const reg = state.myRegistration || {};
+  const isFacReal = Boolean(studentObj && !studentObj.isMissing && !studentObj.notFoundInMaster);
   return {
     mssv,
-    fullName: studentObj?.fullName || studentObj?.name || state.myRegistration?.studentName || state.user?.displayName || `Sinh viên ${mssv}`,
-    major: studentObj?.major || state.myRegistration?.major || 'Thiết kế nội thất',
-    email: state.myRegistration?.email || (state.impersonation?.target?.email) || state.user?.email || `${mssv}@student.tdtu.edu.vn`
+    fullName: resolveOfficialStudentFullName(mssv, reg, studentObj),
+    major: reg.major || (isFacReal ? studentObj.major : '') || state.studentSelfProfile?.major || 'Thiết kế nội thất',
+    email: reg.personalEmail || reg.email || (state.impersonation?.target?.email) || (isFacReal ? studentObj.email : '') || state.user?.email || `${mssv}@student.tdtu.edu.vn`
   };
 }
 
@@ -144,14 +291,18 @@ window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
           * {
             box-sizing: border-box;
             font-family: 'Times New Roman', Times, serif !important;
-            color: #000 !important;
           }
           body {
             margin: 0;
             padding: 0;
             background: #fff;
+            color: #000;
             font-size: 13pt;
             line-height: 1.4;
+          }
+          #topic-preview-doc-sup-status {
+            color: #047857 !important;
+            font-weight: bold;
           }
           table {
             border-collapse: collapse;
@@ -199,30 +350,56 @@ window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
   }, 250);
 };
 
-window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
+window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null, targetVersion = null) {
   let reg = null;
   let identity = null;
 
+  const modal = document.getElementById('modal-supervisor-topic-preview');
+  if (modal && modal._currentRegistration) {
+    if (!targetStudentId || (modal._currentRegistration.studentId === targetStudentId || modal._currentRegistration.mssv === targetStudentId)) {
+      reg = modal._currentRegistration;
+    }
+  }
+
   if (targetStudentId && typeof targetStudentId === 'string') {
-    reg = (state.supervisorAssignedStudents || []).find(st => (st.studentId || st.id) === targetStudentId) ||
-      (typeof findStudentInRound === 'function' ? findStudentInRound(targetStudentId) : null);
+    if (!reg) {
+      reg = (state.supervisorAssignedStudents || []).find(st => (st.studentId || st.id) === targetStudentId) ||
+        (typeof findStudentInRound === 'function' ? findStudentInRound(targetStudentId) : null) ||
+        (state.myRegistration && (state.myRegistration.studentId === targetStudentId || state.myRegistration.mssv === targetStudentId) ? state.myRegistration : null);
+    }
     const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(targetStudentId) : null;
+    const isFacReal = Boolean(studentObj && !studentObj.isMissing && !studentObj.notFoundInMaster);
+    let resolvedName = resolveOfficialStudentFullName(targetStudentId, reg, studentObj);
+    if ((!resolvedName || resolvedName.startsWith('Sinh viên')) && modal) {
+      const modalStudentName = document.getElementById('topic-preview-doc-sign-student')?.textContent?.trim() ||
+        document.getElementById('topic-preview-doc-name')?.textContent?.trim();
+      if (modalStudentName && modalStudentName !== '--') resolvedName = modalStudentName;
+    }
     identity = {
       mssv: targetStudentId,
-      fullName: reg?.studentName || studentObj?.fullName || studentObj?.name || targetStudentId,
-      major: reg?.major || studentObj?.major || 'Thiết kế nội thất',
-      email: reg?.personalEmail || reg?.email || studentObj?.email || `${targetStudentId}@student.tdtu.edu.vn`
+      fullName: resolvedName,
+      major: reg?.major || (isFacReal ? studentObj.major : '') || 'Thiết kế nội thất',
+      email: reg?.personalEmail || reg?.email || (isFacReal ? studentObj.email : '') || `${targetStudentId}@student.tdtu.edu.vn`
     };
   } else {
-    reg = state.myRegistration;
+    if (!reg) reg = state.myRegistration;
     identity = getRegistrationStudentIdentity();
+    if ((!identity.fullName || identity.fullName.startsWith('Sinh viên')) && modal) {
+      const modalStudentName = document.getElementById('topic-preview-doc-sign-student')?.textContent?.trim() ||
+        document.getElementById('topic-preview-doc-name')?.textContent?.trim();
+      if (modalStudentName && modalStudentName !== '--') identity.fullName = modalStudentName;
+    }
+  }
+
+  if (!targetVersion && modal && modal._viewingVersion) {
+    targetVersion = modal._viewingVersion;
   }
 
   if (!reg) {
     showToast('Không tìm thấy thông tin đăng ký.', 'warning');
     return;
   }
-  if (!targetStudentId && reg.topicApprovalStatus !== 'approved') {
+  if (!targetStudentId && reg.topicApprovalStatus !== 'approved' && !targetVersion) {
     showToast('Phiếu PDF chỉ được tải sau khi GVHD xác nhận tên đề tài.', 'warning');
     return;
   }
@@ -239,12 +416,47 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
   const mm = String(approvedDate.getMonth() + 1).padStart(2, '0');
   const yyyy = approvedDate.getFullYear();
   const roundLabel = round.title || round.roundName || 'ĐỒ ÁN TỐT NGHIỆP';
-  const version = Number(reg.topicTitleVersion || 1);
+
+  const approvedList = getApprovedTopicVersions(reg);
+  let activeVersion = Number(reg.topicTitleVersion || 1);
+  let activeTitle = reg.topicTitle || '';
+  let activeDesc = String(reg.topicDescription || '').trim();
+  const isDirectlyApproved = Boolean(
+    reg.topicApprovalStatus === 'approved' ||
+    reg.approvalStatus === 'approved'
+  );
+  let isApprovedForVersion = isDirectlyApproved;
+
+  if (targetVersion) {
+    const matched = approvedList.find(item => Number(item.version) === Number(targetVersion));
+    if (matched) {
+      activeVersion = Number(matched.version);
+      activeTitle = matched.title || activeTitle;
+      activeDesc = String(matched.topicDescription || activeDesc).trim();
+      isApprovedForVersion = true;
+    } else {
+      isApprovedForVersion = isDirectlyApproved && (Number(targetVersion) === activeVersion);
+    }
+  } else if (!isDirectlyApproved && approvedList.length > 0) {
+    const latest = approvedList[approvedList.length - 1];
+    if (latest) {
+      activeVersion = Number(latest.version);
+      activeTitle = latest.title || activeTitle;
+      activeDesc = String(latest.topicDescription || activeDesc).trim();
+      isApprovedForVersion = true;
+    }
+  }
+
+  let supervisorName = resolveOfficialSupervisorName(reg);
+  if ((!supervisorName || supervisorName === 'Giảng viên Hướng dẫn') && modal) {
+    const modalSupName = document.getElementById('topic-preview-doc-sup-name')?.textContent?.trim();
+    if (modalSupName && modalSupName !== '--') supervisorName = modalSupName;
+  }
   const normalizedRoundLabel = roundLabel.toUpperCase().replace(/\s+/g, ' ').trim();
   const roundHeadingMatch = normalizedRoundLabel.match(/^(.*?)(?:\s*-\s*)?(ĐỢT\s+.+)$/);
   const programHeading = roundHeadingMatch?.[1] || 'ĐỒ ÁN TỐT NGHIỆP/ĐỒ ÁN TỔNG HỢP';
   const roundHeading = roundHeadingMatch?.[2] || (round.roundName ? `ĐỢT ${round.roundName}` : '');
-  const descriptionText = String(reg.topicDescription || '').trim();
+  const descriptionText = activeDesc || '';
   const studentClass = reg.currentClass || reg.studentClass || reg.className || studentObj?.className || studentObj?.studentClass || '--';
   const studentAddress = getCleanRegistrationAddress(reg, studentObj);
 
@@ -260,15 +472,29 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
             stack: [
               { text: 'TRƯỜNG ĐẠI HỌC TÔN ĐỨC THẮNG', fontSize: 10.5, alignment: 'center' },
               { text: 'KHOA MỸ THUẬT CÔNG NGHIỆP', fontSize: 10.5, bold: true, alignment: 'center', margin: [0, 2, 0, 4] },
-              { canvas: [{ type: 'line', x1: 25, y1: 0, x2: 175, y2: 0, lineWidth: 0.8 }] }
+              {
+                columns: [
+                  { text: '', width: '*' },
+                  { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 90, y2: 0, lineWidth: 0.8 }], width: 90 },
+                  { text: '', width: '*' }
+                ],
+                margin: [0, 1, 0, 0]
+              }
             ]
           },
           {
             width: '54%',
             stack: [
               { text: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', fontSize: 10.5, bold: true, alignment: 'center' },
-              { text: 'Độc lập -Tự do – Hạnh phúc', fontSize: 10.5, bold: true, alignment: 'center', margin: [0, 2, 0, 4] },
-              { canvas: [{ type: 'line', x1: 45, y1: 0, x2: 175, y2: 0, lineWidth: 0.8 }] }
+              { text: 'Độc lập - Tự do - Hạnh phúc', fontSize: 10.5, bold: true, alignment: 'center', margin: [0, 2, 0, 4] },
+              {
+                columns: [
+                  { text: '', width: '*' },
+                  { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 135, y2: 0, lineWidth: 0.8 }], width: 135 },
+                  { text: '', width: '*' }
+                ],
+                margin: [0, 1, 0, 0]
+              }
             ]
           }
         ],
@@ -280,20 +506,20 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
         ? [{ text: roundHeading, bold: true, italics: true, fontSize: 13.5, alignment: 'center', margin: [0, 2, 0, 18] }]
         : [{ text: '', margin: [0, 0, 0, 18] }]),
 
-      // Thông tin sinh viên (inline, không bị cách xa, không bold giá trị)
+      // Thông tin sinh viên (inline, không bị cách xa, không bold nhãn & giá trị)
       {
         columns: [
           {
-            width: '62%',
+            width: '60%',
             text: [
-              { text: 'HỌ VÀ TÊN: ', bold: true },
+              { text: 'HỌ VÀ TÊN: ', bold: false },
               { text: identity.fullName || '', bold: false }
             ]
           },
           {
-            width: '38%',
+            width: '40%',
             text: [
-              { text: 'MSSV: ', bold: true },
+              { text: 'MSSV: ', bold: false },
               { text: identity.mssv || '', bold: false }
             ]
           }
@@ -305,14 +531,14 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
           {
             width: '46%',
             text: [
-              { text: 'LỚP: ', bold: true },
+              { text: 'LỚP: ', bold: false },
               { text: studentClass, bold: false }
             ]
           },
           {
             width: '54%',
             text: [
-              { text: 'NGÀNH: ', bold: true },
+              { text: 'NGÀNH: ', bold: false },
               { text: reg.major || identity.major || 'Thiết kế nội thất', bold: false }
             ]
           }
@@ -321,21 +547,21 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
       },
       {
         text: [
-          { text: 'EMAIL: ', bold: true },
+          { text: 'EMAIL: ', bold: false },
           { text: reg.personalEmail || identity.email || '', bold: false }
         ],
         margin: [0, 0, 0, 8]
       },
       {
         text: [
-          { text: 'ĐIỆN THOẠI: ', bold: true },
+          { text: 'ĐIỆN THOẠI: ', bold: false },
           { text: reg.studentPhone || '', bold: false }
         ],
         margin: [0, 0, 0, 8]
       },
       {
         text: [
-          { text: 'ĐỊA CHỈ: ', bold: true },
+          { text: 'ĐỊA CHỈ: ', bold: false },
           { text: studentAddress, bold: false }
         ],
         margin: [0, 0, 0, 8]
@@ -343,23 +569,23 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
       {
         columns: [
           {
-            width: '45%',
+            width: '46%',
             text: [
-              { text: 'MÔN HỌC: ', bold: true },
+              { text: 'MÔN HỌC: ', bold: false },
               { text: reg.courseName || reg.projectType || 'Đồ án tốt nghiệp', bold: false }
             ]
           },
           {
-            width: '35%',
+            width: '34%',
             text: [
-              { text: 'MÃ MÔN HỌC: ', bold: true },
+              { text: 'MÃ MÔN HỌC: ', bold: false },
               { text: reg.courseCode || '', bold: false }
             ]
           },
           {
             width: '20%',
             text: [
-              { text: 'NHÓM: ', bold: true },
+              { text: 'NHÓM: ', bold: false },
               { text: reg.courseGroup || '1', bold: false }
             ]
           }
@@ -367,7 +593,7 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
         margin: [0, 0, 0, 14]
       },
       {
-        text: `Đăng ký đề tài chính thức lần thứ : ${version}`,
+        text: `Đăng ký đề tài chính thức lần thứ : ${activeVersion}`,
         italics: true,
         fontSize: 12,
         alignment: 'center',
@@ -375,8 +601,8 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
       },
       {
         text: [
-          { text: 'TÊN ĐỀ TÀI : ', bold: true },
-          { text: reg.topicTitle || '', bold: false }
+          { text: 'TÊN ĐỀ TÀI : ', bold: false },
+          { text: activeTitle || '', bold: false }
         ],
         lineHeight: 1.35,
         margin: [0, 0, 0, 14]
@@ -389,7 +615,7 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
         margin: [0, 0, 0, 8]
       },
       {
-        text: descriptionText || '',
+        text: descriptionText,
         alignment: 'justify',
         fontSize: 12,
         lineHeight: 1.35,
@@ -403,35 +629,49 @@ window.downloadOfficialTopicRegistrationPdf = function(targetStudentId = null) {
         margin: [0, 4, 0, 18]
       },
       {
-        columns: [
-          {
-            width: '56%',
-            stack: [
-              { text: 'Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN', bold: true, fontSize: 12, alignment: 'center', margin: [0, 18, 0, 0] }
+        table: {
+          widths: ['50%', '50%'],
+          body: [
+            [
+              {
+                stack: [
+                  { text: 'Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN', bold: true, fontSize: 12, alignment: 'center' }
+                ]
+              },
+              {
+                stack: [
+                  { text: `Tp.HCM, ngày ${dd} tháng ${mm} năm ${yyyy}`, italics: true, fontSize: 11, alignment: 'center' },
+                  { text: 'NGƯỜI ĐĂNG KÝ', bold: true, fontSize: 12, alignment: 'center', margin: [0, 3, 0, 0] },
+                  { text: '(ký và ghi rõ họ tên)', italics: true, fontSize: 10, alignment: 'center', margin: [0, 1, 0, 0] }
+                ]
+              }
+            ],
+            [
+              { text: '', margin: [0, 0, 0, 75] },
+              { text: '', margin: [0, 0, 0, 75] }
+            ],
+            [
+              { text: supervisorName || '', bold: false, fontSize: 12, alignment: 'center' },
+              { text: identity.fullName || '', bold: false, fontSize: 12, alignment: 'center' }
             ]
-          },
-          {
-            width: '44%',
-            stack: [
-              { text: `Tp.HCM, ngày ${dd} tháng ${mm} năm ${yyyy}`, italics: true, fontSize: 12, alignment: 'center' },
-              { text: 'NGƯỜI ĐĂNG KÝ', bold: true, fontSize: 12, alignment: 'center', margin: [0, 3, 0, 0] },
-              { text: '(ký và ghi rõ họ tên)', italics: true, fontSize: 11, alignment: 'center', margin: [0, 1, 0, 40] },
-              { text: identity.fullName, bold: false, fontSize: 12, alignment: 'center' }
-            ]
-          }
-        ]
+          ]
+        },
+        layout: 'noBorders'
       }
     ],
     styles: {}
   };
 
   const safeId = String(identity.mssv || 'sinh-vien').replace(/[^0-9A-Za-z_-]/g, '');
-  window.pdfMake.createPdf(docDefinition).download(`Phieu-dang-ky-de-tai-${safeId}-lan-${version}.pdf`);
+  window.pdfMake.createPdf(docDefinition).download(`Phieu-dang-ky-de-tai-${safeId}-lan-${activeVersion}.pdf`);
 };
 
 export {
   loadStudentSelfProfile,
   getRegistrationStudentIdentity,
+  resolveOfficialStudentFullName,
+  resolveOfficialSupervisorName,
+  getApprovedTopicVersions,
   populateRegistrationStudentForm,
   collectOfficialFormFields,
   validateOfficialFormFields
@@ -440,6 +680,9 @@ export {
 if (typeof window !== 'undefined') {
   window.loadStudentSelfProfile = loadStudentSelfProfile;
   window.getRegistrationStudentIdentity = getRegistrationStudentIdentity;
+  window.resolveOfficialStudentFullName = resolveOfficialStudentFullName;
+  window.resolveOfficialSupervisorName = resolveOfficialSupervisorName;
+  window.getApprovedTopicVersions = getApprovedTopicVersions;
   window.populateRegistrationStudentForm = populateRegistrationStudentForm;
   window.collectOfficialFormFields = collectOfficialFormFields;
   window.validateOfficialFormFields = validateOfficialFormFields;

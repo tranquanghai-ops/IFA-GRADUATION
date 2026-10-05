@@ -3,6 +3,11 @@
 const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
 const normalizeOfficialAssignment = (a, r) => (typeof window !== 'undefined' && window.normalizeOfficialAssignment ? window.normalizeOfficialAssignment(a, r) : (a || r));
 const isDirectSupervisorAssignment = (rnd) => (typeof window !== 'undefined' && window.isDirectSupervisorAssignment ? window.isDirectSupervisorAssignment(rnd) : false);
+const getAdminAssignmentRows = () => (typeof window !== 'undefined' && window.getAdminAssignmentRows ? window.getAdminAssignmentRows() : []);
+const isAssignmentEditingLocked = () => (typeof window !== 'undefined' && window.isAssignmentEditingLocked ? window.isAssignmentEditingLocked() : false);
+const ensureAssignmentEditingAllowed = () => (typeof window !== 'undefined' && window.ensureAssignmentEditingAllowed ? window.ensureAssignmentEditingAllowed() : true);
+const getSupervisorAssignmentCount = (...args) => (typeof window !== 'undefined' && window.getSupervisorAssignmentCount ? window.getSupervisorAssignmentCount(...args) : 0);
+const refreshRoundCardMetrics = (roundId) => (typeof window !== 'undefined' && typeof window.refreshRoundCardMetrics === 'function' ? window.refreshRoundCardMetrics(roundId) : Promise.resolve());
 /**
  * IFA+ Graduation — Admin Manual Assignments & Support Supervisor Submodule
  */
@@ -55,6 +60,7 @@ window.loadAdminReviewData = async function(roundId) {
     const assignmentDrafts = draftSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     state.adminReviewData = {
+      roundId,
       supervisors,
       registrations,
       decisions,
@@ -63,7 +69,9 @@ window.loadAdminReviewData = async function(roundId) {
       assignmentDrafts
     };
 
-    await refreshRoundCardMetrics(roundId);
+    if (typeof window.refreshRoundCardMetrics === 'function') {
+      await window.refreshRoundCardMetrics(roundId);
+    }
     renderAdminReviewDashboard();
     renderAdminReviewSupervisorsTable();
     renderAdminManualAssignmentTable();

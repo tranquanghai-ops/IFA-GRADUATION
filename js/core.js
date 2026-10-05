@@ -756,6 +756,7 @@ if (typeof window !== 'undefined') {
   window.getSupervisorAssignmentMode = getSupervisorAssignmentMode;
   window.isDirectSupervisorAssignment = isDirectSupervisorAssignment;
   window.shouldSkipStudentSupervisorPreference = shouldSkipStudentSupervisorPreference;
+  if (!window.refreshRoundCardMetrics) window.refreshRoundCardMetrics = async () => {};
 }
 
 // --- TIMELINE EVENT & COLOR DOMAIN HELPERS ---

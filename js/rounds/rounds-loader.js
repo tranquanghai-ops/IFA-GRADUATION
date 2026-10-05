@@ -243,6 +243,7 @@ async function refreshRoundCardMetrics(roundId) {
     console.warn(`[Rounds] Could not refresh live metrics for ${roundId}:`, error);
   }
 }
+window.refreshRoundCardMetrics = refreshRoundCardMetrics;
 
 
 // Safe helper to populate round selectors across views
@@ -385,19 +386,19 @@ function renderRoundHeader() {
         const fallback = getSupervisorAvatarSvgDataUri(profile.name);
         const avatar = profile.photoUrl || fallback;
         const phoneHref = String(profile.phone || '').replace(/[^\d+]/g, '');
-        return `<div class="flex items-center gap-3 min-w-0">
-          <img src="${escapeHtml(avatar)}" data-fallback="${escapeHtml(fallback)}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="${escapeHtml(profile.name)}" class="w-13 h-13 sm:w-14 sm:h-14 rounded-xl border-2 border-white/30 object-cover shrink-0 shadow-2xs bg-white/10">
-          <div class="min-w-0 flex-1 space-y-0.5 text-left">
+        return `<div class="flex items-center gap-3.5 min-w-0">
+          <img src="${escapeHtml(avatar)}" data-fallback="${escapeHtml(fallback)}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="${escapeHtml(profile.name)}" class="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/40 object-cover shrink-0 shadow-md bg-white/10">
+          <div class="min-w-0 flex-1 space-y-1 text-left">
             <div class="flex items-center gap-1.5">
               <span class="rounded-md bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 uppercase tracking-wide">${escapeHtml(profile.label)}</span>
             </div>
-            <h4 class="text-xs sm:text-sm font-black text-white truncate leading-snug" title="${escapeHtml(profile.name)}">${escapeHtml(profile.name)}</h4>
-            ${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}" class="truncate flex items-center gap-1 text-[11px] text-blue-100 hover:underline" title="${escapeHtml(profile.email)}"><span>✉️</span><span class="truncate">${escapeHtml(profile.email)}</span></a>` : ''}
-            ${profile.phone ? `<a href="tel:${escapeHtml(phoneHref)}" class="flex items-center gap-1 text-[11px] font-bold text-emerald-300 hover:underline" title="${escapeHtml(profile.phone)}"><span>📞</span><span>${escapeHtml(profile.phone)}</span></a>` : ''}
+            <h4 class="text-sm sm:text-base font-black text-white truncate leading-snug" title="${escapeHtml(profile.name)}">${escapeHtml(profile.name)}</h4>
+            ${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}" class="truncate flex items-center gap-1 text-xs text-blue-100 hover:underline" title="${escapeHtml(profile.email)}"><span>✉️</span><span class="truncate">${escapeHtml(profile.email)}</span></a>` : ''}
+            ${profile.phone ? `<a href="tel:${escapeHtml(phoneHref)}" class="flex items-center gap-1 text-xs font-bold text-emerald-300 hover:underline" title="${escapeHtml(profile.phone)}"><span>📞</span><span>${escapeHtml(profile.phone)}</span></a>` : ''}
           </div>
         </div>`;
       }).join('')}</div>`
-      : '<div class="flex items-center gap-3 text-left"><div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center text-xl shrink-0">👨‍🏫</div><div class="min-w-0"><span class="rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-black text-white uppercase">GVHD</span><p class="mt-0.5 text-xs text-blue-100 font-bold">Chưa phân công</p></div></div>';
+      : '<div class="flex items-center gap-3.5 text-left"><div class="w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center text-2xl shrink-0">👨‍🏫</div><div class="min-w-0"><span class="rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-black text-white uppercase">GVHD</span><p class="mt-0.5 text-sm text-blue-100 font-bold">Chưa phân công</p></div></div>';
   }
 
   // Tinh giản banner sinh viên theo yêu cầu: ẩn các badge và thông tin trùng lặp
@@ -462,8 +463,39 @@ function renderRoundHeader() {
         }
       }
 
+      const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
+        ? window.getApprovedTopicVersions(reg)
+        : [];
+      const latestApproved = approvedVersions.length > 0 ? approvedVersions[approvedVersions.length - 1] : null;
+
       if (topicVersionBadge) {
-        topicVersionBadge.textContent = `Lần ${reg?.topicTitleVersion || 1}`;
+        topicVersionBadge.textContent = latestApproved ? `Phiếu ĐK lần ${latestApproved.version}` : `Lần ${reg?.topicTitleVersion || 1}`;
+      }
+
+      const previewBtn = document.getElementById('btn-hero-preview-topic-form');
+      const previewLabel = document.getElementById('btn-hero-preview-topic-label');
+      const dropdownTrigger = document.getElementById('btn-hero-topic-versions-dropdown-trigger');
+      const dropdownMenu = document.getElementById('hero-topic-versions-dropdown');
+
+      if (previewLabel) {
+        if (latestApproved) {
+          previewLabel.textContent = `Phiếu ĐK lần ${latestApproved.version}`;
+        } else {
+          previewLabel.textContent = 'Xem phiếu ĐK';
+        }
+      }
+
+      if (dropdownTrigger && previewBtn) {
+        if (approvedVersions.length > 1) {
+          dropdownTrigger.classList.remove('hidden');
+          previewBtn.classList.remove('rounded-xl');
+          previewBtn.classList.add('rounded-l-xl', 'rounded-r-none', 'border-r-0');
+        } else {
+          dropdownTrigger.classList.add('hidden');
+          previewBtn.classList.add('rounded-xl');
+          previewBtn.classList.remove('rounded-l-xl', 'rounded-r-none', 'border-r-0');
+          if (dropdownMenu) dropdownMenu.classList.add('hidden');
+        }
       }
 
       if (topicMetaEl) {
@@ -498,6 +530,42 @@ function renderRoundHeader() {
     renderStudentTimelineWeeks();
   }
 }
+
+window.toggleHeroTopicVersionsDropdown = function(event) {
+  if (event) { event.stopPropagation(); event.preventDefault(); }
+  const dropdown = document.getElementById('hero-topic-versions-dropdown');
+  if (!dropdown) return;
+  const isHidden = dropdown.classList.contains('hidden');
+  if (!isHidden) {
+    dropdown.classList.add('hidden');
+    return;
+  }
+  const reg = state.myRegistration;
+  const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
+    ? window.getApprovedTopicVersions(reg)
+    : [];
+  if (approvedVersions.length === 0) return;
+
+  const sortedVersions = [...approvedVersions].sort((a, b) => b.version - a.version);
+  dropdown.innerHTML = sortedVersions.map((item, idx) => `
+    <button type="button" onclick="openTopicRegistrationPreviewModal(null, false, ${item.version}); document.getElementById('hero-topic-versions-dropdown').classList.add('hidden');" class="w-full text-left px-3.5 py-2 hover:bg-white/15 transition flex items-center justify-between gap-2 cursor-pointer">
+      <span class="font-bold flex items-center gap-1.5">
+        <span>📄</span> <span>Phiếu ĐK lần ${item.version}</span>
+      </span>
+      ${idx === 0 ? '<span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-300 font-bold">Mới nhất</span>' : ''}
+    </button>
+  `).join('');
+
+  dropdown.classList.remove('hidden');
+
+  const closeDropdown = (e) => {
+    if (!dropdown.contains(e.target)) {
+      dropdown.classList.add('hidden');
+      document.removeEventListener('click', closeDropdown);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeDropdown), 10);
+};
 
 function startCountdown() {
   if (countdownInterval) clearInterval(countdownInterval);

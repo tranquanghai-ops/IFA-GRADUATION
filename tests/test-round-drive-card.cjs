@@ -245,11 +245,11 @@ test('official topic form captures student-owned class data and unlocks PDF afte
   assert.match(app, /window\.downloadOfficialTopicRegistrationPdf = function/);
   assert.match(app, /reg\.topicApprovalStatus !== 'approved'/);
   assert.match(app, /PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC/);
-  assert.match(app, /text: 'HỌ VÀ TÊN: ', bold: true/);
-  assert.match(app, /text: 'LỚP: ', bold: true/);
-  assert.match(app, /text: 'EMAIL: ', bold: true/);
-  assert.match(app, /text: 'ĐIỆN THOẠI: ', bold: true/);
-  assert.match(app, /text: 'ĐỊA CHỈ: ', bold: true/);
+  assert.match(app, /text: 'HỌ VÀ TÊN: ', bold: false/);
+  assert.match(app, /text: 'LỚP: ', bold: false/);
+  assert.match(app, /text: 'EMAIL: ', bold: false/);
+  assert.match(app, /text: 'ĐIỆN THOẠI: ', bold: false/);
+  assert.match(app, /text: 'ĐỊA CHỈ: ', bold: false/);
   assert.match(app, /text: 'Ý KIẾN CỦA GIẢNG VIÊN HƯỚNG DẪN', bold: true, fontSize: 12/);
   assert.match(app, /text: 'NGƯỜI ĐĂNG KÝ', bold: true, fontSize: 12/);
   assert.match(app, /text: identity\.fullName \|\| '', bold: false/);

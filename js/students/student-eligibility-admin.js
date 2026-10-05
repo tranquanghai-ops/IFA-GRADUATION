@@ -3,6 +3,7 @@
 const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
 const normalizeOfficialAssignment = (a, r) => (typeof window !== 'undefined' && window.normalizeOfficialAssignment ? window.normalizeOfficialAssignment(a, r) : (a || r));
 const isDirectSupervisorAssignment = (rnd) => (typeof window !== 'undefined' && window.isDirectSupervisorAssignment ? window.isDirectSupervisorAssignment(rnd) : false);
+const refreshRoundCardMetrics = (roundId) => (typeof window !== 'undefined' && typeof window.refreshRoundCardMetrics === 'function' ? window.refreshRoundCardMetrics(roundId) : Promise.resolve());
 /**
  * IFA+ Graduation — Admin Eligible Students Management & Excel Import
  */
@@ -152,12 +153,14 @@ function renderAdminEligibleStudentsTable() {
   const directAssignment = isDirectSupervisorAssignment(round);
   const details = state.eligibleStudentDetails;
 
-  // Merge each eligible record with Faculty Student Master
+  // Merge each eligible record with Faculty Student Master & Registrations / Official Assignments
   const mergedList = (state.eligibleStudents || []).map(s => {
     const rawMssv = s.studentId || s.mssv || s.id || '';
     const mssv = String(rawMssv).trim().replace(/\s+/g, '').toUpperCase();
     const master = (typeof window.getFacultyStudentByMssv === 'function') ? window.getFacultyStudentByMssv(mssv) : null;
     const isFoundInMaster = Boolean(master && !master.notFoundInMaster && master.name);
+    const reg = details?.registrations?.get(mssv) || null;
+    const assignment = details?.assignments?.get(mssv) || null;
 
     let displayName = '';
     let displayEmail = '';
@@ -165,23 +168,29 @@ function renderAdminEligibleStudentsTable() {
     let displayMajor = '';
     let isMissingInfo = false;
 
+    // Resolve Class: master -> registration (currentClass) -> official assignment -> eligible record snapshot
+    const resolvedClassValue = (isFoundInMaster && (master.className || master.studentClass))
+      || reg?.currentClass || reg?.studentClass || reg?.className
+      || assignment?.className || assignment?.studentClass
+      || s.className || s.studentClass || s.class || '';
+
     if (isFoundInMaster) {
       displayName = master.fullName || master.name;
       displayEmail = master.email || `${mssv.toLowerCase()}@student.tdtu.edu.vn`;
-      displayClass = master.className || master.studentClass || 'Chưa có thông tin';
-      displayMajor = master.major || 'Thiết kế Nội thất';
+      displayClass = resolvedClassValue || 'Chưa có thông tin';
+      displayMajor = master.major || reg?.major || assignment?.major || s.major || 'Thiết kế Nội thất';
     } else {
-      // Fallback to snapshot in eligible record
-      const rawName = String(s.name || s.fullName || s.studentName || '').trim();
+      // Fallback to registration, assignment, or snapshot in eligible record
+      const rawName = String(reg?.studentName || assignment?.studentName || s.name || s.fullName || s.studentName || '').trim();
       if (rawName && rawName !== mssv && !rawName.startsWith('Sinh viên ' + mssv)) {
         displayName = rawName;
       } else {
         displayName = '<span class="text-slate-400 italic">Chưa có thông tin</span>';
         isMissingInfo = true;
       }
-      displayEmail = s.email || (mssv ? `${mssv.toLowerCase()}@student.tdtu.edu.vn` : '<span class="text-slate-400 italic">Chưa có thông tin</span>');
-      displayClass = s.className || s.studentClass || s.class || '<span class="text-slate-400 italic">Chưa có thông tin</span>';
-      displayMajor = s.major || 'Thiết kế Nội thất';
+      displayEmail = reg?.email || assignment?.studentEmail || s.email || (mssv ? `${mssv.toLowerCase()}@student.tdtu.edu.vn` : '<span class="text-slate-400 italic">Chưa có thông tin</span>');
+      displayClass = resolvedClassValue || '<span class="text-slate-400 italic">Chưa có thông tin</span>';
+      displayMajor = reg?.major || assignment?.major || s.major || 'Thiết kế Nội thất';
     }
 
     return {

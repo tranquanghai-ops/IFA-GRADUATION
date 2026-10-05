@@ -55,9 +55,20 @@
                 <div id="hero-registered-topic-review-note" class="hidden p-2.5 bg-rose-500/20 border border-rose-400/40 rounded-xl text-xs text-rose-200 font-medium"></div>
 
                 <div class="flex items-center gap-2 pt-1 flex-wrap">
-                  <button id="btn-hero-preview-topic-form" type="button" onclick="openTopicRegistrationPreviewModal()" class="px-3.5 py-1.5 bg-white/20 hover:bg-white/30 active:bg-white/35 text-white rounded-xl text-xs font-bold transition-all border border-white/25 shadow-xs flex items-center gap-1.5 cursor-pointer" title="Xem trước tờ phiếu đăng ký chuẩn A4">
-                    <span>👁️</span> <span>Xem phiếu ĐK</span>
-                  </button>
+                  <!-- Xem phiếu ĐK & Dropdown mũi tên xem các phiếu đã duyệt -->
+                  <div class="relative inline-flex items-center shadow-xs" id="hero-topic-preview-btn-group">
+                    <button id="btn-hero-preview-topic-form" type="button" onclick="openTopicRegistrationPreviewModal()" class="px-3.5 py-1.5 bg-white/20 hover:bg-white/30 active:bg-white/35 text-white rounded-xl text-xs font-bold transition-all border border-white/25 flex items-center gap-1.5 cursor-pointer" title="Xem trước tờ phiếu đăng ký chuẩn A4">
+                      <span>👁️</span> <span id="btn-hero-preview-topic-label">Xem phiếu ĐK</span>
+                    </button>
+                    <button id="btn-hero-topic-versions-dropdown-trigger" type="button" onclick="toggleHeroTopicVersionsDropdown(event)" class="hidden px-2 py-1.5 bg-white/20 hover:bg-white/30 active:bg-white/35 text-white rounded-r-xl text-xs font-bold transition-all border-y border-r border-white/25 border-l border-l-white/20 flex items-center justify-center cursor-pointer" title="Xem các phiếu đã duyệt">
+                      <span class="text-[9px]">▼</span>
+                    </button>
+                    <!-- Dropdown danh sách phiếu đã duyệt -->
+                    <div id="hero-topic-versions-dropdown" class="hidden absolute left-0 top-full mt-1.5 z-40 min-w-[210px] bg-slate-900/95 backdrop-blur-md border border-white/20 rounded-xl shadow-2xl py-1 text-xs text-white">
+                      <!-- Injected dynamically -->
+                    </div>
+                  </div>
+
                   <button id="btn-hero-edit-topic" type="button" onclick="openTopicRegistrationPreviewModal(null, true)" class="px-3.5 py-1.5 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white rounded-xl text-xs font-bold transition-all border border-white/20 shadow-xs flex items-center gap-1.5 cursor-pointer">
                     <span>✏️</span> <span>Sửa đề tài</span>
                   </button>
@@ -68,8 +79,8 @@
               </div>
 
               <!-- Supervisor Info Widget (Compact Horizontal Card) -->
-              <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-3 sm:p-3.5 rounded-2xl border border-white/20 shadow-sm min-w-[280px] sm:min-w-[320px] lg:w-[350px] max-w-full shrink-0 flex flex-col justify-center">
-                <div class="min-h-12 flex items-center justify-center text-xs text-blue-100">Đang tải thông tin GVHD...</div>
+              <div id="hero-supervisor-info-card" class="bg-white/10 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/20 shadow-sm min-w-[280px] sm:min-w-[340px] lg:w-[380px] max-w-full shrink-0 flex flex-col justify-center">
+                <div class="min-h-14 flex items-center justify-center text-xs text-blue-100">Đang tải thông tin GVHD...</div>
                 <!-- Hidden placeholders for countdown to preserve script references without errors -->
                 <span id="countdown-label" class="hidden"></span>
                 <span id="countdown-value" class="hidden"></span>

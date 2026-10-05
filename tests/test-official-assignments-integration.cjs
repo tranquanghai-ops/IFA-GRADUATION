@@ -95,6 +95,7 @@ test('Rules giới hạn draft/published và không coi mọi staff là Admin', 
   assert.match(rules, /resource\.data\.assignmentStatus == 'published'/);
   assert.match(rules, /email\(\) in resource\.data\.supervisorEmails/);
   assert.match(rules, /function admin\(\)\{ return owner\(\) \|\| \(signedIn\(\) && exists/);
+  assert.match(rules, /allow list:[^;]+signedIn\(\)[^;]+assignmentStatus == 'published'[^;]+supervisorEmails/);
 });
 
 test('Header mới và navigation vẫn nguyên vẹn', () => {

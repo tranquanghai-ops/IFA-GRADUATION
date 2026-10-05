@@ -1,3 +1,6 @@
+// --- Module Bridges ---
+const refreshRoundCardMetrics = (roundId) => (typeof window !== 'undefined' && typeof window.refreshRoundCardMetrics === 'function' ? window.refreshRoundCardMetrics(roundId) : Promise.resolve());
+
 // --- ADMIN: SUPERVISORS MASTER CRUD ---
 async function loadAdminSupervisorsMaster() {
   try {

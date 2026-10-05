@@ -232,6 +232,14 @@ function applyCouncilLiveSnapshot(round, activityId, councilId, live) {
       assignment.presentationStatus = status;
     }
   });
+  if (Array.isArray(live.presentationOrder) && live.presentationOrder.length > 0) {
+    live.presentationOrder.forEach((sid, idx) => {
+      const assignment = (activity.councilStudentAssignments || []).find(a => a.councilId === councilId && a.studentId === sid);
+      if (assignment) {
+        assignment.order = idx + 1;
+      }
+    });
+  }
 }
 
 function councilLiveDocRef(roundId, activityId, councilId) {
@@ -267,14 +275,18 @@ async function persistCouncilLiveState(round, activityId, councilId) {
   const council = (activity?.councils || []).find(item => item.id === councilId);
   if (!round || !activity || !council) return false;
   const presentationStatuses = {};
-  (activity.councilStudentAssignments || []).forEach(assignment => {
-    if (assignment.councilId === councilId) presentationStatuses[assignment.studentId] = assignment.presentationStatus || 'waiting';
+  const councilStudents = (activity.councilStudentAssignments || [])
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  councilStudents.forEach(assignment => {
+    presentationStatuses[assignment.studentId] = assignment.presentationStatus || 'waiting';
   });
   const live = {
     activityId,
     councilId,
     status: council.status || 'preparing',
     presentationStatuses,
+    presentationOrder: councilStudents.map(a => a.studentId),
     liveTimer: council.liveTimer || {},
     timerSettings: council.timerSettings || {},
     updatedAt: Date.now(),
@@ -695,6 +707,7 @@ function renderCouncilWorkspaceFull() {
   renderPresentationTimerUI();
   renderPostCouncilSection();
   renderAuditLogsSection();
+  renderCouncilMemberRankingList();
 }
 
 function renderCouncilWorkspacePartialSync() {
@@ -718,6 +731,7 @@ function renderCouncilWorkspacePartialSync() {
   // Update post-council calibration and audit logs
   renderPostCouncilSection();
   renderAuditLogsSection();
+  renderCouncilMemberRankingList();
 }
 
 // --- PRESENTATION COUNTDOWN TIMER CONTROLS ---
@@ -1224,6 +1238,10 @@ function renderCouncilStudentList() {
     }
   }
 
+  const canReorder = Boolean(auth?.isSecretary || auth?.isChair || auth?.isAdmin);
+  const reorderHint = document.getElementById('cws-reorder-hint');
+  if (reorderHint) reorderHint.classList.toggle('hidden', !canReorder);
+
   const container = document.getElementById('cws-students-list');
   if (!container) return;
 
@@ -1277,11 +1295,28 @@ function renderCouncilStudentList() {
 
     const presentationState = isPresenting ? 'presenting' : isPresented ? 'presented' : 'waiting';
     const selectedRing = isPresenting ? 'ring-emerald-500' : isPresented ? 'ring-slate-500' : 'ring-indigo-500';
+
+    const reorderControls = canReorder ? `
+      <div class="flex items-center gap-1 shrink-0 ml-1">
+        <div class="flex flex-col">
+          <button type="button" onclick="event.stopPropagation(); moveCouncilStudentPresentationOrderStep('${sid}', -1)" class="p-0.5 text-[10px] text-slate-400 hover:text-indigo-600 rounded hover:bg-slate-200 transition-colors leading-none" title="Chuyển lên trên">▲</button>
+          <button type="button" onclick="event.stopPropagation(); moveCouncilStudentPresentationOrderStep('${sid}', 1)" class="p-0.5 text-[10px] text-slate-400 hover:text-indigo-600 rounded hover:bg-slate-200 transition-colors leading-none" title="Chuyển xuống dưới">▼</button>
+        </div>
+        <span class="cws-drag-handle px-1 py-0.5 text-slate-400 hover:text-indigo-600 font-bold text-xs select-none" title="Giữ và kéo để đổi thứ tự bảo vệ">⠿</span>
+      </div>
+    ` : '';
+
     return `
-      <div onclick="selectCouncilStudent('${sid}')" data-tone="${index % 2 === 0 ? 'odd' : 'even'}" data-presentation-state="${presentationState}" data-score-status="${scoreStatus}" class="cws-student-list-card p-2.5 rounded-xl border border-slate-200 transition-all cursor-pointer hover:border-slate-400 ${isSelected ? `ring-2 ${selectedRing} shadow-xs` : ''}">
+      <div onclick="selectCouncilStudent('${sid}')" ${canReorder ? `draggable="true" ondragstart="handleCouncilStudentDragStart(event, '${sid}')" ondragover="handleCouncilStudentDragOver(event, '${sid}')" ondragleave="handleCouncilStudentDragLeave(event, '${sid}')" ondrop="handleCouncilStudentDrop(event, '${sid}')" ondragend="handleCouncilStudentDragEnd(event)" ontouchstart="handleCouncilTouchDragStart(event, '${sid}', 'student')"` : ''} data-student-id="${sid}" data-tone="${index % 2 === 0 ? 'odd' : 'even'}" data-presentation-state="${presentationState}" data-score-status="${scoreStatus}" class="cws-student-list-card ${canReorder ? 'cws-draggable-item' : ''} p-2.5 rounded-xl border border-slate-200 transition-all cursor-pointer hover:border-slate-400 ${isSelected ? `ring-2 ${selectedRing} shadow-xs` : ''}">
         <div class="flex items-center justify-between gap-1.5">
-          <div class="flex items-center gap-1.5 min-w-0"><span class="font-mono font-bold text-xs shrink-0 ${isSelected ? 'text-indigo-900' : 'text-slate-600'}">#${asgn.order || '--'}</span><span class="font-bold text-slate-900 text-xs truncate">${escapeHtml(sName)}</span></div>
-          ${presBadge}
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="font-mono font-bold text-xs shrink-0 ${isSelected ? 'text-indigo-900' : 'text-slate-600'}">#${asgn.order || '--'}</span>
+            <span class="font-bold text-slate-900 text-xs truncate">${escapeHtml(sName)}</span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            ${presBadge}
+            ${reorderControls}
+          </div>
         </div>
         <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono mt-0.5">
           <span>${escapeHtml(sid)}</span>
@@ -1307,34 +1342,572 @@ window.filterCouncilWorkspaceStudents = function(q) {
 window.switchCouncilWorkspaceMobileTab = function(tab = 'grading') {
   const colStudents = document.getElementById('cws-col-students');
   const colGrading = document.getElementById('cws-col-grading');
+  const colRanking = document.getElementById('cws-col-ranking');
   const btnStudents = document.getElementById('btn-cws-tab-students');
   const btnGrading = document.getElementById('btn-cws-tab-grading');
+  const btnRanking = document.getElementById('btn-cws-tab-ranking');
 
   if (!colStudents || !colGrading) return;
 
+  const activeTabClass = 'flex-1 py-1.5 px-2 text-xs font-bold rounded-lg bg-white shadow-xs text-indigo-900 border border-indigo-200 flex items-center justify-center gap-1 transition-all cursor-pointer';
+  const inactiveTabClass = 'flex-1 py-1.5 px-2 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1 transition-all cursor-pointer';
+
   if (tab === 'students') {
     colStudents.classList.remove('hidden');
+    colStudents.classList.add('flex');
     colGrading.classList.add('hidden');
     colGrading.classList.remove('flex');
+    if (colRanking) {
+      colRanking.classList.add('hidden');
+      colRanking.classList.remove('flex');
+    }
 
-    if (btnStudents) {
-      btnStudents.className = 'flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-white shadow-xs text-indigo-900 border border-indigo-200 flex items-center justify-center gap-1.5 transition-all';
+    if (btnStudents) btnStudents.className = activeTabClass;
+    if (btnGrading) btnGrading.className = inactiveTabClass;
+    if (btnRanking) btnRanking.className = inactiveTabClass;
+  } else if (tab === 'ranking') {
+    colStudents.classList.add('hidden');
+    colStudents.classList.remove('flex');
+    colGrading.classList.add('hidden');
+    colGrading.classList.remove('flex');
+    if (colRanking) {
+      colRanking.classList.remove('hidden');
+      colRanking.classList.add('flex');
+      renderCouncilMemberRankingList();
     }
-    if (btnGrading) {
-      btnGrading.className = 'flex-1 py-2 px-3 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition-all';
-    }
+
+    if (btnStudents) btnStudents.className = inactiveTabClass;
+    if (btnGrading) btnGrading.className = inactiveTabClass;
+    if (btnRanking) btnRanking.className = activeTabClass;
   } else {
     colStudents.classList.add('hidden');
+    colStudents.classList.remove('flex');
     colGrading.classList.remove('hidden');
     colGrading.classList.add('flex');
-
-    if (btnStudents) {
-      btnStudents.className = 'flex-1 py-2 px-3 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition-all';
+    if (colRanking) {
+      colRanking.classList.add('hidden');
+      colRanking.classList.remove('flex');
     }
-    if (btnGrading) {
-      btnGrading.className = 'flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-white shadow-xs text-indigo-900 border border-indigo-200 flex items-center justify-center gap-1.5 transition-all';
+
+    if (btnStudents) btnStudents.className = inactiveTabClass;
+    if (btnGrading) btnGrading.className = activeTabClass;
+    if (btnRanking) btnRanking.className = inactiveTabClass;
+  }
+};
+
+// --- DRAG & DROP AND TOUCH EVENT HANDLERS ---
+let activeDraggingType = null;
+let activeDraggingSid = null;
+
+window.handleCouncilStudentDragStart = function(e, sid) {
+  activeDraggingType = 'student';
+  activeDraggingSid = sid;
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', sid);
+  }
+  e.currentTarget?.classList.add('is-dragging');
+};
+
+window.handleCouncilStudentDragOver = function(e, sid) {
+  if (activeDraggingType !== 'student' || activeDraggingSid === sid) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  const rect = e.currentTarget.getBoundingClientRect();
+  const relY = e.clientY - rect.top;
+  if (relY < rect.height / 2) {
+    e.currentTarget.classList.add('drag-over-top');
+    e.currentTarget.classList.remove('drag-over-bottom');
+  } else {
+    e.currentTarget.classList.add('drag-over-bottom');
+    e.currentTarget.classList.remove('drag-over-top');
+  }
+};
+
+window.handleCouncilStudentDragLeave = function(e, sid) {
+  e.currentTarget?.classList.remove('drag-over-top', 'drag-over-bottom');
+};
+
+window.handleCouncilStudentDrop = async function(e, targetSid) {
+  if (activeDraggingType !== 'student') return;
+  e.preventDefault();
+  const rect = e.currentTarget.getBoundingClientRect();
+  const placeAfter = (e.clientY - rect.top) >= (rect.height / 2);
+  e.currentTarget?.classList.remove('drag-over-top', 'drag-over-bottom');
+  const fromSid = e.dataTransfer?.getData('text/plain') || activeDraggingSid;
+  if (fromSid && fromSid !== targetSid) {
+    await window.moveCouncilStudentPresentationOrder(fromSid, targetSid, placeAfter);
+  }
+};
+
+window.handleCouncilStudentDragEnd = function(e) {
+  activeDraggingType = null;
+  activeDraggingSid = null;
+  document.querySelectorAll('.cws-draggable-item').forEach(el => {
+    el.classList.remove('is-dragging', 'drag-over-top', 'drag-over-bottom');
+  });
+};
+
+window.handleCouncilRankingDragStart = function(e, sid) {
+  activeDraggingType = 'ranking';
+  activeDraggingSid = sid;
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', sid);
+  }
+  e.currentTarget?.classList.add('is-dragging');
+};
+
+window.handleCouncilRankingDragOver = function(e, sid) {
+  if (activeDraggingType !== 'ranking' || activeDraggingSid === sid) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  const rect = e.currentTarget.getBoundingClientRect();
+  const relY = e.clientY - rect.top;
+  if (relY < rect.height / 2) {
+    e.currentTarget.classList.add('drag-over-top');
+    e.currentTarget.classList.remove('drag-over-bottom');
+  } else {
+    e.currentTarget.classList.add('drag-over-bottom');
+    e.currentTarget.classList.remove('drag-over-top');
+  }
+};
+
+window.handleCouncilRankingDragLeave = function(e, sid) {
+  e.currentTarget?.classList.remove('drag-over-top', 'drag-over-bottom');
+};
+
+window.handleCouncilRankingDrop = function(e, targetSid) {
+  if (activeDraggingType !== 'ranking') return;
+  e.preventDefault();
+  const rect = e.currentTarget.getBoundingClientRect();
+  const placeAfter = (e.clientY - rect.top) >= (rect.height / 2);
+  e.currentTarget?.classList.remove('drag-over-top', 'drag-over-bottom');
+  const fromSid = e.dataTransfer?.getData('text/plain') || activeDraggingSid;
+  if (fromSid && fromSid !== targetSid) {
+    window.moveCouncilMemberRankingOrder(fromSid, targetSid, placeAfter);
+  }
+};
+
+window.handleCouncilRankingDragEnd = function(e) {
+  activeDraggingType = null;
+  activeDraggingSid = null;
+  document.querySelectorAll('.cws-draggable-item').forEach(el => {
+    el.classList.remove('is-dragging', 'drag-over-top', 'drag-over-bottom');
+  });
+};
+
+// Touch drag-and-drop for mobile devices
+let touchDragTimer = null;
+let touchDragType = null;
+let touchDragSid = null;
+
+window.handleCouncilTouchDragStart = function(e, sid, type) {
+  const touch = e.touches?.[0];
+  if (!touch) return;
+  const startX = touch.clientX;
+  const startY = touch.clientY;
+  const targetCard = e.currentTarget;
+
+  touchDragTimer = setTimeout(() => {
+    touchDragType = type;
+    touchDragSid = sid;
+    targetCard.classList.add('is-dragging');
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(35);
+  }, 240);
+
+  const onTouchMove = (moveEvt) => {
+    const curTouch = moveEvt.touches?.[0];
+    if (!curTouch) return;
+    const diffX = Math.abs(curTouch.clientX - startX);
+    const diffY = Math.abs(curTouch.clientY - startY);
+    if (!touchDragType && (diffX > 10 || diffY > 10)) {
+      clearTimeout(touchDragTimer);
+      targetCard.removeEventListener('touchmove', onTouchMove);
+      targetCard.removeEventListener('touchend', onTouchEnd);
+      targetCard.removeEventListener('touchcancel', onTouchEnd);
+      return;
+    }
+    if (touchDragType) {
+      moveEvt.preventDefault();
+      const elemBelow = document.elementFromPoint(curTouch.clientX, curTouch.clientY);
+      const dropTarget = elemBelow?.closest?.('.cws-draggable-item');
+      document.querySelectorAll('.cws-draggable-item').forEach(el => {
+        if (el !== targetCard) el.classList.remove('drag-over-top', 'drag-over-bottom');
+      });
+      if (dropTarget && dropTarget !== targetCard) {
+        const rect = dropTarget.getBoundingClientRect();
+        if (curTouch.clientY < rect.top + rect.height / 2) {
+          dropTarget.classList.add('drag-over-top');
+        } else {
+          dropTarget.classList.add('drag-over-bottom');
+        }
+      }
+    }
+  };
+
+  const onTouchEnd = async (endEvt) => {
+    clearTimeout(touchDragTimer);
+    targetCard.removeEventListener('touchmove', onTouchMove);
+    targetCard.removeEventListener('touchend', onTouchEnd);
+    targetCard.removeEventListener('touchcancel', onTouchEnd);
+    if (!touchDragType) return;
+
+    targetCard.classList.remove('is-dragging');
+    const changedTouch = endEvt.changedTouches?.[0];
+    const elemBelow = changedTouch ? document.elementFromPoint(changedTouch.clientX, changedTouch.clientY) : null;
+    const dropTarget = elemBelow?.closest?.('.cws-draggable-item');
+
+    let targetSid = null;
+    let placeAfter = false;
+    if (dropTarget && dropTarget !== targetCard) {
+      const rect = dropTarget.getBoundingClientRect();
+      placeAfter = (changedTouch.clientY >= rect.top + rect.height / 2);
+      if (touchDragType === 'student') {
+        targetSid = dropTarget.dataset.studentId;
+      } else if (touchDragType === 'ranking') {
+        targetSid = dropTarget.dataset.rankingSid;
+      }
+    }
+
+    document.querySelectorAll('.cws-draggable-item').forEach(el => {
+      el.classList.remove('drag-over-top', 'drag-over-bottom', 'is-dragging');
+    });
+
+    const dragSid = touchDragSid;
+    const currentType = touchDragType;
+    touchDragType = null;
+    touchDragSid = null;
+
+    if (dragSid && targetSid && dragSid !== targetSid) {
+      if (currentType === 'student') {
+        await window.moveCouncilStudentPresentationOrder(dragSid, targetSid, placeAfter);
+      } else if (currentType === 'ranking') {
+        window.moveCouncilMemberRankingOrder(dragSid, targetSid, placeAfter);
+      }
+    }
+  };
+
+  targetCard.addEventListener('touchmove', onTouchMove, { passive: false });
+  targetCard.addEventListener('touchend', onTouchEnd);
+  targetCard.addEventListener('touchcancel', onTouchEnd);
+};
+
+// --- PRESENTATION ORDER REORDERING (CHAIR & SECRETARY) ---
+window.moveCouncilStudentPresentationOrder = async function(fromSid, toSid, placeAfter = false) {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
+    showToast('Chỉ Thư ký hoặc Chủ tịch Hội đồng mới có quyền đổi thứ tự bảo vệ!', 'warning');
+    return;
+  }
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const assignments = act.councilStudentAssignments || [];
+  const councilStudents = assignments
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const fromIndex = councilStudents.findIndex(a => a.studentId === fromSid);
+  const toIndex = councilStudents.findIndex(a => a.studentId === toSid);
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
+
+  const [movedItem] = councilStudents.splice(fromIndex, 1);
+  const targetInsertIndex = placeAfter ? (toIndex > fromIndex ? toIndex : toIndex + 1) : (toIndex > fromIndex ? toIndex - 1 : toIndex);
+  councilStudents.splice(Math.max(0, Math.min(targetInsertIndex, councilStudents.length)), 0, movedItem);
+
+  councilStudents.forEach((asgn, idx) => {
+    asgn.order = idx + 1;
+  });
+
+  const orderedSids = councilStudents.map(a => a.studentId);
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(`cws_presentation_order_${roundId}_${activityId}_${councilId}`, JSON.stringify(orderedSids));
+    }
+  } catch (_) {}
+
+  await persistCouncilLiveState(targetRound, activityId, councilId);
+
+  if (auth?.isAdmin || state.isAdmin) {
+    if (typeof persistActivityCouncilChanges === 'function') {
+      await persistActivityCouncilChanges(targetRound);
     }
   }
+
+  renderCouncilStudentList();
+  renderCouncilSelectedStudentDetails();
+  renderSecretaryControls();
+
+  const movedProfile = getStudentFullProfile(fromSid, act, (act.councils || []).find(c => c.id === councilId), targetRound);
+  const name = movedProfile?.fullName || fromSid;
+  showToast(`Đã chuyển sinh viên ${name} sang vị trí #${movedItem.order}.`, 'success');
+};
+
+window.moveCouncilStudentPresentationOrderStep = async function(sid, delta) {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
+    showToast('Chỉ Thư ký hoặc Chủ tịch Hội đồng mới có quyền đổi thứ tự bảo vệ!', 'warning');
+    return;
+  }
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  if (!act) return;
+
+  const assignments = act.councilStudentAssignments || [];
+  const councilStudents = assignments
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const curIdx = councilStudents.findIndex(a => a.studentId === sid);
+  if (curIdx === -1) return;
+  const newIdx = curIdx + delta;
+  if (newIdx < 0 || newIdx >= councilStudents.length) return;
+
+  const targetSid = councilStudents[newIdx].studentId;
+  await window.moveCouncilStudentPresentationOrder(sid, targetSid, delta > 0);
+};
+
+// --- PERSONAL MEMBER RANKING CARD (THẺ XẾP HẠNG CHO TỪNG THÀNH VIÊN) ---
+function getCouncilMemberRankingKey(roundId, activityId, councilId, myScorerId) {
+  return `cws_ranking_${roundId}_${activityId}_${councilId}_${myScorerId}`;
+}
+
+window.renderCouncilMemberRankingList = function() {
+  const container = document.getElementById('cws-ranking-list');
+  if (!container) return;
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!targetRound || !act || !council) return;
+
+  const assignments = act.councilStudentAssignments || [];
+  const councilStudents = assignments
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  if (councilStudents.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center text-slate-400">Chưa có sinh viên nào trong hội đồng.</div>';
+    return;
+  }
+
+  const myScorerId = resolveCouncilScorerId(council, auth);
+  const storageKey = getCouncilMemberRankingKey(roundId, activityId, councilId, myScorerId);
+
+  let rankingSids = [];
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) rankingSids = JSON.parse(saved);
+  } catch (_) {}
+
+  const allSids = councilStudents.map(a => a.studentId);
+  const validSavedSids = rankingSids.filter(sid => allSids.includes(sid));
+  const missingSids = allSids.filter(sid => !validSavedSids.includes(sid));
+
+  let finalSids = [...validSavedSids, ...missingSids];
+  if (finalSids.length === 0) {
+    finalSids = allSids;
+  }
+
+  container.innerHTML = finalSids.map((sid, index) => {
+    const rank = index + 1;
+    const asgn = councilStudents.find(a => a.studentId === sid) || { studentId: sid };
+    const sObj = getStudentFullProfile(sid, act, council, targetRound);
+    const sName = sObj?.fullName || sObj?.studentName || sObj?.name || sid;
+    const sTopic = sObj?.topicTitle || sObj?.topic || '';
+    const isSelected = (sid === state.activeCouncilSelectedStudentId);
+
+    // Score badge
+    const scoreKey = `${activityId}_${councilId}_${sid}_${myScorerId}`;
+    const myScore = state.councilScores?.[scoreKey];
+    const localValue = state.councilLocalDrafts?.[sid]?.value;
+    const scoreValue = myScore?.status === 'completed'
+      ? myScore.value
+      : (localValue !== undefined && localValue !== '' ? localValue : myScore?.value);
+    const scoreText = scoreValue !== undefined && scoreValue !== null && scoreValue !== '' ? escapeHtml(String(scoreValue)) : '';
+
+    let scoreBadge = '<span class="text-[10px] text-slate-400">Chưa chấm</span>';
+    if (myScore?.status === 'completed') {
+      scoreBadge = `<span class="badge bg-emerald-100 text-emerald-800 font-extrabold text-[11px] px-2 py-0.5 rounded-md border border-emerald-300">Điểm ${scoreText} ✓</span>`;
+    } else if (scoreText) {
+      scoreBadge = `<span class="badge bg-amber-100 text-amber-800 font-bold text-[11px] px-2 py-0.5 rounded-md border border-amber-300">Điểm ${scoreText} (nháp)</span>`;
+    }
+
+    // TOP 3 PROMINENCE
+    let cardClass = 'cws-ranking-card-standard rounded-xl p-2.5';
+    let rankBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-black text-xs">#${rank}</span>`;
+    if (rank === 1) {
+      cardClass = 'cws-ranking-card-top1 rounded-2xl p-3 shadow-md ring-1 ring-amber-300';
+      rankBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-black text-xs shadow-xs"><span class="text-sm">🥇</span> <span>HẠNG 1</span></span>`;
+    } else if (rank === 2) {
+      cardClass = 'cws-ranking-card-top2 rounded-2xl p-3 shadow-sm ring-1 ring-slate-200';
+      rankBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-slate-500 to-slate-600 text-white font-black text-xs shadow-xs"><span class="text-sm">🥈</span> <span>HẠNG 2</span></span>`;
+    } else if (rank === 3) {
+      cardClass = 'cws-ranking-card-top3 rounded-2xl p-3 shadow-sm ring-1 ring-amber-600/20';
+      rankBadge = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-700 to-amber-600 text-white font-black text-xs shadow-xs"><span class="text-sm">🥉</span> <span>HẠNG 3</span></span>`;
+    }
+
+    return `
+      <div onclick="handleSelectStudentFromRanking('${sid}')" draggable="true" ondragstart="handleCouncilRankingDragStart(event, '${sid}')" ondragover="handleCouncilRankingDragOver(event, '${sid}')" ondragleave="handleCouncilRankingDragLeave(event, '${sid}')" ondrop="handleCouncilRankingDrop(event, '${sid}')" ondragend="handleCouncilRankingDragEnd(event)" ontouchstart="handleCouncilTouchDragStart(event, '${sid}', 'ranking')" data-ranking-sid="${sid}" class="cws-draggable-item ${cardClass} cursor-pointer transition-all ${isSelected ? 'ring-2 ring-indigo-500 shadow-md' : ''}">
+        <div class="flex items-center justify-between gap-1.5">
+          <div class="flex items-center gap-2 min-w-0">
+            ${rankBadge}
+            <span class="font-extrabold text-slate-900 text-xs sm:text-sm truncate">${escapeHtml(sName)}</span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <div class="flex flex-col">
+              <button type="button" onclick="event.stopPropagation(); moveCouncilMemberRankingStep('${sid}', -1)" class="p-0.5 text-[10px] text-slate-400 hover:text-indigo-600 rounded hover:bg-slate-200 transition-colors leading-none" title="Tăng hạng (lên trên)">▲</button>
+              <button type="button" onclick="event.stopPropagation(); moveCouncilMemberRankingStep('${sid}', 1)" class="p-0.5 text-[10px] text-slate-400 hover:text-indigo-600 rounded hover:bg-slate-200 transition-colors leading-none" title="Giảm hạng (xuống dưới)">▼</button>
+            </div>
+            <span class="cws-drag-handle px-1 py-0.5 text-slate-400 hover:text-indigo-600 font-bold text-xs select-none" title="Giữ và kéo để xếp hạng theo ý thích">⠿</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono mt-1.5 pl-0.5">
+          <span>MSSV: ${escapeHtml(sid)} (Số #${asgn.order || '--'})</span>
+          ${scoreBadge}
+        </div>
+        ${sTopic ? `<div class="cws-list-topic mt-1 text-[11px] text-slate-600 pl-0.5" title="${escapeHtml(sTopic)}">Đề tài: ${escapeHtml(sTopic)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+};
+
+window.handleSelectStudentFromRanking = function(sid) {
+  selectCouncilStudent(sid);
+  if (window.innerWidth < 768) {
+    switchCouncilWorkspaceMobileTab('grading');
+  }
+};
+
+window.sortCouncilMemberRankingByScore = function() {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!act || !council) return;
+
+  const myScorerId = resolveCouncilScorerId(council, auth);
+  const assignments = (act.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+
+  const scoredStudents = assignments.map(a => {
+    const sid = a.studentId;
+    const scoreKey = `${activityId}_${councilId}_${sid}_${myScorerId}`;
+    const myScore = state.councilScores?.[scoreKey];
+    const localValue = state.councilLocalDrafts?.[sid]?.value;
+    const val = myScore?.status === 'completed' ? myScore.value : (localValue !== undefined && localValue !== '' ? localValue : myScore?.value);
+    const num = parseFloat(val);
+    return {
+      studentId: sid,
+      score: isNaN(num) ? -1 : num,
+      order: a.order || 0
+    };
+  });
+
+  scoredStudents.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.order - b.order;
+  });
+
+  const sortedSids = scoredStudents.map(a => a.studentId);
+  const storageKey = getCouncilMemberRankingKey(roundId, activityId, councilId, myScorerId);
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(sortedSids));
+  } catch (_) {}
+
+  renderCouncilMemberRankingList();
+  showToast('Đã sắp xếp bảng xếp hạng theo điểm số bạn đã chấm.', 'info');
+};
+
+window.resetCouncilMemberRankingToPresentationOrder = function() {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!act || !council) return;
+
+  const myScorerId = resolveCouncilScorerId(council, auth);
+  const assignments = (act.councilStudentAssignments || [])
+    .filter(a => a.councilId === councilId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  const sortedSids = assignments.map(a => a.studentId);
+  const storageKey = getCouncilMemberRankingKey(roundId, activityId, councilId, myScorerId);
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(sortedSids));
+  } catch (_) {}
+
+  renderCouncilMemberRankingList();
+  showToast('Đã đặt lại bảng xếp hạng theo thứ tự báo cáo gốc.', 'info');
+};
+
+window.moveCouncilMemberRankingOrder = function(fromSid, toSid, placeAfter = false) {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!act || !council) return;
+
+  const myScorerId = resolveCouncilScorerId(council, auth);
+  const storageKey = getCouncilMemberRankingKey(roundId, activityId, councilId, myScorerId);
+
+  const assignments = (act.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+  const allSids = assignments.map(a => a.studentId);
+
+  let rankingSids = [];
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) rankingSids = JSON.parse(saved);
+  } catch (_) {}
+
+  let finalSids = rankingSids.filter(sid => allSids.includes(sid));
+  allSids.forEach(sid => { if (!finalSids.includes(sid)) finalSids.push(sid); });
+
+  const fromIndex = finalSids.indexOf(fromSid);
+  const toIndex = finalSids.indexOf(toSid);
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
+
+  const [moved] = finalSids.splice(fromIndex, 1);
+  const targetInsert = placeAfter ? (toIndex > fromIndex ? toIndex : toIndex + 1) : (toIndex > fromIndex ? toIndex - 1 : toIndex);
+  finalSids.splice(Math.max(0, Math.min(targetInsert, finalSids.length)), 0, moved);
+
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(finalSids));
+  } catch (_) {}
+
+  renderCouncilMemberRankingList();
+  const sObj = getStudentFullProfile(fromSid, act, council, targetRound);
+  const rank = finalSids.indexOf(fromSid) + 1;
+  showToast(`Đã xếp sinh viên ${sObj?.fullName || fromSid} vào Hạng #${rank}.`, 'success');
+};
+
+window.moveCouncilMemberRankingStep = function(sid, delta) {
+  const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const act = (targetRound?.activities || []).find(a => a.id === activityId);
+  const council = (act?.councils || []).find(c => c.id === councilId);
+  if (!act || !council) return;
+
+  const myScorerId = resolveCouncilScorerId(council, auth);
+  const storageKey = getCouncilMemberRankingKey(roundId, activityId, councilId, myScorerId);
+  const assignments = (act.councilStudentAssignments || []).filter(a => a.councilId === councilId);
+  const allSids = assignments.map(a => a.studentId);
+
+  let finalSids = [];
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) finalSids = JSON.parse(saved).filter(s => allSids.includes(s));
+  } catch (_) {}
+  allSids.forEach(s => { if (!finalSids.includes(s)) finalSids.push(s); });
+
+  const curIdx = finalSids.indexOf(sid);
+  if (curIdx === -1) return;
+  const newIdx = curIdx + delta;
+  if (newIdx < 0 || newIdx >= finalSids.length) return;
+
+  const targetSid = finalSids[newIdx];
+  window.moveCouncilMemberRankingOrder(sid, targetSid, delta > 0);
 };
 
 let councilStudentTransitioning = false;
@@ -2048,4 +2621,11 @@ if (typeof window !== 'undefined') {
   if (typeof addPresentationTimerMinutes !== 'undefined') window.addPresentationTimerMinutes = addPresentationTimerMinutes;
   if (typeof setPresentationTimerPreset !== 'undefined') window.setPresentationTimerPreset = setPresentationTimerPreset;
   if (typeof resetPresentationTimer !== 'undefined') window.resetPresentationTimer = resetPresentationTimer;
+  if (typeof renderCouncilMemberRankingList !== 'undefined') window.renderCouncilMemberRankingList = renderCouncilMemberRankingList;
+  if (typeof moveCouncilStudentPresentationOrder !== 'undefined') window.moveCouncilStudentPresentationOrder = moveCouncilStudentPresentationOrder;
+  if (typeof moveCouncilStudentPresentationOrderStep !== 'undefined') window.moveCouncilStudentPresentationOrderStep = moveCouncilStudentPresentationOrderStep;
+  if (typeof sortCouncilMemberRankingByScore !== 'undefined') window.sortCouncilMemberRankingByScore = sortCouncilMemberRankingByScore;
+  if (typeof resetCouncilMemberRankingToPresentationOrder !== 'undefined') window.resetCouncilMemberRankingToPresentationOrder = resetCouncilMemberRankingToPresentationOrder;
+  if (typeof moveCouncilMemberRankingOrder !== 'undefined') window.moveCouncilMemberRankingOrder = moveCouncilMemberRankingOrder;
+  if (typeof moveCouncilMemberRankingStep !== 'undefined') window.moveCouncilMemberRankingStep = moveCouncilMemberRankingStep;
 }

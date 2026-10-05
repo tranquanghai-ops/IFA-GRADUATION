@@ -192,3 +192,34 @@ test('numeric council scores are bounded as soon as they are entered', async () 
   assert.equal(normalizeBoundedScoreInput('', 0, 4), '');
   assert.equal(normalizeBoundedScoreInput('invalid', 0, 4), '');
 });
+
+test('council workspace supports presentation reordering and personal member ranking card', () => {
+  const workspace = read('js/grading/rubrics-workspace.js');
+  const template = read('templates/modals/grading/modal-council-workspace.html');
+  const styles = read('styles.css');
+
+  // Presentation reordering
+  assert.match(workspace, /window\.moveCouncilStudentPresentationOrder/);
+  assert.match(workspace, /window\.moveCouncilStudentPresentationOrderStep/);
+  assert.match(workspace, /canReorder = Boolean\(auth\?\.isSecretary \|\| auth\?\.isChair \|\| auth\?\.isAdmin\)/);
+  assert.match(workspace, /presentationOrder: councilStudents\.map/);
+  assert.match(workspace, /live\.presentationOrder\.forEach/);
+
+  // Mobile 3 tabs & scrolling
+  assert.match(template, /id="btn-cws-tab-ranking"/);
+  assert.match(template, /id="cws-col-ranking"/);
+  assert.match(template, /id="cws-ranking-list"/);
+  assert.match(styles, /#modal-council-workspace #cws-students-list,\s*#modal-council-workspace #cws-ranking-list/);
+
+  // Personal member ranking & top 3 prominence
+  assert.match(workspace, /window\.renderCouncilMemberRankingList/);
+  assert.match(workspace, /window\.sortCouncilMemberRankingByScore/);
+  assert.match(workspace, /window\.resetCouncilMemberRankingToPresentationOrder/);
+  assert.match(workspace, /cws-ranking-card-top1/);
+  assert.match(workspace, /cws-ranking-card-top2/);
+  assert.match(workspace, /cws-ranking-card-top3/);
+  assert.match(styles, /\.cws-ranking-card-top1/);
+  assert.match(styles, /\.cws-ranking-card-top2/);
+  assert.match(styles, /\.cws-ranking-card-top3/);
+});
+

@@ -59,17 +59,53 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
       : (state.rounds || []).filter(r => !r.deleted);
 
     for (const r of targetRounds) {
-      // In-memory registrations
-      const regs = r.registrations || (state.adminReviewData?.registrations && state.selectedRoundId === r.id ? state.adminReviewData.registrations : []);
+      let regs = [];
+      let eligible = [];
+
+      if (roundFilter !== 'all') {
+        // Exact Act-as must query both collections even when registrations already exist.
+        const [regSnap, elSnap] = await Promise.all([
+          getDocs(collection(db, 'graduationRounds', r.id, 'registrations')).catch(() => null),
+          getDocs(collection(db, 'graduationRounds', r.id, 'eligibleStudents')).catch(() => null)
+        ]);
+
+        if (regSnap && regSnap.docs) {
+          regs = regSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } else if (state.adminReviewData?.roundId === r.id && Array.isArray(state.adminReviewData?.registrations)) {
+          regs = state.adminReviewData.registrations;
+        } else if (Array.isArray(r.registrations)) {
+          regs = r.registrations;
+        }
+
+        if (elSnap && elSnap.docs) {
+          eligible = elSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } else if (state.adminReviewData?.roundId === r.id && Array.isArray(state.adminReviewData?.eligible)) {
+          eligible = state.adminReviewData.eligible;
+        } else if (Array.isArray(r.eligibleStudents)) {
+          eligible = r.eligibleStudents;
+        }
+      } else {
+        regs = (state.adminReviewData?.roundId === r.id && Array.isArray(state.adminReviewData?.registrations))
+          ? state.adminReviewData.registrations
+          : (Array.isArray(r.registrations) ? r.registrations : []);
+        eligible = (state.adminReviewData?.roundId === r.id && Array.isArray(state.adminReviewData?.eligible))
+          ? state.adminReviewData.eligible
+          : (Array.isArray(r.eligibleStudents) ? r.eligibleStudents : []);
+      }
+
+      const regMap = new Map();
       regs.forEach(st => {
-        const sid = st.mssv || st.studentId;
+        const sid = String(st.mssv || st.studentId || st.id || '').trim().toUpperCase();
         if (sid) {
+          regMap.set(sid, st);
           addCandidate({
             type: 'student',
             id: sid,
             mssv: sid,
             name: resolveStudentName(sid, st.studentName || st.name || st.fullName || ''),
             email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
+            major: st.major || '',
+            className: st.currentClass || st.studentClass || st.className || '',
             roundId: r.id,
             roundTitle: r.roundName || r.title || r.id,
             roundShortCode: r.shortCode || '',
@@ -81,78 +117,28 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
         }
       });
 
-      // Eligible students if any
-      const eligible = r.eligibleStudents || [];
       eligible.forEach(st => {
-        const sid = st.mssv || st.studentId;
+        const sid = String(st.mssv || st.studentId || st.id || '').trim().toUpperCase();
         if (sid) {
+          const regInfo = regMap.get(sid);
           addCandidate({
             type: 'student',
             id: sid,
             mssv: sid,
-            name: resolveStudentName(sid, st.studentName || st.name || st.fullName || ''),
-            email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
+            name: resolveStudentName(sid, st.studentName || st.fullName || st.name || regInfo?.studentName || ''),
+            email: st.email || regInfo?.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
+            major: st.major || st.majorName || regInfo?.major || '',
+            className: st.className || st.studentClass || regInfo?.currentClass || regInfo?.className || '',
             roundId: r.id,
             roundTitle: r.roundName || r.title || r.id,
             roundShortCode: r.shortCode || '',
             roundAcademicYear: r.academicYear || '',
-            topicTitle: '',
-            registrationStatus: regs.some(reg => String(reg.studentId || reg.mssv || reg.id).trim().toUpperCase() === String(sid).trim().toUpperCase()) ? 'Đã đăng ký' : 'Chưa đăng ký',
+            topicTitle: regInfo?.topicTitle || '',
+            registrationStatus: regInfo ? 'Đã đăng ký' : 'Chưa đăng ký',
             roleLabel: 'Sinh viên'
           });
         }
       });
-
-      // Exact Act-as must query both collections even when registrations already exist.
-      if (roundFilter !== 'all') {
-        try {
-          const snap = await getDocs(collection(db, 'graduationRounds', r.id, 'registrations'));
-          snap.docs.forEach(d => {
-            const st = d.data();
-            const sid = d.id || st.mssv || st.studentId;
-            if (sid) {
-              addCandidate({
-                type: 'student',
-                id: sid,
-                mssv: sid,
-                name: resolveStudentName(sid, st.studentName || st.name || st.fullName || ''),
-                email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
-                roundId: r.id,
-                roundTitle: r.roundName || r.title || r.id,
-                roundShortCode: r.shortCode || '',
-                roundAcademicYear: r.academicYear || '',
-                topicTitle: st.topicTitle || '',
-                registrationStatus: 'Đã đăng ký',
-                roleLabel: 'Sinh viên'
-              });
-            }
-          });
-        } catch (e) {}
-
-        try {
-          const snapEligible = await getDocs(collection(db, 'graduationRounds', r.id, 'eligibleStudents'));
-          snapEligible.docs.forEach(d => {
-            const st = d.data();
-            const sid = d.id || st.mssv || st.studentId;
-            if (sid) {
-              addCandidate({
-                type: 'student',
-                id: sid,
-                mssv: sid,
-                name: resolveStudentName(sid, st.studentName || st.name || st.fullName || ''),
-                email: st.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`,
-                roundId: r.id,
-                roundTitle: r.roundName || r.title || r.id,
-                roundShortCode: r.shortCode || '',
-                roundAcademicYear: r.academicYear || '',
-                topicTitle: '',
-                registrationStatus: 'Chưa đăng ký',
-                roleLabel: 'Sinh viên'
-              });
-            }
-          });
-        } catch (e) {}
-      }
     }
 
     // Also check facultyStudents if candidates are empty
@@ -280,16 +266,17 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
     const master = typeof window.getFacultyStudentByMssv === 'function'
       ? window.getFacultyStudentByMssv(sid)
       : null;
-    if (master) {
+    if (master && !master.isMissing && !master.notFoundInMaster) {
       candidate.name = master.fullName || master.name || candidate.name || sid;
       candidate.email = master.email || candidate.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`;
-      candidate.major = master.major || master.majorName || '';
-      candidate.className = master.className || master.studentClass || '';
+      candidate.major = master.major || master.majorName || candidate.major || '';
+      candidate.className = master.className || master.studentClass || candidate.className || '';
       candidate.notFoundInMaster = false;
     } else {
       const currentName = String(candidate.name || '').trim();
-      candidate.name = currentName && currentName.toUpperCase() !== sid ? currentName : sid;
-      candidate.notFoundInMaster = state.facultyStudentsLoaded === true;
+      const hasRealName = Boolean(currentName && currentName.toUpperCase() !== sid && !currentName.toUpperCase().startsWith('SINH VIÊN ' + sid));
+      candidate.name = hasRealName ? currentName : sid;
+      candidate.notFoundInMaster = !hasRealName && (state.facultyStudentsLoaded === true);
     }
   });
 

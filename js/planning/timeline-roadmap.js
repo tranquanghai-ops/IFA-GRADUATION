@@ -154,9 +154,15 @@ export function renderUnifiedActivityCard(act, round, options = {}) {
     statusPill = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Kế hoạch</span>';
   }
 
-  // Highlight nearest milestone card
+  // Highlight nearest milestone card with light orange for upcoming event
   if (isNearest) {
-    cardBorder += ' ring-2 ring-emerald-500/40 shadow-sm';
+    if (status === 'ongoing') {
+      cardBorder = 'border-emerald-400 bg-emerald-50/40 ring-2 ring-emerald-500/50 shadow-md';
+    } else {
+      cardBorder = 'border-amber-400 bg-amber-50/85 ring-2 ring-amber-400/60 shadow-md';
+      markerHtml = '<div class="w-7 h-7 rounded-full bg-amber-100 border-2 border-amber-500 text-amber-700 flex items-center justify-center text-xs font-black shadow-sm shrink-0 pulse-timer">🔔</div>';
+      statusPill = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-200 text-amber-950 border border-amber-400 shadow-2xs">⚡ Sắp tới</span>';
+    }
   }
 
   // Countdown Badge ONLY on the single nearest milestone

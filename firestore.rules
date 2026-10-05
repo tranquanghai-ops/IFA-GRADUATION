@@ -108,7 +108,10 @@ service cloud.firestore {
               || staff()
               || (signedIn() && (email() in resource.data.supervisorEmails || email().lower() in resource.data.supervisorEmails))
             ));
-        allow list: if admin() || staff();
+        allow list: if admin() || staff()
+          || (signedIn()
+            && resource.data.assignmentStatus == 'published'
+            && (email() in resource.data.supervisorEmails || email().lower() in resource.data.supervisorEmails));
         allow create: if admin()
           && request.resource.data.studentId == studentId
           && request.resource.data.assignmentStatus == 'published'
@@ -361,22 +364,24 @@ service cloud.firestore {
             && liveId == resource.data.activityId + '_' + resource.data.councilId
             && isCouncilMember(resource.data.activityId, resource.data.councilId, email()));
         allow create: if admin() || (staff()
-          && request.resource.data.keys().hasOnly(['activityId', 'councilId', 'status', 'presentationStatuses', 'liveTimer', 'timerSettings', 'updatedAt', 'updatedBy'])
+          && request.resource.data.keys().hasOnly(['activityId', 'councilId', 'status', 'presentationStatuses', 'presentationOrder', 'liveTimer', 'timerSettings', 'updatedAt', 'updatedBy'])
           && request.resource.data.activityId is string
           && request.resource.data.councilId is string
           && liveId == request.resource.data.activityId + '_' + request.resource.data.councilId
           && request.resource.data.presentationStatuses is map
+          && (!request.resource.data.keys().hasAll(['presentationOrder']) || (request.resource.data.presentationOrder is list && request.resource.data.presentationOrder.size() <= 200))
           && request.resource.data.liveTimer is map
           && request.resource.data.timerSettings is map
           && request.resource.data.updatedBy == email()
           && canOperateCouncilLive(request.resource.data.activityId, request.resource.data.councilId, email())
           && (request.resource.data.status in ['preparing', 'active', 'ongoing'] || isCouncilChair(request.resource.data.activityId, request.resource.data.councilId, email())));
         allow update: if admin() || (staff()
-          && request.resource.data.keys().hasOnly(['activityId', 'councilId', 'status', 'presentationStatuses', 'liveTimer', 'timerSettings', 'updatedAt', 'updatedBy'])
+          && request.resource.data.keys().hasOnly(['activityId', 'councilId', 'status', 'presentationStatuses', 'presentationOrder', 'liveTimer', 'timerSettings', 'updatedAt', 'updatedBy'])
           && request.resource.data.activityId == resource.data.activityId
           && request.resource.data.councilId == resource.data.councilId
           && request.resource.data.updatedBy == email()
           && request.resource.data.presentationStatuses is map
+          && (!request.resource.data.keys().hasAll(['presentationOrder']) || (request.resource.data.presentationOrder is list && request.resource.data.presentationOrder.size() <= 200))
           && request.resource.data.liveTimer is map
           && request.resource.data.timerSettings is map
           && canOperateCouncilLive(resource.data.activityId, resource.data.councilId, email())

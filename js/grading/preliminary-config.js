@@ -103,9 +103,9 @@ function renderAdminReviewerAssignmentTable() {
   const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
   if (!targetRound) return;
 
-  const allStudents = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
-    ? state.adminReviewData.registrations
-    : (targetRound.eligibleStudents || []);
+  const allStudents = (typeof window.getScoringRoundStudents === 'function')
+    ? window.getScoringRoundStudents(targetRound)
+    : ((state.adminReviewData?.roundId === targetRound.id && state.adminReviewData?.registrations) ? state.adminReviewData.registrations : (targetRound.eligibleStudents || []));
 
   const supervisors = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
     ? state.supervisorsMaster

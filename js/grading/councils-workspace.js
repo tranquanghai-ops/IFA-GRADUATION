@@ -872,7 +872,7 @@ function getRoundAllStudents() {
   }
 
   // Priority 2: registrations in adminReviewData
-  if (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0) {
+  if (state.adminReviewData?.roundId === targetRound?.id && state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0) {
     return state.adminReviewData.registrations;
   }
 

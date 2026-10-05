@@ -1,6 +1,10 @@
 
 // --- Module Bridges ---
 const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
+const getAdminAssignmentRows = () => (typeof window !== 'undefined' && window.getAdminAssignmentRows ? window.getAdminAssignmentRows() : []);
+const isAssignmentEditingLocked = () => (typeof window !== 'undefined' && window.isAssignmentEditingLocked ? window.isAssignmentEditingLocked() : false);
+const ensureAssignmentEditingAllowed = () => (typeof window !== 'undefined' && window.ensureAssignmentEditingAllowed ? window.ensureAssignmentEditingAllowed() : true);
+const getSupervisorAssignmentCount = (...args) => (typeof window !== 'undefined' && window.getSupervisorAssignmentCount ? window.getSupervisorAssignmentCount(...args) : 0);
 /**
  * IFA+ Graduation — Supervisor Assignment Excel Import/Export Submodule
  */

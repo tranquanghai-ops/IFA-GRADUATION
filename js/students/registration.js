@@ -776,7 +776,20 @@ window.submitRegistration = async function() {
       // topic. Preserve that published relationship rather than sending the
       // student back to the waiting state on first registration.
       reviewStatus: directAssignment && primaryPublishedSupervisor ? 'manually_assigned' : (directAssignment ? 'direct_assignment_pending' : 'waiting'),
-      eligibilityStatus: eligibilityStatus
+      eligibilityStatus: eligibilityStatus,
+      ...(primaryPublishedSupervisor ? {
+        officialSupervisors: publishedSupervisors,
+        acceptedSupervisorId: primaryPublishedSupervisor.supervisorId || '',
+        acceptedSupervisorName: primaryPublishedSupervisor.supervisorName || '',
+        acceptedRank: publishedAssignment?.acceptedRank || 'manual',
+        assignmentStatus: 'published'
+      } : (previous?.officialSupervisors ? {
+        officialSupervisors: previous.officialSupervisors,
+        acceptedSupervisorId: previous.acceptedSupervisorId || '',
+        acceptedSupervisorName: previous.acceptedSupervisorName || '',
+        acceptedRank: previous.acceptedRank || 'manual',
+        assignmentStatus: previous.assignmentStatus || ''
+      } : {}))
     };
 
     await setDoc(doc(db, 'graduationStudentProfiles', mssv), {

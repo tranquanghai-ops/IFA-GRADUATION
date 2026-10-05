@@ -13,9 +13,53 @@ window.renderSupervisorAssignedStudents = function() {
   const round = state.activeRound;
   const actor = getEffectiveActor();
   const emailLower = (actor.email || '').toLowerCase().trim();
-  const currentSup = (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower) ||
-    (state.supervisorsMaster || []).find(s => (s.email || '').toLowerCase().trim() === emailLower);
-  const mySupId = currentSup?.id || currentSup?.supervisorId;
+  const matchingMaster = (state.supervisorsMaster || []).find(s =>
+    (s.email || '').toLowerCase().trim() === emailLower ||
+    (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
+    (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower) ||
+    (s.institutionalEmail && s.institutionalEmail.toLowerCase().trim() === emailLower) ||
+    (actor.uid && (s.id === actor.uid || s.supervisorId === actor.uid))
+  );
+  const supervisorIdentityIds = new Set([
+    actor.uid,
+    matchingMaster?.id,
+    matchingMaster?.supervisorId
+  ].filter(Boolean).map(value => String(value).trim()));
+  const roundSupervisor = (state.roundSupervisors || []).find(s =>
+    (s.email || '').toLowerCase().trim() === emailLower ||
+    (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
+    (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower) ||
+    (s.institutionalEmail && s.institutionalEmail.toLowerCase().trim() === emailLower) ||
+    supervisorIdentityIds.has(String(s.id || '').trim()) ||
+    supervisorIdentityIds.has(String(s.supervisorId || '').trim())
+  );
+  const currentSup = roundSupervisor || matchingMaster;
+  const candidateEmails = new Set([
+    emailLower,
+    currentSup?.email,
+    currentSup?.institutionalEmail,
+    currentSup?.personalEmail,
+    matchingMaster?.email,
+    matchingMaster?.personalEmail,
+    matchingMaster?.institutionalEmail,
+    roundSupervisor?.email,
+    roundSupervisor?.institutionalEmail,
+    roundSupervisor?.personalEmail,
+    ...(Array.isArray(currentSup?.emails) ? currentSup.emails : []),
+    ...(Array.isArray(matchingMaster?.emails) ? matchingMaster.emails : []),
+    ...(Array.isArray(roundSupervisor?.emails) ? roundSupervisor.emails : [])
+  ].filter(Boolean).map(e => String(e).toLowerCase().trim()));
+
+  const mySupId = currentSup?.id || currentSup?.supervisorId || matchingMaster?.id || matchingMaster?.supervisorId;
+  const supervisorIdsSet = new Set([
+    mySupId,
+    ...supervisorIdentityIds,
+    roundSupervisor?.id,
+    roundSupervisor?.supervisorId,
+    matchingMaster?.id,
+    matchingMaster?.supervisorId
+  ].filter(Boolean).map(v => String(v).trim()));
+  const currentSupName = (currentSup?.name || '').toLowerCase().trim();
 
   const all = state.supervisorAssignedStudents || [];
   const searchTerm = (document.getElementById('supervisor-student-search')?.value || '').toLowerCase().trim();
@@ -31,9 +75,11 @@ window.renderSupervisorAssignedStudents = function() {
   all.forEach(st => {
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
     const isPrimary = officials.some(s => {
-      const isMe = (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) ||
-        (s.email && s.email.toLowerCase().trim() === emailLower) ||
-        (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower);
+      const sId = String(s.supervisorId || s.id || '').trim();
+      const sEmail = (s.email || s.supervisorEmail || '').toLowerCase().trim();
+      const isMe = (sId && supervisorIdsSet.has(sId)) ||
+        (sEmail && candidateEmails.has(sEmail)) ||
+        (currentSupName && s.supervisorName && s.supervisorName.toLowerCase().trim() === currentSupName);
       return (isMe || actor.isAdmin) && s.role === 'primary';
     });
     if (isPrimary) cntPrimary++;
@@ -71,9 +117,11 @@ window.renderSupervisorAssignedStudents = function() {
     // Filter pill
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
     const isPrimary = officials.some(s => {
-      const isMe = (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) ||
-        (s.email && s.email.toLowerCase().trim() === emailLower) ||
-        (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower);
+      const sId = String(s.supervisorId || s.id || '').trim();
+      const sEmail = (s.email || s.supervisorEmail || '').toLowerCase().trim();
+      const isMe = (sId && supervisorIdsSet.has(sId)) ||
+        (sEmail && candidateEmails.has(sEmail)) ||
+        (currentSupName && s.supervisorName && s.supervisorName.toLowerCase().trim() === currentSupName);
       return (isMe || state.isAdmin) && s.role === 'primary';
     });
 
@@ -114,9 +162,11 @@ window.renderSupervisorAssignedStudents = function() {
 
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
     const isPrimary = officials.some(s => {
-      const isMe = (mySupId && (s.supervisorId === mySupId || s.id === mySupId)) ||
-        (s.email && s.email.toLowerCase().trim() === emailLower) ||
-        (s.supervisorEmail && s.supervisorEmail.toLowerCase().trim() === emailLower);
+      const sId = String(s.supervisorId || s.id || '').trim();
+      const sEmail = (s.email || s.supervisorEmail || '').toLowerCase().trim();
+      const isMe = (sId && supervisorIdsSet.has(sId)) ||
+        (sEmail && candidateEmails.has(sEmail)) ||
+        (currentSupName && s.supervisorName && s.supervisorName.toLowerCase().trim() === currentSupName);
       return (isMe || state.isAdmin) && s.role === 'primary';
     });
 
@@ -140,6 +190,16 @@ window.renderSupervisorAssignedStudents = function() {
 
     const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
     const studentAvatarUrl = st.photoURL || studentObj?.photoURL || studentObj?.avatar || defaultAvatar;
+
+    const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
+      ? window.getApprovedTopicVersions(st)
+      : [];
+    const latestApproved = approvedVersions.length > 0 ? approvedVersions[approvedVersions.length - 1] : null;
+    const latestApprovedVer = latestApproved ? latestApproved.version : (topicApprovalStatus === 'approved' ? topicVersion : 1);
+
+    const versionDisplayBadge = approvedVersions.length > 0
+      ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-tdtu-blue border border-blue-200 shadow-2xs">📄 Phiếu ĐK lần ${latestApprovedVer}</span>`
+      : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">📄 Lần ${topicVersion}</span>`;
 
     return `
       <div class="card-surface p-4 sm:p-5 bg-white rounded-2xl border border-slate-200 hover:border-tdtu-blue/40 shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -166,9 +226,7 @@ window.renderSupervisorAssignedStudents = function() {
               <span class="text-xs font-bold text-slate-500 shrink-0">Đề tài:</span>
               <span class="text-sm sm:text-base font-black text-slate-900 leading-snug">${escapeHtml(topicTitle)}</span>
               ${hasRegistration ? topicApprovalBadge : ''}
-              <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-tdtu-blue border border-slate-200 shadow-2xs transition cursor-pointer" title="Bấm để xem lại phiếu đăng ký đề tài PDF">
-                📄 Phiên bản ${topicVersion}
-              </button>
+              ${hasRegistration ? versionDisplayBadge : ''}
             </div>
 
             <div class="flex flex-wrap items-center gap-2.5 text-xs text-slate-500">
@@ -190,23 +248,76 @@ window.renderSupervisorAssignedStudents = function() {
           ${hasRegistration ? (
             topicApprovalStatus === 'approved'
               ? `
-                <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký đã duyệt">
-                  <span>✓</span> <span>Đã duyệt</span>
-                </button>
+                <div class="relative inline-flex items-center shadow-xs">
+                  <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold ${approvedVersions.length > 1 ? 'rounded-l-xl' : 'rounded-xl'} text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký đã duyệt">
+                    <span>✓</span> <span>Phiếu ĐK lần ${latestApprovedVer}</span>
+                  </button>
+                  ${approvedVersions.length > 1 ? `
+                    <button type="button" onclick="toggleSupervisorStudentVersionsDropdown(event, '${studentId}')" class="px-2 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-r-xl text-xs transition-all flex items-center justify-center cursor-pointer border-l border-emerald-500" title="Xem các phiếu đã duyệt">
+                      <span class="text-[9px]">▼</span>
+                    </button>
+                    <div id="sup-versions-dropdown-${studentId}" class="hidden absolute right-0 top-full mt-1.5 z-40 min-w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs">
+                      ${[...approvedVersions].reverse().map(v => `
+                        <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}', false, ${v.version}); document.getElementById('sup-versions-dropdown-${studentId}').classList.add('hidden');" class="w-full text-left px-3.5 py-2 hover:bg-slate-100 transition flex items-center justify-between gap-2 cursor-pointer text-slate-800">
+                          <span class="font-bold">📄 Phiếu ĐK lần ${v.version}</span>
+                          ${v.version === latestApprovedVer ? '<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Mới nhất</span>' : ''}
+                        </button>
+                      `).join('')}
+                    </div>
+                  ` : ''}
+                </div>
                 <button type="button" onclick="unlockSupervisorStudentTopic('${studentId}')" class="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Mở khóa trả quyền sửa đề tài cho sinh viên">
                   <span>🔓</span> <span>Mở khóa</span>
                 </button>
               `
-              : `
-                <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký và duyệt tên đề tài">
-                  <span>📝</span> <span>Duyệt đề tài</span>
-                </button>
-              `
+              : (approvedVersions.length > 0
+                  ? `
+                    <div class="relative inline-flex items-center shadow-xs">
+                      <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-l-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký và duyệt tên đề tài">
+                        <span>📝</span> <span>Duyệt đề tài (Lần ${topicVersion})</span>
+                      </button>
+                      <button type="button" onclick="toggleSupervisorStudentVersionsDropdown(event, '${studentId}')" class="px-2 py-1.5 bg-amber-600 hover:bg-amber-700 text-slate-950 font-bold rounded-r-xl text-xs transition-all flex items-center justify-center cursor-pointer border-l border-amber-400" title="Xem các phiếu đã duyệt trước đó">
+                        <span class="text-[9px]">▼</span>
+                      </button>
+                      <div id="sup-versions-dropdown-${studentId}" class="hidden absolute right-0 top-full mt-1.5 z-40 min-w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs">
+                        ${[...approvedVersions].reverse().map(v => `
+                          <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}', false, ${v.version}); document.getElementById('sup-versions-dropdown-${studentId}').classList.add('hidden');" class="w-full text-left px-3.5 py-2 hover:bg-slate-100 transition flex items-center justify-between gap-2 cursor-pointer text-slate-800">
+                            <span class="font-bold">📄 Phiếu ĐK lần ${v.version}</span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Đã duyệt</span>
+                          </button>
+                        `).join('')}
+                      </div>
+                    </div>
+                  `
+                  : `
+                    <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký và duyệt tên đề tài">
+                      <span>📝</span> <span>Duyệt đề tài</span>
+                    </button>
+                  `
+                )
           ) : ''}
         </div>
       </div>
     `;
   }).join('');
+};
+
+window.toggleSupervisorStudentVersionsDropdown = function(event, studentId) {
+  if (event) { event.stopPropagation(); event.preventDefault(); }
+  const dropdown = document.getElementById(`sup-versions-dropdown-${studentId}`);
+  if (!dropdown) return;
+  const isHidden = dropdown.classList.contains('hidden');
+  document.querySelectorAll('[id^="sup-versions-dropdown-"]').forEach(el => el.classList.add('hidden'));
+  if (!isHidden) return;
+  dropdown.classList.remove('hidden');
+
+  const closeDropdown = (e) => {
+    if (!dropdown.contains(e.target)) {
+      dropdown.classList.add('hidden');
+      document.removeEventListener('click', closeDropdown);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeDropdown), 10);
 };
 
 window.saveStudentSelfProfile = async function() {

@@ -43,6 +43,9 @@ window.reviewStudentTopicTitle = async function(studentId, decision) {
   const idx = history.findIndex(item => Number(item.version) === version);
   const reviewedEntry = {
     ...(idx >= 0 ? history[idx] : { version, title: registration.topicTitle, submittedAt: new Date().toISOString() }),
+    version,
+    title: registration.topicTitle,
+    topicDescription: registration.topicDescription || '',
     status: decision,
     reviewedAt: new Date().toISOString(),
     reviewedBy: actor?.email || state.user?.email || '',
@@ -75,7 +78,7 @@ window.reviewStudentTopicTitle = async function(studentId, decision) {
 };
 
 
-window.openTopicRegistrationPreviewModal = function(studentId = null, startInEditMode = false) {
+window.openTopicRegistrationPreviewModal = function(studentId = null, startInEditMode = false, targetVersion = null) {
   const modal = document.getElementById('modal-supervisor-topic-preview');
   if (!modal) return;
 
@@ -113,7 +116,9 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
   }
 
   const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(studentId) : null;
-  const fullName = st?.studentName || studentObj?.fullName || studentObj?.name || identity?.fullName || studentId;
+  const fullName = (typeof window.resolveOfficialStudentFullName === 'function')
+    ? window.resolveOfficialStudentFullName(studentId, st, studentObj)
+    : (st?.studentName || identity?.fullName || (studentObj && !studentObj.isMissing ? studentObj.fullName : '') || studentId);
   const className = st?.currentClass || st?.studentClass || st?.className || studentObj?.className || studentObj?.studentClass || '--';
   const major = st?.major || studentObj?.major || identity?.major || 'Thiết kế nội thất';
   const personalEmail = st?.personalEmail || st?.email || studentObj?.email || identity?.email || '--';
@@ -122,10 +127,32 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
   const courseName = st?.courseName || 'Đồ án tốt nghiệp';
   const courseCode = st?.courseCode || '--';
   const courseGroup = st?.courseGroup || '--';
-  const version = Number(st?.topicTitleVersion || 1);
-  const topicTitle = st?.topicTitle || 'Chưa đăng ký đề tài';
-  const topicDescription = st?.topicDescription || '(Chưa có mô tả định hướng thiết kế)';
-  const status = st?.topicApprovalStatus || 'pending';
+
+  const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
+    ? window.getApprovedTopicVersions(st)
+    : [];
+
+  let viewingVersion = Number(st?.topicTitleVersion || 1);
+  let topicTitle = st?.topicTitle || 'Chưa đăng ký đề tài';
+  let topicDescription = st?.topicDescription || '(Chưa có mô tả định hướng thiết kế)';
+  let isViewingPastVersion = false;
+  let status = st?.topicApprovalStatus || 'pending';
+
+  if (targetVersion) {
+    const matched = approvedVersions.find(v => Number(v.version) === Number(targetVersion)) ||
+      (Array.isArray(st.topicTitleHistory) ? st.topicTitleHistory.find(h => Number(h.version) === Number(targetVersion)) : null);
+    if (matched) {
+      viewingVersion = Number(matched.version);
+      topicTitle = matched.title || topicTitle;
+      topicDescription = matched.topicDescription || topicDescription;
+      status = (matched.status === 'approved') ? 'approved' : status;
+      isViewingPastVersion = (viewingVersion !== Number(st?.topicTitleVersion || 1));
+    }
+  }
+
+  modal._approvedVersions = approvedVersions;
+  modal._viewingVersion = viewingVersion;
+  modal._isViewingPastVersion = isViewingPastVersion;
 
   const roundLabel = round.title || round.roundName || 'ĐỒ ÁN TỐT NGHIỆP';
   const normalizedRoundLabel = roundLabel.toUpperCase().replace(/\s+/g, ' ').trim();
@@ -163,7 +190,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
   setEl('topic-preview-doc-course', courseName);
   setEl('topic-preview-doc-code', courseCode);
   setEl('topic-preview-doc-group', courseGroup);
-  setEl('topic-preview-doc-version', `Đăng ký đề tài chính thức lần thứ : ${version}`);
+  setEl('topic-preview-doc-version', `Đăng ký đề tài chính thức lần thứ : ${viewingVersion}`);
   setEl('topic-preview-doc-title', topicTitle);
   setEl('topic-preview-doc-description', topicDescription);
   setEl('topic-preview-doc-sign-student', fullName);
@@ -172,8 +199,31 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
   // Supervisor info
   const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : [];
   const primary = officials.find(s => s.role === 'primary') || officials[0];
-  const supName = primary?.supervisorName || st.acceptedSupervisorName || 'Giảng viên Hướng dẫn';
+  const supName = (typeof window.resolveOfficialSupervisorName === 'function')
+    ? window.resolveOfficialSupervisorName(st)
+    : (primary?.supervisorName || st.acceptedSupervisorName || 'Giảng viên Hướng dẫn');
   setEl('topic-preview-doc-sup-name', supName);
+
+  // Version selector in header
+  const versionSelectorWrap = document.getElementById('topic-preview-version-selector-wrap');
+  const versionBtnText = document.getElementById('topic-preview-version-btn-text');
+  const versionDropdown = document.getElementById('topic-preview-version-dropdown');
+
+  if (approvedVersions.length > 1) {
+    if (versionSelectorWrap) versionSelectorWrap.classList.remove('hidden');
+    if (versionBtnText) versionBtnText.textContent = `Phiếu ĐK lần ${viewingVersion}`;
+    if (versionDropdown) {
+      const sortedVersions = [...approvedVersions].sort((a, b) => b.version - a.version);
+      versionDropdown.innerHTML = sortedVersions.map(v => `
+        <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}', false, ${v.version}); document.getElementById('topic-preview-version-dropdown').classList.add('hidden');" class="w-full text-left px-3.5 py-2 hover:bg-slate-100 transition flex items-center justify-between gap-2 cursor-pointer ${v.version === viewingVersion ? 'bg-blue-50/70 font-bold text-tdtu-blue' : 'text-slate-700'}">
+          <span>📄 Phiếu ĐK lần ${v.version}</span>
+          ${v.version === Number(st.topicTitleVersion || 1) ? '<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Mới nhất</span>' : ''}
+        </button>
+      `).join('');
+    }
+  } else {
+    if (versionSelectorWrap) versionSelectorWrap.classList.add('hidden');
+  }
 
   // Status badge & sup status in document
   const badgeEl = document.getElementById('topic-preview-status-badge');
@@ -186,7 +236,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
 
   // Role-based button visibility
   if (btnStudentEdit) {
-    btnStudentEdit.classList.toggle('hidden', !isStudentViewer);
+    btnStudentEdit.classList.toggle('hidden', !isStudentViewer || isViewingPastVersion);
   }
 
   if (status === 'approved') {
@@ -197,22 +247,27 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
     if (docSupStatusEl) {
       docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-emerald-700 italic';
       docSupStatusEl.textContent = '✓ Đã duyệt đề tài';
+      docSupStatusEl.classList.remove('hidden');
     }
     if (footerNoteEl) {
-      footerNoteEl.textContent = isStudentViewer
-        ? `Tên đề tài của bạn đã được GVHD phê duyệt${st.topicReviewedAt ? ' lúc ' + fmtIsoToVietnameseDateTime(st.topicReviewedAt) : ''}.`
-        : `Tên đề tài đã được GVHD phê duyệt${st.topicReviewedAt ? ' lúc ' + fmtIsoToVietnameseDateTime(st.topicReviewedAt) : ''}.`;
+      if (isViewingPastVersion) {
+        footerNoteEl.textContent = `📌 Bạn đang xem Phiếu đăng ký đề tài đã duyệt lần ${viewingVersion}.`;
+      } else {
+        footerNoteEl.textContent = isStudentViewer
+          ? `Tên đề tài của bạn đã được GVHD phê duyệt${st.topicReviewedAt ? ' lúc ' + fmtIsoToVietnameseDateTime(st.topicReviewedAt) : ''}.`
+          : `Tên đề tài đã được GVHD phê duyệt${st.topicReviewedAt ? ' lúc ' + fmtIsoToVietnameseDateTime(st.topicReviewedAt) : ''}.`;
+      }
     }
     if (btnApprove) btnApprove.classList.add('hidden');
     if (btnCancelApproval) {
-      if (isStudentViewer) {
+      if (isStudentViewer || isViewingPastVersion) {
         btnCancelApproval.classList.add('hidden');
       } else {
         btnCancelApproval.classList.remove('hidden');
       }
     }
     if (btnReject) {
-      if (isStudentViewer) {
+      if (isStudentViewer || isViewingPastVersion) {
         btnReject.classList.add('hidden');
       } else {
         btnReject.classList.remove('hidden');
@@ -228,6 +283,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
     if (docSupStatusEl) {
       docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-rose-700 italic';
       docSupStatusEl.textContent = `✕ Yêu cầu chỉnh sửa: ${st.topicApprovalNote || ''}`;
+      docSupStatusEl.classList.remove('hidden');
     }
     if (footerNoteEl) {
       footerNoteEl.textContent = isStudentViewer
@@ -235,7 +291,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
         : `Đã yêu cầu sinh viên chỉnh sửa: "${st.topicApprovalNote || ''}".`;
     }
     if (btnApprove) {
-      if (isStudentViewer) {
+      if (isStudentViewer || isViewingPastVersion) {
         btnApprove.classList.add('hidden');
       } else {
         btnApprove.classList.remove('hidden');
@@ -252,6 +308,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
     if (docSupStatusEl) {
       docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-amber-700 italic';
       docSupStatusEl.textContent = '(Chờ GVHD xem xét & ký duyệt)';
+      docSupStatusEl.classList.remove('hidden');
     }
     if (footerNoteEl) {
       footerNoteEl.textContent = isStudentViewer
@@ -259,7 +316,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
         : 'GVHD xem xét nội dung phiếu đăng ký và xác nhận duyệt hoặc yêu cầu chỉnh sửa.';
     }
     if (btnApprove) {
-      if (isStudentViewer) {
+      if (isStudentViewer || isViewingPastVersion) {
         btnApprove.classList.add('hidden');
       } else {
         btnApprove.classList.remove('hidden');
@@ -267,7 +324,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
       }
     }
     if (btnReject) {
-      if (isStudentViewer) {
+      if (isStudentViewer || isViewingPastVersion) {
         btnReject.classList.add('hidden');
       } else {
         btnReject.classList.remove('hidden');
@@ -303,21 +360,45 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
   const btnPdf = document.getElementById('btn-topic-preview-download-pdf');
   if (btnPdf) {
     btnPdf.onclick = () => {
-      window.printOfficialTopicRegistrationPaper(studentId);
+      const activeVer = modal?._viewingVersion || viewingVersion || null;
+      if (typeof window.downloadOfficialTopicRegistrationPdf === 'function') {
+        window.downloadOfficialTopicRegistrationPdf(studentId, activeVer);
+      } else if (typeof window.printOfficialTopicRegistrationPaper === 'function') {
+        window.printOfficialTopicRegistrationPaper(studentId);
+      }
     };
   }
 
   // Handle start in edit mode if requested
-  window.toggleTopicPreviewEditMode(Boolean(startInEditMode && isStudentViewer));
+  window.toggleTopicPreviewEditMode(Boolean(startInEditMode && isStudentViewer && !isViewingPastVersion));
 
   modal.classList.remove('hidden');
+};
+
+window.toggleModalVersionDropdown = function(event) {
+  if (event) { event.stopPropagation(); event.preventDefault(); }
+  const dropdown = document.getElementById('topic-preview-version-dropdown');
+  if (!dropdown) return;
+  const isHidden = dropdown.classList.contains('hidden');
+  if (!isHidden) {
+    dropdown.classList.add('hidden');
+    return;
+  }
+  dropdown.classList.remove('hidden');
+  const close = (e) => {
+    if (!dropdown.contains(e.target)) {
+      dropdown.classList.add('hidden');
+      document.removeEventListener('click', close);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', close), 10);
 };
 
 window.toggleTopicPreviewEditMode = function(isEdit = true) {
   const modal = document.getElementById('modal-supervisor-topic-preview');
   if (!modal) return;
   const isStudent = Boolean(modal._isStudentViewer);
-  if (isEdit && !isStudent) return;
+  if (isEdit && (!isStudent || modal._isViewingPastVersion)) return;
 
   const titleTextEl = document.getElementById('topic-preview-doc-title');
   const titleEditWrap = document.getElementById('topic-preview-doc-title-edit-wrap');
@@ -328,8 +409,6 @@ window.toggleTopicPreviewEditMode = function(isEdit = true) {
   const descInput = document.getElementById('topic-preview-edit-description');
 
   const btnEdit = document.getElementById('btn-topic-preview-student-edit');
-  const btnSave = document.getElementById('btn-topic-preview-save-edit');
-  const btnCancel = document.getElementById('btn-topic-preview-cancel-edit');
   const btnPdf = document.getElementById('btn-topic-preview-download-pdf');
 
   const footerSave = document.getElementById('btn-topic-preview-footer-save');
@@ -337,7 +416,24 @@ window.toggleTopicPreviewEditMode = function(isEdit = true) {
   const footerClose = document.getElementById('btn-topic-preview-close');
   const footerNote = document.getElementById('topic-preview-footer-note');
 
+  const btnApprove = document.getElementById('btn-topic-preview-approve');
+  const btnReject = document.getElementById('btn-topic-preview-reject');
+  const btnCancelApproval = document.getElementById('btn-topic-preview-cancel-approval');
+
+  const docSupStatusEl = document.getElementById('topic-preview-doc-sup-status');
+  const versionSelectorWrap = document.getElementById('topic-preview-version-selector-wrap');
+
+  const st = modal._currentRegistration || state.myRegistration || {};
+  const wasApproved = (st.topicApprovalStatus === 'approved' || st.approvalStatus === 'approved');
+  const currentVersion = Number(st.topicTitleVersion || 1);
+  const versionEl = document.getElementById('topic-preview-doc-version');
+
   if (isEdit) {
+    const displayVersion = wasApproved ? (currentVersion + 1) : currentVersion;
+    if (versionEl) {
+      versionEl.textContent = `Đăng ký đề tài chính thức lần thứ : ${displayVersion}`;
+    }
+
     if (titleTextEl) {
       titleTextEl.classList.add('hidden');
       titleTextEl.style.display = 'none';
@@ -365,19 +461,32 @@ window.toggleTopicPreviewEditMode = function(isEdit = true) {
       descInput.value = currentDesc;
     }
 
+    // Hide supervisor status in edit mode (requirement: "khi GVHD đã duyệt tên đề tài mà sv bấm sửa. thì không ghi GVHD đã duyệt tên đề tài bên dưới ý kiến GVHD")
+    if (docSupStatusEl) {
+      docSupStatusEl.classList.add('hidden');
+      docSupStatusEl.textContent = '';
+    }
+    if (versionSelectorWrap) versionSelectorWrap.classList.add('hidden');
+
     if (btnEdit) btnEdit.classList.add('hidden');
-    if (btnSave) btnSave.classList.remove('hidden');
-    if (btnCancel) btnCancel.classList.remove('hidden');
     if (btnPdf) btnPdf.classList.add('hidden');
 
     if (footerSave) footerSave.classList.remove('hidden');
     if (footerCancel) footerCancel.classList.remove('hidden');
     if (footerClose) footerClose.classList.add('hidden');
 
+    if (btnApprove) btnApprove.classList.add('hidden');
+    if (btnReject) btnReject.classList.add('hidden');
+    if (btnCancelApproval) btnCancelApproval.classList.add('hidden');
+
     if (footerNote) {
       footerNote.textContent = '✏️ Chế độ sửa: Chỉ mở khóa chỉnh sửa Tên đề tài và Mô tả định hướng thiết kế. Các thông tin hành chính khác được bảo lưu.';
     }
   } else {
+    if (versionEl) {
+      versionEl.textContent = `Đăng ký đề tài chính thức lần thứ : ${modal._viewingVersion || currentVersion}`;
+    }
+
     if (titleTextEl) {
       titleTextEl.classList.remove('hidden');
       titleTextEl.style.display = '';
@@ -396,19 +505,47 @@ window.toggleTopicPreviewEditMode = function(isEdit = true) {
       descEditWrap.style.display = 'none';
     }
 
-    if (btnEdit) btnEdit.classList.toggle('hidden', !isStudent);
-    if (btnSave) btnSave.classList.add('hidden');
-    if (btnCancel) btnCancel.classList.add('hidden');
+    if (btnEdit) btnEdit.classList.toggle('hidden', !isStudent || modal._isViewingPastVersion);
     if (btnPdf) btnPdf.classList.remove('hidden');
 
     if (footerSave) footerSave.classList.add('hidden');
     if (footerCancel) footerCancel.classList.add('hidden');
     if (footerClose) footerClose.classList.remove('hidden');
 
-    const st = modal._currentRegistration || {};
+    if (isStudent) {
+      if (btnApprove) btnApprove.classList.add('hidden');
+      if (btnReject) btnReject.classList.add('hidden');
+      if (btnCancelApproval) btnCancelApproval.classList.add('hidden');
+    }
+
     const status = st?.topicApprovalStatus || 'pending';
+    const isApproved = (status === 'approved' || modal._isViewingPastVersion);
+
+    // Restore supervisor status when viewing
+    if (docSupStatusEl) {
+      if (isApproved) {
+        docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-emerald-700 italic';
+        docSupStatusEl.textContent = '✓ Đã duyệt đề tài';
+        docSupStatusEl.classList.remove('hidden');
+      } else if (status === 'rejected') {
+        docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-rose-700 italic';
+        docSupStatusEl.textContent = `✕ Yêu cầu chỉnh sửa: ${st.topicApprovalNote || ''}`;
+        docSupStatusEl.classList.remove('hidden');
+      } else {
+        docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-amber-700 italic';
+        docSupStatusEl.textContent = '(Chờ GVHD xem xét & ký duyệt)';
+        docSupStatusEl.classList.remove('hidden');
+      }
+    }
+
+    if (modal._approvedVersions && modal._approvedVersions.length > 1 && versionSelectorWrap) {
+      versionSelectorWrap.classList.remove('hidden');
+    }
+
     if (footerNote) {
-      if (status === 'approved') {
+      if (modal._isViewingPastVersion) {
+        footerNote.textContent = `📌 Bạn đang xem Phiếu đăng ký đề tài đã duyệt lần ${modal._viewingVersion}.`;
+      } else if (status === 'approved') {
         footerNote.textContent = `Tên đề tài của bạn đã được GVHD phê duyệt${st.topicReviewedAt ? ' lúc ' + fmtIsoToVietnameseDateTime(st.topicReviewedAt) : ''}.`;
       } else if (status === 'rejected') {
         footerNote.textContent = `GVHD yêu cầu chỉnh sửa: "${st.topicApprovalNote || ''}". Vui lòng sửa lại tên đề tài.`;
@@ -546,7 +683,7 @@ window.saveTopicPreviewEdits = async function() {
     console.error('Lỗi khi lưu phiếu đăng ký:', err);
     showToast('Lỗi khi lưu phiếu đăng ký: ' + err.message, 'error');
   } finally {
-    if (btnSaveTop) { btnSaveTop.disabled = false; btnSaveTop.innerHTML = '<span>💾</span> <span>Lưu & Gửi duyệt lại</span>'; }
+    if (btnSaveTop) { btnSaveTop.disabled = false; btnSaveTop.innerHTML = '<span>💾</span> <span>Lưu & Gửi GVHD duyệt lại</span>'; }
     if (btnSaveBottom) { btnSaveBottom.disabled = false; btnSaveBottom.innerHTML = '<span>💾</span> <span>Lưu & Gửi GVHD duyệt lại</span>'; }
   }
 };

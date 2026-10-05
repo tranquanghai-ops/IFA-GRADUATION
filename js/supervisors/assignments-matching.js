@@ -101,13 +101,24 @@ function buildOfficialAssignmentPayload(row, supervisors, assignmentStatus = 'dr
   });
   const primary = enrichedSupervisors.find(item => item.role === 'primary') || enrichedSupervisors[0] || {};
   const studentId = row.studentId;
+  const allSupervisorEmails = new Set();
+  enrichedSupervisors.forEach(item => {
+    if (item.supervisorEmail) allSupervisorEmails.add(item.supervisorEmail.toLowerCase().trim());
+    if (item.email) allSupervisorEmails.add(item.email.toLowerCase().trim());
+    const profile = (state.adminReviewData?.supervisors || []).find(s => s.id === item.supervisorId || s.supervisorId === item.supervisorId)
+      || (state.supervisorsMaster || []).find(s => s.id === item.supervisorId || s.supervisorId === item.supervisorId);
+    if (profile?.email) allSupervisorEmails.add(profile.email.toLowerCase().trim());
+    if (profile?.personalEmail) allSupervisorEmails.add(profile.personalEmail.toLowerCase().trim());
+    if (profile?.institutionalEmail) allSupervisorEmails.add(profile.institutionalEmail.toLowerCase().trim());
+    if (Array.isArray(profile?.emails)) profile.emails.forEach(e => e && allSupervisorEmails.add(e.toLowerCase().trim()));
+  });
   return {
     studentId,
     studentName: resolveStudentName(studentId, row.registration?.studentName || row.eligibleStudent?.fullName || row.eligibleStudent?.name || row.effective?.studentName),
     studentEmail: row.registration?.email || row.eligibleStudent?.email || row.effective?.email || `${studentId.toLowerCase()}@student.tdtu.edu.vn`,
     supervisors: enrichedSupervisors,
     supervisorIds: enrichedSupervisors.map(item => item.supervisorId),
-    supervisorEmails: enrichedSupervisors.map(item => item.supervisorEmail).filter(Boolean),
+    supervisorEmails: Array.from(allSupervisorEmails).filter(Boolean),
     acceptedSupervisorId: primary.supervisorId || '',
     acceptedSupervisorName: primary.supervisorName || '',
     acceptedRank: row.effective?.acceptedRank || 'manual',
@@ -1109,4 +1120,9 @@ if (typeof window !== 'undefined') {
 if (typeof window !== 'undefined') {
   window.loadRoundSupervisors = loadRoundSupervisors;
   window.renderSupervisorsGrid = renderSupervisorsGrid;
+  window.getAdminAssignmentRows = getAdminAssignmentRows;
+  window.normalizeOfficialAssignment = normalizeOfficialAssignment;
+  window.isAssignmentEditingLocked = isAssignmentEditingLocked;
+  window.ensureAssignmentEditingAllowed = ensureAssignmentEditingAllowed;
+  window.getSupervisorAssignmentCount = getSupervisorAssignmentCount;
 }

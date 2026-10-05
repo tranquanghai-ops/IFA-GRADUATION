@@ -114,7 +114,7 @@ export function checkUserAssessmentCapabilities(round, userEmail = null, userId 
   }
 
   // Check official supervised students
-  const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
+  const allRegs = (state.adminReviewData?.roundId === round.id && state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (round.registrations && round.registrations.length > 0 ? round.registrations : (round.eligibleStudents || []));
 
@@ -379,7 +379,7 @@ window.renderAssessmentHeroCard = function() {
   }
 
   // Metrics computation for user
-  const allRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
+  const allRegs = (state.adminReviewData?.roundId === targetRound.id && state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (targetRound.registrations && targetRound.registrations.length > 0 ? targetRound.registrations : (targetRound.eligibleStudents || []));
 
@@ -595,7 +595,7 @@ window.renderAssessmentDuyetList = function(phase) {
   const uEmail = (actor.email || '').toLowerCase().trim();
   const uId = actor.uid || actor.email;
   const isViewAll = actor.isAdmin && state.assessmentAdminScope === 'all';
-  const rawRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
+  const rawRegs = (state.adminReviewData?.roundId === targetRound.id && state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (targetRound.eligibleStudents || targetRound.registrations || []);
   const allRegs = rawRegs.map(s => getStudentFullProfile(s.mssv || s.studentId || s.id, targetRound));
@@ -703,7 +703,7 @@ window.renderAssessmentThesisList = function() {
   const uEmail = (actor.email || '').toLowerCase().trim();
   const uId = actor.uid || actor.email;
   const isViewAll = actor.isAdmin && state.assessmentAdminScope === 'all';
-  const rawRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
+  const rawRegs = (state.adminReviewData?.roundId === targetRound.id && state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (targetRound.eligibleStudents || targetRound.registrations || []);
   const allRegs = rawRegs.map(s => getStudentFullProfile(s.mssv || s.studentId || s.id, targetRound));
@@ -824,7 +824,7 @@ window.renderAssessmentPreliminaryList = function() {
   const actor = getEffectiveActor();
   const uEmail = (actor.email || '').toLowerCase().trim();
   const uId = actor.uid || actor.email;
-  const rawRegs = (state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
+  const rawRegs = (state.adminReviewData?.roundId === targetRound.id && state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (targetRound.eligibleStudents || targetRound.registrations || []);
   const allRegs = rawRegs.map(s => getStudentFullProfile(s.mssv || s.studentId || s.id, targetRound));

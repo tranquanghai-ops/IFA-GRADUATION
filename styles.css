@@ -644,3 +644,142 @@ body.council-standalone-active #modal-confirm {
     transition: none !important;
   }
 }
+
+/* ==========================================================================
+   COUNCIL WORKSPACE: 3 PANELS & RANKING CARDS ENHANCEMENT
+   ========================================================================== */
+#modal-council-workspace #cws-col-students,
+#modal-council-workspace #cws-col-grading,
+#modal-council-workspace #cws-col-ranking {
+  min-height: 0;
+}
+
+/* Desktop & Tablet: Always ensure appropriate multi-column layout */
+@media (min-width: 768px) {
+  #modal-council-workspace #cws-col-students {
+    display: flex !important;
+  }
+  #modal-council-workspace #cws-col-grading {
+    display: flex !important;
+  }
+}
+@media (min-width: 1280px) {
+  #modal-council-workspace #cws-col-ranking {
+    display: flex !important;
+  }
+}
+
+/* Ensure mobile scroll works reliably down to the very last student card */
+@media (max-width: 767px) {
+  #modal-council-workspace #cws-col-students:not(.hidden),
+  #modal-council-workspace #cws-col-grading:not(.hidden),
+  #modal-council-workspace #cws-col-ranking:not(.hidden) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  #modal-council-workspace #cws-students-list,
+  #modal-council-workspace #cws-ranking-list {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    padding-bottom: 7rem !important; /* guarantees bottom student cards are completely viewable above mobile browser bars */
+  }
+}
+
+/* Drag & Drop Presentation Order & Ranking styling */
+.cws-drag-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cws-drag-handle:active {
+  cursor: grabbing;
+}
+.cws-draggable-item {
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+.cws-draggable-item.is-dragging {
+  opacity: 0.45;
+  transform: scale(0.98);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+.cws-draggable-item.drag-over-top {
+  border-top: 3px solid #6366f1 !important;
+}
+.cws-draggable-item.drag-over-bottom {
+  border-bottom: 3px solid #6366f1 !important;
+}
+
+/* TOP 3 RANKING CARDS PROMINENCE ("3 thẻ này làm sao cho nổi bật hơn") */
+.cws-ranking-card-top1 {
+  background: linear-gradient(135deg, #fffdf0 0%, #fef3c7 45%, #fffbeb 100%);
+  border: 2px solid #f59e0b !important;
+  box-shadow: 0 6px 18px -2px rgba(245, 158, 11, 0.32), 0 2px 6px -1px rgba(245, 158, 11, 0.18);
+  position: relative;
+}
+.cws-ranking-card-top1::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5px;
+  height: 100%;
+  background: linear-gradient(to bottom, #d97706, #fbbf24);
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+
+.cws-ranking-card-top2 {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #ffffff 100%);
+  border: 2px solid #94a3b8 !important;
+  box-shadow: 0 4px 14px -2px rgba(100, 116, 139, 0.22), 0 2px 4px -1px rgba(100, 116, 139, 0.12);
+  position: relative;
+}
+.cws-ranking-card-top2::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5px;
+  height: 100%;
+  background: linear-gradient(to bottom, #64748b, #cbd5e1);
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+
+.cws-ranking-card-top3 {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 50%, #ffffff 100%);
+  border: 2px solid #d97706 !important;
+  box-shadow: 0 4px 14px -2px rgba(217, 119, 6, 0.2), 0 2px 4px -1px rgba(217, 119, 6, 0.12);
+  position: relative;
+}
+.cws-ranking-card-top3::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5px;
+  height: 100%;
+  background: linear-gradient(to bottom, #b45309, #f97316);
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+
+.cws-ranking-card-standard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+.cws-ranking-card-standard:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+

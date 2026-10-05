@@ -102,6 +102,36 @@ describe('officialAssignments least privilege', () => {
     assert.equal(snap.size, 1);
   });
 
+  test('GVHD ngoài (email ngoài @tdtu.edu.vn) query được assignment published thuộc mình', async () => {
+    const externalSupervisorEmail = 'external.supervisor@gmail.com';
+    await env.withSecurityRulesDisabled(async context => {
+      const db = context.firestore();
+      await setDoc(doc(db, assignmentPath('52200099')), {
+        studentId: '52200099',
+        assignmentStatus: 'published',
+        supervisors: [{ supervisorId: 'ext-1', supervisorEmail: externalSupervisorEmail, role: 'primary' }],
+        supervisorIds: ['ext-1'],
+        supervisorEmails: [externalSupervisorEmail]
+      });
+    });
+
+    const extDb = env.authenticatedContext(externalSupervisorEmail, auth(externalSupervisorEmail)).firestore();
+    const ownQuery = query(
+      collection(extDb, `graduationRounds/${roundId}/officialAssignments`),
+      where('assignmentStatus', '==', 'published'),
+      where('supervisorEmails', 'array-contains', externalSupervisorEmail)
+    );
+    const snap = await assertSucceeds(getDocs(ownQuery));
+    assert.equal(snap.size, 1);
+
+    // External supervisor cannot list all assignments without filtering
+    const allQuery = query(
+      collection(extDb, `graduationRounds/${roundId}/officialAssignments`),
+      where('assignmentStatus', '==', 'published')
+    );
+    await assertFails(getDocs(allQuery));
+  });
+
   test('Student và GVHD không được ghi assignment', async () => {
     const studentDb = env.authenticatedContext(`${studentId}@student.tdtu.edu.vn`, auth(`${studentId}@student.tdtu.edu.vn`)).firestore();
     const supervisorDb = env.authenticatedContext(supervisorEmail, auth(supervisorEmail)).firestore();
