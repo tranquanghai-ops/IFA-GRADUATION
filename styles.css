@@ -624,6 +624,9 @@ body.council-standalone-active #modal-confirm {
 
   #cws-col-grading {
     overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
   #cws-selected-student-card h2 {
@@ -669,10 +672,19 @@ body.council-standalone-active #modal-confirm {
   }
 }
 
-/* Ensure mobile scroll works reliably down to the very last student card */
+/* Ensure mobile scroll works reliably across all council workspace panels */
 @media (max-width: 767px) {
+  #modal-council-workspace {
+    padding: 0 !important;
+  }
+  #modal-council-workspace > div {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+  }
+
   #modal-council-workspace #cws-col-students:not(.hidden),
-  #modal-council-workspace #cws-col-grading:not(.hidden),
   #modal-council-workspace #cws-col-ranking:not(.hidden) {
     display: flex !important;
     flex-direction: column !important;
@@ -689,6 +701,34 @@ body.council-standalone-active #modal-confirm {
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
     padding-bottom: 7rem !important; /* guarantees bottom student cards are completely viewable above mobile browser bars */
+  }
+
+  /* CRITICAL: Grading column holds score card & inputs directly and MUST scroll vertically on mobile */
+  #modal-council-workspace #cws-col-grading:not(.hidden) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+    overscroll-behavior-y: contain;
+    padding-bottom: 8.5rem !important; /* guarantees bottom score actions, comment inputs, and save buttons are completely viewable above mobile browser bars */
+  }
+}
+
+@supports (height: 100dvh) {
+  @media (max-width: 767px) {
+    #modal-council-workspace {
+      height: 100dvh !important;
+      max-height: 100dvh !important;
+    }
+    #modal-council-workspace > div {
+      height: 100dvh !important;
+      max-height: 100dvh !important;
+    }
   }
 }
 

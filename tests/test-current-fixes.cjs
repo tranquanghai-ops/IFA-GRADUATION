@@ -177,6 +177,10 @@ assert.match(authJs, /\(isAdmin \|\| isSupervisor\) && !state\.impersonation[\s\
 const coreJs = read('js/core.js');
 assert.match(coreJs, /path\.includes\('\/supervisor'\)[\s\S]*?window\.history\.replaceState\(null, '', '\/'\)/);
 
+// 9. Mobile council workspace: grading column must scroll vertically with overflow-y: auto and touch-action: pan-y
+assert.match(stylesCss, /#modal-council-workspace #cws-col-grading:not\(\.hidden\) \{[\s\S]*?overflow-y: auto !important;[\s\S]*?touch-action: pan-y !important;/);
+assert.doesNotMatch(stylesCss, /#modal-council-workspace #cws-col-grading:not\(\.hidden\)[^{]*\{[\s\S]*?overflow: hidden !important;/);
+
 console.log('Current regression checks passed.');
 
 
