@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kiểm tra hộp chi tiết mốc kế hoạch</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="../../styles.css">
+<div id="student-timeline-event-dialog" class="fixed inset-0 flex items-center justify-center bg-slate-950/60 p-4">
+  <div role="dialog" aria-modal="true" aria-label="Chi tiết mốc kế hoạch" class="student-timeline-event-panel rounded-2xl sm:rounded-3xl bg-white shadow-2xl">
+    <div class="flex items-start justify-between gap-4 px-5 pt-5 sm:px-8 sm:pt-7">
+      <div><div class="text-xs font-black uppercase tracking-wider text-blue-700">Mốc kế hoạch</div><h3 class="mt-1 text-lg sm:text-xl font-black text-slate-900 leading-snug">DUYỆT ĐỒ ÁN TỐT NGHIỆP ĐỢT 1</h3></div>
+      <button type="button" class="rounded-xl bg-slate-100 px-3.5 py-1.5 text-xl font-bold text-slate-600" aria-label="Đóng">×</button>
+    </div>
+    <div class="mx-5 mt-4 space-y-2 text-base sm:text-lg font-bold text-slate-900 bg-blue-50/70 p-4 rounded-xl border border-blue-100 sm:mx-8">
+      <div class="flex items-start gap-3"><span>🕒</span><span>16/10/2026 • 13:00 → 17:00</span></div>
+      <div class="flex items-start gap-3"><span>📍</span><span>Ngành thông báo sau</span></div>
+    </div>
+    <div class="student-timeline-event-scroll rich-rendered-content mx-5 mt-5 mb-5 border-t border-slate-200 pt-5 text-sm sm:text-base leading-relaxed text-slate-800 sm:mx-8 sm:mb-7">
+      <p><strong>Thời gian:</strong> Sinh viên có mặt trước 15–30 phút. <span style="color:#dc2626">SV đến sau 10 phút xem như vắng.</span></p>
+      <p><strong>Yêu cầu &amp; quy định trình bày</strong></p>
+      <p>Đây là nội dung mô phỏng dài để kiểm tra chiều rộng, vùng cuộn và cách xuống dòng trên màn hình nhỏ.</p>
+      <p><a href="https://example.org" target="_blank" rel="noopener noreferrer">Xem hướng dẫn qua liên kết</a></p>
+      <p>Lặp nội dung kiểm tra vùng cuộn.</p><p>Lặp nội dung kiểm tra vùng cuộn.</p><p>Lặp nội dung kiểm tra vùng cuộn.</p><p>Lặp nội dung kiểm tra vùng cuộn.</p><p>Lặp nội dung kiểm tra vùng cuộn.</p><p>Lặp nội dung kiểm tra vùng cuộn.</p><p>Lặp nội dung kiểm tra vùng cuộn.</p><p>Lặp nội dung kiểm tra vùng cuộn.</p><p>Lặp nội dung kiểm tra vùng cuộn.</p><p>Lặp nội dung kiểm tra vùng cuộn.</p><p>Lặp nội dung kiểm tra vùng cuộn.</p>
+    </div>
+  </div>
+</div>
+<output id="sanitize-check" hidden></output>
+<script type="module">
+  import { sanitizeRichHtml } from '../../js/planning/activities-manager.js';
+  const sample = '<p><font color="#dc2626">Chữ đỏ</font> <a href="https://example.org">Liên kết</a></p>';
+  document.querySelector('#sanitize-check').textContent = sanitizeRichHtml(sample);
+</script>
+</html>

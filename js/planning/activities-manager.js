@@ -198,6 +198,30 @@ window.clearActivityDateTime = function(target) {
 };
 
 // Rich Text Editor Helpers
+let savedActivityEditorRange = null;
+window.captureActivityEditorSelection = function() {
+  const editor = document.getElementById('activity-editor');
+  const selection = window.getSelection();
+  if (editor && selection?.rangeCount && editor.contains(selection.anchorNode) && editor.contains(selection.focusNode)) {
+    savedActivityEditorRange = selection.getRangeAt(0).cloneRange();
+  }
+};
+
+function restoreActivityEditorSelection() {
+  const editor = document.getElementById('activity-editor');
+  if (!editor || !savedActivityEditorRange || !editor.contains(savedActivityEditorRange.commonAncestorContainer)) return;
+  editor.focus();
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(savedActivityEditorRange);
+}
+
+window.applyActivityTextColor = function(color) {
+  restoreActivityEditorSelection();
+  document.execCommand('foreColor', false, color);
+  window.captureActivityEditorSelection();
+};
+
 window.richFormatHeading = function(tag) {
   if (!tag) return;
   document.execCommand('formatBlock', false, '<' + tag + '>');
@@ -221,13 +245,15 @@ window.setRichFontSize = function(size) {
 };
 
 window.insertRichLink = async function() {
+  window.captureActivityEditorSelection();
   const url = await showInputDialog('Chèn liên kết', 'Nhập địa chỉ liên kết (URL):', { defaultValue: 'https://', required: true });
   if (!url || !url.trim()) return;
   const cleanUrl = url.trim();
-  if (/^javascript:/i.test(cleanUrl)) {
-    showToast('Liên kết không an toàn!', 'warning');
+  if (!/^https?:\/\//i.test(cleanUrl)) {
+    showToast('Liên kết phải bắt đầu bằng http:// hoặc https://', 'warning');
     return;
   }
+  restoreActivityEditorSelection();
   document.execCommand('createLink', false, cleanUrl);
   const editor = document.getElementById('activity-editor');
   if (editor) {
@@ -256,9 +282,18 @@ export function sanitizeRichHtml(rawHtml) {
 
     function cleanNode(node) {
       const children = Array.from(node.childNodes);
-      for (const child of children) {
+      for (let child of children) {
         if (child.nodeType === 1) { // Element
-          const tagName = child.tagName.toLowerCase();
+          let tagName = child.tagName.toLowerCase();
+          if (tagName === 'font') {
+            const replacement = doc.createElement('span');
+            const color = child.getAttribute('color');
+            if (color && (/^#[0-9a-f]{3,8}$/i.test(color) || /^(?:rgb|rgba)\([\d\s.,%]+\)$/i.test(color))) replacement.style.color = color;
+            while (child.firstChild) replacement.appendChild(child.firstChild);
+            child.replaceWith(replacement);
+            child = replacement;
+            tagName = 'span';
+          }
           if (!allowedTags.has(tagName)) {
             if (['script', 'iframe', 'object', 'embed', 'style', 'link', 'svg'].includes(tagName)) {
               child.remove();

@@ -12,6 +12,17 @@ test('submission deadline parses Vietnam time and rejects invalid dates', async 
 });
 
 const root = path.resolve(__dirname, '..');
+
+test('student milestone details keep rich colors and links in a wider scrolling dialog', () => {
+  const planning = fs.readFileSync(path.join(root, 'js/planning/activities-manager.js'), 'utf8');
+  const timeline = fs.readFileSync(path.join(root, 'js/rounds/rounds-timeline-preview.js'), 'utf8');
+  const styles = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  assert.match(planning, /if \(tagName === 'font'\)/);
+  assert.match(planning, /restoreActivityEditorSelection\(\);\s*document\.execCommand\('createLink'/);
+  assert.match(timeline, /student-timeline-event-panel/);
+  assert.match(styles, /width: min\(94vw, 1400px\)/);
+  assert.match(styles, /\.student-timeline-event-scroll[\s\S]*overflow-y: auto/);
+});
 function loadFullAppSource(dir) {
   let code = fs.readFileSync(path.join(dir, 'app.js'), 'utf8');
   const jsDir = path.join(dir, 'js');

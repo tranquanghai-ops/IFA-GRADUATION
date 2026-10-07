@@ -396,6 +396,25 @@ body {
   color: #1d4ed8;
 }
 
+.student-timeline-event-panel {
+  width: min(94vw, 1400px);
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.student-timeline-event-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.student-timeline-event-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 .rich-rendered-content blockquote {
   border-left: 3px solid #94a3b8;
   padding-left: 0.75rem;
