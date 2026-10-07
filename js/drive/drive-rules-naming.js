@@ -1,6 +1,7 @@
 /**
  * IFA+ Graduation — Drive Filename Templates & Submission Rules
  */
+import { parseVietnameseDateTimeToIso } from './submission-deadline-date.js';
 window.normalizeVietnameseNoDiacritics = function(str) {
   if (!str) return '';
   return String(str)
@@ -285,6 +286,7 @@ window.readActivitySubmissionForm = function() {
     const dDate = document.getElementById('sub-deadline-date')?.value || '';
     const dTime = document.getElementById('sub-deadline-time')?.value || '';
     deadlineAt = parseVietnameseDateTimeToIso(dDate, dTime);
+    if (!deadlineAt) throw new Error('Hạn nộp bài không hợp lệ. Vui lòng nhập ngày DD/MM/YYYY và giờ HH:mm.');
   }
 
   const allowLateSubmission = document.getElementById('sub-allow-late')?.checked === true;

@@ -3,6 +3,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+test('submission deadline parses Vietnam time and rejects invalid dates', async () => {
+  const { parseVietnameseDateTimeToIso } = await import('../js/drive/submission-deadline-date.js');
+  assert.equal(parseVietnameseDateTimeToIso('16/10/2026', '10:00'), '2026-10-16T03:00:00.000Z');
+  assert.equal(parseVietnameseDateTimeToIso('31/02/2026', '10:00'), null);
+  assert.equal(parseVietnameseDateTimeToIso('16/10/2026', '25:00'), null);
+  assert.equal(parseVietnameseDateTimeToIso('', '10:00'), null);
+});
+
 const root = path.resolve(__dirname, '..');
 function loadFullAppSource(dir) {
   let code = fs.readFileSync(path.join(dir, 'app.js'), 'utf8');

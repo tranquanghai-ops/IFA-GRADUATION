@@ -5,6 +5,7 @@ const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window
  * IFA+ Graduation — Google Drive File Upload & Attachment Management Submodule
  */
 import { parseDriveFolderId, getDriveFolderUrl } from './drive-provisioning.js';
+import { parseVietnameseDateTimeToIso } from './submission-deadline-date.js';
 
 window.checkStudentFileSubmission = function(actId) {
   const round = (state.rounds || []).find(r => r.id === state.selectedRoundId);
@@ -651,6 +652,10 @@ window.saveSubmissionOverride = async function() {
   const oDate = document.getElementById('sub-override-date')?.value || '';
   const oTime = document.getElementById('sub-override-time')?.value || '';
   const allowUntil = (oDate && oTime) ? parseVietnameseDateTimeToIso(oDate, oTime) : null;
+  if ((oDate || oTime) && !allowUntil) {
+    showToast('Ngày gia hạn không hợp lệ. Vui lòng nhập đủ ngày DD/MM/YYYY và giờ HH:mm.', 'warning');
+    return;
+  }
   const extraAttempts = parseInt(document.getElementById('sub-override-extra-attempts')?.value, 10) || 0;
   const reason = (document.getElementById('sub-override-reason')?.value || '').trim();
 
