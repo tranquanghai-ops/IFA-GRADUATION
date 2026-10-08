@@ -136,7 +136,9 @@ function validateActivity(activity, currentAttempt) {
     }
   }
 
-  const openAtStr = activity.startAt || activity.submissionOpenAt;
+  const openAtStr = activity.submissionConfig?.openMode === 'custom' && activity.submissionConfig?.openAt
+    ? activity.submissionConfig.openAt
+    : (activity.startAt || activity.submissionOpenAt);
   if (openAtStr) {
     const openAt = openAtStr instanceof Date ? openAtStr : new Date(openAtStr);
     if (!isNaN(openAt.getTime()) && now < openAt) {

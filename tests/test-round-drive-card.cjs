@@ -11,6 +11,36 @@ test('submission deadline parses Vietnam time and rejects invalid dates', async 
   assert.equal(parseVietnameseDateTimeToIso('', '10:00'), null);
 });
 
+test('custom submission opening is independent from event time on client and server', async () => {
+  global.window = global.window || {};
+  await import('../js/drive/drive-rules-naming.js');
+  const { validateActivity } = require('../functions/validation.js');
+  const activity = {
+    id: 'act-test', submissionEnabled: true,
+    startAt: '2099-10-16T06:00:00.000Z',
+    endAt: '2099-10-16T10:00:00.000Z',
+    submissionConfig: { openMode: 'custom', openAt: '2000-10-15T01:00:00.000Z', deadlineMode: 'custom', deadlineAt: '2099-10-16T03:00:00.000Z' }
+  };
+  const rules = window.getEffectiveSubmissionRules('student', activity, {});
+  assert.equal(rules.isNotStarted, false);
+  assert.equal(rules.canSubmit, true);
+  assert.doesNotThrow(() => validateActivity(activity, 0));
+  activity.submissionConfig.openAt = '2099-10-15T01:00:00.000Z';
+  assert.equal(window.getEffectiveSubmissionRules('student', activity, {}).isNotStarted, true);
+  assert.throws(() => validateActivity(activity, 0), /Chưa đến thời gian nhận hồ sơ/);
+});
+
+test('milestone edit and details expose submission window and live countdowns', () => {
+  const form = fs.readFileSync(path.join(__dirname, '../templates/modals/rounds/modal-activity.html'), 'utf8');
+  const details = fs.readFileSync(path.join(__dirname, '../js/rounds/rounds-timeline-preview.js'), 'utf8');
+  const panel = fs.readFileSync(path.join(__dirname, '../js/drive/drive-upload-panel.js'), 'utf8');
+  assert.match(form, /max-w-\[min\(94vw,1180px\)\]/);
+  assert.match(form, /id="sub-open-date"/);
+  assert.match(form, /id="sub-open-time"/);
+  assert.match(details, /student-timeline-submission-slot/);
+  assert.match(panel, /data-student-countdown-at/);
+});
+
 const root = path.resolve(__dirname, '..');
 
 test('student milestone details keep rich colors and links in a wider scrolling dialog', () => {

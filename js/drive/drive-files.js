@@ -222,6 +222,7 @@ window.submitStudentFiles = async function(actId) {
     if (submitData.auditLogged === false) {
       showToast(submitData.auditWarning || 'Bài đã lưu nhưng nhật ký kiểm toán chưa ghi được.', 'warning');
     }
+    if (document.getElementById('student-timeline-event-dialog')) window.closeStudentTimelineEvent?.();
     loadStudentRoundActivities(round.id);
   } catch (err) {
     console.error('Submit error:', err);
@@ -415,6 +416,7 @@ window.withdrawStudentSubmission = async function(actId, attemptNum, optRoundId)
     if (withdrawData.auditLogged === false) {
       showToast(withdrawData.auditWarning || 'Bài đã rút nhưng nhật ký kiểm toán chưa ghi được.', 'warning');
     }
+    if (document.getElementById('student-timeline-event-dialog')) window.closeStudentTimelineEvent?.();
     loadStudentRoundActivities(round.id);
   } catch (err) {
     console.error('Withdraw error:', err);

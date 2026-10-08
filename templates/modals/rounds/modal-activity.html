@@ -1,7 +1,7 @@
 
   <!-- CREATE / EDIT ACTIVITY MODAL (v1.9.0-beta.1) -->
   <div id="modal-activity" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
+    <div class="bg-white rounded-2xl w-full max-w-[min(94vw,1180px)] shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
         <div>
           <h3 id="modal-activity-title" class="font-bold text-base text-tdtu-blue">Thêm Mốc Kế hoạch Đợt TN</h3>
@@ -279,9 +279,32 @@
                   </div>
                 </div>
 
+                <!-- Submission window is independent from the event time. -->
+                <div class="space-y-1.5 pt-1">
+                  <label class="font-bold text-slate-800 block">2. Bắt đầu nhận bài:</label>
+                  <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="sub_open_mode" value="activity_start" checked onchange="toggleSubCustomOpen(false)">
+                      <span>Theo thời gian bắt đầu mốc</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                      <input type="radio" name="sub_open_mode" value="custom" onchange="toggleSubCustomOpen(true)">
+                      <span>Giờ mở nhận bài riêng</span>
+                    </label>
+                  </div>
+                  <div id="sub-custom-open-wrap" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
+                    <label class="text-[11px] font-bold text-slate-600">Ngày mở (DD/MM/YYYY)
+                      <input type="text" id="sub-open-date" placeholder="DD/MM/YYYY" maxlength="10" class="mt-1 w-full rounded-lg border border-slate-300 p-2 font-mono text-xs" oninput="formatDateInput(this)" onblur="validateDateInput(this)">
+                    </label>
+                    <label class="text-[11px] font-bold text-slate-600">Giờ mở (HH:mm)
+                      <input type="text" id="sub-open-time" placeholder="08:00" maxlength="5" class="mt-1 w-full rounded-lg border border-slate-300 p-2 font-mono text-xs" onblur="validateTimeInput(this)">
+                    </label>
+                  </div>
+                </div>
+
                 <!-- 3. Deadline mode -->
                 <div class="space-y-1.5 pt-1">
-                  <label class="font-bold text-slate-800 block">2. Hạn chót nhận bài:</label>
+                  <label class="font-bold text-slate-800 block">3. Hạn chót nhận bài:</label>
                   <div class="flex items-center gap-4 text-xs font-semibold">
                     <label class="flex items-center gap-1.5 cursor-pointer">
                       <input type="radio" name="sub_deadline_mode" value="activity_end" checked onchange="toggleSubCustomDeadline(false)">
@@ -375,11 +398,11 @@
 
                   <div class="space-y-1.5">
                     <label class="text-[10px] font-bold text-slate-600 block">Tên thư mục Drive cho mốc này:</label>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap gap-2 sm:flex-nowrap">
                       <input type="text" id="activity-form-drive-folder-name" placeholder="VD: NỘP THUYẾT MINH ĐỢT 1"
-                        class="flex-1 p-2 border border-slate-300 rounded-lg text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        class="min-w-0 w-full flex-1 p-2 border border-slate-300 rounded-lg text-xs font-bold bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
                       <button type="button" id="btn-connect-activity-drive" onclick="connectActivityDriveFolder()"
-                        class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center gap-1 cursor-pointer">
+                        class="w-full justify-center sm:w-auto px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors shrink-0 flex items-center gap-1 cursor-pointer">
                         <span>📁 Tạo / Kết nối Thư mục</span>
                       </button>
                     </div>

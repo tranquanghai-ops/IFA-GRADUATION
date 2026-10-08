@@ -142,6 +142,10 @@ window.toggleSubCustomDeadline = function(isCustom) {
   }
 };
 
+window.toggleSubCustomOpen = function(isCustom) {
+  document.getElementById('sub-custom-open-wrap')?.classList.toggle('hidden', !isCustom);
+};
+
 window.resetActivitySubmissionForm = function() {
   ['pdf', 'zip', 'rar', '7z', 'jpg', 'png', 'docx', 'xlsx', 'pptx'].forEach(ext => {
     const el = document.getElementById('sub-ext-' + ext);
@@ -151,6 +155,11 @@ window.resetActivitySubmissionForm = function() {
   if (document.getElementById('sub-max-files')) document.getElementById('sub-max-files').value = '1';
   if (document.getElementById('sub-max-size')) document.getElementById('sub-max-size').value = '100';
   if (document.getElementById('sub-max-attempts')) document.getElementById('sub-max-attempts').value = '3';
+  const openRadio = document.querySelector('input[name="sub_open_mode"][value="activity_start"]');
+  if (openRadio) openRadio.checked = true;
+  toggleSubCustomOpen(false);
+  if (document.getElementById('sub-open-date')) document.getElementById('sub-open-date').value = '';
+  if (document.getElementById('sub-open-time')) document.getElementById('sub-open-time').value = '';
   
   const endRadio = document.querySelector('input[name="sub_deadline_mode"][value="activity_end"]');
   if (endRadio) endRadio.checked = true;
@@ -200,6 +209,13 @@ window.populateActivitySubmissionForm = function(cfg) {
   if (document.getElementById('sub-max-files')) document.getElementById('sub-max-files').value = cfg.maxFiles ?? 1;
   if (document.getElementById('sub-max-size')) document.getElementById('sub-max-size').value = cfg.maxFileSizeMB ?? 100;
   if (document.getElementById('sub-max-attempts')) document.getElementById('sub-max-attempts').value = cfg.maxAttempts ?? 3;
+  const isCustomOpen = cfg.openMode === 'custom' && Boolean(cfg.openAt);
+  const openModeRadio = document.querySelector(`input[name="sub_open_mode"][value="${isCustomOpen ? 'custom' : 'activity_start'}"]`);
+  if (openModeRadio) openModeRadio.checked = true;
+  toggleSubCustomOpen(isCustomOpen);
+  const openParts = isCustomOpen ? isoToVietnameseDateTime(cfg.openAt) : { date: '', time: '' };
+  if (document.getElementById('sub-open-date')) document.getElementById('sub-open-date').value = openParts.date;
+  if (document.getElementById('sub-open-time')) document.getElementById('sub-open-time').value = openParts.time;
 
   const isCustomDeadline = cfg.deadlineMode === 'custom' && Boolean(cfg.deadlineAt);
   const dModeRadio = document.querySelector(`input[name="sub_deadline_mode"][value="${isCustomDeadline ? 'custom' : 'activity_end'}"]`);
@@ -280,6 +296,16 @@ window.readActivitySubmissionForm = function() {
   const maxFileSizeMB = parseInt(document.getElementById('sub-max-size')?.value, 10) || 100;
   const maxAttempts = parseInt(document.getElementById('sub-max-attempts')?.value, 10) || 3;
 
+  const openMode = document.querySelector('input[name="sub_open_mode"]:checked')?.value || 'activity_start';
+  let openAt = null;
+  if (openMode === 'custom') {
+    openAt = parseVietnameseDateTimeToIso(
+      document.getElementById('sub-open-date')?.value || '',
+      document.getElementById('sub-open-time')?.value || ''
+    );
+    if (!openAt) throw new Error('Giờ mở nhận bài không hợp lệ. Vui lòng nhập ngày DD/MM/YYYY và giờ HH:mm.');
+  }
+
   const deadlineMode = document.querySelector('input[name="sub_deadline_mode"]:checked')?.value || 'activity_end';
   let deadlineAt = null;
   if (deadlineMode === 'custom') {
@@ -287,6 +313,15 @@ window.readActivitySubmissionForm = function() {
     const dTime = document.getElementById('sub-deadline-time')?.value || '';
     deadlineAt = parseVietnameseDateTimeToIso(dDate, dTime);
     if (!deadlineAt) throw new Error('Hạn nộp bài không hợp lệ. Vui lòng nhập ngày DD/MM/YYYY và giờ HH:mm.');
+  }
+  const activityStart = document.getElementById('activity-form-start-date')?.value || '';
+  const activityStartTime = document.getElementById('activity-form-start-time')?.value || '';
+  const effectiveOpen = openAt || (activityStart ? parseVietnameseDateTimeToIso(activityStart, activityStartTime || '00:00') : null);
+  const activityEnd = document.getElementById('activity-form-end-date')?.value || '';
+  const activityEndTime = document.getElementById('activity-form-end-time')?.value || '';
+  const effectiveClose = deadlineAt || (activityEnd ? parseVietnameseDateTimeToIso(activityEnd, activityEndTime || '23:59') : null);
+  if (effectiveOpen && effectiveClose && new Date(effectiveOpen) > new Date(effectiveClose)) {
+    throw new Error('Giờ bắt đầu nhận bài phải trước hạn chót nhận bài.');
   }
 
   const allowLateSubmission = document.getElementById('sub-allow-late')?.checked === true;
@@ -312,6 +347,8 @@ window.readActivitySubmissionForm = function() {
     maxFiles,
     maxFileSizeMB,
     maxAttempts,
+    openMode,
+    openAt,
     deadlineMode,
     deadlineAt,
     allowLateSubmission,
@@ -367,7 +404,9 @@ window.getEffectiveSubmissionRules = function(studentId, activity, round) {
 
   // Time status
   const now = new Date();
-  const startAt = activity?.startAt ? new Date(activity.startAt) : null;
+  const startAt = cfg.openMode === 'custom' && cfg.openAt
+    ? new Date(cfg.openAt)
+    : (activity?.startAt ? new Date(activity.startAt) : null);
   const isNotStarted = startAt ? (now < startAt) : false;
   const isPastDeadline = effectiveDeadline ? (now > effectiveDeadline) : false;
   const isNearDeadline = effectiveDeadline && !isPastDeadline && ((effectiveDeadline - now) <= 24 * 3600 * 1000);
@@ -385,6 +424,7 @@ window.getEffectiveSubmissionRules = function(studentId, activity, round) {
     totalAllowedAttempts,
     completedAttempts,
     remainingAttempts,
+    startAt,
     isNotStarted,
     isPastDeadline,
     isNearDeadline,

@@ -256,7 +256,31 @@ window.validateFileSubmission = function(files, student, activity, round) {
 };
 
 // 6. STUDENT SUBMISSION PANEL RENDERING IN TIMELINE CARD
+window.refreshStudentMilestoneCountdowns = function() {
+  document.querySelectorAll('[data-student-countdown-at]').forEach(node => {
+    const target = new Date(node.dataset.studentCountdownAt);
+    if (!Number.isFinite(target.getTime())) return;
+    const remaining = target.getTime() - Date.now();
+    if (remaining <= 0) {
+      node.textContent = node.dataset.studentCountdownDone || 'Đã đến hạn';
+      return;
+    }
+    const seconds = Math.floor(remaining / 1000);
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    node.textContent = `Còn ${days} ngày ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  });
+};
+
+function ensureStudentMilestoneCountdownClock() {
+  if (window._studentMilestoneCountdownClock) return;
+  window._studentMilestoneCountdownClock = window.setInterval(refreshStudentMilestoneCountdowns, 1000);
+}
+
 window.renderStudentSubmissionPanel = function(act, round) {
+  ensureStudentMilestoneCountdownClock();
   const userMssv = state.userStudentId || (state.user?.email ? state.user.email.split('@')[0] : '');
   const targetStudent =
     (round?.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
@@ -288,6 +312,10 @@ window.renderStudentSubmissionPanel = function(act, round) {
   }
 
   const deadlineStr = rules.effectiveDeadline ? fmtIsoToVietnameseDateTime(rules.effectiveDeadline.toISOString()) : 'Không giới hạn';
+  const eventCountdown = act.startAt && Number.isFinite(new Date(act.startAt).getTime())
+    ? `<div>📅 Ngày duyệt: <strong data-student-countdown-at="${escapeHtml(new Date(act.startAt).toISOString())}" data-student-countdown-done="Đã đến ngày duyệt">Đang tính…</strong></div>` : '';
+  const deadlineCountdown = rules.effectiveDeadline && Number.isFinite(rules.effectiveDeadline.getTime())
+    ? `<div>⏳ Kết thúc nhận bài: <strong data-student-countdown-at="${escapeHtml(rules.effectiveDeadline.toISOString())}" data-student-countdown-done="Đã hết hạn">Đang tính…</strong></div>` : '';
 
   const acceptAttr = (cfg.acceptedExtensions || ['pdf']).map(e => '.' + e.replace(/^\./, '')).join(',');
   const isMultiple = (cfg.maxFiles || 1) > 1;
@@ -344,6 +372,8 @@ window.renderStudentSubmissionPanel = function(act, round) {
         </div>
         ${statusBadge}
       </div>
+
+      ${(eventCountdown || deadlineCountdown) ? `<div class="grid gap-1 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 sm:grid-cols-2" aria-live="off">${eventCountdown}${deadlineCountdown}</div>` : ''}
 
       <!-- Constraints notice -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-white p-2.5 rounded-xl border border-slate-200/80">

@@ -159,6 +159,11 @@ function renderTimelineWeekEvents(events = [], weekNumber = null, roundId = null
 }
 
 window.closeStudentTimelineEvent = function() {
+  const mount = window._studentTimelineSubmissionMount;
+  if (mount?.panel && mount.parent?.isConnected) {
+    mount.parent.insertBefore(mount.panel, mount.nextSibling?.parentNode === mount.parent ? mount.nextSibling : null);
+  }
+  window._studentTimelineSubmissionMount = null;
   document.getElementById('student-timeline-event-dialog')?.remove();
 };
 
@@ -168,6 +173,8 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
   if (!event) return;
   window.closeStudentTimelineEvent();
   const activity = event.activity;
+  const submissionRound = (state.rounds || []).find(round => round.id === (roundId || state.selectedRoundId));
+  const showSubmission = Boolean(activity?.submissionEnabled && submissionRound && typeof renderStudentSubmissionPanel === 'function');
   const details = activity?.descriptionHtml
     ? sanitizeRichHtml(activity.descriptionHtml)
     : escapeHtml(activity?.description || '').replace(/\n/g, '<br>');
@@ -188,9 +195,23 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
       ${activity?.location ? `<div class="flex items-start gap-3"><span aria-hidden="true">📍</span> <span>${escapeHtml(activity.location)}</span></div>` : ''}
       ${activity?.isTentative ? '<div class="text-amber-700 font-semibold text-xs sm:text-sm">⚠️ Thời gian dự kiến</div>' : ''}
     </div>
-    ${details ? `<div class="student-timeline-event-scroll rich-rendered-content mx-5 mt-5 mb-5 border-t border-slate-200 pt-5 text-sm sm:text-base leading-relaxed text-slate-800 sm:mx-8 sm:mb-7">${details}</div>` : ''}
+    <div class="student-timeline-event-scroll mx-5 mt-5 mb-5 border-t border-slate-200 pt-5 sm:mx-8 sm:mb-7">
+      ${details ? `<div class="rich-rendered-content text-sm sm:text-base leading-relaxed text-slate-800">${details}</div>` : ''}
+      ${showSubmission ? '<div id="student-timeline-submission-slot" class="mt-5"></div>' : ''}
+    </div>
   </div>`;
   document.body.appendChild(dialog);
+  if (showSubmission) {
+    const slot = dialog.querySelector('#student-timeline-submission-slot');
+    const existing = document.getElementById('sub-panel-' + activity.id);
+    if (existing) {
+      window._studentTimelineSubmissionMount = { panel: existing, parent: existing.parentNode, nextSibling: existing.nextSibling };
+      slot.appendChild(existing);
+    } else {
+      slot.innerHTML = renderStudentSubmissionPanel(activity, submissionRound);
+    }
+    refreshStudentMilestoneCountdowns?.();
+  }
   dialog.querySelector('button')?.focus();
 };
 
