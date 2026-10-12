@@ -147,17 +147,28 @@ export function checkCouncilAuthorization(round, act, council, user) {
       }
 
       if (isMatch) {
-        const memberRole = String(assigned.role || '').toLowerCase();
+        const slotObj = (council?.memberSlots || []).find(s => s.key === slotKey);
+        const memberRole = String(assigned.role || slotObj?.name || slotObj?.label || '').toLowerCase();
         const isMinutesSecretary = /biên bản|bien ban|minutes/.test(`${slotKey} ${memberRole}`);
         const isSec = (slotKey === 'secretary' || slotKey.startsWith('secretary') || memberRole.includes('thư ký') || isMinutesSecretary);
         const isChair = (slotKey === 'chair' || slotKey.startsWith('chair') || String(assigned.role || '').toLowerCase().includes('chủ tịch'));
-        const roleLabel = isChair ? 'Chủ tịch Hội đồng' : (isMinutesSecretary ? 'Thư ký biên bản' : (isSec ? 'Thư ký Hội đồng' : (assigned.role || 'Thành viên Hội đồng')));
+        const roleLabel = assigned.role || slotObj?.name || (isChair ? 'Chủ tịch Hội đồng' : (isMinutesSecretary ? 'Thư ký biên bản' : (isSec ? 'Thư ký Hội đồng' : 'Thành viên Hội đồng')));
+
+        const canScore = (assigned.canScore !== undefined)
+          ? Boolean(assigned.canScore)
+          : (slotObj?.canScore !== undefined ? Boolean(slotObj.canScore) : true);
+
+        const canOperate = (assigned.canOperate !== undefined)
+          ? Boolean(assigned.canOperate)
+          : (slotObj?.canOperate !== undefined ? Boolean(slotObj.canOperate) : (isSec || isChair));
+
         return {
           authorized: true,
           role: slotKey,
           roleName: roleLabel,
           slotKey: slotKey,
-          canScore: true,
+          canScore: canScore,
+          canOperate: canOperate,
           isSecretary: isSec,
           isMinutesSecretary,
           isChair: isChair,
@@ -305,12 +316,20 @@ async function persistCouncilLiveState(round, activityId, councilId) {
 
 export function getRequiredScorers(council, act) {
   const slots = getCouncilMemberSlots(council, act);
-  return slots.filter(s => s.type === 'mandatory');
+  return slots.filter(s => {
+    const assigned = council?.membersBySlot?.[s.key];
+    const canScore = assigned?.canScore !== undefined ? assigned.canScore : (s.canScore !== false);
+    return s.type === 'mandatory' && canScore !== false;
+  });
 }
 
 export function getGuestScorers(council, act) {
   const slots = getCouncilMemberSlots(council, act);
-  return slots.filter(s => s.type === 'guest');
+  return slots.filter(s => {
+    const assigned = council?.membersBySlot?.[s.key];
+    const canScore = assigned?.canScore !== undefined ? assigned.canScore : (s.canScore !== false);
+    return s.type === 'guest' && canScore !== false;
+  });
 }
 
 // 3. COUNCIL WORKSPACE OPEN & REAL-TIME LISTENER
@@ -670,7 +689,7 @@ function renderCouncilWorkspaceFull() {
   // Session Controls (Secretary / Chair / Admin)
   const sessionControls = document.getElementById('cws-session-controls');
   if (sessionControls) {
-    if (auth.isAdmin || auth.isSecretary || auth.isChair) {
+    if (auth.isAdmin || auth.isSecretary || auth.isChair || auth.canOperate) {
       sessionControls.classList.remove('hidden');
       sessionControls.classList.add('flex');
       const startBtn = document.getElementById('btn-start-council-session');
@@ -680,7 +699,7 @@ function renderCouncilWorkspaceFull() {
       const cStat = council.status || 'preparing';
       const mayEnd = Boolean(auth.isAdmin || auth.isChair);
 
-      if (startBtn) startBtn.classList.toggle('hidden', cStat !== 'preparing' || (!auth.isAdmin && !auth.isSecretary && !auth.isChair));
+      if (startBtn) startBtn.classList.toggle('hidden', cStat !== 'preparing' || (!auth.isAdmin && !auth.isSecretary && !auth.isChair && !auth.canOperate));
       const showEnd = mayEnd && (cStat === 'active' || cStat === 'ongoing');
       document.getElementById('cws-end-session-footer')?.classList.toggle('hidden', !showEnd);
       if (endBtn) endBtn.classList.toggle('hidden', !showEnd);
@@ -913,7 +932,7 @@ window.toggleCouncilStatusDetails = function() {
 
 window.toggleCouncilTimerSettings = function(forceOpen) {
   const auth = state.activeCouncilWorkspace?.auth;
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) return;
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) return;
   const panel = document.getElementById('cws-timer-settings');
   const trigger = document.getElementById('cws-header-timer-pill');
   if (!panel) return;
@@ -931,7 +950,7 @@ window.toggleCouncilTimerSettings = function(forceOpen) {
 
 window.saveCouncilTimerSettings = async function() {
   const auth = state.activeCouncilWorkspace?.auth;
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) return;
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) return;
   const duration = Number(document.getElementById('cws-timer-duration-input')?.value);
   const shortAdd = Number(document.getElementById('cws-timer-short-add-input')?.value);
   const longAdd = Number(document.getElementById('cws-timer-long-add-input')?.value);
@@ -959,7 +978,7 @@ window.saveCouncilTimerSettings = async function() {
 
 window.previewCouncilTimerSound = function() {
   const auth = state.activeCouncilWorkspace?.auth;
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) return;
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) return;
   unlockCouncilAudio();
   stopCouncilTimerAlarm();
   councilAlarmDismissed = false;
@@ -977,7 +996,7 @@ export function renderPresentationTimerUI() {
   if (!display) return;
 
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
-  const isManager = Boolean(auth?.isAdmin || auth?.isSecretary || auth?.isChair);
+  const isManager = Boolean(auth?.isAdmin || auth?.isSecretary || auth?.isChair || auth?.canOperate);
 
   state.councilTimer = state.councilTimer || {
     intervalId: null,
@@ -1058,8 +1077,8 @@ export function renderPresentationTimerUI() {
 
 window.onTimerDurationSelectChange = function(val) {
   const auth = state.activeCouncilWorkspace?.auth;
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ người có quyền điều hành Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
     return;
   }
   if (val === 'custom') {
@@ -1071,8 +1090,8 @@ window.onTimerDurationSelectChange = function(val) {
 
 window.promptCustomPresentationTimer = async function() {
   const auth = state.activeCouncilWorkspace?.auth;
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ người có quyền điều hành Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
     return;
   }
   toggleCouncilTimerSettings(true);
@@ -1081,8 +1100,8 @@ window.promptCustomPresentationTimer = async function() {
 
 window.setCustomPresentationTimer = async function(mins) {
   const auth = state.activeCouncilWorkspace?.auth;
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ người có quyền điều hành Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
     return;
   }
   const sec = mins * 60;
@@ -1101,8 +1120,8 @@ window.setCustomPresentationTimer = async function(mins) {
 
 window.promptCustomAddTimerMinutes = async function() {
   const auth = state.activeCouncilWorkspace?.auth;
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ người có quyền điều hành Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
     return;
   }
   toggleCouncilTimerSettings(true);
@@ -1111,8 +1130,8 @@ window.promptCustomAddTimerMinutes = async function() {
 
 window.togglePresentationTimer = async function() {
   const auth = state.activeCouncilWorkspace?.auth;
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ người có quyền điều hành Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
     return;
   }
   state.councilTimer = state.councilTimer || {
@@ -1155,8 +1174,8 @@ window.togglePresentationTimer = async function() {
 
 window.addPresentationTimerMinutes = async function(mins = 5) {
   const auth = state.activeCouncilWorkspace?.auth;
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ người có quyền điều hành Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
     return;
   }
   state.councilTimer = state.councilTimer || {
@@ -1173,8 +1192,8 @@ window.addPresentationTimerMinutes = async function(mins = 5) {
 
 window.setPresentationTimerPreset = async function(secStr) {
   const auth = state.activeCouncilWorkspace?.auth;
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ người có quyền điều hành Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
     return;
   }
   const sec = parseInt(secStr, 10);
@@ -1194,8 +1213,8 @@ window.setPresentationTimerPreset = async function(secStr) {
 
 window.resetPresentationTimer = async function(shouldBroadcast = true) {
   const auth = state.activeCouncilWorkspace?.auth;
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ người có quyền điều hành Hội đồng mới có quyền điều khiển đồng hồ!', 'warning');
     return;
   }
   state.councilTimer = state.councilTimer || {};
@@ -1238,7 +1257,7 @@ function renderCouncilStudentList() {
     }
   }
 
-  const canReorder = Boolean(auth?.isSecretary || auth?.isChair || auth?.isAdmin);
+  const canReorder = Boolean(auth?.isSecretary || auth?.isChair || auth?.isAdmin || auth?.canOperate);
   const reorderHint = document.getElementById('cws-reorder-hint');
   if (reorderHint) reorderHint.classList.toggle('hidden', !canReorder);
 
@@ -2342,8 +2361,8 @@ function renderSecretaryControls() {
   const btnWrap = document.getElementById('cws-secretary-buttons');
   if (!container || !btnWrap) return;
 
-  // Only the chair and the two secretary roles see the persistent presentation toolbar.
-  if (auth?.role === 'admin' || (!auth?.isSecretary && !auth?.isChair)) {
+  // Only the chair, secretary roles, or assigned operators see the persistent presentation toolbar.
+  if (auth?.role === 'admin' || (!auth?.isSecretary && !auth?.isChair && !auth?.canOperate)) {
     container.classList.add('hidden');
     return;
   }
@@ -2398,8 +2417,8 @@ function renderSecretaryControls() {
 
 window.startStudentPresentation = async function(targetSid) {
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Thư ký hoặc Chủ tịch Hội đồng mới có quyền điều hành lượt báo cáo!', 'warning');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ người có quyền điều hành Hội đồng mới có quyền điều hành lượt báo cáo!', 'warning');
     return;
   }
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
@@ -2442,7 +2461,7 @@ window.startStudentPresentation = async function(targetSid) {
 
 window.advanceCouncilPresentation = async function() {
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) return;
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) return;
   const round = (state.rounds || []).find(r => r.id === roundId);
   const act = (round?.activities || []).find(a => a.id === activityId);
   const council = (act?.councils || []).find(c => c.id === councilId);
@@ -2470,8 +2489,8 @@ window.advanceCouncilPresentation = async function() {
 
 window.finishStudentPresentation = async function(sid) {
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Thư ký hoặc Chủ tịch Hội đồng mới có quyền điều hành lượt báo cáo!', 'warning');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ người có quyền điều hành Hội đồng mới có quyền điều hành lượt báo cáo!', 'warning');
     return;
   }
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
@@ -2496,8 +2515,8 @@ window.finishStudentPresentation = async function(sid) {
 
 window.resetStudentPresentation = async function(sid) {
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Thư ký hoặc Chủ tịch Hội đồng mới có quyền điều hành lượt báo cáo!', 'warning');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ người có quyền điều hành Hội đồng mới có quyền điều hành lượt báo cáo!', 'warning');
     return;
   }
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
@@ -2524,8 +2543,8 @@ window.resetStudentPresentation = async function(sid) {
 // 9. COUNCIL SESSION CONTROLS (START / END)
 window.startCouncilSession = async function() {
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
-  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair) {
-    showToast('Chỉ Chủ tịch hoặc Thư ký Hội đồng mới có quyền bắt đầu phiên làm việc!', 'error');
+  if (!auth?.isAdmin && !auth?.isSecretary && !auth?.isChair && !auth?.canOperate) {
+    showToast('Chỉ Ban điều hành Hội đồng mới có quyền bắt đầu phiên làm việc!', 'error');
     return;
   }
   const targetRound = (state.rounds || []).find(r => r.id === roundId);

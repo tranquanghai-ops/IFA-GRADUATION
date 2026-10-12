@@ -3,10 +3,40 @@
  */
 let councilFormSlots = [];
 function setCouncilFormSlots(council, act) {
-  councilFormSlots = (Array.isArray(council?.memberSlots) ? council.memberSlots : (act.councilStructure?.slots || [])).map(slot => ({ ...slot }));
+  const existingSlots = Array.isArray(council?.memberSlots) ? council.memberSlots : (act.councilStructure?.slots || []);
+  councilFormSlots = existingSlots.map(slot => {
+    const mem = council?.membersBySlot?.[slot.key];
+    const isChair = slot.key === 'chair' || slot.key.startsWith('chair');
+    const isSec = slot.key === 'secretary' || slot.key.startsWith('secretary');
+    const canScore = (mem?.canScore !== undefined)
+      ? Boolean(mem.canScore)
+      : (slot.canScore !== undefined ? Boolean(slot.canScore) : true);
+    const canOperate = (mem?.canOperate !== undefined)
+      ? Boolean(mem.canOperate)
+      : (slot.canOperate !== undefined ? Boolean(slot.canOperate) : (isChair || isSec));
+    const roleName = mem?.role || slot.name || slot.label || (isChair ? 'Chủ tịch Hội đồng' : (isSec ? 'Thư ký Hội đồng' : 'Ủy viên'));
+    return {
+      ...slot,
+      name: roleName,
+      label: roleName,
+      canScore,
+      canOperate
+    };
+  });
+
   Object.entries(council?.membersBySlot || {}).forEach(([key, member]) => {
     if (!councilFormSlots.some(slot => slot.key === key)) {
-      councilFormSlots.push({ key, label: member.role || 'Thành viên', name: member.role || 'Thành viên Hội đồng', type: member.type === 'guest' ? 'guest' : 'mandatory', removable: true });
+      const isChair = key === 'chair' || key.startsWith('chair');
+      const isSec = key === 'secretary' || key.startsWith('secretary');
+      councilFormSlots.push({
+        key,
+        label: member.role || 'Thành viên',
+        name: member.role || 'Thành viên Hội đồng',
+        type: member.type === 'guest' ? 'guest' : 'mandatory',
+        removable: true,
+        canScore: member.canScore !== undefined ? Boolean(member.canScore) : true,
+        canOperate: member.canOperate !== undefined ? Boolean(member.canOperate) : (isChair || isSec)
+      });
     }
   });
 }
@@ -234,6 +264,22 @@ function getCurrentCouncilFormMembers(act) {
   const currentMembers = {};
   slots.forEach(s => {
     const isGuest = document.getElementById(`chk-guest-${s.key}`)?.checked === true;
+    const canScore = document.getElementById(`chk-score-${s.key}`)
+      ? document.getElementById(`chk-score-${s.key}`).checked
+      : (s.canScore !== false);
+    const canOperate = document.getElementById(`chk-operate-${s.key}`)
+      ? document.getElementById(`chk-operate-${s.key}`).checked
+      : Boolean(s.canOperate);
+    const customRoleName = document.getElementById(`slot-role-name-${s.key}`)?.value?.trim()
+      || s.name
+      || s.label
+      || (s.key === 'chair' ? 'Chủ tịch' : (s.key === 'secretary' ? 'Thư ký' : 'Ủy viên'));
+
+    s.name = customRoleName;
+    s.label = customRoleName;
+    s.canScore = canScore;
+    s.canOperate = canOperate;
+
     if (isGuest) {
       currentMembers[s.key] = {
         type: 'guest',
@@ -241,8 +287,10 @@ function getCurrentCouncilFormMembers(act) {
         memberName: document.getElementById(`slot-guest-name-${s.key}`)?.value?.trim() || '',
         memberEmail: document.getElementById(`slot-guest-email-${s.key}`)?.value?.trim().toLowerCase() || '',
         organization: document.getElementById(`slot-guest-org-${s.key}`)?.value?.trim() || '',
-        role: s.label || s.name || 'Khách mời',
-        slotKey: s.key
+        role: customRoleName,
+        slotKey: s.key,
+        canScore,
+        canOperate
       };
     } else {
       const supId = document.getElementById(`slot-sup-${s.key}`)?.value || '';
@@ -250,8 +298,10 @@ function getCurrentCouncilFormMembers(act) {
         type: 'internal',
         isExternalGuest: false,
         memberId: supId,
-        role: s.label || s.name || 'Ủy viên',
-        slotKey: s.key
+        role: customRoleName,
+        slotKey: s.key,
+        canScore,
+        canOperate
       };
     }
   });
@@ -270,17 +320,29 @@ window.quickAddCouncilMemberSlot = function(kind = 'internal') {
   const memberSlots = councilFormSlots.filter(s => s.key.startsWith('member') || (s.label && s.label.includes('Ủy viên')));
   const nextNumber = memberSlots.length + 1;
   const newKey = `member_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 5)}`;
+  const defaultTitle = kind === 'guest' ? `Khách mời (${nextNumber})` : `Ủy viên Hội đồng (${nextNumber})`;
 
   councilFormSlots.push({
     key: newKey,
-    label: kind === 'guest' ? 'Khách mời' : 'Ủy viên',
-    name: kind === 'guest' ? `Khách mời (${nextNumber})` : `Ủy viên Hội đồng (${nextNumber})`,
+    label: defaultTitle,
+    name: defaultTitle,
     type: kind === 'guest' ? 'guest' : 'mandatory',
-    removable: true
+    removable: true,
+    canScore: true,
+    canOperate: false
   });
 
   renderCouncilMembersFormSlots(act, currentMembers);
-  showToast('Đã thêm thành viên cho riêng hội đồng này.', 'success');
+  showToast(`Đã thêm vị trí ${kind === 'guest' ? 'khách mời' : 'thành viên'}. Bạn có thể chỉnh sửa vai trò và quyền hạn tương ứng.`, 'success');
+
+  const container = document.getElementById('council-members-form-container');
+  if (container) {
+    setTimeout(() => {
+      container.scrollTop = container.scrollHeight;
+      const roleInput = document.getElementById(`slot-role-name-${newKey}`);
+      if (roleInput) roleInput.focus();
+    }, 60);
+  }
 };
 
 window.quickRemoveCouncilMemberSlot = function(slotKey) {
@@ -329,6 +391,19 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
     const isGuest = (assigned.type === 'guest') || (!assigned.type && s.type === 'guest');
     const isRemovable = Boolean(s.removable || s.type === 'optional' || s.type === 'guest' || s.key.startsWith('member_'));
 
+    const isChair = s.key === 'chair' || s.key.startsWith('chair');
+    const isSec = s.key === 'secretary' || s.key.startsWith('secretary');
+
+    const canScore = (assigned.canScore !== undefined)
+      ? Boolean(assigned.canScore)
+      : (s.canScore !== undefined ? Boolean(s.canScore) : true);
+
+    const canOperate = (assigned.canOperate !== undefined)
+      ? Boolean(assigned.canOperate)
+      : (s.canOperate !== undefined ? Boolean(s.canOperate) : (isChair || isSec));
+
+    const roleTitle = assigned.role || s.name || s.label || (isChair ? 'Chủ tịch Hội đồng' : (isSec ? 'Thư ký Hội đồng' : 'Ủy viên'));
+
     // Filter supervisors who are not busy in overlapping councils (or already assigned in this specific slot)
     const availableSupervisors = supervisors.filter(sup => {
       if (memberId && sup.id === memberId) return true;
@@ -337,18 +412,38 @@ function renderCouncilMembersFormSlots(act, membersBySlot = {}) {
     });
 
     return `
-      <div class="p-2.5 bg-white border border-slate-200 rounded-xl space-y-1.5" id="slot-container-${s.key}">
-        <div class="flex items-center justify-between">
-          <label class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
-            <span>👤</span> ${s.name || s.label} <span class="text-indigo-600 font-mono text-[10px]">(${s.label || s.key})</span>
-          </label>
-          <div class="flex items-center gap-2">
-            <label class="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer">
-              <input type="checkbox" id="chk-guest-${s.key}" ${isGuest ? 'checked' : ''} onchange="toggleSlotGuestInput('${s.key}', this.checked)" class="rounded text-tdtu-blue">
-              <span>Khách mời ngoài</span>
+      <div class="p-2.5 bg-white border border-slate-200 rounded-xl space-y-2 shadow-2xs" id="slot-container-${s.key}">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="flex items-center gap-1.5 flex-1 min-w-[200px]">
+            <span class="text-sm shrink-0">👤</span>
+            <input type="text" id="slot-role-name-${s.key}" value="${escapeHtml(roleTitle)}"
+              placeholder="Tên vai trò..."
+              title="Nhấp để sửa tên vai trò (VD: Thư ký biên bản, SV hỗ trợ bấm máy, Người phản biện...)"
+              class="font-bold text-slate-800 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-lg px-2 py-1 w-full max-w-[220px] sm:max-w-[240px] focus:ring-2 focus:ring-indigo-100 focus:outline-none transition-all">
+            <span class="text-[10px] text-slate-400 font-mono shrink-0">(${s.key})</span>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap text-[11px]">
+            <!-- Checkbox Chấm điểm -->
+            <label class="flex items-center gap-1 cursor-pointer font-medium select-none text-slate-700 hover:text-indigo-700 transition-colors" title="Cho phép thành viên này chấm điểm đánh giá sinh viên">
+              <input type="checkbox" id="chk-score-${s.key}" ${canScore ? 'checked' : ''} class="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5">
+              <span class="text-[11px] ${canScore ? 'font-bold text-indigo-900' : 'text-slate-500'}">Chấm điểm</span>
             </label>
+
+            <!-- Checkbox Bấm giờ / Bắt đầu -->
+            <label class="flex items-center gap-1 cursor-pointer font-medium select-none text-slate-700 hover:text-emerald-700 transition-colors" title="Cho phép bấm giờ, bắt đầu lượt, chuyển sinh viên trình bày">
+              <input type="checkbox" id="chk-operate-${s.key}" ${canOperate ? 'checked' : ''} class="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5">
+              <span class="text-[11px] ${canOperate ? 'font-bold text-emerald-900' : 'text-slate-500'}">Bấm giờ & Bắt đầu</span>
+            </label>
+
+            <!-- Checkbox Khách mời -->
+            <label class="flex items-center gap-1 text-slate-500 cursor-pointer select-none text-[11px]" title="Chuyển sang hình thức khách mời ngoài">
+              <input type="checkbox" id="chk-guest-${s.key}" ${isGuest ? 'checked' : ''} onchange="toggleSlotGuestInput('${s.key}', this.checked)" class="rounded text-tdtu-blue w-3.5 h-3.5">
+              <span>Khách ngoài</span>
+            </label>
+
             ${isRemovable ? `
-              <button type="button" onclick="quickRemoveCouncilMemberSlot('${s.key}')" class="text-rose-500 hover:text-rose-700 font-bold text-xs p-0.5" title="Xóa vị trí này">✕</button>
+              <button type="button" onclick="quickRemoveCouncilMemberSlot('${s.key}')" class="text-rose-500 hover:text-rose-700 active:scale-95 font-bold text-xs p-1 rounded-md hover:bg-rose-50 transition-all cursor-pointer" title="Xóa vị trí này">✕</button>
             ` : ''}
           </div>
         </div>
@@ -477,17 +572,33 @@ window.saveCouncil = async function(e) {
   slots.forEach(s => {
     if (emailError) return;
     const isGuest = document.getElementById(`chk-guest-${s.key}`)?.checked === true;
+    const canScore = document.getElementById(`chk-score-${s.key}`)
+      ? document.getElementById(`chk-score-${s.key}`).checked
+      : (s.canScore !== false);
+    const canOperate = document.getElementById(`chk-operate-${s.key}`)
+      ? document.getElementById(`chk-operate-${s.key}`).checked
+      : Boolean(s.canOperate);
+    const roleTitle = document.getElementById(`slot-role-name-${s.key}`)?.value?.trim()
+      || s.name
+      || s.label
+      || (s.key === 'chair' ? 'Chủ tịch' : (s.key === 'secretary' ? 'Thư ký' : 'Ủy viên'));
+
+    s.name = roleTitle;
+    s.label = roleTitle;
+    s.canScore = canScore;
+    s.canOperate = canOperate;
+
     if (isGuest) {
       const gName = document.getElementById(`slot-guest-name-${s.key}`)?.value?.trim();
       const gEmail = document.getElementById(`slot-guest-email-${s.key}`)?.value?.trim().toLowerCase();
       const gOrg = document.getElementById(`slot-guest-org-${s.key}`)?.value?.trim();
       if (gName || gEmail) {
         if (!gName) {
-          emailError = `Vui lòng nhập họ và tên khách mời cho vị trí "${s.name || s.label}"`;
+          emailError = `Vui lòng nhập họ và tên khách mời cho vị trí "${roleTitle}"`;
           return;
         }
         if (!gEmail) {
-          emailError = `Email là bắt buộc đối với khách mời "${gName}" (${s.name || s.label})`;
+          emailError = `Email là bắt buộc đối với khách mời "${gName}" (${roleTitle})`;
           return;
         }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -512,8 +623,10 @@ window.saveCouncil = async function(e) {
           memberName: gName,
           memberEmail: gEmail,
           organization: gOrg || '',
-          role: s.label || s.name || 'Khách mời',
-          slotKey: s.key
+          role: roleTitle,
+          slotKey: s.key,
+          canScore,
+          canOperate
         };
       }
     } else {
@@ -540,8 +653,10 @@ window.saveCouncil = async function(e) {
           memberName: supObj?.name || 'Giảng viên',
           memberEmail: sEmail,
           department: supObj?.department || '',
-          role: s.label || s.name || 'Ủy viên',
-          slotKey: s.key
+          role: roleTitle,
+          slotKey: s.key,
+          canScore,
+          canOperate
         };
       }
     }
@@ -765,11 +880,30 @@ async function persistActivityCouncilChanges(targetRound) {
     if (activity) {
       const expectedMembers = new Map();
       for (const council of (activity.councils || [])) {
-        for (const [role, member] of Object.entries(council.membersBySlot || {})) {
+        for (const [slotKey, member] of Object.entries(council.membersBySlot || {})) {
           const memberEmail = String(member?.memberEmail || member?.email || '').toLowerCase().trim();
           if (!memberEmail) continue;
           const id = `${activity.id}_${council.id}_${memberEmail}`;
-          expectedMembers.set(id, { roundId, activityId: activity.id, councilId: council.id, memberEmail, role, active: true, updatedAt: new Date().toISOString() });
+          const isChair = slotKey === 'chair' || slotKey.startsWith('chair');
+          const isSec = slotKey === 'secretary' || slotKey.startsWith('secretary');
+          const canOperate = member.canOperate !== undefined ? Boolean(member.canOperate) : (isChair || isSec);
+          const canScore = member.canScore !== undefined ? Boolean(member.canScore) : true;
+          let role = slotKey;
+          if (canOperate && !isChair && !isSec) {
+            role = 'secretary_minutes';
+          }
+          expectedMembers.set(id, {
+            roundId,
+            activityId: activity.id,
+            councilId: council.id,
+            memberEmail,
+            role,
+            roleTitle: member.role || '',
+            canOperate,
+            canScore,
+            active: true,
+            updatedAt: new Date().toISOString()
+          });
         }
         const chairEmail = String(council.chairEmail || '').toLowerCase().trim();
         if (chairEmail && !expectedMembers.has(`${activity.id}_${council.id}_${chairEmail}`)) {

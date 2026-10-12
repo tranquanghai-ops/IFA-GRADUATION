@@ -123,7 +123,7 @@ test('presentation controls stay in the header and are hidden from ordinary memb
   assert.ok(template.indexOf('id="cws-secretary-actions"') < template.indexOf('id="cws-mobile-tab-bar"'));
   assert.ok(template.indexOf('id="cws-header-timer-container"') < template.indexOf('id="cws-secretary-actions"'));
   assert.doesNotMatch(template, /Điều hành trình bày/);
-  assert.match(workspace, /auth\?\.role === 'admin' \|\| \(!auth\?\.isSecretary && !auth\?\.isChair\)/);
+  assert.match(workspace, /auth\?\.role === 'admin' \|\| \(!auth\?\.isSecretary && !auth\?\.isChair && !auth\?\.canOperate\)/);
   assert.match(styles, /\.cws-header-presentation:not\(\.hidden\) \{ display: flex;/);
 });
 
@@ -201,7 +201,7 @@ test('council workspace supports presentation reordering and personal member ran
   // Presentation reordering
   assert.match(workspace, /window\.moveCouncilStudentPresentationOrder/);
   assert.match(workspace, /window\.moveCouncilStudentPresentationOrderStep/);
-  assert.match(workspace, /canReorder = Boolean\(auth\?\.isSecretary \|\| auth\?\.isChair \|\| auth\?\.isAdmin\)/);
+  assert.match(workspace, /canReorder = Boolean\(auth\?\.isSecretary \|\| auth\?\.isChair \|\| auth\?\.isAdmin \|\| auth\?\.canOperate\)/);
   assert.match(workspace, /presentationOrder: councilStudents\.map/);
   assert.match(workspace, /live\.presentationOrder\.forEach/);
 
@@ -221,5 +221,40 @@ test('council workspace supports presentation reordering and personal member ran
   assert.match(styles, /\.cws-ranking-card-top1/);
   assert.match(styles, /\.cws-ranking-card-top2/);
   assert.match(styles, /\.cws-ranking-card-top3/);
+});
+
+test('council modal buttons are at the bottom and support customizable roles with score and timer permissions', () => {
+  const modal = read('templates/modals/grading/modal-edit-council.html');
+  const editor = read('js/grading/councils-editor.js');
+  const workspace = read('js/grading/rubrics-workspace.js');
+  const scoring = read('js/grading/rubrics-scoring.js');
+
+  // 1. Buttons moved below member list container
+  const containerPos = modal.indexOf('id="council-members-form-container"');
+  const addInternalBtnPos = modal.indexOf("quickAddCouncilMemberSlot('internal')");
+  const addGuestBtnPos = modal.indexOf("quickAddCouncilMemberSlot('guest')");
+  assert.ok(containerPos > 0, 'council members container exists');
+  assert.ok(addInternalBtnPos > containerPos, '+ Thêm giảng viên must be below council members container');
+  assert.ok(addGuestBtnPos > containerPos, '+ Thêm khách mời must be below council members container');
+
+  // 2. Role title editable input & permission checkboxes rendered
+  assert.match(editor, /id="slot-role-name-\$\{s\.key\}"/);
+  assert.match(editor, /id="chk-score-\$\{s\.key\}"/);
+  assert.match(editor, /id="chk-operate-\$\{s\.key\}"/);
+
+  // 3. Persisting custom role and permissions
+  assert.match(editor, /canScore = document\.getElementById\(`chk-score-\$\{s\.key\}`\)/);
+  assert.match(editor, /canOperate = document\.getElementById\(`chk-operate-\$\{s\.key\}`\)/);
+  assert.match(editor, /canOperate = member\.canOperate !== undefined \? Boolean\(member\.canOperate\)/);
+  assert.match(editor, /roleTitle: member\.role \|\| ''/);
+
+  // 4. Workspace enforces permissions
+  // - canScore === false displays non-scoring role notice
+  assert.match(scoring, /Vị trí không tham gia chấm điểm/);
+  assert.match(scoring, /if \(auth\?\.canScore === false\) \{\s*showToast\('Vai trò của bạn không có quyền chấm điểm/);
+
+  // - canOperate === true allows timer & presentation controls
+  assert.match(workspace, /const isManager = Boolean\(auth\?\.isAdmin \|\| auth\?\.isSecretary \|\| auth\?\.isChair \|\| auth\?\.canOperate\);/);
+  assert.match(workspace, /if \(!auth\?\.isAdmin && !auth\?\.isSecretary && !auth\?\.isChair && !auth\?\.canOperate\)/);
 });
 

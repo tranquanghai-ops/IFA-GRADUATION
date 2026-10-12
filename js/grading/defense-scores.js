@@ -102,6 +102,8 @@ export function getOfficialDefenseScore(studentId, council, act, round) {
 
   for (const s of slots) {
     const assigned = membersBySlot[s.key];
+    const canScore = (assigned?.canScore !== undefined) ? Boolean(assigned.canScore) : (s.canScore !== false);
+    if (!canScore) continue;
     const scorerId = getCouncilMemberScorerId(assigned);
     if (!scorerId) continue;
     const scoreKey = `${activityId}_${councilId}_${studentId}_${scorerId}`;

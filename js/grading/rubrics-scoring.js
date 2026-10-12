@@ -39,7 +39,19 @@ function renderScoringSection() {
   const council = (act?.councils || []).find(c => c.id === councilId);
 
   const scoringEnabled = Boolean(act?.scoringConfig?.enabled !== false && (act?.councilEnabled || act?.scoringConfig?.enabled));
-  if (!scoringEnabled) {
+  if (!scoringEnabled || auth?.canScore === false) {
+    if (auth?.canScore === false) {
+      container.classList.remove('hidden');
+      const roleName = auth?.roleName || 'Hỗ trợ Hội đồng';
+      container.innerHTML = `
+        <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center space-y-1.5 my-2">
+          <div class="inline-flex p-2 bg-slate-100 rounded-full text-slate-500 text-lg">📝🚫</div>
+          <h4 class="font-bold text-slate-700 text-xs sm:text-sm">Vị trí không tham gia chấm điểm</h4>
+          <p class="text-[11px] text-slate-500 max-w-md mx-auto">Tài khoản này được phân công vai trò <strong>${typeof escapeHtml === 'function' ? escapeHtml(roleName) : roleName}</strong> (chỉ theo dõi thứ tự, thời gian và sinh viên đang trình bày, không có quyền chấm điểm).</p>
+        </div>
+      `;
+      return;
+    }
     container.classList.add('hidden');
     return;
   }
@@ -331,6 +343,10 @@ window.saveCurrentScore = async function(isCompleted) {
   if (!sid) return;
 
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace;
+  if (auth?.canScore === false) {
+    showToast('Vai trò của bạn không có quyền chấm điểm trong hội đồng này.', 'warning');
+    return;
+  }
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
   const council = (act?.councils || []).find(c => c.id === councilId);
@@ -558,6 +574,10 @@ window.batchFinalizeAllCouncilScores = async function() {
   if (!checkImpersonationWriteGuard('Hoàn tất chấm tất cả sinh viên')) return;
 
   const { roundId, activityId, councilId, auth } = state.activeCouncilWorkspace || {};
+  if (auth?.canScore === false) {
+    showToast('Vai trò của bạn không có quyền chấm điểm trong hội đồng này.', 'warning');
+    return;
+  }
   const targetRound = (state.rounds || []).find(r => r.id === roundId);
   const act = (targetRound?.activities || []).find(a => a.id === activityId);
   const council = (act?.councils || []).find(c => c.id === councilId);
@@ -767,15 +787,16 @@ function renderScorersProgress() {
   const itemsHtml = slots.map(s => {
     const assigned = membersBySlot[s.key];
     const isAssigned = Boolean(assigned && (assigned.memberId || assigned.memberName));
+    const memberCanScore = (assigned?.canScore !== undefined) ? Boolean(assigned.canScore) : (s.canScore !== false);
     const scorerId = getCouncilMemberScorerId(assigned);
     const scoreKey = scorerId ? `${activityId}_${councilId}_${sid}_${scorerId}` : null;
     const score = scoreKey ? state.councilScores?.[scoreKey] : null;
 
     const isMandatory = (s.type === 'mandatory');
-    if (isMandatory && isAssigned) {
+    if (memberCanScore && isMandatory && isAssigned) {
       reqTotal++;
       if (score?.status === 'completed') reqCompleted++;
-    } else if (!isMandatory && isAssigned) {
+    } else if (memberCanScore && !isMandatory && isAssigned) {
       guestTotal++;
       if (score?.status === 'completed') guestCompleted++;
     }
@@ -788,7 +809,9 @@ function renderScorersProgress() {
     const canSeeValue = (auth.isAdmin || isOwnScore || (isCouncilEnded && auth.isChair));
 
     let statusPill = '<span class="text-slate-400 font-mono text-xs">— Chưa chấm</span>';
-    if (!isAssigned) {
+    if (!memberCanScore) {
+      statusPill = '<span class="text-slate-400 italic text-[11px]">Không chấm điểm</span>';
+    } else if (!isAssigned) {
       statusPill = '<span class="text-slate-300 italic text-[11px]">Chưa phân công</span>';
     } else if (score?.status === 'completed') {
       if (canSeeValue) {
@@ -807,9 +830,9 @@ function renderScorersProgress() {
     return `
       <div class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-200 text-xs">
         <div>
-          <span class="font-bold text-slate-800">${s.name || s.label}</span>
+          <span class="font-bold text-slate-800">${assigned?.role || s.name || s.label}</span>
           <span class="text-slate-500 font-normal ml-1">(${assigned?.memberName || 'Chưa phân công'})</span>
-          ${isMandatory ? '<span class="text-rose-500 font-bold ml-1">*</span>' : ''}
+          ${(isMandatory && memberCanScore) ? '<span class="text-rose-500 font-bold ml-1">*</span>' : ''}
         </div>
         <div>${statusPill}</div>
       </div>
