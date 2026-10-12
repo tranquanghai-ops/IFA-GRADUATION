@@ -182,18 +182,35 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
   dialog.id = 'student-timeline-event-dialog';
   dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
-  dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Chi tiết mốc kế hoạch" class="student-timeline-event-panel rounded-2xl sm:rounded-3xl bg-white shadow-2xl">
+  dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Chi tiết mốc kế hoạch" class="student-timeline-event-panel max-w-3xl lg:max-w-4xl rounded-2xl sm:rounded-3xl bg-white shadow-2xl">
     <div class="flex items-start justify-between gap-4 px-5 pt-5 sm:px-8 sm:pt-7">
       <div>
         <div class="text-xs font-black uppercase tracking-wider text-blue-700">${activity ? 'Mốc kế hoạch' : 'Sự kiện trong tuần'}</div>
         <h3 class="mt-1 text-lg sm:text-xl font-black text-slate-900 leading-snug">${escapeHtml(event.title)}</h3>
       </div>
-      <button type="button" onclick="closeStudentTimelineEvent()" class="rounded-xl bg-slate-100 hover:bg-slate-200 px-3.5 py-1.5 text-xl font-bold text-slate-600 transition-colors cursor-pointer shrink-0" aria-label="Đóng">×</button>
+      <div class="flex items-center gap-2 shrink-0">
+        ${showSubmission ? `
+          <button type="button" onclick="scrollToStudentSubmissionSlot()" class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm px-3.5 py-2 shadow-xs transition-colors cursor-pointer" title="Đi đến khu vực nộp bài">
+            <span>📥</span> <span>Nộp bài</span>
+          </button>
+        ` : ''}
+        <button type="button" onclick="closeStudentTimelineEvent()" class="rounded-xl bg-slate-100 hover:bg-slate-200 px-3.5 py-1.5 text-xl font-bold text-slate-600 transition-colors cursor-pointer shrink-0" aria-label="Đóng">×</button>
+      </div>
     </div>
-    <div class="mx-5 mt-4 space-y-2 text-base sm:text-lg font-bold text-slate-900 bg-blue-50/70 p-4 rounded-xl border border-blue-100 sm:mx-8">
+    <div class="mx-5 mt-4 space-y-2.5 text-base sm:text-lg font-bold text-slate-900 bg-blue-50/70 p-4 rounded-xl border border-blue-100 sm:mx-8">
       <div class="flex items-start gap-3"><span aria-hidden="true">🕒</span> <span>${activity ? escapeHtml(fmtActivityTime(activity.startAt, activity.endAt)) : escapeHtml(event.startDate === event.endDate ? event.startDate : `${event.startDate} – ${event.endDate}`)}</span></div>
       ${activity?.location ? `<div class="flex items-start gap-3"><span aria-hidden="true">📍</span> <span>${escapeHtml(activity.location)}</span></div>` : ''}
       ${activity?.isTentative ? '<div class="text-amber-700 font-semibold text-xs sm:text-sm">⚠️ Thời gian dự kiến</div>' : ''}
+      ${(activity?.startAt) ? `
+        <div class="flex items-center gap-2 text-xs sm:text-sm font-semibold text-blue-950 bg-white/90 px-3 py-2 rounded-xl border border-blue-200 shadow-2xs">
+          <span aria-hidden="true" class="text-base">⏳</span>
+          <span>Đếm ngược mốc kế hoạch:</span>
+          <strong data-student-countdown-at="${escapeHtml(new Date(activity.startAt).toISOString())}"
+                  ${activity.endAt ? `data-student-countdown-end-at="${escapeHtml(new Date(activity.endAt).toISOString())}"` : ''}
+                  data-student-countdown-done="${activity.endAt && new Date(activity.endAt).getTime() < Date.now() ? 'Đã kết thúc' : 'Đang diễn ra'}"
+                  class="text-blue-700 font-black text-xs sm:text-sm tracking-wide">Đang tính…</strong>
+        </div>
+      ` : ''}
     </div>
     <div class="student-timeline-event-scroll mx-5 mt-5 mb-5 border-t border-slate-200 pt-5 sm:mx-8 sm:mb-7">
       ${details ? `<div class="rich-rendered-content text-sm sm:text-base leading-relaxed text-slate-800">${details}</div>` : ''}
@@ -210,9 +227,26 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
     } else {
       slot.innerHTML = renderStudentSubmissionPanel(activity, submissionRound);
     }
-    refreshStudentMilestoneCountdowns?.();
   }
+  if (typeof ensureStudentMilestoneCountdownClock === 'function') ensureStudentMilestoneCountdownClock();
+  if (typeof refreshStudentMilestoneCountdowns === 'function') refreshStudentMilestoneCountdowns();
   dialog.querySelector('button')?.focus();
+};
+
+window.scrollToStudentSubmissionSlot = function() {
+  const dialog = document.getElementById('student-timeline-event-dialog');
+  const slot = dialog?.querySelector('#student-timeline-submission-slot') || document.getElementById('student-timeline-submission-slot');
+  if (!slot) return;
+  slot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const panel = slot.querySelector('[id^="sub-panel-"]') || slot;
+  panel.classList.add('ring-4', 'ring-emerald-400/50', 'transition-all');
+  setTimeout(() => {
+    panel.classList.remove('ring-4', 'ring-emerald-400/50');
+  }, 1800);
+  const fileInput = slot.querySelector('input[type="file"]') || slot.querySelector('button');
+  if (fileInput) {
+    try { fileInput.focus(); } catch (e) {}
+  }
 };
 
 window.openStudentTimelineDay = function(weekNumber, dateKey, roundId = null) {

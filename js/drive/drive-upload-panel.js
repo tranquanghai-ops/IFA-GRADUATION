@@ -258,10 +258,19 @@ window.validateFileSubmission = function(files, student, activity, round) {
 // 6. STUDENT SUBMISSION PANEL RENDERING IN TIMELINE CARD
 window.refreshStudentMilestoneCountdowns = function() {
   document.querySelectorAll('[data-student-countdown-at]').forEach(node => {
-    const target = new Date(node.dataset.studentCountdownAt);
+    const atStr = node.dataset.studentCountdownAt;
+    if (!atStr) return;
+    const target = new Date(atStr);
     if (!Number.isFinite(target.getTime())) return;
     const remaining = target.getTime() - Date.now();
     if (remaining <= 0) {
+      if (node.dataset.studentCountdownEndAt) {
+        const endTarget = new Date(node.dataset.studentCountdownEndAt);
+        if (Number.isFinite(endTarget.getTime()) && Date.now() <= endTarget.getTime()) {
+          node.textContent = 'Đang diễn ra';
+          return;
+        }
+      }
       node.textContent = node.dataset.studentCountdownDone || 'Đã đến hạn';
       return;
     }
@@ -278,6 +287,7 @@ function ensureStudentMilestoneCountdownClock() {
   if (window._studentMilestoneCountdownClock) return;
   window._studentMilestoneCountdownClock = window.setInterval(refreshStudentMilestoneCountdowns, 1000);
 }
+window.ensureStudentMilestoneCountdownClock = ensureStudentMilestoneCountdownClock;
 
 window.renderStudentSubmissionPanel = function(act, round) {
   ensureStudentMilestoneCountdownClock();
@@ -312,10 +322,12 @@ window.renderStudentSubmissionPanel = function(act, round) {
   }
 
   const deadlineStr = rules.effectiveDeadline ? fmtIsoToVietnameseDateTime(rules.effectiveDeadline.toISOString()) : 'Không giới hạn';
-  const eventCountdown = act.startAt && Number.isFinite(new Date(act.startAt).getTime())
-    ? `<div>📅 Ngày duyệt: <strong data-student-countdown-at="${escapeHtml(new Date(act.startAt).toISOString())}" data-student-countdown-done="Đã đến ngày duyệt">Đang tính…</strong></div>` : '';
   const deadlineCountdown = rules.effectiveDeadline && Number.isFinite(rules.effectiveDeadline.getTime())
-    ? `<div>⏳ Kết thúc nhận bài: <strong data-student-countdown-at="${escapeHtml(rules.effectiveDeadline.toISOString())}" data-student-countdown-done="Đã hết hạn">Đang tính…</strong></div>` : '';
+    ? `<div class="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-800">
+         <span class="text-base">⏳</span>
+         <span>Kết thúc nhận bài:</span>
+         <strong data-student-countdown-at="${escapeHtml(rules.effectiveDeadline.toISOString())}" data-student-countdown-done="Đã hết hạn" class="text-rose-600 font-black text-xs sm:text-sm tracking-wide">Đang tính…</strong>
+       </div>` : '';
 
   const acceptAttr = (cfg.acceptedExtensions || ['pdf']).map(e => '.' + e.replace(/^\./, '')).join(',');
   const isMultiple = (cfg.maxFiles || 1) > 1;
@@ -373,7 +385,11 @@ window.renderStudentSubmissionPanel = function(act, round) {
         ${statusBadge}
       </div>
 
-      ${(eventCountdown || deadlineCountdown) ? `<div class="grid gap-1 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 sm:grid-cols-2" aria-live="off">${eventCountdown}${deadlineCountdown}</div>` : ''}
+      ${deadlineCountdown ? `
+        <div class="rounded-xl border border-rose-200 bg-rose-50/50 px-3.5 py-2.5 shadow-2xs" aria-live="off">
+          ${deadlineCountdown}
+        </div>
+      ` : ''}
 
       <!-- Constraints notice -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-white p-2.5 rounded-xl border border-slate-200/80">

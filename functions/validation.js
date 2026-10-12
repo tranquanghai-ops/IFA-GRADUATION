@@ -123,9 +123,16 @@ function validateActivity(activity, currentAttempt) {
   const now = new Date();
 
   // Check deadline
-  const deadlineStr = activity.submissionConfig?.deadlineMode === 'custom' && activity.submissionConfig?.deadlineAt
-    ? activity.submissionConfig.deadlineAt
-    : (activity.endAt || activity.submissionDeadline);
+  let deadlineStr = null;
+  if (activity.submissionConfig?.deadlineAt) {
+    deadlineStr = activity.submissionConfig.deadlineAt;
+  } else if (activity.submissionConfig?.deadlineMode === 'custom' && activity.submissionConfig?.deadlineAt) {
+    deadlineStr = activity.submissionConfig.deadlineAt;
+  } else if (activity.submissionConfig?.deadlineMode === 'activity_end' && (activity.endAt || activity.submissionDeadline)) {
+    deadlineStr = activity.endAt || activity.submissionDeadline;
+  } else if (!activity.submissionConfig && (activity.endAt || activity.submissionDeadline)) {
+    deadlineStr = activity.endAt || activity.submissionDeadline;
+  }
 
   const allowLate = Boolean(activity.submissionConfig?.allowLateSubmission);
 
@@ -136,9 +143,18 @@ function validateActivity(activity, currentAttempt) {
     }
   }
 
-  const openAtStr = activity.submissionConfig?.openMode === 'custom' && activity.submissionConfig?.openAt
-    ? activity.submissionConfig.openAt
-    : (activity.startAt || activity.submissionOpenAt);
+  let openAtStr = null;
+  if (activity.submissionConfig?.openMode === 'immediate') {
+    openAtStr = null; // Bắt đầu nhận bài ngay từ lúc này
+  } else if (activity.submissionConfig?.openAt) {
+    openAtStr = activity.submissionConfig.openAt;
+  } else if (activity.submissionConfig?.openMode === 'custom' && activity.submissionConfig?.openAt) {
+    openAtStr = activity.submissionConfig.openAt;
+  } else if (activity.submissionConfig?.openMode === 'activity_start' && (activity.startAt || activity.submissionOpenAt)) {
+    openAtStr = activity.startAt || activity.submissionOpenAt;
+  } else if (!activity.submissionConfig && (activity.startAt || activity.submissionOpenAt)) {
+    openAtStr = activity.startAt || activity.submissionOpenAt;
+  }
   if (openAtStr) {
     const openAt = openAtStr instanceof Date ? openAtStr : new Date(openAtStr);
     if (!isNaN(openAt.getTime()) && now < openAt) {

@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=1.0.1.1">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-blue-100 selection:text-blue-900">
 
@@ -4383,13 +4383,21 @@
             <div id="activity-form-color-options" class="flex flex-wrap gap-2" role="group" aria-label="Màu sự kiện"></div>
           </div>
 
-          <!-- THỜI GIAN THEO CHUẨN VIỆT NAM (DD/MM/YYYY - 24H) -->
+          <!-- KHU VỰC 1: THỜI GIAN DIỄN RA HOẠT ĐỘNG (DD/MM/YYYY - 24H) -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between">
+              <label class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                <span>📅</span> Khu vực 1: Thời gian diễn ra hoạt động
+              </label>
+              <span class="text-[10px] text-slate-500 font-medium">Bảo vệ, hội đồng, họp duyệt...</span>
+            </div>
+          </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <!-- THỜI GIAN BẮT ĐẦU -->
+            <!-- THỜI GIAN BẮT ĐẦU HOẠT ĐỘNG -->
             <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
               <div class="flex items-center justify-between">
                 <label class="font-bold text-slate-700 text-xs flex items-center gap-1.5">
-                  <span>🕒</span> Bắt đầu
+                  <span>🕒</span> Bắt đầu hoạt động
                 </label>
                 <button type="button" onclick="clearActivityDateTime('start')" class="text-[10px] text-slate-400 hover:text-rose-600 font-semibold transition-colors">Xóa</button>
               </div>
@@ -4413,11 +4421,11 @@
               </div>
             </div>
 
-            <!-- THỜI GIAN KẾT THÚC / HẠN CUỐI -->
+            <!-- THỜI GIAN KẾT THÚC HOẠT ĐỘNG -->
             <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
               <div class="flex items-center justify-between">
                 <label class="font-bold text-slate-700 text-xs flex items-center gap-1.5">
-                  <span>🏁</span> Kết thúc / Hạn cuối
+                  <span>🏁</span> Kết thúc hoạt động
                 </label>
                 <button type="button" onclick="clearActivityDateTime('end')" class="text-[10px] text-slate-400 hover:text-rose-600 font-semibold transition-colors">Xóa</button>
               </div>
@@ -4451,6 +4459,40 @@
 
           <!-- RICH TEXT EDITOR CHO "NỘI DUNG / HƯỚNG DẪN CHI TIẾT" -->
           <div>
+            <style>
+              #activity-editor a,
+              #activity-editor a *,
+              .rich-editor-content a,
+              .rich-editor-content a * {
+                color: #2563eb !important;
+                text-decoration: underline !important;
+                text-decoration-color: #2563eb !important;
+                text-underline-offset: 3px !important;
+                font-weight: 600 !important;
+                cursor: pointer !important;
+              }
+              #activity-editor a,
+              .rich-editor-content a {
+                border-bottom: 2px solid #2563eb !important;
+                background-color: rgba(37, 99, 235, 0.08) !important;
+                padding: 1px 5px !important;
+                border-radius: 4px !important;
+              }
+              #activity-editor a:hover,
+              .rich-editor-content a:hover {
+                color: #1d4ed8 !important;
+                border-bottom-color: #1d4ed8 !important;
+                background-color: rgba(37, 99, 235, 0.15) !important;
+              }
+              #activity-editor a:hover *,
+              .rich-editor-content a:hover * {
+                color: #1d4ed8 !important;
+              }
+              .rich-link-tooltip {
+                position: fixed !important;
+                z-index: 999999 !important;
+              }
+            </style>
             <label class="font-bold text-slate-700 block mb-1">Nội dung / Hướng dẫn chi tiết</label>
             
             <!-- Toolbar -->
@@ -4462,7 +4504,7 @@
               <div class="rich-separator"></div>
 
               <!-- Heading / Normal -->
-              <select class="rich-select" onchange="richFormatHeading(this.value); this.value='p';" title="Định dạng đoạn văn / Tiêu đề">
+              <select class="rich-select" onmousedown="captureActivityEditorSelection()" onfocus="captureActivityEditorSelection()" onchange="richFormatHeading(this.value); this.value='p';" title="Định dạng đoạn văn / Tiêu đề">
                 <option value="p">Đoạn văn</option>
                 <option value="h1">Tiêu đề 1 (H1)</option>
                 <option value="h2">Tiêu đề 2 (H2)</option>
@@ -4470,7 +4512,7 @@
               </select>
 
               <!-- Font Size -->
-              <select class="rich-select" onchange="setRichFontSize(this.value); this.value='';" title="Cỡ chữ">
+              <select class="rich-select" onmousedown="captureActivityEditorSelection()" onfocus="captureActivityEditorSelection()" onchange="setRichFontSize(this.value); this.value='';" title="Cỡ chữ">
                 <option value="">Cỡ chữ</option>
                 <option value="10">10px</option>
                 <option value="12">12px</option>
@@ -4522,8 +4564,8 @@
               <div class="rich-separator"></div>
 
               <!-- Link & Clear formatting -->
-              <button type="button" class="rich-btn text-blue-600" onmousedown="event.preventDefault(); captureActivityEditorSelection(); insertRichLink()" title="Chèn liên kết">🔗</button>
-              <button type="button" class="rich-btn text-slate-500" onmousedown="event.preventDefault(); document.execCommand('unlink')" title="Bỏ liên kết">🚫</button>
+              <button type="button" class="rich-btn text-blue-600" onmousedown="event.preventDefault(); captureActivityEditorSelection(); insertRichLink()" title="Chèn / Chỉnh sửa liên kết (Ctrl+K)">🔗</button>
+              <button type="button" class="rich-btn text-slate-500" onmousedown="event.preventDefault(); unlinkRichLink()" title="Gỡ liên kết">🚫</button>
               <button type="button" class="rich-btn text-rose-500" onmousedown="event.preventDefault(); document.execCommand('removeFormat')" title="Xóa định dạng">Tx</button>
             </div>
 
@@ -4614,56 +4656,135 @@
                   </div>
                 </div>
 
-                <!-- Submission window is independent from the event time. -->
-                <div class="space-y-1.5 pt-1">
-                  <label class="font-bold text-slate-800 block">2. Bắt đầu nhận bài:</label>
-                  <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold">
-                    <label class="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="sub_open_mode" value="activity_start" checked onchange="toggleSubCustomOpen(false)">
-                      <span>Theo thời gian bắt đầu mốc</span>
+                <!-- KHU VỰC 2: THỜI GIAN TIẾP NHẬN BÀI NỘP -->
+                <div class="rounded-xl border border-emerald-300 bg-white p-3.5 space-y-3 shadow-2xs">
+                  <div class="flex items-center justify-between flex-wrap gap-1">
+                    <label class="font-bold text-emerald-900 text-xs flex items-center gap-1.5">
+                      <span>⏱️</span> Khu vực 2: Thời gian tiếp nhận bài nộp
                     </label>
-                    <label class="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="sub_open_mode" value="custom" onchange="toggleSubCustomOpen(true)">
-                      <span>Giờ mở nhận bài riêng</span>
-                    </label>
+                    <span class="text-[10px] text-emerald-700 bg-emerald-100 font-semibold px-2 py-0.5 rounded-full">Độc lập với thời gian hoạt động</span>
                   </div>
-                  <div id="sub-custom-open-wrap" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
-                    <label class="text-[11px] font-bold text-slate-600">Ngày mở (DD/MM/YYYY)
-                      <input type="text" id="sub-open-date" placeholder="DD/MM/YYYY" maxlength="10" class="mt-1 w-full rounded-lg border border-slate-300 p-2 font-mono text-xs" oninput="formatDateInput(this)" onblur="validateDateInput(this)">
-                    </label>
-                    <label class="text-[11px] font-bold text-slate-600">Giờ mở (HH:mm)
-                      <input type="text" id="sub-open-time" placeholder="08:00" maxlength="5" class="mt-1 w-full rounded-lg border border-slate-300 p-2 font-mono text-xs" onblur="validateTimeInput(this)">
-                    </label>
-                  </div>
-                </div>
+                  <p class="text-[11px] text-slate-600 leading-relaxed">
+                    Thời gian nhận bài độc lập với thời gian diễn ra hoạt động. Sinh viên chỉ được nộp bài trong khoảng thời gian tiếp nhận được thiết lập.
+                  </p>
+                  
+                  <!-- 2. BẮT ĐẦU NHẬN BÀI -->
+                  <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                    <div class="flex items-center justify-between">
+                      <label class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                        <span>🟢</span> 2. Bắt đầu nhận bài:
+                      </label>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold">
+                      <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="sub_open_mode" value="immediate" checked onchange="toggleSubOpenMode('immediate')">
+                        <span class="text-emerald-800 font-bold">Bắt đầu nhận bài ngay (cho phép SV nộp bài từ lúc này)</span>
+                      </label>
+                      <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="sub_open_mode" value="custom" onchange="toggleSubOpenMode('custom')">
+                        <span class="text-slate-700">Giờ mở nhận bài riêng</span>
+                      </label>
+                      <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="sub_open_mode" value="activity_start" onchange="toggleSubOpenMode('activity_start')">
+                        <span class="text-slate-600">Theo thời gian bắt đầu mốc</span>
+                      </label>
+                    </div>
 
-                <!-- 3. Deadline mode -->
-                <div class="space-y-1.5 pt-1">
-                  <label class="font-bold text-slate-800 block">3. Hạn chót nhận bài:</label>
-                  <div class="flex items-center gap-4 text-xs font-semibold">
-                    <label class="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="sub_deadline_mode" value="activity_end" checked onchange="toggleSubCustomDeadline(false)">
-                      <span>Theo thời gian kết thúc mốc</span>
-                    </label>
-                    <label class="flex items-center gap-1.5 cursor-pointer">
-                      <input type="radio" name="sub_deadline_mode" value="custom" onchange="toggleSubCustomDeadline(true)">
-                      <span>Hạn riêng cho nộp bài</span>
+                    <!-- Khung nhập ngày giờ mở nhận bài riêng -->
+                    <div id="sub-custom-open-wrap" class="hidden pt-1">
+                      <div class="p-2.5 bg-white border border-emerald-300 rounded-xl space-y-1.5">
+                        <div class="flex items-center justify-between">
+                          <span class="text-[11px] font-bold text-slate-700">Thiết lập ngày & giờ bắt đầu mở nhận bài:</span>
+                          <button type="button" onclick="clearActivitySubmissionDateTime('open')" class="text-[10px] text-slate-400 hover:text-rose-600 font-semibold transition-colors">Xóa</button>
+                        </div>
+                        <div class="grid grid-cols-5 gap-1.5">
+                          <div class="col-span-3">
+                            <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Ngày (DD/MM/YYYY):</span>
+                            <div class="relative flex items-center">
+                              <input type="text" id="sub-open-date" placeholder="10/10/2026" maxlength="10"
+                                class="w-full p-2 border border-slate-300 rounded-l-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono"
+                                oninput="formatDateInput(this)" onblur="validateDateInput(this)">
+                              <button type="button" onclick="openActivitySubmissionDatePicker('open')" class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch" aria-label="Chọn ngày bắt đầu nhận bài từ lịch">📅</button>
+                              <input type="date" id="sub-open-date-picker" tabindex="-1" class="absolute h-px w-px opacity-0 pointer-events-none" onchange="syncActivitySubmissionPickerToDateInput('open', this.value)">
+                            </div>
+                          </div>
+                          <div class="col-span-2">
+                            <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Giờ (24h):</span>
+                            <input type="text" id="sub-open-time" placeholder="08:00" maxlength="5"
+                              class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono font-bold"
+                              onblur="validateTimeInput(this)">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Gợi ý chế độ nhận bài ngay -->
+                    <div id="sub-open-immediate-note" class="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2 font-medium">
+                      ✓ <strong>Bắt đầu nhận bài ngay:</strong> Sinh viên có thể nộp bài ngay từ thời điểm này (khi mốc được lưu/công bố) mà không cần chờ đến ngày diễn ra hoạt động.
+                    </div>
+
+                    <!-- Gợi ý chế độ theo thời gian bắt đầu mốc -->
+                    <div id="sub-open-activity-start-note" class="hidden text-[11px] text-slate-600 bg-slate-100 border border-slate-200 rounded-lg p-2 font-medium">
+                      ℹ️ <strong>Theo thời gian bắt đầu mốc:</strong> Hệ thống tự động mở nhận bài đúng vào thời gian bắt đầu hoạt động đã thiết lập ở Khu vực 1.
+                    </div>
+                  </div>
+
+                  <!-- 3. HẠN CHÓT NHẬN BÀI -->
+                  <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                    <div class="flex items-center justify-between">
+                      <label class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                        <span>🔴</span> 3. Hạn chót nhận bài:
+                      </label>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold">
+                      <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="sub_deadline_mode" value="custom" checked onchange="toggleSubDeadlineMode('custom')">
+                        <span class="text-rose-800 font-bold">Hạn riêng cho nộp bài</span>
+                      </label>
+                      <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name="sub_deadline_mode" value="activity_end" onchange="toggleSubDeadlineMode('activity_end')">
+                        <span class="text-slate-600">Theo thời gian kết thúc mốc</span>
+                      </label>
+                    </div>
+
+                    <!-- Khung nhập hạn chót riêng -->
+                    <div id="sub-custom-deadline-wrap" class="pt-1">
+                      <div class="p-2.5 bg-white border border-rose-200 rounded-xl space-y-1.5">
+                        <div class="flex items-center justify-between">
+                          <span class="text-[11px] font-bold text-slate-700">Thiết lập ngày & giờ hạn chót nộp bài:</span>
+                          <button type="button" onclick="clearActivitySubmissionDateTime('deadline')" class="text-[10px] text-slate-400 hover:text-rose-600 font-semibold transition-colors">Xóa</button>
+                        </div>
+                        <div class="grid grid-cols-5 gap-1.5">
+                          <div class="col-span-3">
+                            <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Ngày hết hạn (DD/MM/YYYY):</span>
+                            <div class="relative flex items-center">
+                              <input type="text" id="sub-deadline-date" placeholder="15/10/2026" maxlength="10"
+                                class="w-full p-2 border border-slate-300 rounded-l-xl text-xs bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none font-mono"
+                                oninput="formatDateInput(this)" onblur="validateDateInput(this)">
+                              <button type="button" onclick="openActivitySubmissionDatePicker('deadline')" class="p-2 border border-l-0 border-slate-300 rounded-r-xl bg-slate-100 hover:bg-slate-200 cursor-pointer text-xs" title="Chọn ngày từ lịch" aria-label="Chọn hạn chót nhận bài từ lịch">📅</button>
+                              <input type="date" id="sub-deadline-date-picker" tabindex="-1" class="absolute h-px w-px opacity-0 pointer-events-none" onchange="syncActivitySubmissionPickerToDateInput('deadline', this.value)">
+                            </div>
+                          </div>
+                          <div class="col-span-2">
+                            <span class="text-[10px] text-slate-500 block mb-0.5 font-semibold">Giờ hết hạn (24h):</span>
+                            <input type="text" id="sub-deadline-time" placeholder="23:59" maxlength="5"
+                              class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none font-mono font-bold"
+                              onblur="validateTimeInput(this)">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Gợi ý chế độ theo thời gian kết thúc mốc -->
+                    <div id="sub-deadline-activity-end-note" class="hidden text-[11px] text-slate-600 bg-slate-100 border border-slate-200 rounded-lg p-2 font-medium">
+                      ℹ️ <strong>Theo thời gian kết thúc mốc:</strong> Hạn chót nhận bài trùng với thời gian kết thúc hoạt động đã thiết lập ở Khu vực 1.
+                    </div>
+
+                    <label class="flex items-center gap-1.5 text-xs cursor-pointer text-slate-700 pt-1 font-medium">
+                      <input type="checkbox" id="sub-allow-late" class="rounded text-emerald-600">
+                      <span>Cho phép nộp trễ (ghi nhận nhãn "Nộp trễ")</span>
                     </label>
                   </div>
-                  <div id="sub-custom-deadline-wrap" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                    <div>
-                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Ngày hết hạn (DD/MM/YYYY):</label>
-                      <input type="text" id="sub-deadline-date" placeholder="DD/MM/YYYY" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs">
-                    </div>
-                    <div>
-                      <label class="text-[10px] font-bold text-slate-600 block mb-0.5">Giờ hết hạn (HH:mm):</label>
-                      <input type="text" id="sub-deadline-time" placeholder="23:59" class="w-full p-1.5 border border-slate-300 rounded-lg font-mono text-xs">
-                    </div>
-                  </div>
-                  <label class="flex items-center gap-1.5 text-xs cursor-pointer text-slate-600 pt-0.5">
-                    <input type="checkbox" id="sub-allow-late" class="rounded text-emerald-600">
-                    <span>Cho phép nộp trễ (ghi nhận nhãn "Nộp trễ")</span>
-                  </label>
                 </div>
 
                 <!-- 4. Filename Rule Engine -->
@@ -6642,7 +6763,7 @@
   <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>
 
   <!-- MODULE ENTRYPOINT -->
-  <script type="module" src="app.js?v=1.0.1"></script>
+  <script type="module" src="app.js?v=1.0.1.1"></script>
 
 </body>
 </html>

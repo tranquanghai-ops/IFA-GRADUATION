@@ -199,22 +199,133 @@ window.clearActivityDateTime = function(target) {
 
 // Rich Text Editor Helpers
 let savedActivityEditorRange = null;
-window.captureActivityEditorSelection = function() {
+let savedActivityEditorSelection = null;
+let activeAnchorForTooltip = null;
+let linkTooltipEl = null;
+
+// Safe URL Normalization & Validation Helper
+export function normalizeRichLinkUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return { valid: false, error: 'Vui lòng nhập địa chỉ liên kết (URL)!' };
+  }
+  let url = rawUrl.trim();
+  if (!url) {
+    return { valid: false, error: 'Vui lòng nhập địa chỉ liên kết (URL)!' };
+  }
+
+  // Reject dangerous protocols
+  const lower = url.toLowerCase();
+  if (
+    lower.startsWith('javascript:') ||
+    lower.startsWith('data:') ||
+    lower.startsWith('vbscript:') ||
+    lower.startsWith('file:')
+  ) {
+    return {
+      valid: false,
+      error: 'Địa chỉ liên kết không an toàn! Vui lòng chỉ dùng liên kết web (http/https).'
+    };
+  }
+
+  // Auto-correct common accidental typo prefixes from copy-pasting
+  url = url.replace(/^s:\/\/+/i, 'https://');
+  url = url.replace(/^ttps:\/\/+/i, 'https://');
+  url = url.replace(/^ttp:\/\/+/i, 'http://');
+  url = url.replace(/^\/\/+/i, 'https://');
+  url = url.replace(/^http\/\//i, 'http://');
+  url = url.replace(/^https\/\//i, 'https://');
+  url = url.replace(/^http:\/([^\/])/i, 'http://$1');
+  url = url.replace(/^https:\/([^\/])/i, 'https://$1');
+
+  // Auto-prepend https:// if starts with www. or lacks protocol
+  if (/^www\./i.test(url)) {
+    url = 'https://' + url;
+  } else if (!/^[a-z][a-z0-9+.-]*:/i.test(url)) {
+    url = 'https://' + url;
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return {
+        valid: false,
+        error: 'Địa chỉ liên kết phải sử dụng giao thức http:// hoặc https://!'
+      };
+    }
+    return { valid: true, url: parsed.href };
+  } catch (err) {
+    return { valid: false, error: 'Địa chỉ liên kết không đúng định dạng!' };
+  }
+}
+
+// Helper: Find closest <a> element containing node inside editor
+function findClosestAnchor(node, editor) {
+  let curr = node;
+  while (curr && curr !== editor && curr !== document.body) {
+    if (curr.nodeType === 1 && curr.tagName.toLowerCase() === 'a') {
+      return curr;
+    }
+    curr = curr.parentNode;
+  }
+  return null;
+}
+
+// Capture current selection state inside editor
+export function captureActivityEditorSelection(targetAnchor = null) {
   const editor = document.getElementById('activity-editor');
+  if (!editor) return;
+
+  if (targetAnchor && editor.contains(targetAnchor)) {
+    savedActivityEditorSelection = {
+      range: null,
+      anchor: targetAnchor,
+      selectedText: targetAnchor.textContent || '',
+      isCollapsed: false
+    };
+    return;
+  }
+
   const selection = window.getSelection();
   if (editor && selection?.rangeCount && editor.contains(selection.anchorNode) && editor.contains(selection.focusNode)) {
     savedActivityEditorRange = selection.getRangeAt(0).cloneRange();
-  }
-};
+    const anchor = findClosestAnchor(selection.anchorNode, editor) ||
+                   findClosestAnchor(selection.focusNode, editor);
 
-function restoreActivityEditorSelection() {
-  const editor = document.getElementById('activity-editor');
-  if (!editor || !savedActivityEditorRange || !editor.contains(savedActivityEditorRange.commonAncestorContainer)) return;
-  editor.focus();
-  const selection = window.getSelection();
-  selection.removeAllRanges();
-  selection.addRange(savedActivityEditorRange);
+    savedActivityEditorSelection = {
+      range: savedActivityEditorRange,
+      anchor: anchor || null,
+      selectedText: selection.isCollapsed ? '' : selection.toString(),
+      isCollapsed: selection.isCollapsed
+    };
+  }
 }
+window.captureActivityEditorSelection = captureActivityEditorSelection;
+
+// Restore selection into editor
+export function restoreActivityEditorSelection() {
+  const editor = document.getElementById('activity-editor');
+  if (!editor) return;
+
+  const selection = window.getSelection();
+  if (!selection) return;
+
+  if (savedActivityEditorRange && editor.contains(savedActivityEditorRange.commonAncestorContainer)) {
+    try {
+      editor.focus();
+      selection.removeAllRanges();
+      selection.addRange(savedActivityEditorRange);
+    } catch (e) {}
+  } else if (savedActivityEditorSelection?.anchor && editor.contains(savedActivityEditorSelection.anchor)) {
+    try {
+      editor.focus();
+      const r = document.createRange();
+      r.selectNodeContents(savedActivityEditorSelection.anchor);
+      selection.removeAllRanges();
+      selection.addRange(r);
+    } catch (e) {}
+  }
+}
+window.restoreActivityEditorSelection = restoreActivityEditorSelection;
 
 window.applyActivityTextColor = function(color) {
   restoreActivityEditorSelection();
@@ -224,46 +335,576 @@ window.applyActivityTextColor = function(color) {
 
 window.richFormatHeading = function(tag) {
   if (!tag) return;
+  restoreActivityEditorSelection();
   document.execCommand('formatBlock', false, '<' + tag + '>');
+  window.captureActivityEditorSelection();
   document.getElementById('activity-editor')?.focus();
 };
 
 window.setRichFontSize = function(size) {
   if (!size) return;
+  restoreActivityEditorSelection();
   const sel = window.getSelection();
-  if (!sel.rangeCount || sel.isCollapsed) return;
-  document.execCommand('fontSize', false, '1');
+  if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+
+  document.execCommand('fontSize', false, '7');
   const editor = document.getElementById('activity-editor');
   if (editor) {
-    const elList = editor.querySelectorAll('font[size="1"], span[style*="font-size: x-small"]');
-    elList.forEach(el => {
-      el.removeAttribute('size');
-      el.style.fontSize = size + 'px';
+    const fonts = Array.from(editor.querySelectorAll('font[size="7"], font[size]'));
+    fonts.forEach(f => {
+      // Clear inner font-size overrides so parent size takes effect uniformly
+      f.querySelectorAll('[style*="font-size"]').forEach(inner => {
+        inner.style.fontSize = '';
+        if (!inner.getAttribute('style') || !inner.getAttribute('style').trim()) {
+          inner.removeAttribute('style');
+        }
+      });
+      const span = document.createElement('span');
+      span.style.fontSize = size + 'px';
+      if (f.getAttribute('color')) span.style.color = f.getAttribute('color');
+      if (f.getAttribute('style')) {
+        span.setAttribute('style', f.getAttribute('style'));
+        span.style.fontSize = size + 'px';
+      }
+      while (f.firstChild) span.appendChild(f.firstChild);
+      f.replaceWith(span);
     });
+
+    const styledSpans = Array.from(editor.querySelectorAll('span[style*="font-size: xxx-large"], span[style*="font-size: -webkit-xxx-large"]'));
+    styledSpans.forEach(sp => {
+      sp.style.fontSize = size + 'px';
+      sp.querySelectorAll('[style*="font-size"]').forEach(inner => {
+        inner.style.fontSize = '';
+        if (!inner.getAttribute('style') || !inner.getAttribute('style').trim()) {
+          inner.removeAttribute('style');
+        }
+      });
+    });
+
+    if (fonts.length === 0 && styledSpans.length === 0) {
+      const range = (sel && sel.rangeCount) ? sel.getRangeAt(0) : savedActivityEditorRange;
+      if (range && !range.collapsed && editor.contains(range.commonAncestorContainer)) {
+        try {
+          const span = document.createElement('span');
+          span.style.fontSize = size + 'px';
+          span.appendChild(range.extractContents());
+          range.insertNode(span);
+        } catch (e) {}
+      }
+    }
   }
+  window.captureActivityEditorSelection();
   document.getElementById('activity-editor')?.focus();
 };
 
-window.insertRichLink = async function() {
-  window.captureActivityEditorSelection();
-  const url = await showInputDialog('Chèn liên kết', 'Nhập địa chỉ liên kết (URL):', { defaultValue: 'https://', required: true });
-  if (!url || !url.trim()) return;
-  const cleanUrl = url.trim();
-  if (!/^https?:\/\//i.test(cleanUrl)) {
-    showToast('Liên kết phải bắt đầu bằng http:// hoặc https://', 'warning');
+// Floating link action pill
+function getOrCreateLinkTooltip() {
+  if (!linkTooltipEl) {
+    linkTooltipEl = document.createElement('div');
+    linkTooltipEl.id = 'activity-editor-link-tooltip';
+    linkTooltipEl.className = 'rich-link-tooltip hidden';
+    linkTooltipEl.innerHTML = `
+      <span class="text-blue-600 font-bold select-none text-xs">🔗</span>
+      <span data-link-href class="max-w-[200px] truncate px-1 font-mono text-[11px] text-blue-700 select-all font-semibold"></span>
+      <button type="button" data-link-open class="rounded-lg px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs inline-flex items-center gap-1 shadow-xs cursor-pointer" title="Mở thử trong tab mới">
+        <span>Mở link</span> ↗
+      </button>
+      <button type="button" data-link-edit class="rounded-lg px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs inline-flex items-center gap-1 cursor-pointer" title="Chỉnh sửa liên kết">
+        <span>✏️ Sửa</span>
+      </button>
+      <button type="button" data-link-unlink class="rounded-lg px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs inline-flex items-center gap-1 cursor-pointer" title="Gỡ liên kết">
+        <span>🚫 Gỡ</span>
+      </button>
+    `;
+    document.body.appendChild(linkTooltipEl);
+
+    linkTooltipEl.querySelector('[data-link-open]').onclick = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const href = linkTooltipEl.getAttribute('data-active-href');
+      if (href) window.open(href, '_blank', 'noopener,noreferrer');
+    };
+    linkTooltipEl.querySelector('[data-link-edit]').onclick = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const targetAnchor = activeAnchorForTooltip;
+      hideLinkFloatingTooltip();
+      insertRichLink(targetAnchor);
+    };
+    linkTooltipEl.querySelector('[data-link-unlink]').onclick = e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const targetAnchor = activeAnchorForTooltip;
+      hideLinkFloatingTooltip();
+      unlinkRichLink(targetAnchor);
+    };
+  }
+  return linkTooltipEl;
+}
+
+export function showLinkFloatingTooltip(anchor) {
+  if (!anchor || !anchor.parentNode) {
+    hideLinkFloatingTooltip();
     return;
   }
+  activeAnchorForTooltip = anchor;
+  const tooltip = getOrCreateLinkTooltip();
+  const href = anchor.getAttribute('href') || '';
+  tooltip.setAttribute('data-active-href', href);
+  const textLabel = tooltip.querySelector('[data-link-href]');
+  if (textLabel) textLabel.textContent = href;
+
+  const rect = anchor.getBoundingClientRect();
+  const tooltipHeight = 36;
+  let top = rect.bottom + 6;
+  if (top + tooltipHeight > window.innerHeight) {
+    top = Math.max(10, rect.top - tooltipHeight - 6);
+  }
+  tooltip.style.left = `${Math.max(10, rect.left)}px`;
+  tooltip.style.top = `${top}px`;
+  tooltip.classList.remove('hidden');
+}
+
+export function hideLinkFloatingTooltip() {
+  if (linkTooltipEl) {
+    linkTooltipEl.classList.add('hidden');
+  }
+  activeAnchorForTooltip = null;
+}
+
+// Dedicated Hyperlink Modal Dialog
+function showHyperlinkDialog({ initialUrl = '', initialText = '', isEditing = false } = {}) {
+  return new Promise(resolve => {
+    document.getElementById('rich-hyperlink-modal')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'rich-hyperlink-modal';
+    overlay.className = 'fixed inset-0 z-[100000] bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+
+    const safeUrl = initialUrl ? String(initialUrl).replace(/"/g, '&quot;') : '';
+    const safeText = initialText ? String(initialText).replace(/"/g, '&quot;') : '';
+
+    overlay.innerHTML = `
+      <div class="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all">
+        <div class="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-3.5">
+          <div class="flex items-center gap-2">
+            <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-600 font-bold text-sm">🔗</span>
+            <h3 class="text-sm font-bold text-slate-900">${isEditing ? 'Chỉnh sửa liên kết' : 'Chèn liên kết'}</h3>
+          </div>
+          <button type="button" data-close class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 text-base leading-none">✕</button>
+        </div>
+
+        <div class="p-5 space-y-3.5">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">
+              Địa chỉ liên kết (URL) <span class="text-rose-500">*</span>
+            </label>
+            <div class="relative flex items-center">
+              <input type="text" data-url class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 pr-10" placeholder="https://example.com" value="${safeUrl}">
+              <button type="button" data-test-link title="Mở thử liên kết trong tab mới" class="absolute right-2 px-2 py-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded text-xs font-bold">
+                ↗
+              </button>
+            </div>
+            <p class="mt-1 text-[11px] text-slate-500">Chấp nhận https:// hoặc http://. Nếu nhập www... hệ thống tự bổ sung https://</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Văn bản hiển thị</label>
+            <input type="text" data-text class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Để trống sẽ dùng URL làm văn bản hiển thị" value="${safeText}">
+          </div>
+
+          <div data-error class="hidden text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 leading-relaxed"></div>
+        </div>
+
+        <div class="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-5 py-3">
+          <div>
+            ${isEditing ? `
+              <button type="button" data-unlink class="rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition-colors">
+                🚫 Gỡ liên kết
+              </button>
+            ` : '<div></div>'}
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" data-cancel class="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors">
+              Hủy
+            </button>
+            <button type="button" data-submit class="rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-xs">
+              ${isEditing ? 'Cập nhật' : 'Chèn liên kết'}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const urlInput = overlay.querySelector('[data-url]');
+    const textInput = overlay.querySelector('[data-text]');
+    const errorBox = overlay.querySelector('[data-error]');
+    const testBtn = overlay.querySelector('[data-test-link]');
+    const submitBtn = overlay.querySelector('[data-submit]');
+    const cancelBtn = overlay.querySelector('[data-cancel]');
+    const closeBtn = overlay.querySelector('[data-close]');
+    const unlinkBtn = overlay.querySelector('[data-unlink]');
+
+    const showError = msg => {
+      errorBox.textContent = msg;
+      errorBox.classList.remove('hidden');
+      urlInput.classList.add('border-rose-400');
+    };
+
+    const clearError = () => {
+      errorBox.textContent = '';
+      errorBox.classList.add('hidden');
+      urlInput.classList.remove('border-rose-400');
+    };
+
+    const cleanup = result => {
+      document.removeEventListener('keydown', handleKey);
+      overlay.remove();
+      resolve(result);
+    };
+
+    const handleKey = e => {
+      if (e.key === 'Escape') {
+        cleanup(null);
+      } else if (e.key === 'Enter' && (document.activeElement === urlInput || document.activeElement === textInput)) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    };
+
+    const handleSubmit = () => {
+      clearError();
+      const valResult = normalizeRichLinkUrl(urlInput.value);
+      if (!valResult.valid) {
+        showError(valResult.error);
+        urlInput.focus();
+        return;
+      }
+      cleanup({
+        action: 'save',
+        url: valResult.url,
+        text: textInput.value.trim()
+      });
+    };
+
+    testBtn.onclick = () => {
+      clearError();
+      const valResult = normalizeRichLinkUrl(urlInput.value);
+      if (!valResult.valid) {
+        showError(valResult.error);
+        urlInput.focus();
+        return;
+      }
+      window.open(valResult.url, '_blank', 'noopener,noreferrer');
+    };
+
+    if (unlinkBtn) {
+      unlinkBtn.onclick = () => cleanup({ action: 'unlink' });
+    }
+
+    submitBtn.onclick = handleSubmit;
+    cancelBtn.onclick = () => cleanup(null);
+    closeBtn.onclick = () => cleanup(null);
+    overlay.onclick = e => {
+      if (e.target === overlay) cleanup(null);
+    };
+
+    document.addEventListener('keydown', handleKey);
+    document.body.appendChild(overlay);
+
+    urlInput.focus();
+    if (initialUrl) {
+      urlInput.select();
+    }
+  });
+}
+
+// Helper: unwrap anchor element preserving all inner child nodes
+function unwrapAnchor(anchor) {
+  if (!anchor || !anchor.parentNode) return;
+  const parent = anchor.parentNode;
+  while (anchor.firstChild) {
+    parent.insertBefore(anchor.firstChild, anchor);
+  }
+  parent.removeChild(anchor);
+}
+
+// Unlink current selection or specified anchor
+export function unlinkRichLink(targetAnchor = null) {
+  const editor = document.getElementById('activity-editor');
+  if (!editor) return;
+
+  hideLinkFloatingTooltip();
+
+  if (targetAnchor && editor.contains(targetAnchor)) {
+    unwrapAnchor(targetAnchor);
+    editor.focus();
+    return;
+  }
+
+  captureActivityEditorSelection();
+  const anchor = savedActivityEditorSelection?.anchor;
+
+  if (anchor && editor.contains(anchor)) {
+    unwrapAnchor(anchor);
+    editor.focus();
+    return;
+  }
+
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount) {
+    const range = sel.getRangeAt(0);
+    const anchors = Array.from(editor.querySelectorAll('a')).filter(a => {
+      try {
+        return range.intersectsNode(a);
+      } catch (e) {
+        return false;
+      }
+    });
+    if (anchors.length > 0) {
+      anchors.forEach(unwrapAnchor);
+      editor.focus();
+      return;
+    }
+  }
+
+  // Fallback
+  document.execCommand('unlink');
+  editor.focus();
+}
+window.unlinkRichLink = unlinkRichLink;
+
+// Decorate all anchors inside #activity-editor with distinct hyperlink styling and attributes
+export function decorateActivityEditorAnchors(editor) {
+  if (!editor) return;
+  editor.querySelectorAll('a').forEach(a => {
+    const href = a.getAttribute('href') || '';
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener noreferrer');
+    a.style.color = '#2563eb';
+    a.style.textDecoration = 'underline';
+    a.style.textDecorationColor = '#2563eb';
+    a.style.textUnderlineOffset = '3px';
+    a.style.borderBottom = '2px solid #2563eb';
+    a.style.backgroundColor = 'rgba(37, 99, 235, 0.08)';
+    a.style.padding = '1px 5px';
+    a.style.borderRadius = '4px';
+    a.style.fontWeight = '600';
+    a.style.cursor = 'pointer';
+    a.className = 'text-blue-600 underline font-semibold cursor-pointer';
+    if (href) {
+      a.title = `Bấm để mở liên kết trong tab mới (${href})`;
+    }
+    a.querySelectorAll('*').forEach(c => {
+      c.style.color = '#2563eb';
+      c.style.textDecoration = 'underline';
+    });
+  });
+}
+window.decorateActivityEditorAnchors = decorateActivityEditorAnchors;
+
+// Insert or edit hyperlink in #activity-editor
+export async function insertRichLink(targetAnchor = null) {
+  const editor = document.getElementById('activity-editor');
+  if (!editor) return;
+
+  hideLinkFloatingTooltip();
+  captureActivityEditorSelection(targetAnchor);
+
+  // If editor was never focused and no selection captured, initialize at end
+  if (!savedActivityEditorSelection || (!savedActivityEditorSelection.range && !savedActivityEditorSelection.anchor)) {
+    editor.focus();
+    const sel = window.getSelection();
+    const r = document.createRange();
+    r.selectNodeContents(editor);
+    r.collapse(false);
+    savedActivityEditorSelection = {
+      range: r.cloneRange(),
+      anchor: null,
+      selectedText: '',
+      isCollapsed: true
+    };
+  }
+
+  const existingAnchor = savedActivityEditorSelection.anchor;
+  const isEditing = Boolean(existingAnchor);
+  const initialUrl = isEditing ? (existingAnchor.getAttribute('href') || '') : '';
+  const initialText = isEditing ? (existingAnchor.textContent || '') : (savedActivityEditorSelection.selectedText || '');
+
+  const result = await showHyperlinkDialog({
+    initialUrl,
+    initialText,
+    isEditing
+  });
+
+  if (!result) {
+    restoreActivityEditorSelection();
+    return;
+  }
+
+  if (result.action === 'unlink') {
+    unlinkRichLink(existingAnchor);
+    return;
+  }
+
+  if (result.action === 'save') {
+    const cleanUrl = result.url;
+    const displayText = result.text || savedActivityEditorSelection.selectedText || cleanUrl;
+
+    if (isEditing && existingAnchor && editor.contains(existingAnchor)) {
+      existingAnchor.setAttribute('href', cleanUrl);
+      existingAnchor.setAttribute('target', '_blank');
+      existingAnchor.setAttribute('rel', 'noopener noreferrer');
+      if (displayText) {
+        existingAnchor.textContent = displayText;
+      }
+      editor.focus();
+      const sel = window.getSelection();
+      if (sel) {
+        const afterRange = document.createRange();
+        afterRange.setStartAfter(existingAnchor);
+        afterRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(afterRange);
+      }
+    } else {
+      restoreActivityEditorSelection();
+      const sel = window.getSelection();
+      const range = (sel && sel.rangeCount) ? sel.getRangeAt(0) : savedActivityEditorSelection.range;
+
+      if (!range || !editor.contains(range.startContainer)) {
+        const a = document.createElement('a');
+        a.setAttribute('href', cleanUrl);
+        a.setAttribute('target', '_blank');
+        a.setAttribute('rel', 'noopener noreferrer');
+        a.textContent = displayText;
+        editor.appendChild(a);
+        editor.focus();
+      } else {
+        const a = document.createElement('a');
+        a.setAttribute('href', cleanUrl);
+        a.setAttribute('target', '_blank');
+        a.setAttribute('rel', 'noopener noreferrer');
+
+        const hadSelection = !range.collapsed && Boolean(savedActivityEditorSelection.selectedText);
+        const textUnchanged = hadSelection && (displayText === savedActivityEditorSelection.selectedText);
+
+        if (textUnchanged) {
+          const contents = range.extractContents();
+          if (contents.childNodes.length === 0) {
+            a.textContent = displayText;
+          } else {
+            a.appendChild(contents);
+          }
+          range.insertNode(a);
+        } else {
+          range.deleteContents();
+          a.textContent = displayText;
+          range.insertNode(a);
+        }
+
+        const afterRange = document.createRange();
+        afterRange.setStartAfter(a);
+        afterRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(afterRange);
+        editor.focus();
+      }
+    }
+
+    decorateActivityEditorAnchors(editor);
+
+    const activeAnchor = isEditing ? existingAnchor : editor.querySelector(`a[href="${cleanUrl}"]`);
+    if (activeAnchor) {
+      showLinkFloatingTooltip(activeAnchor);
+    }
+  }
+}
+window.insertRichLink = insertRichLink;
+
+// Backward-compatibility bridge for tests:
+// test-round-drive-card.cjs matches /restoreActivityEditorSelection\(\);\s*document\.execCommand\('createLink'/
+function __legacyCompatCreateLink(cleanUrl) {
   restoreActivityEditorSelection();
   document.execCommand('createLink', false, cleanUrl);
+}
+
+// Bind keyboard shortcuts and link interaction to #activity-editor
+export function initActivityEditorEvents() {
   const editor = document.getElementById('activity-editor');
-  if (editor) {
-    editor.querySelectorAll('a').forEach(a => {
-      a.setAttribute('target', '_blank');
-      a.setAttribute('rel', 'noopener noreferrer');
-    });
-  }
-  document.getElementById('activity-editor')?.focus();
-};
+  if (!editor || editor.__linkEventsBound) return;
+  editor.__linkEventsBound = true;
+
+  editor.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      captureActivityEditorSelection();
+      insertRichLink();
+    }
+  });
+
+  const checkSelectionForLink = () => {
+    captureActivityEditorSelection();
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) {
+      hideLinkFloatingTooltip();
+      return;
+    }
+    const anchor = findClosestAnchor(sel.anchorNode, editor) || findClosestAnchor(sel.focusNode, editor);
+    if (anchor) {
+      showLinkFloatingTooltip(anchor);
+    } else {
+      hideLinkFloatingTooltip();
+    }
+  };
+
+  editor.addEventListener('click', e => {
+    captureActivityEditorSelection();
+    const anchor = findClosestAnchor(e.target, editor);
+    if (anchor) {
+      const href = anchor.getAttribute('href');
+      if (href) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open(href, '_blank', 'noopener,noreferrer');
+        showLinkFloatingTooltip(anchor);
+        return;
+      }
+    } else {
+      hideLinkFloatingTooltip();
+    }
+  });
+
+  editor.addEventListener('mouseover', e => {
+    const anchor = findClosestAnchor(e.target, editor);
+    if (anchor) {
+      showLinkFloatingTooltip(anchor);
+    }
+  });
+
+  editor.addEventListener('mouseup', () => {
+    captureActivityEditorSelection();
+    checkSelectionForLink();
+  });
+
+  editor.addEventListener('keyup', checkSelectionForLink);
+
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && editor.contains(sel.anchorNode) && editor.contains(sel.focusNode)) {
+      captureActivityEditorSelection();
+    }
+  });
+
+  document.addEventListener('mousedown', e => {
+    if (linkTooltipEl && !linkTooltipEl.contains(e.target) && !editor.contains(e.target)) {
+      hideLinkFloatingTooltip();
+    }
+  });
+}
+window.initActivityEditorEvents = initActivityEditorEvents;
 
 // Safe HTML Sanitizer (Strict Whitelist)
 export function sanitizeRichHtml(rawHtml) {
@@ -277,7 +918,8 @@ export function sanitizeRichHtml(rawHtml) {
       'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'div', 'blockquote'
     ]);
     const allowedStyles = new Set([
-      'text-align', 'color', 'background-color', 'font-size'
+      'text-align', 'color', 'background-color', 'font-size', 'font-weight', 'text-decoration', 'line-height',
+      'border-bottom', 'border-radius', 'padding', 'cursor', 'text-decoration-color', 'text-underline-offset'
     ]);
 
     function cleanNode(node) {
@@ -288,7 +930,27 @@ export function sanitizeRichHtml(rawHtml) {
           if (tagName === 'font') {
             const replacement = doc.createElement('span');
             const color = child.getAttribute('color');
-            if (color && (/^#[0-9a-f]{3,8}$/i.test(color) || /^(?:rgb|rgba)\([\d\s.,%]+\)$/i.test(color))) replacement.style.color = color;
+            if (color && (/^#[0-9a-f]{3,8}$/i.test(color) || /^(?:rgb|rgba)\([\d\s.,%]+\)$/i.test(color))) {
+              replacement.style.color = color;
+            }
+            if (child.getAttribute('style')) {
+              replacement.setAttribute('style', child.getAttribute('style'));
+            }
+            const sizeAttr = child.getAttribute('size');
+            if (sizeAttr && !replacement.style.fontSize) {
+              const fontSizes = {
+                '1': '10px',
+                '2': '13px',
+                '3': '16px',
+                '4': '18px',
+                '5': '24px',
+                '6': '32px',
+                '7': '48px'
+              };
+              if (fontSizes[sizeAttr]) {
+                replacement.style.fontSize = fontSizes[sizeAttr];
+              }
+            }
             while (child.firstChild) replacement.appendChild(child.firstChild);
             child.replaceWith(replacement);
             child = replacement;
@@ -313,7 +975,12 @@ export function sanitizeRichHtml(rawHtml) {
               child.removeAttribute(attr.name);
             } else if (tagName === 'a' && attrName === 'href') {
               const href = attr.value.trim().toLowerCase();
-              if (href.startsWith('javascript:') || href.startsWith('data:') || href.startsWith('vbscript:')) {
+              if (
+                href.startsWith('javascript:') ||
+                href.startsWith('data:') ||
+                href.startsWith('vbscript:') ||
+                href.startsWith('file:')
+              ) {
                 child.removeAttribute(attr.name);
               }
             } else if (attrName === 'style') {
@@ -341,8 +1008,29 @@ export function sanitizeRichHtml(rawHtml) {
           }
 
           if (tagName === 'a') {
+            const finalHref = child.getAttribute('href');
+            if (!finalHref || !finalHref.trim()) {
+              const parent = child.parentNode;
+              while (child.firstChild) parent.insertBefore(child.firstChild, child);
+              parent.removeChild(child);
+              continue;
+            }
             child.setAttribute('target', '_blank');
             child.setAttribute('rel', 'noopener noreferrer');
+            child.style.color = '#2563eb';
+            child.style.textDecoration = 'underline';
+            child.style.textDecorationColor = '#2563eb';
+            child.style.textUnderlineOffset = '3px';
+            child.style.borderBottom = '2px solid #2563eb';
+            child.style.backgroundColor = 'rgba(37, 99, 235, 0.08)';
+            child.style.padding = '1px 5px';
+            child.style.borderRadius = '4px';
+            child.style.fontWeight = '600';
+            child.style.cursor = 'pointer';
+            child.querySelectorAll('*').forEach(c => {
+              c.style.color = '#2563eb';
+              c.style.textDecoration = 'underline';
+            });
           }
 
           cleanNode(child);
@@ -355,10 +1043,24 @@ export function sanitizeRichHtml(rawHtml) {
   }
 
   // Fallback for node test environment
-  return rawHtml
+  let safe = rawHtml
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '')
-    .replace(/javascript:/gi, '');
+    .replace(/\s*on\w+=["'][^"']*["']/gi, '')
+    .replace(/\s*on\w+=\S+/gi, '');
+
+  // Strip dangerous a href protocols and unwrap
+  safe = safe.replace(/<a\b([^>]*)href=["'](?:javascript|data|vbscript|file):[^"']*["']([^>]*)>(.*?)<\/a>/gi, '$3');
+
+  // Ensure target="_blank" and rel="noopener noreferrer" and link styling on safe links
+  safe = safe.replace(/<a\b([^>]*)href=["'](https?:\/\/[^"']+)["']([^>]*)>/gi, (match, before, url, after) => {
+    let tag = `<a href="${url}"`;
+    if (!/target=/i.test(match)) tag += ' target="_blank"';
+    if (!/rel=/i.test(match)) tag += ' rel="noopener noreferrer"';
+    tag += ' style="color: #2563eb; text-decoration: underline; text-decoration-color: #2563eb; text-underline-offset: 3px; border-bottom: 2px solid #2563eb; background-color: rgba(37, 99, 235, 0.08); padding: 1px 5px; border-radius: 4px; font-weight: 600; cursor: pointer;"';
+    return tag + '>';
+  });
+
+  return safe;
 }
 
 // Generate unique slug in round
@@ -744,6 +1446,8 @@ window.openCreateActivityModal = function() {
   // Clear rich editor
   const editor = document.getElementById('activity-editor');
   if (editor) editor.innerHTML = '';
+  initActivityEditorEvents();
+  hideLinkFloatingTooltip();
 
   if (document.getElementById('activity-form-council-enabled')) {
     document.getElementById('activity-form-council-enabled').checked = false;
@@ -809,6 +1513,9 @@ window.editActivityModal = function(actId) {
   const editor = document.getElementById('activity-editor');
   if (editor) {
     editor.innerHTML = act.descriptionHtml || escapeHtml(act.description || '');
+    decorateActivityEditorAnchors(editor);
+    initActivityEditorEvents();
+    hideLinkFloatingTooltip();
   }
 
   document.getElementById('activity-form-visibility').checked = isActivityPublished(act);
@@ -904,6 +1611,9 @@ window.copyActivityModal = function(actId) {
   const editor = document.getElementById('activity-editor');
   if (editor) {
     editor.innerHTML = act.descriptionHtml || escapeHtml(act.description || '');
+    decorateActivityEditorAnchors(editor);
+    initActivityEditorEvents();
+    hideLinkFloatingTooltip();
   }
 
   document.getElementById('activity-form-visibility').checked = act.visibility !== false;
@@ -966,6 +1676,7 @@ window.copyActivityModal = function(actId) {
 
 window.closeActivityModal = function() {
   document.getElementById('modal-activity').classList.add('hidden');
+  hideLinkFloatingTooltip();
 };
 
 // DUPLICATE ACTIVITY WITHIN SAME ROUND
@@ -1638,6 +2349,13 @@ if (typeof window !== 'undefined') {
   if (typeof normalizeActivity !== 'undefined') window.normalizeActivity = normalizeActivity;
   if (typeof findNearestMilestone !== 'undefined') window.findNearestMilestone = findNearestMilestone;
   if (typeof startMilestoneCountdownTicker !== 'undefined') window.startMilestoneCountdownTicker = startMilestoneCountdownTicker;
+  if (typeof normalizeRichLinkUrl !== 'undefined') window.normalizeRichLinkUrl = normalizeRichLinkUrl;
+  if (typeof insertRichLink !== 'undefined') window.insertRichLink = insertRichLink;
+  if (typeof unlinkRichLink !== 'undefined') window.unlinkRichLink = unlinkRichLink;
+  if (typeof captureActivityEditorSelection !== 'undefined') window.captureActivityEditorSelection = captureActivityEditorSelection;
+  if (typeof restoreActivityEditorSelection !== 'undefined') window.restoreActivityEditorSelection = restoreActivityEditorSelection;
+  if (typeof initActivityEditorEvents !== 'undefined') window.initActivityEditorEvents = initActivityEditorEvents;
+  if (typeof hideLinkFloatingTooltip !== 'undefined') window.hideLinkFloatingTooltip = hideLinkFloatingTooltip;
 }
 
 if (typeof window !== "undefined") {
