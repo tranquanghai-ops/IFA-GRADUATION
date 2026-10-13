@@ -201,27 +201,26 @@ test('Milestone Hyperlink Engine & Data Flow Suite', async (t) => {
     assert.doesNotMatch(driveUploadPanelSource, /Ngày duyệt:\s*<strong/);
   });
 
-  await t.test('14. Admin edit view renders distinct blue underline/pill links in #activity-editor and opens link on direct click', () => {
-    // 1. decorateActivityEditorAnchors is exported and decorates anchors with prominent styling
+  await t.test('14. Admin edit view renders distinct blue underline links in #activity-editor without background shading', () => {
+    // 1. decorateActivityEditorAnchors is exported and decorates anchors with blue text and underline
     assert.match(activitiesManagerSource, /export function decorateActivityEditorAnchors/);
-    assert.match(activitiesManagerSource, /borderBottom\s*=\s*'2px solid #2563eb'/);
-    assert.match(activitiesManagerSource, /backgroundColor\s*=\s*'rgba\(37, 99, 235, 0\.08\)'/);
+    assert.match(activitiesManagerSource, /a\.style\.color\s*=\s*'#2563eb'/);
+    assert.match(activitiesManagerSource, /backgroundColor\s*=\s*'transparent'/);
     assert.match(activitiesManagerSource, /cursor\s*=\s*'pointer'/);
     assert.match(activitiesManagerSource, /decorateActivityEditorAnchors\(editor\)/);
 
     // 2. Direct click on anchor inside editor opens link in new tab just like student page
     assert.match(activitiesManagerSource, /window\.open\(href,\s*'_blank',\s*'noopener,noreferrer'\)/);
 
-    // 3. Modal template, styles.css and index.html have high-visibility underline & pill styles
-    assert.match(modalActivityTemplate, /border-bottom:\s*2px solid #2563eb !important/);
-    assert.match(modalActivityTemplate, /background-color:\s*rgba\(37, 99, 235, 0\.08\) !important/);
-    assert.match(stylesCss, /border-bottom:\s*2px solid #2563eb !important/);
-    assert.match(stylesCss, /background-color:\s*rgba\(37, 99, 235, 0\.08\) !important/);
-    assert.match(indexHtml, /border-bottom:\s*2px solid #2563eb !important/);
+    // 3. Modal template, styles.css and index.html have clean blue text and transparent background
+    assert.match(modalActivityTemplate, /color:\s*#2563eb !important/);
+    assert.match(modalActivityTemplate, /background-color:\s*transparent !important/);
+    assert.match(stylesCss, /color:\s*#2563eb !important/);
+    assert.match(stylesCss, /background-color:\s*transparent !important/);
 
-    // 4. Sanitizer bakes inline styles into output for persistent styling
+    // 4. Sanitizer produces clean blue links without background color box
     const sanitizedLink = sanitizeRichHtml('<p><a href="https://example.com">test link</a></p>');
-    assert.match(sanitizedLink, /border-bottom:\s*2px solid #2563eb/);
-    assert.match(sanitizedLink, /background-color:\s*rgba\(37, 99, 235, 0\.08\)/);
+    assert.match(sanitizedLink, /color:\s*#2563eb/);
+    assert.doesNotMatch(sanitizedLink, /background-color:\s*rgba\(37,\s*99,\s*235/);
   });
 });

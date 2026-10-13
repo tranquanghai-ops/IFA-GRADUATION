@@ -349,11 +349,12 @@ body {
   color: #2563eb !important;
   text-decoration: underline !important;
   text-decoration-color: #2563eb !important;
-  text-underline-offset: 3px !important;
-  border-bottom: 2px solid #2563eb !important;
-  background-color: rgba(37, 99, 235, 0.08) !important;
-  padding: 1px 5px !important;
-  border-radius: 4px !important;
+  text-underline-offset: 2px !important;
+  border-bottom: none !important;
+  background-color: transparent !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
   font-weight: 600 !important;
   cursor: pointer !important;
   word-break: break-word !important;
@@ -364,11 +365,12 @@ body {
   color: #2563eb !important;
   text-decoration: underline !important;
   text-decoration-color: #2563eb !important;
-  text-underline-offset: 3px !important;
-  border-bottom: 2px solid #2563eb !important;
-  background-color: rgba(37, 99, 235, 0.08) !important;
-  padding: 1px 5px !important;
-  border-radius: 4px !important;
+  text-underline-offset: 2px !important;
+  border-bottom: none !important;
+  background-color: transparent !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
   font-weight: 600 !important;
   cursor: pointer !important;
   word-break: break-word !important;
@@ -380,6 +382,8 @@ body {
   color: #2563eb !important;
   text-decoration: underline !important;
   text-decoration-color: #2563eb !important;
+  background-color: transparent !important;
+  background: transparent !important;
   font-weight: 600 !important;
 }
 
@@ -387,14 +391,18 @@ body {
 .rich-rendered-content a:hover,
 #activity-editor a:hover {
   color: #1d4ed8 !important;
-  border-bottom-color: #1d4ed8 !important;
-  background-color: rgba(37, 99, 235, 0.15) !important;
+  text-decoration-color: #1d4ed8 !important;
+  border-bottom: none !important;
+  background-color: transparent !important;
+  background: transparent !important;
 }
 
 .rich-editor-content a:hover *,
 .rich-rendered-content a:hover *,
 #activity-editor a:hover * {
   color: #1d4ed8 !important;
+  background-color: transparent !important;
+  background: transparent !important;
 }
 
 .rich-link-tooltip {

@@ -686,11 +686,11 @@ export function decorateActivityEditorAnchors(editor) {
     a.style.color = '#2563eb';
     a.style.textDecoration = 'underline';
     a.style.textDecorationColor = '#2563eb';
-    a.style.textUnderlineOffset = '3px';
-    a.style.borderBottom = '2px solid #2563eb';
-    a.style.backgroundColor = 'rgba(37, 99, 235, 0.08)';
-    a.style.padding = '1px 5px';
-    a.style.borderRadius = '4px';
+    a.style.textUnderlineOffset = '2px';
+    a.style.borderBottom = 'none';
+    a.style.backgroundColor = 'transparent';
+    a.style.padding = '0';
+    a.style.borderRadius = '0';
     a.style.fontWeight = '600';
     a.style.cursor = 'pointer';
     a.className = 'text-blue-600 underline font-semibold cursor-pointer';
@@ -700,6 +700,7 @@ export function decorateActivityEditorAnchors(editor) {
     a.querySelectorAll('*').forEach(c => {
       c.style.color = '#2563eb';
       c.style.textDecoration = 'underline';
+      c.style.backgroundColor = 'transparent';
     });
   });
 }
@@ -1020,16 +1021,17 @@ export function sanitizeRichHtml(rawHtml) {
             child.style.color = '#2563eb';
             child.style.textDecoration = 'underline';
             child.style.textDecorationColor = '#2563eb';
-            child.style.textUnderlineOffset = '3px';
-            child.style.borderBottom = '2px solid #2563eb';
-            child.style.backgroundColor = 'rgba(37, 99, 235, 0.08)';
-            child.style.padding = '1px 5px';
-            child.style.borderRadius = '4px';
+            child.style.textUnderlineOffset = '2px';
+            child.style.borderBottom = 'none';
+            child.style.backgroundColor = 'transparent';
+            child.style.padding = '0';
+            child.style.borderRadius = '0';
             child.style.fontWeight = '600';
             child.style.cursor = 'pointer';
             child.querySelectorAll('*').forEach(c => {
               c.style.color = '#2563eb';
               c.style.textDecoration = 'underline';
+              c.style.backgroundColor = 'transparent';
             });
           }
 
@@ -1056,7 +1058,7 @@ export function sanitizeRichHtml(rawHtml) {
     let tag = `<a href="${url}"`;
     if (!/target=/i.test(match)) tag += ' target="_blank"';
     if (!/rel=/i.test(match)) tag += ' rel="noopener noreferrer"';
-    tag += ' style="color: #2563eb; text-decoration: underline; text-decoration-color: #2563eb; text-underline-offset: 3px; border-bottom: 2px solid #2563eb; background-color: rgba(37, 99, 235, 0.08); padding: 1px 5px; border-radius: 4px; font-weight: 600; cursor: pointer;"';
+    tag += ' style="color: #2563eb; text-decoration: underline; text-decoration-color: #2563eb; text-underline-offset: 2px; font-weight: 600; cursor: pointer; background-color: transparent;"';
     return tag + '>';
   });
 
