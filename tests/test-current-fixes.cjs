@@ -186,7 +186,16 @@ assert.match(supervisor, /async function checkSupervisorParticipatesInRound/);
 assert.match(supervisor, /const filteredRounds = validRounds\.filter\(r => participatingRoundIds\.has\(r\.id\)\)/);
 assert.doesNotMatch(supervisor, /if \(filteredRounds\.length === 0 && validRounds\.length > 0\) \{\s*filteredRounds = \[validRounds\.find/);
 
+// 11. Student hero banner includes thesis guide link next to milestones count
+const studentHtml = read('views/student.html');
+const indexHtmlContent = read('index.html');
+assert.match(studentHtml, /id="hero-thesis-guide-link"[\s\S]*?href="https:\/\/drive\.google\.com\/file\/d\/1-FE9Scxa34Qj24tJDrTwTbxjkMM3vSNc\/view"/);
+assert.match(studentHtml, /id="hero-thesis-guide-link"[\s\S]*?target="_blank"/);
+assert.match(studentHtml, /id="hero-thesis-guide-link"[\s\S]*?Hướng dẫn Thuyết minh/);
+assert.match(indexHtmlContent, /id="hero-thesis-guide-link"[\s\S]*?href="https:\/\/drive\.google\.com\/file\/d\/1-FE9Scxa34Qj24tJDrTwTbxjkMM3vSNc\/view"/);
+
 console.log('Current regression checks passed.');
+
 
 
 
