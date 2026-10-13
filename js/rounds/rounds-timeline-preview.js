@@ -180,7 +180,7 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
     : escapeHtml(activity?.description || '').replace(/\n/g, '<br>');
   const dialog = document.createElement('div');
   dialog.id = 'student-timeline-event-dialog';
-  dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
+  dialog.className = 'fixed inset-0 z-[120] modal-backdrop flex items-center justify-center bg-slate-950/60 p-4';
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
   dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Chi tiết mốc kế hoạch" class="student-timeline-event-panel max-w-3xl lg:max-w-4xl rounded-2xl sm:rounded-3xl bg-white shadow-2xl">
     <div class="flex items-start justify-between gap-4 px-5 pt-5 sm:px-8 sm:pt-7">
@@ -264,7 +264,7 @@ window.openStudentTimelineDay = function(weekNumber, dateKey, roundId = null) {
   window.closeStudentTimelineEvent();
   const dialog = document.createElement('div');
   dialog.id = 'student-timeline-event-dialog';
-  dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
+  dialog.className = 'fixed inset-0 z-[120] modal-backdrop flex items-center justify-center bg-slate-950/60 p-4';
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
   dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Sự kiện trong ngày" class="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><div class="flex items-center justify-between gap-2"><h3 class="text-lg font-black text-slate-900">Sự kiện ngày ${escapeHtml(dateKey)}</h3><button type="button" onclick="closeStudentTimelineEvent()" class="rounded-lg bg-slate-100 px-3 py-1.5 text-lg" aria-label="Đóng">×</button></div><div class="mt-4 space-y-2">${matches.map(item => `<button type="button" onclick="openStudentTimelineEvent(${weekNumber}, ${item.index}, ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})" class="block w-full rounded-xl border border-slate-200 p-3 text-left text-sm font-bold text-blue-800 hover:bg-blue-50">${escapeHtml(item.event.title)}</button>`).join('')}</div></div>`;
   document.body.appendChild(dialog);
@@ -302,7 +302,7 @@ window.openAdminTimelineEventEditor = function(roundId, weekNumber, eventId) {
 
   const dialog = document.createElement('div');
   dialog.id = 'student-timeline-event-dialog';
-  dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
+  dialog.className = 'fixed inset-0 z-[120] modal-backdrop flex items-center justify-center bg-slate-950/60 p-4';
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
 
   dialog.innerHTML = `
@@ -463,7 +463,7 @@ window.openAdminTimelineQuickCreateEvent = function(roundId, weekNumber, dateKey
 
   const dialog = document.createElement('div');
   dialog.id = 'student-timeline-event-dialog';
-  dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
+  dialog.className = 'fixed inset-0 z-[120] modal-backdrop flex items-center justify-center bg-slate-950/60 p-4';
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
 
   dialog.innerHTML = `
@@ -584,7 +584,7 @@ window.openAdminTimelineDayAction = function(weekNumber, dateKey, roundId) {
   window.closeStudentTimelineEvent();
   const dialog = document.createElement('div');
   dialog.id = 'student-timeline-event-dialog';
-  dialog.className = 'fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4';
+  dialog.className = 'fixed inset-0 z-[120] modal-backdrop flex items-center justify-center bg-slate-950/60 p-4';
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
 
   dialog.innerHTML = `

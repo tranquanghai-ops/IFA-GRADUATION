@@ -479,7 +479,7 @@ function showHyperlinkDialog({ initialUrl = '', initialText = '', isEditing = fa
 
     const overlay = document.createElement('div');
     overlay.id = 'rich-hyperlink-modal';
-    overlay.className = 'fixed inset-0 z-[100000] bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4';
+    overlay.className = 'fixed inset-0 z-[100000] modal-backdrop bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
 
@@ -487,7 +487,7 @@ function showHyperlinkDialog({ initialUrl = '', initialText = '', isEditing = fa
     const safeText = initialText ? String(initialText).replace(/"/g, '&quot;') : '';
 
     overlay.innerHTML = `
-      <div class="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all">
+      <div class="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl transition-all">
         <div class="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-3.5">
           <div class="flex items-center gap-2">
             <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-600 font-bold text-sm">🔗</span>
