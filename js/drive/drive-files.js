@@ -346,8 +346,8 @@ window.retryStudentComplete = async function(actId) {
   }
 };
 
-window.withdrawStudentSubmission = async function(actId, attemptNum, optRoundId) {
-  if (!checkImpersonationWriteGuard('Rút bài nộp')) return;
+window.withdrawStudentSubmission = async function(actId, attemptNum, optRoundId, optStudentId) {
+  if (!checkImpersonationWriteGuard('Rút/Xóa bài nộp')) return;
 
   const round = (state.rounds || []).find(r => r.id === (optRoundId || state.selectedRoundId)) || state.rounds?.[0];
   const act = (round?.activities || []).find(a => a.id === actId);
@@ -356,22 +356,29 @@ window.withdrawStudentSubmission = async function(actId, attemptNum, optRoundId)
     return;
   }
 
-  const userMssv = state.userStudentId || (state.user?.email ? state.user.email.split('@')[0] : '');
+  const userMssv = optStudentId || state.userStudentId || (state.user?.email ? state.user.email.split('@')[0] : '');
   const subEntry = round?.activitySubmissions?.[actId]?.[userMssv];
   if (!subEntry || !subEntry.currentSubmission) {
-    showToast('Không tìm thấy bài nộp để rút!', 'warning');
+    showToast('Không tìm thấy bài nộp để rút/xóa!', 'warning');
     return;
   }
 
+  const isAdminDeleting = Boolean(state.isAdmin || (optStudentId && optStudentId !== state.userStudentId));
+  const confirmTitle = isAdminDeleting ? `Xác nhận xóa bài nộp của SV ${userMssv}?` : 'Xác nhận rút bài nộp?';
+  const confirmMessage = isAdminDeleting
+    ? `Tệp trên Google Drive sẽ được chuyển vào Thùng rác. Bài nộp của sinh viên ${userMssv} sẽ được hủy bỏ (chuyển sang trạng thái "Đã rút"), giải phóng số lần nộp để sinh viên có thể nộp lại bài mới.`
+    : 'Tệp trên Google Drive sẽ được tự động chuyển vào Thùng rác để giải phóng dung lượng. Bài nộp này sẽ chuyển sang trạng thái "Đã rút" và bạn có thể nộp lại nếu còn lượt.';
+  const confirmBtnText = isAdminDeleting ? 'Xóa bài nộp' : 'Rút bài nộp';
+
   const confirmed = await showConfirm(
-    'Xác nhận rút bài nộp?',
-    'Tệp trên Google Drive sẽ được tự động chuyển vào Thùng rác để giải phóng dung lượng. Bài nộp này sẽ chuyển sang trạng thái "Đã rút" và bạn có thể nộp lại nếu còn lượt.',
-    { confirmText: 'Rút bài nộp', cancelText: 'Hủy', danger: true }
+    confirmTitle,
+    confirmMessage,
+    { confirmText: confirmBtnText, cancelText: 'Hủy', danger: true }
   );
   if (!confirmed) return;
 
   try {
-    showToast('Đang xử lý rút bài trên hệ thống...', 'info');
+    showToast('Đang xử lý trên hệ thống...', 'info');
 
     // Call authenticated backend to withdraw via Service Account (FAIL-CLOSED)
     const endpoint = (typeof getGraduationApiBase === 'function') ? getGraduationApiBase() : (window.IFA_CONFIG?.graduationApiEndpoint || window.IFA_CONFIG?.driveUploadEndpoint || 'https://asia-southeast1-ifa-activities.cloudfunctions.net/graduationApi');
@@ -409,19 +416,27 @@ window.withdrawStudentSubmission = async function(actId, attemptNum, optRoundId)
     };
 
     if (withdrawData.driveCleaned) {
-      showToast('✅ Đã rút bài nộp và chuyển tệp vào Thùng rác Google Drive.', 'success');
+      showToast(isAdminDeleting ? `✅ Đã xóa bài nộp của SV ${userMssv} và chuyển tệp vào Thùng rác Google Drive.` : '✅ Đã rút bài nộp và chuyển tệp vào Thùng rác Google Drive.', 'success');
     } else {
-      showToast('⚠️ Bài nộp đã được rút trên hệ thống. ' + (withdrawData.driveWarning || 'Tệp Google Drive chưa được xóa hoàn toàn.'), 'warning');
+      showToast((isAdminDeleting ? `⚠️ Đã xóa bài nộp của SV ${userMssv}. ` : '⚠️ Bài nộp đã được rút trên hệ thống. ') + (withdrawData.driveWarning || 'Tệp Google Drive chưa được xóa hoàn toàn.'), 'warning');
     }
     if (withdrawData.auditLogged === false) {
-      showToast(withdrawData.auditWarning || 'Bài đã rút nhưng nhật ký kiểm toán chưa ghi được.', 'warning');
+      showToast(withdrawData.auditWarning || 'Bài đã xử lý nhưng nhật ký kiểm toán chưa ghi được.', 'warning');
     }
     if (document.getElementById('student-timeline-event-dialog')) window.closeStudentTimelineEvent?.();
-    loadStudentRoundActivities(round.id);
+    if (typeof loadStudentRoundActivities === 'function') loadStudentRoundActivities(round.id);
+    if (typeof renderAdminSubmissionsTable === 'function') renderAdminSubmissionsTable();
+    if (document.getElementById('modal-submission-history') && !document.getElementById('modal-submission-history').classList.contains('hidden')) {
+      window.openSubmissionHistoryModal(userMssv, actId, round.id);
+    }
   } catch (err) {
-    console.error('Withdraw error:', err);
-    showToast('Lỗi khi rút bài: ' + (err.message || String(err)), 'error');
+    console.error('Withdraw/delete error:', err);
+    showToast('Lỗi khi rút/xóa bài: ' + (err.message || String(err)), 'error');
   }
+};
+
+window.adminDeleteStudentSubmission = async function(studentId, actId, roundId, attemptNum) {
+  return window.withdrawStudentSubmission(actId, attemptNum, roundId, studentId);
 };
 
 // 7. ADMIN ACTIVITY SUBMISSIONS DASHBOARD
@@ -597,6 +612,11 @@ window.renderAdminSubmissionsTable = function() {
               📜 Lịch sử (${rules.attemptsHistory.length})
             </button>
           ` : ''}
+          ${current && current.status !== 'withdrawn' ? `
+            <button type="button" onclick="adminDeleteStudentSubmission('${student.studentId}', '${act.id}', '${round.id}', ${current.attempt || 1})" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded text-[11px] transition-colors cursor-pointer" title="Xóa bài nộp sai để sinh viên nộp lại">
+              🗑️ Xóa bài
+            </button>
+          ` : ''}
           <button type="button" onclick="openSubmissionOverrideModal('${student.studentId}', '${act.id}', '${round.id}')" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold rounded text-[11px] transition-colors">
             ⭐ Gia hạn/Lượt
           </button>
@@ -604,6 +624,19 @@ window.renderAdminSubmissionsTable = function() {
       </tr>
     `;
   }).join('');
+};
+
+// Quick helper for granting extra attempts
+window.setQuickExtraAttempts = function(n) {
+  const inputEl = document.getElementById('sub-override-extra-attempts');
+  const reasonEl = document.getElementById('sub-override-reason');
+  if (inputEl) {
+    const currentVal = parseInt(inputEl.value, 10) || 0;
+    inputEl.value = Math.max(1, currentVal + n);
+  }
+  if (reasonEl && (!reasonEl.value.trim() || reasonEl.value.includes('Cấp thêm lượt'))) {
+    reasonEl.value = `Cấp thêm ${n} lượt nộp lại do sinh viên nộp sai/cần cập nhật bản mới.`;
+  }
 };
 
 // 8. DEADLINE & ATTEMPTS OVERRIDE MODAL
@@ -703,6 +736,12 @@ window.saveSubmissionOverride = async function() {
   showToast('Đã lưu quyết định gia hạn thành công!', 'success');
   closeSubmissionOverrideModal();
   renderAdminSubmissionsTable();
+  if (typeof loadStudentRoundActivities === 'function') {
+    loadStudentRoundActivities(round.id);
+  }
+  if (typeof renderStudentGraduationTimeline === 'function') {
+    renderStudentGraduationTimeline(round);
+  }
 };
 
 // 9. SUBMISSION HISTORY MODAL
@@ -713,10 +752,18 @@ window.openSubmissionHistoryModal = function(studentId, actId, roundId) {
 
   const stInfo = document.getElementById('sub-hist-student-info');
   const actInfo = document.getElementById('sub-hist-activity-info');
+  const histHeaderActionEl = document.getElementById('sub-hist-header-action');
   const listEl = document.getElementById('sub-hist-list');
 
   if (stInfo) stInfo.textContent = `Sinh viên: ${studentId}`;
   if (actInfo) actInfo.textContent = `Mốc Kế hoạch: ${act.title}`;
+  if (histHeaderActionEl) {
+    histHeaderActionEl.innerHTML = `
+      <button type="button" onclick="closeSubmissionHistoryModal(); openSubmissionOverrideModal('${studentId}', '${act.id}', '${round.id}')" class="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold rounded-lg text-xs transition-colors flex items-center gap-1 cursor-pointer">
+        ⭐ Cấp thêm lượt / Gia hạn
+      </button>
+    `;
+  }
 
   const subRecord = round.activitySubmissions?.[actId]?.[studentId];
   const history = Array.isArray(subRecord?.attempts) ? subRecord.attempts : [];
@@ -744,9 +791,15 @@ window.openSubmissionHistoryModal = function(studentId, actId, roundId) {
           <div class="font-mono text-[11px] text-slate-800 bg-slate-50 p-2 rounded border border-slate-100 select-all">
             📁 ${fName} (${fSize})
           </div>
-          <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-0.5">
-            <span>Mã biên nhận: ${att.receiptId || '--'}</span>
-            <span>Nộp bởi: ${att.submittedBy || '--'}</span>
+          <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-1 border-t border-slate-100 mt-1">
+            <span>Mã biên nhận: ${att.receiptId || '--'} • Nộp bởi: ${att.submittedBy || '--'}</span>
+            <div class="flex items-center gap-1.5">
+              ${att.status !== 'withdrawn' ? `
+                <button type="button" onclick="adminDeleteStudentSubmission('${studentId}', '${act.id}', '${round.id}', ${att.attempt || (idx + 1)})" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded text-[10px] transition-colors cursor-pointer" title="Xóa lần nộp này để sinh viên nộp lại">
+                  🗑️ Xóa lần nộp này
+                </button>
+              ` : ''}
+            </div>
           </div>
         </div>
       `;

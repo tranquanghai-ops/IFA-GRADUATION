@@ -323,10 +323,19 @@ window.renderStudentSubmissionPanel = function(act, round) {
 
   const deadlineStr = rules.effectiveDeadline ? fmtIsoToVietnameseDateTime(rules.effectiveDeadline.toISOString()) : 'Không giới hạn';
   const deadlineCountdown = rules.effectiveDeadline && Number.isFinite(rules.effectiveDeadline.getTime())
-    ? `<div class="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-800">
-         <span class="text-base">⏳</span>
-         <span>Kết thúc nhận bài:</span>
-         <strong data-student-countdown-at="${escapeHtml(rules.effectiveDeadline.toISOString())}" data-student-countdown-done="Đã hết hạn" class="text-rose-600 font-black text-xs sm:text-sm tracking-wide">Đang tính…</strong>
+    ? `<div class="p-3.5 sm:p-4 rounded-2xl border-2 border-rose-300 bg-rose-50/90 shadow-sm" aria-live="off">
+         <div class="flex flex-wrap items-center justify-between gap-3">
+           <div class="flex items-center gap-2.5 sm:gap-3 text-slate-900">
+             <span class="text-2xl sm:text-3xl select-none leading-none">⏳</span>
+             <div>
+               <span class="text-[11px] sm:text-xs font-black uppercase tracking-wider text-rose-700 block">Thời gian còn lại đến hạn chót</span>
+               <span class="text-xs sm:text-sm font-bold text-slate-700">Kết thúc nhận bài:</span>
+             </div>
+           </div>
+           <div class="text-right ml-auto sm:ml-0">
+             <strong data-student-countdown-at="${escapeHtml(rules.effectiveDeadline.toISOString())}" data-student-countdown-done="Đã hết hạn" class="text-rose-600 font-black font-mono text-base sm:text-xl lg:text-2xl tracking-tight block">Đang tính…</strong>
+           </div>
+         </div>
        </div>` : '';
 
   const acceptAttr = (cfg.acceptedExtensions || ['pdf']).map(e => '.' + e.replace(/^\./, '')).join(',');
@@ -348,7 +357,7 @@ window.renderStudentSubmissionPanel = function(act, round) {
             const fName = att.files?.[0]?.validatedName || att.files?.[0]?.originalName || 'file';
             const fSize = att.files?.[0]?.size ? (att.files[0].size / (1024 * 1024)).toFixed(1) + ' MB' : '';
             return `
-              <div class="p-2 bg-white rounded-lg border ${isLatest ? 'border-emerald-300 shadow-xs' : 'border-slate-200 opacity-80'} flex items-center justify-between text-xs">
+              <div class="p-2.5 bg-white rounded-xl border ${isLatest ? 'border-emerald-300 shadow-xs' : 'border-slate-200 opacity-90'} flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div>
                   <div class="flex items-center gap-1.5">
                     <span class="font-bold ${isLatest ? 'text-emerald-900' : 'text-slate-700'}">Lần ${att.attempt || (idx + 1)}</span>
@@ -359,11 +368,18 @@ window.renderStudentSubmissionPanel = function(act, round) {
                   <span class="text-[11px] text-slate-600 font-mono block truncate max-w-xs mt-0.5">${fName} (${fSize})</span>
                   <span class="text-[10px] text-slate-400 font-mono block">Biên nhận: ${att.receiptId || '--'} • ${timeFormatted}</span>
                 </div>
-                ${isLatest && att.status !== 'withdrawn' ? `
-                  <button type="button" onclick="withdrawStudentSubmission('${act.id}', ${att.attempt || 1}, '${round.id}')" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded text-[10px] font-bold transition-colors">
-                    Rút bài
-                  </button>
-                ` : ''}
+                <div class="flex items-center gap-1.5">
+                  ${isLatest && att.status !== 'withdrawn' ? `
+                    <button type="button" onclick="withdrawStudentSubmission('${act.id}', ${att.attempt || 1}, '${round.id}')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[10px] font-bold transition-colors cursor-pointer">
+                      Rút bài
+                    </button>
+                  ` : ''}
+                  ${state.isAdmin && att.status !== 'withdrawn' ? `
+                    <button type="button" onclick="adminDeleteStudentSubmission('${userMssv}', '${act.id}', '${round.id}', ${att.attempt || (idx + 1)})" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-bold transition-colors cursor-pointer" title="Admin xóa bài nộp sai để sinh viên nộp lại">
+                      🗑️ Xóa bài (Admin)
+                    </button>
+                  ` : ''}
+                </div>
               </div>
             `;
           }).join('')}
@@ -374,22 +390,23 @@ window.renderStudentSubmissionPanel = function(act, round) {
 
   return `
     <div id="sub-panel-${act.id}" class="mt-3 p-3.5 bg-emerald-50/70 border border-emerald-200 text-slate-800 rounded-2xl text-xs space-y-3 shadow-xs">
-      <div class="flex items-center justify-between gap-2 border-b border-emerald-200/70 pb-2">
-        <div class="flex items-center gap-2">
-          <span class="text-lg">📥</span>
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/70 pb-3">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl sm:text-3xl select-none leading-none">📥</span>
           <div>
-            <span class="font-black text-emerald-950 text-xs sm:text-sm block">Nộp bài trực tuyến</span>
-            <span class="text-[10px] text-emerald-800 font-mono">Hạn nộp: ${deadlineStr}</span>
+            <span class="font-black text-emerald-950 text-sm sm:text-base tracking-tight block">Nộp bài trực tuyến</span>
+            <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
+              <span class="text-xs sm:text-sm text-emerald-900 font-bold">Hạn nộp:</span>
+              <span class="text-xs sm:text-sm font-black font-mono px-2.5 py-0.5 rounded-lg bg-emerald-100/90 text-emerald-950 border border-emerald-300 shadow-2xs">${deadlineStr}</span>
+            </div>
           </div>
         </div>
-        ${statusBadge}
+        <div class="shrink-0">
+          ${statusBadge}
+        </div>
       </div>
 
-      ${deadlineCountdown ? `
-        <div class="rounded-xl border border-rose-200 bg-rose-50/50 px-3.5 py-2.5 shadow-2xs" aria-live="off">
-          ${deadlineCountdown}
-        </div>
-      ` : ''}
+      ${deadlineCountdown}
 
       <!-- Constraints notice -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-white p-2.5 rounded-xl border border-slate-200/80">
@@ -406,8 +423,15 @@ window.renderStudentSubmissionPanel = function(act, round) {
           <span class="font-bold text-slate-800">${cfg.maxFiles || 1} file</span>
         </div>
         <div>
-          <span class="text-[10px] text-slate-400 block uppercase font-bold">Lượt nộp còn lại</span>
-          <span class="font-bold font-mono ${rules.remainingAttempts > 0 ? 'text-emerald-700' : 'text-rose-600'}">${rules.remainingAttempts} / ${rules.totalAllowedAttempts}</span>
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] text-slate-400 block uppercase font-bold">Lượt nộp còn lại</span>
+            ${state.isAdmin ? `
+              <button type="button" onclick="openSubmissionOverrideModal('${userMssv}', '${act.id}', '${round.id}')" title="Cấp thêm lượt cho sinh viên" class="text-[10px] px-1.5 py-0.2 bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold rounded cursor-pointer transition-colors">
+                + Thêm lượt
+              </button>
+            ` : ''}
+          </div>
+          <span class="font-bold font-mono text-xs sm:text-sm ${rules.remainingAttempts > 0 ? 'text-emerald-700' : 'text-rose-600'}">${rules.remainingAttempts} / ${rules.totalAllowedAttempts}</span>
         </div>
       </div>
 

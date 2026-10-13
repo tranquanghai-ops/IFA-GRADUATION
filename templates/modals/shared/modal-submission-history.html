@@ -9,9 +9,12 @@
         </h4>
         <button type="button" onclick="closeSubmissionHistoryModal()" class="text-slate-600 hover:text-slate-900 font-bold p-1">✕</button>
       </div>
-      <div class="p-4 bg-slate-50 border-b border-slate-200">
-        <div class="font-bold text-slate-900 text-xs" id="sub-hist-student-info">Sinh viên: ...</div>
-        <div class="text-[11px] text-slate-500 mt-0.5" id="sub-hist-activity-info">Mốc: ...</div>
+      <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div class="font-bold text-slate-900 text-xs" id="sub-hist-student-info">Sinh viên: ...</div>
+          <div class="text-[11px] text-slate-500 mt-0.5" id="sub-hist-activity-info">Mốc: ...</div>
+        </div>
+        <div id="sub-hist-header-action"></div>
       </div>
       <div class="p-4 flex-1 overflow-auto space-y-3" id="sub-hist-list">
         <!-- Rendered dynamically -->
@@ -22,4 +25,4 @@
     </div>
   </div>
 
-  <!-- ============================================================================
+  <!-- ============================================================================
