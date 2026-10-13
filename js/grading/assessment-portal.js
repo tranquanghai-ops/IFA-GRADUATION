@@ -117,10 +117,17 @@ export function checkUserAssessmentCapabilities(round, userEmail = null, userId 
   const allRegs = (state.adminReviewData?.roundId === round.id && state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0)
     ? state.adminReviewData.registrations
     : (round.registrations && round.registrations.length > 0 ? round.registrations : (round.eligibleStudents || []));
+  const officialSources = [
+    ...(Array.isArray(round.officialAssignments) ? round.officialAssignments.filter(a => !a.assignmentStatus || a.assignmentStatus === 'published') : []),
+    ...allRegs
+  ];
 
-  const hasSupervisedStudents = allRegs.some(s => {
+  const hasSupervisedStudents = officialSources.some(s => {
     const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(s) : [];
-    return officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase().trim() === uEmail));
+    if (officials.some(sup => sup.supervisorId === uId || (sup.supervisorEmail && sup.supervisorEmail.toLowerCase().trim() === uEmail) || (sup.email && sup.email.toLowerCase().trim() === uEmail))) return true;
+    if (Array.isArray(s.supervisorEmails) && uEmail && s.supervisorEmails.some(e => String(e || '').toLowerCase().trim() === uEmail)) return true;
+    if (Array.isArray(s.supervisorIds) && uId && s.supervisorIds.some(id => String(id || '').trim() === String(uId).trim())) return true;
+    return false;
   });
 
   // Check reviewer assignments

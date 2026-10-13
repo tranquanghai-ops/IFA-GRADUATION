@@ -181,6 +181,12 @@ assert.match(coreJs, /path\.includes\('\/supervisor'\)[\s\S]*?window\.history\.r
 assert.match(stylesCss, /#modal-council-workspace #cws-col-grading:not\(\.hidden\) \{[\s\S]*?overflow-y: auto !important;[\s\S]*?touch-action: pan-y !important;/);
 assert.doesNotMatch(stylesCss, /#modal-council-workspace #cws-col-grading:not\(\.hidden\)[^{]*\{[\s\S]*?overflow: hidden !important;/);
 
+// 10. GVHD round selector only shows rounds where supervisor participates/guides students (including Admin viewing GVHD portal)
+assert.match(supervisor, /async function checkSupervisorParticipatesInRound/);
+assert.match(supervisor, /const filteredRounds = validRounds\.filter\(r => participatingRoundIds\.has\(r\.id\)\)/);
+assert.doesNotMatch(supervisor, /if \(filteredRounds\.length === 0 && validRounds\.length > 0\) \{\s*filteredRounds = \[validRounds\.find/);
+
 console.log('Current regression checks passed.');
+
 
 

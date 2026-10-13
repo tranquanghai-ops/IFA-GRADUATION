@@ -8,8 +8,8 @@ import './js/core.js';
 import './js/ui.js';
 
 // 2. Foundation Data & Masters
-import './js/supervisors.js?v=1.0.1';
-import './js/students.js?v=1.0.1';
+import './js/supervisors.js?v=1.0.1.2';
+import './js/students.js?v=1.0.1.2';
 
 // 3. Rounds, Planning & Google Drive
 import './js/rounds.js';
@@ -17,10 +17,10 @@ import './js/planning.js';
 import './js/drive.js';
 
 // 4. Councils, Rubric Scoring & Grading
-import './js/grading.js?v=1.0.1';
+import './js/grading.js?v=1.0.1.2';
 
 // 5. Exact Act-As Impersonation Test Mode
-import './js/impersonation.js';
+import './js/impersonation.js?v=1.0.1.2';
 
 // 6. User Activity & Login Tracker
 import './js/tracking/user-activity-tracker.js';

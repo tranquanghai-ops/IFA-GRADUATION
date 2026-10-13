@@ -42,21 +42,231 @@ window.initSupervisorPortal = async function() {
   if (deniedCard) deniedCard.classList.add('hidden');
   if (workspaceContainer) workspaceContainer.classList.remove('hidden');
 
-  // Populate round selector filtered to rounds supervisor participates in (or all for admin)
+  if (!state.roundsLoaded && (!state.rounds || state.rounds.length === 0)) {
+    document.getElementById('supervisor-round-loading')?.classList.remove('hidden');
+    document.getElementById('supervisor-not-assigned-alert')?.classList.add('hidden');
+    document.getElementById('supervisor-sub-tabs-container')?.classList.add('hidden');
+    document.getElementById('sup-panel-assigned')?.classList.add('hidden');
+    return;
+  }
+
+  // Populate round selector strictly filtered to rounds where this supervisor guides students
   const supervisorRounds = await renderSupervisorRoundsDropdown();
 
-  // Prefer a round where this supervisor is actually in the round roster.
-  // This prevents the active round of another semester from incorrectly
-  // showing "không tham gia" when the teacher belongs to a later round.
-  const currentRoundId = document.getElementById('supervisor-round-select')?.value
-    || supervisorRounds?.[0]?.id
-    || state.selectedRoundId
-    || state.activeRound?.id
-    || (state.rounds && state.rounds[0]?.id);
+  if (!supervisorRounds || supervisorRounds.length === 0) {
+    document.getElementById('supervisor-round-loading')?.classList.add('hidden');
+    const matchingMaster = (state.supervisorsMaster || []).find(s =>
+      (s.email || '').toLowerCase().trim() === emailLower ||
+      (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
+      (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower) ||
+      (s.institutionalEmail && s.institutionalEmail.toLowerCase().trim() === emailLower) ||
+      (actor.uid && (s.id === actor.uid || s.supervisorId === actor.uid))
+    );
+    const supDisplayName = matchingMaster?.name || actor.displayName || 'Thầy/Cô';
+    const greetingEl = document.getElementById('supervisor-greeting-name');
+    if (greetingEl) greetingEl.innerHTML = `Kính chào Thầy/Cô<br class="sm:hidden"> <span class="font-black">${escapeHtml(supDisplayName)}</span>`;
+    const roundInfoEl = document.getElementById('supervisor-round-info');
+    if (roundInfoEl) roundInfoEl.textContent = 'Chưa có đợt tốt nghiệp tham gia hướng dẫn';
+    const statAssignedEl = document.getElementById('sup-stat-assigned-total');
+    if (statAssignedEl) statAssignedEl.textContent = '0';
+    document.getElementById('supervisor-round-timeline')?.classList.add('hidden');
+    document.getElementById('supervisor-plan-section')?.classList.add('hidden');
+    document.getElementById('supervisor-sub-tabs-container')?.classList.add('hidden');
+    document.getElementById('sup-panel-assigned')?.classList.add('hidden');
+    document.getElementById('sup-panel-review')?.classList.add('hidden');
+    document.getElementById('sup-panel-accepted')?.classList.add('hidden');
+    document.getElementById('supervisor-not-assigned-alert')?.classList.remove('hidden');
+    return;
+  }
+
+  const currentRoundId = (supervisorRounds.some(r => r.id === state.selectedRoundId) ? state.selectedRoundId : null)
+    || document.getElementById('supervisor-round-select')?.value
+    || supervisorRounds[0]?.id;
   if (currentRoundId) {
     await loadSupervisorPortalData(currentRoundId);
   }
 };
+
+async function checkSupervisorParticipatesInRound(round, actor, matchingMaster, baseIdentityIds) {
+  if (!round || !round.id) return false;
+  const roundId = round.id;
+  const emailLower = (actor?.email || '').toLowerCase().trim();
+  const isStaffOrAdmin = Boolean(actor?.isAdmin || (emailLower && emailLower.endsWith('@tdtu.edu.vn')));
+
+  const [supSnap, elSnap] = await Promise.all([
+    getDocs(collection(db, 'graduationRounds', roundId, 'supervisors')).catch(() => null),
+    getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents')).catch(() => null)
+  ]);
+
+  const supDocs = supSnap && supSnap.docs ? supSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+  const roundSupervisor = supDocs.find(s =>
+    (s.email || '').toLowerCase().trim() === emailLower ||
+    (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
+    (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower) ||
+    (s.institutionalEmail && s.institutionalEmail.toLowerCase().trim() === emailLower) ||
+    baseIdentityIds.has(String(s.id || '').trim()) ||
+    baseIdentityIds.has(String(s.supervisorId || '').trim())
+  );
+
+  const currentSup = roundSupervisor || matchingMaster;
+  const candidateEmails = new Set([
+    emailLower,
+    currentSup?.email,
+    currentSup?.institutionalEmail,
+    currentSup?.personalEmail,
+    matchingMaster?.email,
+    matchingMaster?.personalEmail,
+    matchingMaster?.institutionalEmail,
+    roundSupervisor?.email,
+    roundSupervisor?.institutionalEmail,
+    roundSupervisor?.personalEmail,
+    ...(Array.isArray(currentSup?.emails) ? currentSup.emails : []),
+    ...(Array.isArray(matchingMaster?.emails) ? matchingMaster.emails : []),
+    ...(Array.isArray(roundSupervisor?.emails) ? roundSupervisor.emails : [])
+  ].filter(Boolean).map(e => String(e).toLowerCase().trim()));
+
+  const mySupId = currentSup?.id || currentSup?.supervisorId || matchingMaster?.id || matchingMaster?.supervisorId;
+  const supervisorIdsSet = new Set([
+    mySupId,
+    ...baseIdentityIds,
+    roundSupervisor?.id,
+    roundSupervisor?.supervisorId,
+    matchingMaster?.id,
+    matchingMaster?.supervisorId
+  ].filter(Boolean).map(v => String(v).trim()));
+
+  const currentSupName = (currentSup?.name || '').toLowerCase().trim();
+
+  const eligibleMap = new Map();
+  let hasEligibleStudentsList = false;
+  if (elSnap && !elSnap.empty) {
+    hasEligibleStudentsList = true;
+    elSnap.docs.forEach(d => {
+      const dData = d.data() || {};
+      const key = String(d.id || dData.studentId || dData.mssv || '').trim().toUpperCase();
+      if (key && dData.eligible !== false) {
+        eligibleMap.set(key, true);
+      }
+    });
+  }
+  const isStudentEligible = (stId) => {
+    if (!hasEligibleStudentsList) return true;
+    return eligibleMap.has(String(stId || '').trim().toUpperCase());
+  };
+
+  const isAssignedToThisSupervisor = (item) => {
+    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(item) : [];
+    if (officials.length > 0) {
+      return officials.some(s => {
+        const sId = String(s.supervisorId || s.id || '').trim();
+        if (sId && supervisorIdsSet.has(sId)) return true;
+        const sEmail = (s.email || s.supervisorEmail || '').toLowerCase().trim();
+        if (sEmail && candidateEmails.has(sEmail)) return true;
+        if (currentSupName && s.supervisorName && s.supervisorName.toLowerCase().trim() === currentSupName) return true;
+        return false;
+      });
+    }
+    const itemSupId = String(item.acceptedSupervisorId || item.finalSupervisorId || item.supervisorId || '').trim();
+    if (itemSupId && supervisorIdsSet.has(itemSupId)) return true;
+
+    const itemEmail = (item.supervisorEmail || '').toLowerCase().trim();
+    if (itemEmail && candidateEmails.has(itemEmail)) return true;
+    if (Array.isArray(item.supervisorEmails) && item.supervisorEmails.some(e => candidateEmails.has((e || '').toLowerCase().trim()))) return true;
+    if (Array.isArray(item.supervisorIds) && item.supervisorIds.some(id => supervisorIdsSet.has(String(id).trim()))) return true;
+
+    if (currentSupName && ((item.acceptedSupervisorName && item.acceptedSupervisorName.toLowerCase().trim() === currentSupName) || (item.supervisorName && item.supervisorName.toLowerCase().trim() === currentSupName))) return true;
+    return false;
+  };
+
+  let publishedAssignments = [];
+  try {
+    const assignmentRef = collection(db, 'graduationRounds', roundId, 'officialAssignments');
+    let assignmentSnap = null;
+    for (const candEmail of candidateEmails) {
+      if (!candEmail) continue;
+      try {
+        const q = query(
+          assignmentRef,
+          where('assignmentStatus', '==', 'published'),
+          where('supervisorEmails', 'array-contains', candEmail)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          assignmentSnap = snap;
+          break;
+        }
+      } catch (qErr) {}
+    }
+    if ((!assignmentSnap || assignmentSnap.empty) && isStaffOrAdmin) {
+      try {
+        assignmentSnap = await getDocs(query(assignmentRef, where('assignmentStatus', '==', 'published')));
+      } catch (e) {}
+    }
+    if (!assignmentSnap || assignmentSnap.empty) {
+      try {
+        assignmentSnap = await getDocs(query(assignmentRef, where('assignmentStatus', '==', 'published')));
+      } catch (e1) {
+        try {
+          assignmentSnap = await getDocs(assignmentRef);
+        } catch (e2) {}
+      }
+    }
+    if (assignmentSnap && assignmentSnap.docs && assignmentSnap.docs.length > 0) {
+      publishedAssignments = assignmentSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(d => !d.assignmentStatus || d.assignmentStatus === 'published');
+    } else if (Array.isArray(round.officialAssignments)) {
+      publishedAssignments = round.officialAssignments.filter(d => !d.assignmentStatus || d.assignmentStatus === 'published');
+    }
+  } catch (err) {
+    if (Array.isArray(round.officialAssignments)) {
+      publishedAssignments = round.officialAssignments.filter(d => !d.assignmentStatus || d.assignmentStatus === 'published');
+    }
+  }
+
+  const hasOfficialAssigned = publishedAssignments.some(item => {
+    const studentId = String(item.studentId || item.id).trim().toUpperCase();
+    return isStudentEligible(studentId) && isAssignedToThisSupervisor(item);
+  });
+  if (hasOfficialAssigned) return true;
+
+  if (round.status === 'published' || round.reviewStatus === 'completed' || (!isDirectSupervisorAssignment(round) && !round.isAssigned && Boolean(roundSupervisor))) {
+    let allRegs = [];
+    try {
+      const regSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'registrations'));
+      if (regSnap && regSnap.docs && regSnap.docs.length > 0) {
+        allRegs = regSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } else if (Array.isArray(round.registrations)) {
+        allRegs = round.registrations;
+      }
+    } catch (e) {
+      allRegs = Array.isArray(round.registrations) ? round.registrations : [];
+    }
+    if (round.status === 'published' || round.reviewStatus === 'completed') {
+      const hasLegacyAssigned = allRegs.some(r => {
+        const studentId = String(r.studentId || r.id).trim().toUpperCase();
+        return isStudentEligible(studentId) && isAssignedToThisSupervisor(r);
+      });
+      if (hasLegacyAssigned) return true;
+    }
+    if (!isDirectSupervisorAssignment(round) && !round.isAssigned && Boolean(roundSupervisor)) {
+      const hasCandidatePrefs = allRegs.some(r => {
+        const studentId = String(r.studentId || r.id).trim().toUpperCase();
+        if (!isStudentEligible(studentId)) return false;
+        if (isAssignedToThisSupervisor(r)) return true;
+        const prefs = Array.isArray(r.preferences) ? r.preferences : [];
+        return prefs.some(p => {
+          const pId = String(p.supervisorId || p.id || '').trim();
+          const pEmail = String(p.supervisorEmail || p.email || '').toLowerCase().trim();
+          return (pId && supervisorIdsSet.has(pId)) || (pEmail && candidateEmails.has(pEmail));
+        });
+      });
+      if (hasCandidatePrefs) return true;
+    }
+  }
+
+  return false;
+}
 
 window.renderSupervisorRoundsDropdown = async function() {
   const select = document.getElementById('supervisor-round-select');
@@ -67,65 +277,49 @@ window.renderSupervisorRoundsDropdown = async function() {
   const lockedBadge = document.getElementById('sup-round-locked-badge');
   const validRounds = (state.rounds || []).filter(r => !r.deleted);
 
-  // Check if session is locked to a specific round
-  const lockedRoundId = (state.impersonation && state.impersonation.target && state.impersonation.target.roundId) || '';
-
-  if (lockedRoundId) {
-    state.selectedRoundId = lockedRoundId;
-    const lockedRound = validRounds.find(r => r.id === lockedRoundId);
-    if (lockedRound) state.activeRound = lockedRound;
-
-    const roundTitle = lockedRound ? `${lockedRound.title} (${lockedRound.academicYear || ''})` : `Đợt: ${lockedRoundId}`;
-
-    select.innerHTML = `<option value="${lockedRoundId}" selected>${roundTitle}</option>`;
-    select.disabled = true;
-    select.className = 'bg-slate-900/80 text-white border border-white/25 rounded-xl px-3 py-1.5 text-xs font-bold max-w-full truncate';
-    if (lockedBadge) lockedBadge.classList.remove('hidden');
-    if (toolbar) toolbar.classList.add('hidden');
-    return lockedRound ? [lockedRound] : [];
-  }
-
-  // Not locked - normal dropdown
   select.disabled = false;
   select.className = 'bg-slate-900/80 hover:bg-slate-900 text-white border border-white/25 rounded-xl px-3 py-1.5 text-xs font-bold focus:ring-2 focus:ring-amber-400 focus:outline-none transition-all cursor-pointer max-w-full truncate';
   if (lockedBadge) lockedBadge.classList.add('hidden');
 
   const emailLower = (actor.email || '').toLowerCase().trim();
-  let filteredRounds = validRounds;
-  if (!actor.isAdmin) {
-    // The source of truth is the per-round supervisors subcollection. Round
-    // documents may not carry a legacy `supervisors` array, which previously
-    // hid a teacher's newly added T4/2027 round.
-    const matchingMaster = (state.supervisorsMaster || []).find(s =>
-      String(s.email || '').toLowerCase().trim() === emailLower ||
-      (actor.uid && (s.id === actor.uid || s.supervisorId === actor.uid))
-    );
-    const supervisorIdentityIds = new Set([
-      actor.uid,
-      matchingMaster?.id,
-      matchingMaster?.supervisorId
-    ].filter(Boolean).map(value => String(value).trim()));
-    const membership = await Promise.all(validRounds.map(async r => {
-      try {
-        const snap = await getDocs(collection(db, 'graduationRounds', r.id, 'supervisors'));
-        const isMember = snap.docs.some(d => {
-          const data = d.data() || {};
-          const roundSupervisorIds = [d.id, data.supervisorId, data.id]
-            .filter(Boolean)
-            .map(value => String(value).trim());
-          return String(data.email || '').toLowerCase().trim() === emailLower ||
-            roundSupervisorIds.some(id => supervisorIdentityIds.has(id));
-        });
-        return [r.id, isMember];
-      } catch (error) {
-        console.warn(`[Supervisor] Cannot check round membership for ${r.id}:`, error);
-        return [r.id, false];
-      }
-    }));
-    const memberRoundIds = new Set(membership.filter(([, isMember]) => isMember).map(([id]) => id));
-    filteredRounds = validRounds.filter(r => memberRoundIds.has(r.id));
-    if (filteredRounds.length === 0 && validRounds.length > 0) {
-      filteredRounds = [validRounds.find(r => r.isActive) || validRounds[0]];
+  const matchingMaster = (state.supervisorsMaster || []).find(s =>
+    String(s.email || '').toLowerCase().trim() === emailLower ||
+    (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
+    (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower) ||
+    (s.institutionalEmail && s.institutionalEmail.toLowerCase().trim() === emailLower) ||
+    (actor.uid && (s.id === actor.uid || s.supervisorId === actor.uid))
+  );
+  const supervisorIdentityIds = new Set([
+    actor.uid,
+    matchingMaster?.id,
+    matchingMaster?.supervisorId
+  ].filter(Boolean).map(value => String(value).trim()));
+
+  const participation = await Promise.all(validRounds.map(async r => {
+    try {
+      const participates = await checkSupervisorParticipatesInRound(r, actor, matchingMaster, supervisorIdentityIds);
+      return [r.id, participates];
+    } catch (error) {
+      console.warn(`[Supervisor] Cannot check round participation for ${r.id}:`, error);
+      return [r.id, false];
+    }
+  }));
+  const participatingRoundIds = new Set(participation.filter(([, participates]) => participates).map(([id]) => id));
+  const filteredRounds = validRounds.filter(r => participatingRoundIds.has(r.id));
+
+  const lockedRoundId = (state.impersonation && state.impersonation.target && state.impersonation.target.roundId) || '';
+  if (filteredRounds.length > 0) {
+    let activeSelectionId = state.selectedRoundId;
+    if (lockedRoundId && filteredRounds.some(r => r.id === lockedRoundId)) {
+      activeSelectionId = lockedRoundId;
+    } else if (!activeSelectionId || !filteredRounds.some(r => r.id === activeSelectionId)) {
+      const preferredRound = filteredRounds.find(r => r.isActive) || filteredRounds[0];
+      activeSelectionId = preferredRound.id;
+    }
+    state.selectedRoundId = activeSelectionId;
+    state.activeRound = filteredRounds.find(r => r.id === activeSelectionId) || state.activeRound;
+    if (state.impersonation?.target && state.impersonation.target.roundId && state.impersonation.target.roundId !== activeSelectionId) {
+      state.impersonation.target.roundId = activeSelectionId;
     }
   }
 
@@ -136,18 +330,27 @@ window.renderSupervisorRoundsDropdown = async function() {
   `).join('');
 
   if (filteredRounds.length === 0) {
-    select.innerHTML = '<option value="">-- Chưa có đợt tốt nghiệp --</option>';
+    select.innerHTML = '<option value="">-- Chưa có đợt tốt nghiệp tham gia --</option>';
+  } else {
+    select.value = state.selectedRoundId;
   }
-  if (toolbar) toolbar.classList.toggle('hidden', filteredRounds.length <= 1);
+  if (toolbar) toolbar.classList.toggle('hidden', filteredRounds.length === 0);
   return filteredRounds;
 };
 
 window.onSupervisorRoundSelected = async function(roundId) {
   if (!roundId) return;
-  const lockedRoundId = (state.impersonation && state.impersonation.target && state.impersonation.target.roundId) || '';
-  if (lockedRoundId && roundId !== lockedRoundId) {
-    showToast('Phiên đóng vai đang bị khóa trong đợt tốt nghiệp này.', 'warning');
-    return;
+  if (state.impersonation && state.impersonation.target) {
+    const selectedRound = (state.rounds || []).find(r => r.id === roundId);
+    state.impersonation.target.roundId = roundId;
+    if (selectedRound) {
+      state.impersonation.target.roundTitle = selectedRound.title || selectedRound.roundName || roundId;
+      state.impersonation.target.roundShortCode = selectedRound.shortCode || selectedRound.slug || '';
+      state.impersonation.target.roundAcademicYear = selectedRound.academicYear || '';
+    }
+    if (typeof window.applyImpersonationActor === 'function') {
+      window.applyImpersonationActor(state.impersonation.target);
+    }
   }
   state.selectedRoundId = roundId;
   state.activeRound = (state.rounds || []).find(r => r.id === roundId) || null;
@@ -344,13 +547,18 @@ window.loadSupervisorPortalData = async function(roundId) {
       }
     }
 
-    if (assignmentSnap && assignmentSnap.docs) {
+    if (assignmentSnap && assignmentSnap.docs && assignmentSnap.docs.length > 0) {
       publishedAssignments = assignmentSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(d => !d.assignmentStatus || d.assignmentStatus === 'published');
+    } else if (Array.isArray(round.officialAssignments)) {
+      publishedAssignments = round.officialAssignments.filter(d => !d.assignmentStatus || d.assignmentStatus === 'published');
     }
   } catch (err) {
     console.warn('[SupervisorPortal] Could not query published official assignments:', err);
+    if (Array.isArray(round.officialAssignments)) {
+      publishedAssignments = round.officialAssignments.filter(d => !d.assignmentStatus || d.assignmentStatus === 'published');
+    }
   }
 
   // 3. Fetch activities if not loaded
@@ -435,10 +643,7 @@ window.loadSupervisorPortalData = async function(roundId) {
     .filter(item => {
       const studentId = String(item.studentId || item.id).trim().toUpperCase();
       if (!isStudentEligible(studentId)) return false;
-      if (currentSup || mySupId) {
-        return isAssignedToThisSupervisor(item);
-      }
-      return true;
+      return isAssignedToThisSupervisor(item);
     });
 
   const legacyAssigned = (round.status === 'published' || round.reviewStatus === 'completed') ? allRegistrations.map(r => {
@@ -455,11 +660,7 @@ window.loadSupervisorPortalData = async function(roundId) {
   }).filter(r => {
     const studentId = String(r.studentId || r.id).trim().toUpperCase();
     if (!isStudentEligible(studentId)) return false;
-    if (currentSup || mySupId) {
-      return isAssignedToThisSupervisor(r);
-    }
-    const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
-    return officials.length > 0 || r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned';
+    return isAssignedToThisSupervisor(r);
   }) : [];
 
   const assignedMap = new Map();
@@ -468,18 +669,7 @@ window.loadSupervisorPortalData = async function(roundId) {
     if (key && !assignedMap.has(key) && isStudentEligible(key)) assignedMap.set(key, item);
   });
   const assigned = [...assignedMap.values()];
-
-  // Admin fallback: ONLY if pure admin who is NOT in the supervisor roster at all and has zero personal assignments
-  let displayStudents = assigned;
-  if (actor.isAdmin && !currentSup && assigned.length === 0) {
-    displayStudents = [...assignedMap.values()];
-    if (displayStudents.length === 0 && (round.status === 'published' || round.reviewStatus === 'completed')) displayStudents = allRegistrations.filter(r => {
-      const studentId = String(r.studentId || r.id).trim().toUpperCase();
-      if (!isStudentEligible(studentId)) return false;
-      const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(r) : [];
-      return officials.length > 0 || r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned';
-    });
-  }
+  const displayStudents = assigned;
 
   state.supervisorAssignedStudents = displayStudents;
 

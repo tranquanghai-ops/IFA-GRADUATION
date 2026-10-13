@@ -174,7 +174,8 @@ test('supervisor portal integrates round selector in banner and hides secondary 
   assert.match(app, /const isDirect = isDirectSupervisorAssignment\(round\)/);
   assert.match(app, /tabReviewBtn\.classList\.toggle\('hidden', isDirect\)/);
   assert.match(app, /tabAcceptedBtn\.classList\.toggle\('hidden', isDirect\)/);
-  assert.match(app, /toolbar\.classList\.toggle\('hidden', filteredRounds\.length <= 1\)/);
+  assert.match(app, /toolbar\.classList\.toggle\('hidden', filteredRounds\.length === 0\)/);
+  assert.match(app, /async function checkSupervisorParticipatesInRound/);
   assert.match(app, /isDirect && \(k === 'review' \|\| k === 'accepted'\)/);
   assert.match(app, /if \(btnGotoStudent\) \{ btnGotoStudent\.classList\.add\('hidden'\)/);
   assert.match(app, /if \(btnGotoAssessment\) \{\s*btnGotoAssessment\.classList\.add\('hidden'\)/);

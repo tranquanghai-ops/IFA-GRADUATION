@@ -24,8 +24,45 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
       : (typeof SAMPLE_SUPERVISORS !== 'undefined' ? SAMPLE_SUPERVISORS : []);
     if (roundFilter !== 'all') {
       try {
-        const roundSupervisorSnap = await getDocs(collection(db, 'graduationRounds', roundFilter, 'supervisors'));
-        sups = roundSupervisorSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const [roundSupervisorSnap, officialSnap] = await Promise.all([
+          getDocs(collection(db, 'graduationRounds', roundFilter, 'supervisors')).catch(() => null),
+          getDocs(collection(db, 'graduationRounds', roundFilter, 'officialAssignments')).catch(() => null)
+        ]);
+        if (roundSupervisorSnap && roundSupervisorSnap.docs) {
+          sups = roundSupervisorSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+        const publishedDocs = (officialSnap && officialSnap.docs)
+          ? officialSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !d.assignmentStatus || d.assignmentStatus === 'published')
+          : [];
+        if (publishedDocs.length > 0) {
+          const activeSupEmails = new Set();
+          const activeSupIds = new Set();
+          publishedDocs.forEach(asgn => {
+            const officials = (typeof window.getOfficialSupervisors === 'function') ? window.getOfficialSupervisors(asgn) : (asgn.officialSupervisors || []);
+            officials.forEach(o => {
+              if (o.supervisorId || o.id) activeSupIds.add(String(o.supervisorId || o.id).trim());
+              if (o.supervisorEmail || o.email) activeSupEmails.add(String(o.supervisorEmail || o.email).toLowerCase().trim());
+            });
+            if (Array.isArray(asgn.supervisorEmails)) {
+              asgn.supervisorEmails.forEach(e => { if (e) activeSupEmails.add(String(e).toLowerCase().trim()); });
+            }
+            if (Array.isArray(asgn.supervisorIds)) {
+              asgn.supervisorIds.forEach(id => { if (id) activeSupIds.add(String(id).trim()); });
+            }
+            if (asgn.acceptedSupervisorId || asgn.supervisorId) {
+              activeSupIds.add(String(asgn.acceptedSupervisorId || asgn.supervisorId).trim());
+            }
+            if (asgn.supervisorEmail) {
+              activeSupEmails.add(String(asgn.supervisorEmail).toLowerCase().trim());
+            }
+          });
+          sups = sups.filter(s => {
+            const sEmail = String(s.email || '').toLowerCase().trim();
+            const sId = String(s.id || '').trim();
+            const sSupId = String(s.supervisorId || '').trim();
+            return (sEmail && activeSupEmails.has(sEmail)) || (sId && activeSupIds.has(sId)) || (sSupId && activeSupIds.has(sSupId));
+          });
+        }
       } catch (error) {
         console.warn('[ActAs] Không thể tải GVHD của đợt:', error.message);
       }
