@@ -10,7 +10,7 @@ const studentId = '52200001';
 const otherStudentId = '52200002';
 const adminEmail = 'admin@tdtu.edu.vn';
 const supervisorEmail = 'gvhd@tdtu.edu.vn';
-const otherSupervisorEmail = 'other@tdtu.edu.vn';
+const otherSupervisorEmail = 'other.outsider@gmail.com';
 let env;
 
 const assignmentPath = id => `graduationRounds/${roundId}/officialAssignments/${id}`;
@@ -139,9 +139,10 @@ describe('officialAssignments least privilege', () => {
     await assertFails(updateDoc(doc(supervisorDb, draftPath(studentId)), { source: 'supervisor' }));
   });
 
-  test('GVHD không được list eligibleStudents và tài khoản TDTU thường không phải Admin', async () => {
+  test('Non-staff/outsider không được list eligibleStudents và GVHD không được ghi assignment', async () => {
+    const outsiderDb = env.authenticatedContext('outsider@gmail.com', auth('outsider@gmail.com')).firestore();
+    await assertFails(getDocs(collection(outsiderDb, `graduationRounds/${roundId}/eligibleStudents`)));
     const supervisorDb = env.authenticatedContext(supervisorEmail, auth(supervisorEmail)).firestore();
-    await assertFails(getDocs(collection(supervisorDb, `graduationRounds/${roundId}/eligibleStudents`)));
     await assertFails(setDoc(doc(supervisorDb, draftPath(otherStudentId)), {
       studentId: otherStudentId,
       assignmentStatus: 'draft',

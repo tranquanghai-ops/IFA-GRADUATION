@@ -12,7 +12,7 @@ service cloud.firestore {
     // ADMINS & ACCESS CONTROL
     // ==========================================
     match /settings/main {
-      allow read: if signedIn();
+      allow read: if owner();
       allow create, update, delete: if owner();
     }
 

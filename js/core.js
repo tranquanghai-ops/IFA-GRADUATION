@@ -372,6 +372,8 @@ export async function logImpersonationAudit(actionName, details = {}) {
     const roundId = details.roundId || actor.roundId || state.selectedRoundId || '';
 
     const auditPayload = {
+      actorEmail: realUser?.email || '',
+      by: realUser?.email || '',
       realAdminUid: realUser?.uid || '',
       realAdminEmail: realUser?.email || '',
       effectiveActorRole: actor.targetType || actor.roleLabel || '',

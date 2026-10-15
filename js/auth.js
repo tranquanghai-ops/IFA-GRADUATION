@@ -50,11 +50,13 @@ export async function setupAuthListener() {
         state.realIsOwner = isSystemOwner(user);
         state.isOwner = state.realIsOwner;
 
-        // 1.1 Tải thiết lập hệ thống và kích hoạt Realtime Listener
-        setupSystemSettingsRealtimeListener();
-        try {
-          await loadSystemSettingsDoc();
-        } catch (e) {}
+        // 1.1 Tải thiết lập hệ thống và kích hoạt Realtime Listener (chỉ dành riêng cho Owner)
+        if (state.realIsOwner) {
+          setupSystemSettingsRealtimeListener();
+          try {
+            await loadSystemSettingsDoc();
+          } catch (e) {}
+        }
 
         // 1.2 Khôi phục phiên đóng vai (chỉ dành riêng cho Owner)
         if (state.allowImpersonation && state.realIsOwner) {
