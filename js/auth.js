@@ -48,6 +48,7 @@ export async function setupAuthListener() {
 
         state.realIsAdmin = Boolean(state.isAdmin);
         state.realIsOwner = isSystemOwner(user);
+        state.isOwner = state.realIsOwner;
 
         // 1.1 Tải thiết lập hệ thống và kích hoạt Realtime Listener
         setupSystemSettingsRealtimeListener();
@@ -55,8 +56,8 @@ export async function setupAuthListener() {
           await loadSystemSettingsDoc();
         } catch (e) {}
 
-        // 1.2 Khôi phục phiên đóng vai (nếu có và hợp lệ)
-        if (state.allowImpersonation && state.realIsAdmin) {
+        // 1.2 Khôi phục phiên đóng vai (chỉ dành riêng cho Owner)
+        if (state.allowImpersonation && state.realIsOwner) {
           loadImpersonationSession();
         } else {
           try { sessionStorage.removeItem('ifa_graduation_impersonation'); } catch (e) {}
@@ -137,6 +138,7 @@ export async function setupAuthListener() {
       state.realUser = null;
       state.realIsAdmin = false;
       state.realIsOwner = false;
+      state.isOwner = false;
       state.impersonation = null;
       try { sessionStorage.removeItem('ifa_graduation_impersonation'); } catch (e) {}
       const gBanner = document.getElementById('global-impersonation-banner');
@@ -415,15 +417,25 @@ export function updateAuthUI() {
       }
     }
 
-    // Header Impersonate button visibility
+    // Header Impersonate button visibility (chỉ dành riêng cho Owner)
     const btnOpenImp = document.getElementById('btn-open-impersonate');
     if (btnOpenImp) {
-      if (state.realIsAdmin && state.allowImpersonation && !isImp) {
+      if (state.realIsOwner && state.allowImpersonation && !isImp) {
         btnOpenImp.classList.remove('hidden');
         btnOpenImp.classList.add('flex');
       } else {
         btnOpenImp.classList.add('hidden');
         btnOpenImp.classList.remove('flex');
+      }
+    }
+
+    // Khu vực điều hướng dành riêng cho Owner trong thanh bên Admin Portal
+    const ownerNavSection = document.getElementById('admin-nav-owner-section');
+    if (ownerNavSection) {
+      if (state.realIsOwner) {
+        ownerNavSection.classList.remove('hidden');
+      } else {
+        ownerNavSection.classList.add('hidden');
       }
     }
 

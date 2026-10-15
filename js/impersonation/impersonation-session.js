@@ -273,8 +273,8 @@ window.startImpersonating = async function(target) {
     showToast('Tính năng đóng vai hiện đang bị tắt trong Cài đặt hệ thống.', 'warning');
     return;
   }
-  if (!state.realIsAdmin) {
-    showToast('Chỉ Quản trị viên mới có quyền sử dụng tính năng này.', 'warning');
+  if (!state.realIsOwner) {
+    showToast('Chỉ Chủ sở hữu hệ thống (Owner) mới có quyền sử dụng tính năng đóng vai.', 'warning');
     return;
   }
 

@@ -962,6 +962,14 @@ window.toggleAdminRoundsAccordion = function(forceOpen) {
 };
 
 window.switchAdminTab = async function(tabKey) {
+  // Guard Owner-only tabs (Chỉ Owner mới được truy cập Quản lý Admin và Cài đặt hệ thống)
+  if ((tabKey === 'admin-management' || tabKey === 'system-settings') && !state.realIsOwner) {
+    if (typeof showToast === 'function') {
+      showToast('Từ chối truy cập: Chức năng này chỉ dành riêng cho Chủ sở hữu hệ thống (Owner).', 'error', 4000);
+    }
+    tabKey = 'rounds';
+  }
+
   state.currentAdminTab = tabKey;
 
   // 1. Always bind currentRoundId to state.selectedRoundId
@@ -982,7 +990,7 @@ window.switchAdminTab = async function(tabKey) {
   }
 
   // 3. Tab panels toggle
-  ['overview', 'review', 'rounds', 'faculty-students', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash', 'timeline', 'scoring-dashboard', 'system-settings', 'councils'].forEach(t => {
+  ['overview', 'review', 'rounds', 'faculty-students', 'supervisors-master', 'round-supervisors', 'eligible-students', 'project-types', 'registrations', 'preview-student', 'trash', 'timeline', 'scoring-dashboard', 'system-settings', 'admin-management', 'councils'].forEach(t => {
     const p = document.getElementById('atab-panel-' + t);
     if (p) {
       if (t === tabKey) p.classList.remove('hidden');
@@ -1016,6 +1024,9 @@ window.switchAdminTab = async function(tabKey) {
   else if (tabKey === 'trash') renderAdminTrashTable();
   else if (tabKey === 'scoring-dashboard') loadAdminScoringDashboard();
   else if (tabKey === 'system-settings') loadAdminSystemSettings();
+  else if (tabKey === 'admin-management') {
+    if (typeof window.loadAdminsList === 'function') await window.loadAdminsList();
+  }
   else if (tabKey === 'councils' && roundId) {
     if (typeof window.loadAdminRoundCouncils === 'function') await window.loadAdminRoundCouncils(roundId);
   }

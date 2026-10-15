@@ -335,8 +335,8 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
 window.gatherRoundCandidates = gatherRoundCandidates;
 
 window.openAdminImpersonateModal = function() {
-  if (!state.allowImpersonation || !state.realIsAdmin) {
-    showToast('Tính năng đóng vai chưa được bật trong Cài đặt hệ thống hoặc bạn không có quyền.', 'warning');
+  if (!state.allowImpersonation || !state.realIsOwner) {
+    showToast('Tính năng đóng vai chỉ dành riêng cho Chủ sở hữu hệ thống (Owner) và phải được bật trong Cài đặt hệ thống.', 'warning');
     return;
   }
 

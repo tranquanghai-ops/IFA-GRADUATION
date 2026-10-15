@@ -1,0 +1,95 @@
+<!-- ============================================================================
+     MODAL: ADD SYSTEM ADMIN / CẤP QUYỀN QUẢN TRỊ VIÊN (OWNER ONLY)
+     ============================================================================ -->
+<div id="modal-add-admin" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+  <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[92vh]">
+    <!-- Header -->
+    <div class="p-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-lg shadow-inner">
+          🛡️
+        </div>
+        <div>
+          <h4 class="font-black text-sm text-white uppercase tracking-tight">Cấp quyền Quản trị viên (Admin)</h4>
+          <p class="text-[11px] text-slate-400 font-medium">Chỉ Chủ sở hữu hệ thống (Owner) mới có quyền cấp quyền</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeAddAdminModal()" class="text-slate-400 hover:text-white font-bold p-1 text-base cursor-pointer transition-colors" title="Đóng">✕</button>
+    </div>
+
+    <!-- Form -->
+    <form id="form-add-admin" onsubmit="submitAddAdmin(event)" class="p-5 space-y-4 overflow-y-auto">
+      <!-- Input: Email -->
+      <div class="space-y-1.5">
+        <label for="add-admin-email" class="block font-bold text-slate-700 text-[11px] uppercase tracking-wider">
+          Email tài khoản Google <span class="text-rose-500">*</span>:
+        </label>
+        <div class="relative">
+          <input 
+            type="email" 
+            id="add-admin-email" 
+            name="email" 
+            required 
+            placeholder="vd: giaovien@tdtu.edu.vn hoặc account@gmail.com" 
+            class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            autocomplete="email"
+          >
+          <span class="absolute left-3 top-2.5 text-slate-400 text-sm">✉️</span>
+        </div>
+        <p class="text-[11px] text-slate-500 leading-relaxed">
+          Tài khoản Google dùng để đăng nhập. Quyền Admin sẽ được kích hoạt ngay lập tức hoặc tự động nhận diện khi người dùng đăng nhập lần đầu.
+        </p>
+      </div>
+
+      <!-- Input: Full Name -->
+      <div class="space-y-1.5">
+        <label for="add-admin-fullname" class="block font-bold text-slate-700 text-[11px] uppercase tracking-wider">
+          Họ và tên (Tùy chọn):
+        </label>
+        <div class="relative">
+          <input 
+            type="text" 
+            id="add-admin-fullname" 
+            name="fullName" 
+            placeholder="vd: TS. Nguyễn Văn A (chưa bắt buộc khi thêm)" 
+            class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+          >
+          <span class="absolute left-3 top-2.5 text-slate-400 text-sm">👤</span>
+        </div>
+        <p class="text-[11px] text-slate-500 leading-relaxed">
+          Nếu để trống, hệ thống sẽ tự động cập nhật tên khi người dùng đăng nhập Google lần đầu.
+        </p>
+      </div>
+
+      <!-- Information & Security Note -->
+      <div class="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-950 text-xs space-y-1.5">
+        <div class="flex items-center gap-1.5 font-bold text-blue-900">
+          <span>ℹ️</span> <span>Nguyên tắc phân quyền Quản trị viên (Admin):</span>
+        </div>
+        <ul class="list-disc pl-5 space-y-1 text-[11px] text-blue-800 leading-relaxed">
+          <li><strong>Được phép:</strong> Quản lý đợt tốt nghiệp, kế hoạch thời gian, sinh viên, danh sách GVHD, phân công GVHD, quản lý hội đồng và duyệt/công bố kết quả.</li>
+          <li><strong>Không được phép:</strong> Truy cập Cài đặt hệ thống, thêm/thu hồi Admin khác, hoặc sử dụng tính năng Đóng vai người dùng (Exact Act-As).</li>
+        </ul>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+        <button 
+          type="button" 
+          onclick="closeAddAdminModal()" 
+          class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
+        >
+          Hủy
+        </button>
+        <button 
+          type="submit" 
+          id="btn-submit-add-admin" 
+          class="px-5 py-2.5 bg-slate-900 hover:bg-black text-white font-bold rounded-xl text-xs shadow-md transition flex items-center gap-2 cursor-pointer"
+        >
+          <span>🛡️</span>
+          <span>Cấp quyền Admin</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

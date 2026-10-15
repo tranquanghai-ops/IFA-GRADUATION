@@ -49,9 +49,10 @@ async function verifyIdToken(idToken) {
   const studentMatch = email.match(/^([^@]+)@student\.tdtu\.edu\.vn$/i);
   const studentId = studentMatch ? studentMatch[1].toUpperCase() : null;
 
-  // Admin determination:
+  // Admin & Owner determination:
   // 1. System owner
-  let isAdmin = (email === 'tranquanghai@tdtu.edu.vn');
+  const isOwner = (email === 'tranquanghai@tdtu.edu.vn');
+  let isAdmin = isOwner;
 
   // 2. Admins collection on ifa-graduation
   if (!isAdmin) {
@@ -65,7 +66,7 @@ async function verifyIdToken(idToken) {
     }
   }
 
-  return { uid, email, studentId, isAdmin };
+  return { uid, email, studentId, isAdmin, isOwner };
 }
 
 /**

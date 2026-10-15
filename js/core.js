@@ -144,7 +144,7 @@ const fmtIsoToVietnameseDateTime = window.fmtIsoToVietnameseDateTime;
 // ============================================================================
 
 
-window.showToast = function(message, type = 'info', duration = 3500) {
+export function showToast(message, type = 'info', duration = 3500) {
   const container = document.getElementById('toast-container');
   if (!container) {
     console.log(`[Toast ${type}] ${message}`);
@@ -190,9 +190,10 @@ window.showToast = function(message, type = 'info', duration = 3500) {
   if (duration > 0) {
     setTimeout(removeToast, duration);
   }
-};
+}
+window.showToast = showToast;
 
-window.showConfirm = function(title, message, { confirmText = 'Xác nhận', cancelText = 'Hủy', danger = true } = {}) {
+export function showConfirm(title, message, { confirmText = 'Xác nhận', cancelText = 'Hủy', danger = true } = {}) {
   return new Promise((resolve) => {
     const modal = document.getElementById('modal-confirm');
     if (!modal) {
@@ -232,7 +233,8 @@ window.showConfirm = function(title, message, { confirmText = 'Xác nhận', can
     cancelBtn.onclick = () => cleanup(false);
     modal.classList.remove('hidden');
   });
-};
+}
+window.showConfirm = showConfirm;
 
 window.showInputDialog = function(title, message, { defaultValue = '', placeholder = '', confirmText = 'Xác nhận', required = false } = {}) {
   return new Promise(resolve => {
@@ -407,8 +409,8 @@ export function assertWriteAllowedForEffectiveActor(actionName = 'Thao tác', co
     throw err;
   }
 
-  if (!state.realIsAdmin) {
-    const msg = `[CHẾ ĐỘ ĐÓNG VAI] Chỉ Quản trị viên mới được phép thực hiện thao tác trong chế độ đóng vai.`;
+  if (!state.realIsOwner) {
+    const msg = `[CHẾ ĐỘ ĐÓNG VAI] Chỉ Chủ sở hữu hệ thống (Owner) mới được phép thực hiện thao tác trong chế độ đóng vai.`;
     if (typeof showToast === 'function') showToast(msg, 'error', 6000);
     const err = new Error(msg);
     err.code = 'permission-denied-impersonation-unauthorized';
@@ -539,6 +541,7 @@ export const state = {
   realUser: null,
   realIsAdmin: false,
   realIsOwner: false,
+  isOwner: false,
   impersonation: null, // { realUser, target, mode: 'read_only', startedAt }
   allowImpersonation: false,
   impersonateCandidates: [],

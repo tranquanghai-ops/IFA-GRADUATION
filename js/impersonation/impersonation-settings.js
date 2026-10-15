@@ -68,11 +68,21 @@ export function setupSystemSettingsRealtimeListener() {
 window.setupSystemSettingsRealtimeListener = setupSystemSettingsRealtimeListener;
 
 export async function loadAdminSystemSettings() {
+  const isOwner = Boolean(isSystemOwner() || state.realIsOwner);
+  if (!isOwner) {
+    if (typeof showToast === 'function') {
+      showToast('Từ chối truy cập: Chỉ Chủ sở hữu hệ thống (Owner) mới có quyền truy cập Cài đặt hệ thống.', 'error', 4000);
+    }
+    if (typeof window.switchAdminTab === 'function') {
+      await window.switchAdminTab('rounds');
+    }
+    return;
+  }
+
   const toggle = document.getElementById('toggle-admin-impersonation');
   const label = document.getElementById('impersonation-status-label');
   const warning = document.getElementById('impersonation-permission-warning');
   const box = document.getElementById('settings-actas-control-box');
-  const isOwner = isSystemOwner();
 
   try {
     const snap = await getDoc(doc(db, 'settings', 'main')).catch(() => null);
@@ -205,6 +215,10 @@ export async function populateSettingsActAsCandidates() {
 window.populateSettingsActAsCandidates = populateSettingsActAsCandidates;
 
 export function onSettingsActAsStartClick() {
+  if (!isSystemOwner()) {
+    showToast('Chỉ Chủ sở hữu hệ thống (Owner) mới có quyền bắt đầu phiên đóng vai.', 'warning');
+    return;
+  }
   const userSelect = document.getElementById('settings-actas-user');
   if (!userSelect || userSelect.selectedIndex < 0) {
     showToast('Vui lòng chọn 1 người dùng từ danh sách để đóng vai.', 'warning');
