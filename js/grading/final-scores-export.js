@@ -259,6 +259,7 @@ window.exportActivityCouncilsToExcel = function() {
   const mode = document.querySelector('input[name="export_scores_mode"]:checked')?.value || 'selected';
   const wb = XLSX.utils.book_new();
 
+  act.councils.forEach(council => {
     const isLetterMode = (act.scoringConfig?.mode === 'letter');
     const slots = getCouncilMemberSlots(council, act);
     const headerRow = ['STT', 'MSSV', 'Họ và tên'];

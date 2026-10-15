@@ -616,6 +616,10 @@ export function showLoading(msg = 'Đang tải IFA+ Graduation...') {
 }
 
 export function hideLoading() {
+  if (typeof window !== 'undefined' && window.__appLoadWatchdog) {
+    clearTimeout(window.__appLoadWatchdog);
+    window.__appLoadWatchdog = null;
+  }
   const overlay = document.getElementById('app-loading-overlay');
   if (overlay) {
     overlay.classList.add('opacity-0', 'pointer-events-none');
