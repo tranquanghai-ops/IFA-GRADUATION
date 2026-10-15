@@ -24,7 +24,11 @@ function test(num, title, fn) {
 }
 
 const graduationDir = path.resolve(__dirname, '..');
-const ifaaDir = 'C:\\Users\\quang\\.gemini\\antigravity\\scratch\\IFAA';
+const ifaaDir = [
+  'C:\\Code\\IFAA-main',
+  path.join(process.env.USERPROFILE || '', '.gemini', 'antigravity', 'scratch', 'IFAA'),
+  'C:\\Users\\quang\\.gemini\\antigravity\\scratch\\IFAA'
+].find(d => fs.existsSync(path.join(d, 'firebase-config.mjs'))) || 'C:\\Code\\IFAA-main';
 function loadFullAppSource(dir) {
   let code = fs.readFileSync(path.join(dir, 'app.js'), 'utf8');
   const jsDir = path.join(dir, 'js');

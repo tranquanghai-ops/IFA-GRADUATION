@@ -22,7 +22,7 @@ export function getDriveFolderUrl(folderId) {
   return `https://drive.google.com/drive/folders/${folderId}`;
 }
 
-function normalizeRoundDriveFolderNames(value) {
+export function normalizeRoundDriveFolderNames(value) {
   const rawNames = Array.isArray(value) ? value : String(value || '').split(/\r?\n/);
   const seen = new Set();
   return rawNames
@@ -35,6 +35,10 @@ function normalizeRoundDriveFolderNames(value) {
       return true;
     })
     .slice(0, 20);
+}
+
+if (typeof window !== 'undefined') {
+  window.normalizeRoundDriveFolderNames = normalizeRoundDriveFolderNames;
 }
 
 window.updateRoundDriveFolderPreview = function() {
@@ -51,7 +55,7 @@ window.updateRoundDriveFolderPreview = function() {
   return names;
 };
 
-async function provisionRoundDriveFolders({ roundId, parentFolderId, folderNames }) {
+export async function provisionRoundDriveFolders({ roundId, parentFolderId, folderNames }) {
   const names = normalizeRoundDriveFolderNames(folderNames);
   if (!roundId || !parentFolderId || names.length === 0) return [];
 
@@ -80,6 +84,10 @@ async function provisionRoundDriveFolders({ roundId, parentFolderId, folderNames
     });
   }
   return results;
+}
+
+if (typeof window !== 'undefined') {
+  window.provisionRoundDriveFolders = provisionRoundDriveFolders;
 }
 
 function getGraduationApiBase() {

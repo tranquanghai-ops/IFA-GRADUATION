@@ -12,95 +12,187 @@ const renderRoundWeeklyContentEditor = (d) => (typeof window !== 'undefined' && 
 const getSupervisorAssignmentMode = (rnd) => (typeof window !== 'undefined' && window.getSupervisorAssignmentMode ? window.getSupervisorAssignmentMode(rnd) : 'student_preference');
 const renderAdminRoundsTable = () => window.renderAdminRoundsTable?.();
 const loadRounds = () => window.loadRounds?.();
+
+const normalizeRoundDriveFolderNames = (value) => {
+  if (typeof window !== 'undefined' && typeof window.normalizeRoundDriveFolderNames === 'function') {
+    return window.normalizeRoundDriveFolderNames(value);
+  }
+  const rawNames = Array.isArray(value) ? value : String(value || '').split(/\r?\n/);
+  const seen = new Set();
+  return rawNames
+    .map(name => String(name || '').trim().replace(/\s+/g, ' ').slice(0, 120))
+    .filter(name => {
+      if (!name) return false;
+      const key = name.toLocaleLowerCase('vi');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 20);
+};
+
+const renderRoundModalEligibleTable = () => {
+  if (typeof window !== 'undefined' && typeof window.renderRoundModalEligibleTable === 'function') {
+    return window.renderRoundModalEligibleTable();
+  }
+};
+
+const updateRoundModalBadges = () => {
+  if (typeof window !== 'undefined' && typeof window.updateRoundModalBadges === 'function') {
+    return window.updateRoundModalBadges();
+  }
+};
+
+const updateRoundModalConfigSummary = () => {
+  if (typeof window !== 'undefined' && typeof window.updateRoundModalConfigSummary === 'function') {
+    return window.updateRoundModalConfigSummary();
+  }
+};
+
+const provisionRoundDriveFolders = (args) => {
+  if (typeof window !== 'undefined' && typeof window.provisionRoundDriveFolders === 'function') {
+    return window.provisionRoundDriveFolders(args);
+  }
+  return Promise.resolve([]);
+};
+
+const getRoundWeekDraftEvents = (w) => {
+  if (typeof window !== 'undefined' && typeof window.getRoundWeekDraftEvents === 'function') {
+    return window.getRoundWeekDraftEvents(w);
+  }
+  return (typeof state !== 'undefined' && state.roundWeekEventsDraft && state.roundWeekEventsDraft[w]) || [];
+};
+
+const getRoundWeekEventRange = (event) => {
+  if (typeof window !== 'undefined' && typeof window.getRoundWeekEventRange === 'function') {
+    return window.getRoundWeekEventRange(event);
+  }
+  const start = Number.isInteger(Number(event?.startDayIndex)) ? Number(event.startDayIndex) : 0;
+  const end = Number.isInteger(Number(event?.endDayIndex)) ? Number(event.endDayIndex) : start;
+  return { startDayIndex: start, endDayIndex: end };
+};
+
+const getSupervisorDefaultAndMaxQuota = (sup) => {
+  if (typeof window !== 'undefined' && typeof window.getSupervisorDefaultAndMaxQuota === 'function') {
+    return window.getSupervisorDefaultAndMaxQuota(sup);
+  }
+  return { employmentType: 'Cơ hữu', maxCap: 15, defaultQuota: 10 };
+};
+
+const renderRoundModalSupervisorsList = (filter) => {
+  if (typeof window !== 'undefined' && typeof window.renderRoundModalSupervisorsList === 'function') {
+    return window.renderRoundModalSupervisorsList(filter);
+  }
+};
+
+const renderRoundsDropdowns = () => {
+  if (typeof window !== 'undefined' && typeof window.renderRoundsDropdowns === 'function') {
+    return window.renderRoundsDropdowns();
+  }
+};
+
+const updateRoundDriveFolderPreview = () => (typeof window !== 'undefined' && typeof window.updateRoundDriveFolderPreview === 'function' ? window.updateRoundDriveFolderPreview() : []);
+const toggleRoundOpenImmediately = (val) => (typeof window !== 'undefined' && typeof window.toggleRoundOpenImmediately === 'function' ? window.toggleRoundOpenImmediately(val) : undefined);
+const switchRoundModalTab = (tab) => (typeof window !== 'undefined' && typeof window.switchRoundModalTab === 'function' ? window.switchRoundModalTab(tab) : undefined);
+const toggleRoundWeekCustomMilestone = (w) => (typeof window !== 'undefined' && typeof window.toggleRoundWeekCustomMilestone === 'function' ? window.toggleRoundWeekCustomMilestone(w) : undefined);
+const ensureSupervisorsMasterLoaded = (f) => (typeof window !== 'undefined' && typeof window.ensureSupervisorsMasterLoaded === 'function' ? window.ensureSupervisorsMasterLoaded(f) : Promise.resolve([]));
+const ensureFacultyDatasetLoaded = (f) => (typeof window !== 'undefined' && typeof window.ensureFacultyDatasetLoaded === 'function' ? window.ensureFacultyDatasetLoaded(f) : Promise.resolve([]));
+
 /**
  * IFA+ Graduation — Round Create & Edit Modal Form Management Module
  */
 window.openCreateRoundModal = async function() {
-  document.getElementById('form-round').reset();
-  document.getElementById('round-form-id').value = '';
-  document.getElementById('modal-round-title').textContent = 'Tạo Đợt Đồ án Tốt nghiệp Mới';
-  const defaultAssignmentMode = document.querySelector('input[name="supervisor-assignment-mode"][value="student_preference"]');
-  if (defaultAssignmentMode) defaultAssignmentMode.checked = true;
+  try {
+    document.getElementById('form-round').reset();
+    document.getElementById('round-form-id').value = '';
+    document.getElementById('modal-round-title').textContent = 'Tạo Đợt Đồ án Tốt nghiệp Mới';
+    const defaultAssignmentMode = document.querySelector('input[name="supervisor-assignment-mode"][value="student_preference"]');
+    if (defaultAssignmentMode) defaultAssignmentMode.checked = true;
 
-  const preEl = document.getElementById('round-allow-pre-eligibility');
-  if (preEl) {
-    preEl.checked = false;
-    preEl.onchange = () => updateRoundModalBadges();
-  }
-
-  // Default dates
-  const today = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  const todayStr = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
-  const nextMonth = new Date(today.getTime() + 30 * 24 * 3600 * 1000);
-  const nextMonthStr = `${nextMonth.getFullYear()}-${pad(nextMonth.getMonth()+1)}-${pad(nextMonth.getDate())}`;
-
-  const openImm = document.getElementById('round-form-open-immediately');
-  if (openImm) openImm.checked = false;
-  toggleRoundOpenImmediately(false);
-
-  if (document.getElementById('round-open-date')) document.getElementById('round-open-date').value = todayStr;
-  if (document.getElementById('round-close-date')) document.getElementById('round-close-date').value = nextMonthStr;
-  if (document.getElementById('round-open-hour')) document.getElementById('round-open-hour').value = '08';
-  if (document.getElementById('round-open-minute')) document.getElementById('round-open-minute').value = '00';
-  if (document.getElementById('round-close-hour')) document.getElementById('round-close-hour').value = '17';
-  if (document.getElementById('round-close-minute')) document.getElementById('round-close-minute').value = '30';
-
-  // 12-week timeline defaults
-  const startDateInput = document.getElementById('round-form-start-date');
-  if (startDateInput) {
-    const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(new Date(today).setDate(diff));
-    startDateInput.value = `${monday.getFullYear()}-${pad(monday.getMonth()+1)}-${pad(monday.getDate())}`;
-    if (typeof window.onRoundStartDateChanged === 'function') {
-      window.onRoundStartDateChanged(startDateInput.value);
+    const preEl = document.getElementById('round-allow-pre-eligibility');
+    if (preEl) {
+      preEl.checked = false;
+      preEl.onchange = () => updateRoundModalBadges();
     }
+
+    // Default dates
+    const today = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const todayStr = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+    const nextMonth = new Date(today.getTime() + 30 * 24 * 3600 * 1000);
+    const nextMonthStr = `${nextMonth.getFullYear()}-${pad(nextMonth.getMonth()+1)}-${pad(nextMonth.getDate())}`;
+
+    const openImm = document.getElementById('round-form-open-immediately');
+    if (openImm) openImm.checked = false;
+    toggleRoundOpenImmediately(false);
+
+    if (document.getElementById('round-open-date')) document.getElementById('round-open-date').value = todayStr;
+    if (document.getElementById('round-close-date')) document.getElementById('round-close-date').value = nextMonthStr;
+    if (document.getElementById('round-open-hour')) document.getElementById('round-open-hour').value = '08';
+    if (document.getElementById('round-open-minute')) document.getElementById('round-open-minute').value = '00';
+    if (document.getElementById('round-close-hour')) document.getElementById('round-close-hour').value = '17';
+    if (document.getElementById('round-close-minute')) document.getElementById('round-close-minute').value = '30';
+
+    // 12-week timeline defaults
+    const startDateInput = document.getElementById('round-form-start-date');
+    if (startDateInput) {
+      const day = today.getDay();
+      const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(new Date(today).setDate(diff));
+      startDateInput.value = `${monday.getFullYear()}-${pad(monday.getMonth()+1)}-${pad(monday.getDate())}`;
+      if (typeof window.onRoundStartDateChanged === 'function') {
+        window.onRoundStartDateChanged(startDateInput.value);
+      }
+    }
+    const durationInput = document.getElementById('round-form-duration-weeks');
+    if (durationInput) durationInput.value = '12';
+
+    // Reset state collections
+    state.roundModalEligibleStudents = [];
+    state.roundModalSupervisors = new Map();
+
+    // Ensure supervisors master loaded before rendering
+    await ensureSupervisorsMasterLoaded();
+
+    // Pre-populate supervisors list from Master Pool
+    renderRoundModalSupervisorsList();
+    renderRoundModalEligibleTable();
+    updateRoundModalBadges();
+
+    // Reset Drive inputs
+    const createDriveInput = document.getElementById('round-drive-folder-url');
+    if (createDriveInput) {
+      createDriveInput.value = '';
+      delete createDriveInput.dataset.validatedFolderId;
+      delete createDriveInput.dataset.validatedFolderName;
+      delete createDriveInput.dataset.validatedFolderUrl;
+    }
+    const createDriveStatusEl = document.getElementById('round-drive-folder-status');
+    if (createDriveStatusEl) {
+      createDriveStatusEl.innerHTML = '';
+      createDriveStatusEl.classList.add('hidden');
+    }
+    const createDriveFoldersInput = document.getElementById('round-drive-subfolder-names');
+    if (createDriveFoldersInput) createDriveFoldersInput.value = '';
+    updateRoundDriveFolderPreview();
+
+    if (typeof renderRoundWeeklyContentEditor === 'function') renderRoundWeeklyContentEditor(12);
+    switchRoundModalTab('info');
+    document.getElementById('modal-round').classList.remove('hidden');
+  } catch (err) {
+    console.error('[IFA-Graduation] Lỗi mở modal tạo đợt:', err);
+    showToast('Lỗi tạo đợt: ' + (err?.message || String(err)), 'error');
   }
-  const durationInput = document.getElementById('round-form-duration-weeks');
-  if (durationInput) durationInput.value = '12';
-
-  // Reset state collections
-  state.roundModalEligibleStudents = [];
-  state.roundModalSupervisors = new Map();
-
-  // Ensure supervisors master loaded before rendering
-  await ensureSupervisorsMasterLoaded();
-
-  // Pre-populate supervisors list from Master Pool
-  renderRoundModalSupervisorsList();
-  renderRoundModalEligibleTable();
-  updateRoundModalBadges();
-
-  // Reset Drive inputs
-  const createDriveInput = document.getElementById('round-drive-folder-url');
-  if (createDriveInput) {
-    createDriveInput.value = '';
-    delete createDriveInput.dataset.validatedFolderId;
-    delete createDriveInput.dataset.validatedFolderName;
-    delete createDriveInput.dataset.validatedFolderUrl;
-  }
-  const createDriveStatusEl = document.getElementById('round-drive-folder-status');
-  if (createDriveStatusEl) {
-    createDriveStatusEl.innerHTML = '';
-    createDriveStatusEl.classList.add('hidden');
-  }
-  const createDriveFoldersInput = document.getElementById('round-drive-subfolder-names');
-  if (createDriveFoldersInput) createDriveFoldersInput.value = '';
-  updateRoundDriveFolderPreview();
-
-  if (typeof renderRoundWeeklyContentEditor === 'function') renderRoundWeeklyContentEditor(12);
-  switchRoundModalTab('info');
-  document.getElementById('modal-round').classList.remove('hidden');
 };
 
 // Open Edit Round Modal
 window.editRoundModal = async function(roundId, initialTab = 'info') {
-  const r = state.rounds.find(x => x.id === roundId);
-  if (!r) {
-    showToast('Không tìm thấy thông tin đợt tốt nghiệp!', 'error');
-    return;
-  }
+  try {
+    const r = (state.rounds || []).find(x => x.id === roundId);
+    if (!r) {
+      showToast('Không tìm thấy thông tin đợt tốt nghiệp!', 'error');
+      return;
+    }
 
   document.getElementById('round-form-id').value = r.id;
   document.getElementById('round-form-title').value = r.title || '';
@@ -369,7 +461,11 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
     renderRoundWeekDayPicker(n);
   });
 
-  document.getElementById('modal-round').classList.remove('hidden');
+    document.getElementById('modal-round').classList.remove('hidden');
+  } catch (err) {
+    console.error('[IFA-Graduation] Lỗi mở modal chỉnh sửa đợt:', err);
+    showToast('Lỗi mở đợt: ' + (err?.message || String(err)), 'error');
+  }
 };
 
 window.closeRoundModal = function() {

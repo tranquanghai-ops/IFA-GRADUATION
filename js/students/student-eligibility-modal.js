@@ -17,7 +17,7 @@ function removeVietnameseTones(str) {
     .trim();
 }
 
-function renderRoundModalEligibleTable() {
+export function renderRoundModalEligibleTable() {
   const tbody = document.getElementById('round-eligible-students-tbody');
   if (!tbody) return;
 
@@ -457,3 +457,7 @@ window.addSelectedEligibleCandidatesToRound = function() {
 // ----------------------------------------------------------------------------
 // EXCEL IMPORT FOR ROUND ELIGIBLE STUDENTS
 // ----------------------------------------------------------------------------
+
+if (typeof window !== 'undefined') {
+  window.renderRoundModalEligibleTable = renderRoundModalEligibleTable;
+}

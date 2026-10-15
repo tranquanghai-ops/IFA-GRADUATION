@@ -62,7 +62,7 @@ export async function ensureSupervisorsMasterLoaded(force = false) {
 }
 window.ensureSupervisorsMasterLoaded = ensureSupervisorsMasterLoaded;
 
-function updateRoundModalBadges() {
+export function updateRoundModalBadges() {
   const elCountBadge = document.getElementById('round-tab-eligible-count');
   const elCountCard = document.getElementById('round-eligible-count-badge');
   const supCountBadge = document.getElementById('round-tab-sup-count');
@@ -79,7 +79,7 @@ function updateRoundModalBadges() {
   updateRoundModalConfigSummary();
 }
 
-function updateRoundModalConfigSummary() {
+export function updateRoundModalConfigSummary() {
   const elStatus = document.getElementById('round-summary-eligible-status');
   const supStatus = document.getElementById('round-summary-sup-status');
   const alertBox = document.getElementById('round-config-alert');
@@ -153,7 +153,7 @@ function getRoundWeekDaysFromForm(weekNumber) {
   });
 }
 
-function getRoundWeekDraftEvents(weekNumber) {
+export function getRoundWeekDraftEvents(weekNumber) {
   if (!state.roundWeekEventsDraft) state.roundWeekEventsDraft = {};
   return Array.isArray(state.roundWeekEventsDraft[weekNumber]) ? state.roundWeekEventsDraft[weekNumber] : [];
 }
@@ -575,4 +575,8 @@ if (typeof window !== 'undefined') {
   window.distinguishOverlappingTimelineEvents = distinguishOverlappingTimelineEvents;
   window.getRoundTimelineDefaultTitle = getRoundTimelineDefaultTitle;
   window.resolveRoundWeekTitle = resolveRoundWeekTitle;
+  window.updateRoundModalBadges = updateRoundModalBadges;
+  window.updateRoundModalConfigSummary = updateRoundModalConfigSummary;
+  window.getRoundWeekDraftEvents = getRoundWeekDraftEvents;
+  window.getRoundWeekEventRange = getRoundWeekEventRange;
 }
