@@ -76,7 +76,7 @@ function renderScoringSection() {
   assignments.forEach(asgn => {
     const k = `${activityId}_${councilId}_${asgn.studentId}_${myScorerId}`;
     const sc = state.councilScores?.[k];
-    const hasLocalDraft = Boolean(state.councilLocalDrafts?.[asgn.studentId]?.value !== undefined || state.councilLocalDrafts?.[asgn.studentId]?.components);
+    const hasLocalDraft = Boolean((state.councilLocalDrafts?.[asgn.studentId]?.value !== undefined && state.councilLocalDrafts?.[asgn.studentId]?.value !== '') || state.councilLocalDrafts?.[asgn.studentId]?.components);
     if (sc?.status === 'draft' || (sc?.status !== 'completed' && hasLocalDraft)) {
       councilDraftsCount++;
     }
@@ -102,7 +102,7 @@ function renderScoringSection() {
     // Helper for rendering a single letter button
     const renderLetterBtn = (o) => {
       if (!o) return '';
-      const isSelected = String(currentVal) === String(o.key) || String(currentVal) === String(o.code);
+      const isSelected = Boolean(currentVal) && (String(currentVal).trim().toUpperCase() === String(o.key || o.code).trim().toUpperCase());
       const standardLabel = DEFAULT_LETTER_GRADE_SCALE.find(item => item.key === String(o.key || o.code))?.label;
       return `
         <button type="button" ${isCompleted ? 'disabled' : ''} onclick="onSelectLetterScore('${o.key}')" class="p-2 sm:p-2.5 rounded-xl border text-center transition-all ${isSelected ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500 font-black text-emerald-950 shadow-xs' : 'bg-white border-slate-200 hover:border-slate-300 font-semibold text-slate-700 hover:bg-slate-50'} ${isCompleted ? 'opacity-80 cursor-not-allowed' : 'cursor-pointer'}">
@@ -303,9 +303,21 @@ function renderScoringSection() {
 }
 
 window.onSelectLetterScore = function(key) {
+  const sid = state.activeCouncilSelectedStudentId;
+  const draft = state.councilLocalDrafts?.[sid];
+  const { activityId, councilId } = state.activeCouncilWorkspace || {};
+  const myScorerId = getActiveCouncilScorerId();
+  const scoreKey = (activityId && councilId && sid && myScorerId) ? `${activityId}_${councilId}_${sid}_${myScorerId}` : null;
+  const savedScore = scoreKey ? state.councilScores?.[scoreKey] : null;
+  const currentVal = draft?.value !== undefined ? draft.value : (savedScore?.value ?? '');
+
+  // Toggle off: If clicking the currently selected letter, unselect it (set to '')
+  const isAlreadySelected = Boolean(currentVal) && String(currentVal).trim().toUpperCase() === String(key).trim().toUpperCase();
+  const nextVal = isAlreadySelected ? '' : key;
+
   const input = document.getElementById('cws-score-input-letter');
-  if (input) input.value = key;
-  onScoreInputChange(key);
+  if (input) input.value = nextVal;
+  onScoreInputChange(nextVal);
   renderScoringSection();
 };
 
@@ -607,7 +619,7 @@ window.batchFinalizeAllCouncilScores = async function() {
   if (curSid) {
     const valInput = document.getElementById('cws-score-input-numeric') || document.getElementById('cws-score-input-letter');
     const commInput = document.getElementById('cws-score-comment');
-    if (valInput && valInput.value !== '') {
+    if (valInput) {
       state.councilLocalDrafts = state.councilLocalDrafts || {};
       state.councilLocalDrafts[curSid] = state.councilLocalDrafts[curSid] || {};
       state.councilLocalDrafts[curSid].value = valInput.value;

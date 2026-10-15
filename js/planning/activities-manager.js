@@ -2363,4 +2363,6 @@ if (typeof window !== 'undefined') {
 if (typeof window !== "undefined") {
   if (typeof loadStudentRoundActivities !== "undefined") window.loadStudentRoundActivities = loadStudentRoundActivities;
   if (typeof loadAdminRoundActivities !== "undefined") window.loadAdminRoundActivities = loadAdminRoundActivities;
+  if (typeof DEFAULT_LETTER_GRADE_SCALE !== "undefined") window.DEFAULT_LETTER_GRADE_SCALE = DEFAULT_LETTER_GRADE_SCALE;
+  if (typeof normalizeLetterGradeOptions !== "undefined") window.normalizeLetterGradeOptions = normalizeLetterGradeOptions;
 }

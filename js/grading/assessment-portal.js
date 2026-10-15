@@ -1037,10 +1037,12 @@ window.renderAssessmentDefenseList = function() {
 
     if (sc?.status === 'completed' && !draft) {
       const val = sc.value !== undefined ? sc.value : (sc.totalScore ?? null);
-      return { status: 'completed', score: val };
+      if (val !== undefined && val !== null && val !== '') {
+        return { status: 'completed', score: val };
+      }
     }
-    if (sc?.status === 'draft' || draft) {
-      const val = draft?.value !== undefined ? draft.value : (sc?.value !== undefined ? sc.value : (draft?.totalScore ?? sc?.totalScore ?? null));
+    const val = draft?.value !== undefined ? draft.value : (sc?.value !== undefined ? sc.value : (draft?.totalScore ?? sc?.totalScore ?? null));
+    if (val !== undefined && val !== null && val !== '') {
       return { status: 'draft', score: val };
     }
     return { status: 'unscored', score: null };

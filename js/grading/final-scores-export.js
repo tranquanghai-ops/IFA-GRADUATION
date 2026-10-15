@@ -259,11 +259,15 @@ window.exportActivityCouncilsToExcel = function() {
   const mode = document.querySelector('input[name="export_scores_mode"]:checked')?.value || 'selected';
   const wb = XLSX.utils.book_new();
 
-  act.councils.forEach(council => {
+    const isLetterMode = (act.scoringConfig?.mode === 'letter');
     const slots = getCouncilMemberSlots(council, act);
     const headerRow = ['STT', 'MSSV', 'Họ và tên'];
     slots.forEach(s => headerRow.push(`${s.label || s.name}${s.type === 'guest' ? ' (Khách)' : ''}`));
-    headerRow.push('Điểm chính thức');
+    if (isLetterMode) {
+      headerRow.push('Kết quả chính thức', 'Điểm tham khảo');
+    } else {
+      headerRow.push('Điểm chính thức');
+    }
     const cSheetName = sanitizeSheetName(council.name || council.id);
     const asgns = (act.councilStudentAssignments || [])
       .filter(a => a.councilId === council.id)
@@ -301,7 +305,12 @@ window.exportActivityCouncilsToExcel = function() {
         }
       });
 
-      row.push(official.isComplete && official.score !== null ? official.score : '');
+      if (isLetterMode) {
+        row.push(official.isComplete && official.letterGrade ? official.letterGrade : '');
+        row.push(official.isComplete && official.score !== null ? Number(official.score.toFixed(2)) : '');
+      } else {
+        row.push(official.isComplete && official.score !== null ? official.score : '');
+      }
       sheetRows.push(row);
     });
 
@@ -336,12 +345,17 @@ window.exportSingleCouncilToExcel = function() {
   const mode = document.querySelector('input[name="export_scores_mode"]:checked')?.value || 'selected';
   const wb = XLSX.utils.book_new();
 
+  const isLetterMode = (act.scoringConfig?.mode === 'letter');
   const slots = getCouncilMemberSlots(council, act);
   const headerRow = ['STT', 'MSSV', 'Họ và tên'];
   slots.forEach(s => {
     headerRow.push(`${s.label || s.name}${s.type === 'guest' ? ' (Khách)' : ''}`);
   });
-  headerRow.push('Điểm chính thức');
+  if (isLetterMode) {
+    headerRow.push('Kết quả chính thức', 'Điểm tham khảo');
+  } else {
+    headerRow.push('Điểm chính thức');
+  }
 
   const asgns = (act.councilStudentAssignments || [])
     .filter(a => a.councilId === council.id)
@@ -379,7 +393,12 @@ window.exportSingleCouncilToExcel = function() {
       }
     });
 
-    row.push(official.isComplete && official.score !== null ? official.score : '');
+    if (isLetterMode) {
+      row.push(official.isComplete && official.letterGrade ? official.letterGrade : '');
+      row.push(official.isComplete && official.score !== null ? Number(official.score.toFixed(2)) : '');
+    } else {
+      row.push(official.isComplete && official.score !== null ? official.score : '');
+    }
     sheetRows.push(row);
   });
 

@@ -1298,7 +1298,7 @@ function renderCouncilStudentList() {
       const localValue = state.councilLocalDrafts?.[sid]?.value;
       const scoreValue = myScore?.status === 'completed'
         ? myScore.value
-        : (localValue !== undefined && localValue !== '' ? localValue : myScore?.value);
+        : (localValue !== undefined ? localValue : myScore?.value);
       const scoreText = scoreValue !== undefined && scoreValue !== null && scoreValue !== '' ? escapeHtml(String(scoreValue)) : '';
 
       if (myScore?.status === 'completed') {
@@ -1744,7 +1744,7 @@ window.renderCouncilMemberRankingList = function() {
     const localValue = state.councilLocalDrafts?.[sid]?.value;
     const scoreValue = myScore?.status === 'completed'
       ? myScore.value
-      : (localValue !== undefined && localValue !== '' ? localValue : myScore?.value);
+      : (localValue !== undefined ? localValue : myScore?.value);
     const scoreText = scoreValue !== undefined && scoreValue !== null && scoreValue !== '' ? escapeHtml(String(scoreValue)) : '';
 
     let scoreBadge = '<span class="text-[10px] text-slate-400">Chưa chấm</span>';
@@ -1815,8 +1815,9 @@ window.sortCouncilMemberRankingByScore = function() {
     const scoreKey = `${activityId}_${councilId}_${sid}_${myScorerId}`;
     const myScore = state.councilScores?.[scoreKey];
     const localValue = state.councilLocalDrafts?.[sid]?.value;
-    const val = myScore?.status === 'completed' ? myScore.value : (localValue !== undefined && localValue !== '' ? localValue : myScore?.value);
-    const num = parseFloat(val);
+    const val = myScore?.status === 'completed' ? myScore.value : (localValue !== undefined ? localValue : myScore?.value);
+    const resolvedNum = (typeof resolveScoreNumericValue === 'function') ? resolveScoreNumericValue({ value: val }, act) : null;
+    const num = (typeof resolvedNum === 'number' && !isNaN(resolvedNum)) ? resolvedNum : parseFloat(val);
     return {
       studentId: sid,
       score: isNaN(num) ? -1 : num,
@@ -2000,10 +2001,10 @@ window.selectCouncilStudent = function(studentId, forceMobileGradingTab = false,
     const savedScore = state.councilScores?.[`${activityId}_${councilId}_${oldSid}_${scorerId}`];
     if (savedScore?.status === 'completed') {
       delete state.councilLocalDrafts?.[oldSid];
-    } else if ((currentVal !== undefined && currentVal !== '') || currentComm || (components && Object.keys(components).length > 0)) {
+    } else {
       state.councilLocalDrafts = state.councilLocalDrafts || {};
       state.councilLocalDrafts[oldSid] = {
-        value: currentVal,
+        value: currentVal !== undefined ? currentVal : '',
         comment: currentComm,
         components: components || state.councilLocalDrafts?.[oldSid]?.components
       };

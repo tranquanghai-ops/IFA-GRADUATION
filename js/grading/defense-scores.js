@@ -1,6 +1,7 @@
 // ============================================================================
 import { getCouncilMemberScorerId, getCouncilMemberSlots } from './council-score-helpers.js';
 import { normalizeBoundedScoreInput } from './council-score-input.js';
+import { DEFAULT_LETTER_GRADE_SCALE, normalizeLetterGradeOptions } from '../planning/activities-manager.js';
 // v2.0.0-beta.1: RUBRIC EVENT HANDLERS & OFFICIAL DEFENSE SCORE & CALIBRATION
 // ============================================================================
 
@@ -80,11 +81,61 @@ export function resolveScoreNumericValue(score, act) {
   if (typeof score.numericValue === 'number' && !isNaN(score.numericValue)) return score.numericValue;
   if (typeof score.selectedLetterNumericValue === 'number' && !isNaN(score.selectedLetterNumericValue)) return score.selectedLetterNumericValue;
   if (typeof score.value === 'number' && !isNaN(score.value)) return score.value;
-  if (typeof score.value === 'string' && act?.scoringConfig?.letterOptions) {
-    const opt = act.scoringConfig.letterOptions.find(o => String(o.key) === score.value || String(o.code) === score.value);
+  if (typeof score.value === 'string') {
+    const rawOpts = (Array.isArray(act?.scoringConfig?.letterOptions) && act.scoringConfig.letterOptions.length > 0)
+      ? act.scoringConfig.letterOptions
+      : (typeof DEFAULT_LETTER_GRADE_SCALE !== 'undefined' ? DEFAULT_LETTER_GRADE_SCALE : (window.DEFAULT_LETTER_GRADE_SCALE || []));
+    const opt = rawOpts.find(o => String(o.key).trim().toUpperCase() === score.value.trim().toUpperCase() || String(o.code).trim().toUpperCase() === score.value.trim().toUpperCase());
     if (opt && typeof opt.numericValue === 'number' && !isNaN(opt.numericValue)) return opt.numericValue;
+    const parsed = parseFloat(score.value);
+    if (!isNaN(parsed)) return parsed;
   }
   return null;
+}
+
+export function resolveNumericToLetter(numericScore, act) {
+  if (numericScore === null || numericScore === undefined || isNaN(Number(numericScore))) {
+    return null;
+  }
+  const rawOpts = (Array.isArray(act?.scoringConfig?.letterOptions) && act.scoringConfig.letterOptions.length > 0)
+    ? act.scoringConfig.letterOptions
+    : (typeof DEFAULT_LETTER_GRADE_SCALE !== 'undefined' ? DEFAULT_LETTER_GRADE_SCALE : (window.DEFAULT_LETTER_GRADE_SCALE || []));
+
+  const normalizer = typeof normalizeLetterGradeOptions === 'function'
+    ? normalizeLetterGradeOptions
+    : (window.normalizeLetterGradeOptions || (opts => opts));
+  const normOpts = normalizer(rawOpts);
+
+  const validOpts = (normOpts || [])
+    .filter(o => o && typeof o.numericValue === 'number' && !isNaN(o.numericValue) && (o.key || o.code))
+    .map(o => ({
+      key: String(o.key || o.code).trim(),
+      code: String(o.code || o.key).trim(),
+      label: o.label || o.description || o.key || o.code,
+      numericValue: Number(o.numericValue)
+    }));
+
+  if (validOpts.length === 0) return null;
+
+  // Sort descending by numericValue (highest score first)
+  validOpts.sort((a, b) => b.numericValue - a.numericValue);
+
+  if (validOpts.length === 1) return validOpts[0];
+
+  const scoreNum = Number(numericScore);
+
+  // Dynamic midpoint threshold between consecutive letter grades
+  for (let i = 0; i < validOpts.length - 1; i++) {
+    const higher = validOpts[i];
+    const lower = validOpts[i + 1];
+    const midpoint = (higher.numericValue + lower.numericValue) / 2;
+    if (scoreNum >= midpoint) {
+      return higher;
+    }
+  }
+
+  // Fallback to lowest option when below the last midpoint
+  return validOpts[validOpts.length - 1];
 }
 
 export function getOfficialDefenseScore(studentId, council, act, round) {
@@ -134,14 +185,40 @@ export function getOfficialDefenseScore(studentId, council, act, round) {
   // Retain full IEEE 754 precision!
   const rawAverage = allIncluded.length > 0 ? (allIncluded.reduce((a, b) => a + b, 0) / allIncluded.length) : null;
 
+  const mode = act.scoringConfig?.mode || 'numeric';
+  let letterGrade = null;
+  let letterLabel = null;
+  if (mode === 'letter' && rawAverage !== null) {
+    const resolved = resolveNumericToLetter(rawAverage, act);
+    if (resolved) {
+      letterGrade = resolved.key;
+      letterLabel = resolved.label;
+    }
+  }
+
+  // formattedScore: in letter mode, official score must display the letter grade (A/B/C)!
+  // in numeric/defense_rubric, displays 2 decimal places.
+  let formattedScore = '--';
+  if (rawAverage !== null) {
+    if (mode === 'letter') {
+      formattedScore = letterGrade || '--';
+    } else {
+      formattedScore = rawAverage.toFixed(2);
+    }
+  }
+
   return {
     studentId,
+    mode,
     isComplete: mandatoryComplete,
     mandatoryTotal,
     mandatoryCompleted,
     mandatoryComplete,
     score: rawAverage,
-    formattedScore: rawAverage !== null ? rawAverage.toFixed(2) : '--',
+    formattedScore,
+    formattedNumericScore: rawAverage !== null ? rawAverage.toFixed(2) : '--',
+    letterGrade,
+    letterLabel,
     mandatoryScores,
     includedGuestScores,
     excludedGuestScores,
@@ -207,6 +284,9 @@ window.finalizeCouncilSession = async function() {
     const official = getOfficialDefenseScore(sId, council, act, targetRound);
     council.finalDefenseScores[sId] = {
       score: official.score,
+      letterGrade: official.letterGrade,
+      letterLabel: official.letterLabel,
+      formattedScore: official.formattedScore,
       completedScoresCount: official.allScoresCount,
       finalizedAt: new Date().toISOString()
     };
@@ -386,17 +466,51 @@ window.renderPostCouncilSection = function() {
     // Summary / Official Column
     let summaryColumnHtml = '';
     if (isEndedOrFinalized) {
-      summaryColumnHtml = `
-        <td class="p-2 text-center font-mono font-black text-sm ${official.isComplete ? 'text-indigo-900 bg-indigo-50/50' : 'text-amber-700 bg-amber-50/50'}">
-          ${official.formattedScore}
-        </td>
-      `;
+      if (mode === 'letter') {
+        const letterHtml = official.letterGrade
+          ? `<div class="flex flex-col items-center">
+               <span class="inline-flex items-center justify-center px-3 py-1 rounded-lg text-base font-black bg-indigo-100 text-indigo-900 border border-indigo-200 shadow-xs">
+                 ${official.letterGrade}
+               </span>
+               <span class="text-[10px] text-slate-500 font-normal mt-0.5" title="Điểm trung bình quy đổi">
+                 (Tham khảo: ${official.formattedNumericScore}đ)
+               </span>
+             </div>`
+          : `<span class="text-slate-400 font-mono text-xs">--</span>`;
+        summaryColumnHtml = `
+          <td class="p-2 text-center ${official.isComplete ? 'bg-indigo-50/50' : 'bg-amber-50/50'}">
+            ${letterHtml}
+          </td>
+        `;
+      } else {
+        summaryColumnHtml = `
+          <td class="p-2 text-center font-mono font-black text-sm ${official.isComplete ? 'text-indigo-900 bg-indigo-50/50' : 'text-amber-700 bg-amber-50/50'}">
+            ${official.formattedScore}
+          </td>
+        `;
+      }
     } else {
       if (isAdmin) {
         let liveSummary = '--';
         if (completedCount > 0) {
-          const avg = (totalCompletedVal / completedCount).toFixed(2);
-          liveSummary = `<strong class="text-slate-900">${avg}</strong> <span class="text-[10px] text-slate-400">(${completedCount}/${slots.length})</span>`;
+          const rawAvg = totalCompletedVal / completedCount;
+          if (mode === 'letter') {
+            const liveResolved = resolveNumericToLetter(rawAvg, act);
+            const liveLetter = liveResolved?.key || '--';
+            liveSummary = `
+              <div class="flex flex-col items-center">
+                <span class="inline-flex items-center justify-center px-2 py-0.5 rounded text-sm font-black bg-indigo-50 text-indigo-800 border border-indigo-200">
+                  ${liveLetter}
+                </span>
+                <span class="text-[10px] text-slate-400 font-normal mt-0.5">
+                  (${rawAvg.toFixed(2)}đ · ${completedCount}/${slots.length})
+                </span>
+              </div>
+            `;
+          } else {
+            const avg = rawAvg.toFixed(2);
+            liveSummary = `<strong class="text-slate-900">${avg}</strong> <span class="text-[10px] text-slate-400">(${completedCount}/${slots.length})</span>`;
+          }
         }
         summaryColumnHtml = `<td class="p-2 text-center font-mono font-semibold">${liveSummary}</td>`;
       } else {
@@ -536,14 +650,42 @@ window.saveScoreCalibration = async function() {
   const newValStr = document.getElementById('calib-new-val')?.value;
   const reason = document.getElementById('calib-reason')?.value?.trim();
 
-  if (newValStr === '' || newValStr === null || isNaN(Number(newValStr))) {
-    showToast('Vui lòng nhập điểm mới hợp lệ (0 – 10)!', 'warning');
-    return;
-  }
-  const newVal = Number(newValStr);
-  if (newVal < 0 || newVal > 10) {
-    showToast('Điểm hiệu chỉnh phải từ 0 đến 10!', 'warning');
-    return;
+  const mode = act.scoringConfig?.mode || 'numeric';
+  let newVal = newValStr;
+  let numericVal = null;
+
+  if (mode === 'letter') {
+    const rawOpts = (Array.isArray(act?.scoringConfig?.letterOptions) && act.scoringConfig.letterOptions.length > 0)
+      ? act.scoringConfig.letterOptions
+      : (typeof DEFAULT_LETTER_GRADE_SCALE !== 'undefined' ? DEFAULT_LETTER_GRADE_SCALE : (window.DEFAULT_LETTER_GRADE_SCALE || []));
+    const opt = rawOpts.find(o => String(o.key).trim().toUpperCase() === String(newValStr).trim().toUpperCase() || String(o.code).trim().toUpperCase() === String(newValStr).trim().toUpperCase());
+    if (opt) {
+      newVal = opt.key || opt.code;
+      numericVal = opt.numericValue;
+    } else if (!isNaN(Number(newValStr))) {
+      const resolved = resolveNumericToLetter(Number(newValStr), act);
+      if (resolved) {
+        newVal = resolved.key;
+        numericVal = resolved.numericValue;
+      } else {
+        showToast('Vui lòng nhập mức điểm chữ hợp lệ (ví dụ: A, B, C...)!', 'warning');
+        return;
+      }
+    } else {
+      showToast('Mức điểm chữ không hợp lệ trong thang điểm của đợt duyệt!', 'warning');
+      return;
+    }
+  } else {
+    if (newValStr === '' || newValStr === null || isNaN(Number(newValStr))) {
+      showToast('Vui lòng nhập điểm mới hợp lệ (0 – 10)!', 'warning');
+      return;
+    }
+    newVal = Number(newValStr);
+    numericVal = newVal;
+    if (newVal < 0 || newVal > 10) {
+      showToast('Điểm hiệu chỉnh phải từ 0 đến 10!', 'warning');
+      return;
+    }
   }
 
   if (!reason) {
@@ -568,6 +710,7 @@ window.saveScoreCalibration = async function() {
     scorerId,
     slotKey,
     value: newVal,
+    ...(mode === 'letter' ? { selectedLetterCode: newVal, selectedLetterNumericValue: numericVal, numericValue: numericVal } : { numericValue: numericVal }),
     status: 'completed',
     adjusted: true,
     adjustments: [
@@ -712,5 +855,6 @@ window.closeGuestPasscodeModal = function() {
 // --- SUBMODULE WINDOW BRIDGE ---
 if (typeof window !== 'undefined') {
   if (typeof resolveScoreNumericValue !== 'undefined') window.resolveScoreNumericValue = resolveScoreNumericValue;
+  if (typeof resolveNumericToLetter !== 'undefined') window.resolveNumericToLetter = resolveNumericToLetter;
   if (typeof getOfficialDefenseScore !== 'undefined') window.getOfficialDefenseScore = getOfficialDefenseScore;
 }
