@@ -59,7 +59,7 @@ function getEffectiveMaxBytes(businessLimit, defaultLimitMB = 100) {
  * @param {number} [customMaxBytes]
  * @throws {ValidationError}
  */
-function validateFile(fileMeta, customMaxBytes) {
+function validateFile(fileMeta, customMaxBytes, acceptedExtensions) {
   if (!fileMeta || typeof fileMeta.name !== 'string' || !fileMeta.name.trim()) {
     throw new ValidationError('Thiếu thông tin hoặc tên tệp không hợp lệ');
   }
@@ -75,10 +75,26 @@ function validateFile(fileMeta, customMaxBytes) {
   }
 
   const ext = getExtension(trimmedName);
+  if (!ext) {
+    throw new ValidationError(
+      'Định dạng tệp không được phép: (không có phần mở rộng). Chấp nhận: ' + [...ALLOWED_EXTENSIONS].join(', ')
+    );
+  }
+
   if (!ALLOWED_EXTENSIONS.has(ext)) {
     throw new ValidationError(
-      'Định dạng tệp không được phép: ' + (ext || '(không có phần mở rộng)') + '. Chấp nhận: ' + [...ALLOWED_EXTENSIONS].join(', ')
+      'Định dạng tệp không được phép: ' + ext + '. Chấp nhận: ' + [...ALLOWED_EXTENSIONS].join(', ')
     );
+  }
+
+  // Activity-specific extension restriction if configured
+  if (Array.isArray(acceptedExtensions) && acceptedExtensions.length > 0) {
+    const normAllowed = acceptedExtensions.map(e => '.' + String(e).toLowerCase().replace(/^\.+/, ''));
+    if (!normAllowed.includes(ext)) {
+      throw new ValidationError(
+        'Định dạng tệp ' + ext + ' không nằm trong cấu hình nhận bài của mốc. Chấp nhận: ' + normAllowed.join(', ')
+      );
+    }
   }
 
   if (fileMeta.type && !ALLOWED_MIME_TYPES.has(fileMeta.type)) {
@@ -176,8 +192,11 @@ function validateActivity(activity, currentAttempt) {
 }
 
 function getExtension(filename) {
-  const parts = filename.toLowerCase().split('.');
-  return parts.length > 1 ? '.' + parts[parts.length - 1] : '';
+  if (!filename || typeof filename !== 'string') return '';
+  const clean = filename.trim();
+  const lastDot = clean.lastIndexOf('.');
+  if (lastDot === -1 || lastDot === clean.length - 1) return '';
+  return '.' + clean.slice(lastDot + 1).toLowerCase();
 }
 
 class ValidationError extends Error {
@@ -192,6 +211,7 @@ module.exports = {
   validateFile,
   validateActivity,
   ValidationError,
+  getExtension,
   ALLOWED_EXTENSIONS,
   ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES,

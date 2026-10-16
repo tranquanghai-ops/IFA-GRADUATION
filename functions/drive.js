@@ -750,6 +750,91 @@ async function getOrCreateDriveChildFolder({ parentFolderId, folderName, folderT
   };
 }
 
+/**
+ * Moves a file from one parent folder to another without changing its ID or content.
+ * @param {{ fileId: string, fromFolderId?: string, toFolderId: string }} params
+ * @returns {Promise<boolean>}
+ */
+async function moveDriveFile({ fileId, fromFolderId, toFolderId }) {
+  if (!fileId || !toFolderId) return false;
+  if (_testDriveDriver && typeof _testDriveDriver.moveDriveFile === 'function') {
+    return _testDriveDriver.moveDriveFile({ fileId, fromFolderId, toFolderId });
+  }
+  const config = await loadDriveConfig();
+  if (!config) return false;
+  const accessToken = await getAccessToken(config);
+
+  const removeParam = fromFolderId ? `&removeParents=${encodeURIComponent(fromFolderId)}` : '';
+  const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?addParents=${encodeURIComponent(toFolderId)}${removeParam}&supportsAllDrives=true&fields=id,parents`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+  return res.ok;
+}
+
+/**
+ * Archives previous attempt files into a "File cũ" subfolder inside student's activity folder.
+ * @param {{ studentFolderId: string, previousAttempts: Array<object> }} params
+ * @returns {Promise<{ archivedCount: number, oldFolderId: string|null, errors: Array<string> }>}
+ */
+async function archivePreviousAttemptFiles({ studentFolderId, previousAttempts }) {
+  if (!studentFolderId || !Array.isArray(previousAttempts) || previousAttempts.length === 0) {
+    return { archivedCount: 0, oldFolderId: null, errors: [] };
+  }
+  if (_testDriveDriver && typeof _testDriveDriver.archivePreviousAttemptFiles === 'function') {
+    return _testDriveDriver.archivePreviousAttemptFiles({ studentFolderId, previousAttempts });
+  }
+
+  const errors = [];
+  let archivedCount = 0;
+  let oldFolderId = null;
+
+  try {
+    const oldFolderRes = await getOrCreateDriveChildFolder({
+      parentFolderId: studentFolderId,
+      folderName: 'File cũ',
+      folderType: 'archive_old_submissions'
+    });
+    oldFolderId = oldFolderRes?.folderId || null;
+    if (!oldFolderId) {
+      throw new Error('Không thể tạo hoặc tìm thấy thư mục "File cũ"');
+    }
+
+    for (const att of previousAttempts) {
+      if (att && att.status !== 'withdrawn' && Array.isArray(att.files)) {
+        for (const file of att.files) {
+          const fId = file?.providerFileId || file?.fileId;
+          if (fId && (file?.storageProvider === 'google_drive' || !file?.storageProvider)) {
+            try {
+              const moved = await moveDriveFile({
+                fileId: fId,
+                fromFolderId: studentFolderId,
+                toFolderId: oldFolderId
+              });
+              if (moved) {
+                archivedCount++;
+              } else {
+                errors.push(`Không thể di chuyển file ${fId} vào "File cũ"`);
+              }
+            } catch (moveErr) {
+              errors.push(`Lỗi di chuyển file ${fId}: ${moveErr.message}`);
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    errors.push(err.message);
+  }
+
+  return { archivedCount, oldFolderId, errors };
+}
+
 module.exports = {
   isDriveConfigured,
   createUploadSession,
@@ -764,6 +849,8 @@ module.exports = {
   isGoogleDriveDocOrFileUrl,
   validateRootDriveFolder,
   getOrCreateDriveChildFolder,
+  moveDriveFile,
+  archivePreviousAttemptFiles,
   setTestDriveDriver,
   _setTestDriveDriver: setTestDriveDriver,
 };

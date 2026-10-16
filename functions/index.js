@@ -36,6 +36,8 @@ const {
   verifyAndCompleteUpload,
   validateRootDriveFolder,
   getOrCreateDriveChildFolder,
+  moveDriveFile,
+  archivePreviousAttemptFiles,
 } = require('./drive.js');
 const { assertOwned, fileId: parseFileId } = require('./policy.js');
 const { getSecret } = require('./secrets.js');
@@ -234,7 +236,7 @@ async function uploadSessionHandler(req, res) {
     // 3. Validate file metadata with effective limit (business limit bounded by 2 GiB ceiling)
     const businessLimitBytes = (activityDoc.submissionConfig?.maxFileSizeMB || 100) * 1024 * 1024;
     const effectiveLimit = getEffectiveMaxBytes(businessLimitBytes);
-    validateFile(fileMeta, effectiveLimit);
+    validateFile(fileMeta, effectiveLimit, activityDoc.submissionConfig?.acceptedExtensions);
 
     // 4. Read current attempt count for this student (exclude withdrawn submissions)
     const studentSubmissions = roundDoc.activitySubmissions?.[activityId]?.[studentId];
@@ -438,6 +440,7 @@ async function completeUploadHandler(req, res) {
     const persistentRecord = {
       fileId: verified.fileId,
       fileName: verified.fileName,
+      name: verified.fileName,
       mimeType: verified.mimeType,
       size: verified.size,
       viewUrl: verified.viewUrl,
@@ -1040,7 +1043,7 @@ async function submitActivityHandler(req, res) {
         });
       }
 
-      const fileName = driveDoc.name || 'document';
+      const fileName = driveDoc.fileName || driveDoc.name || f.validatedName || f.originalName || 'document';
       const fileSize = driveDoc.size;
       const fileMime = driveDoc.mimeType || 'application/octet-stream';
 
@@ -1075,6 +1078,9 @@ async function submitActivityHandler(req, res) {
     let retryCount = 0;
     let finalSubmission = null;
     let finalAttempts = null;
+    let latestRoundDoc = null;
+    let latestActivity = null;
+    let previousAttemptsList = [];
 
     while (retryCount < MAX_RETRIES && !attemptSucceeded) {
       // 1. Fetch round doc
@@ -1163,6 +1169,9 @@ async function submitActivityHandler(req, res) {
         attemptSucceeded = true;
         finalSubmission = submissionMetadata;
         finalAttempts = newAttempts;
+        latestRoundDoc = roundDoc;
+        latestActivity = activity;
+        previousAttemptsList = existingEntry.attempts || [];
       } catch (writeErr) {
         if (
           writeErr.statusCode === 412 ||
@@ -1184,6 +1193,31 @@ async function submitActivityHandler(req, res) {
         error: 'CONCURRENT_SUBMISSION_CONFLICT',
         message: 'Xung đột khi ghi nhận bài nộp đồng thời. Vui lòng thử lại.',
       });
+    }
+
+    // (5b) Priority 6: Safe archiving of previous attempts into "File cũ" subfolder
+    let archivedPreviousCount = 0;
+    try {
+      if (previousAttemptsList.length > 0 && latestRoundDoc && latestActivity) {
+        const studentFolderId = await resolveTargetDriveFolder({
+          roundDoc: latestRoundDoc,
+          activityDoc: latestActivity,
+          studentId: effectiveStudentId,
+          serverToken,
+        });
+        if (studentFolderId) {
+          const archiveResult = await archivePreviousAttemptFiles({
+            studentFolderId,
+            previousAttempts: previousAttemptsList,
+          });
+          archivedPreviousCount = archiveResult.archivedCount;
+          if (archiveResult.errors && archiveResult.errors.length > 0) {
+            console.warn('[submit-activity] Non-fatal archive errors:', archiveResult.errors.join('; '));
+          }
+        }
+      }
+    } catch (archiveErr) {
+      console.warn('[submit-activity] Non-fatal error while archiving previous attempts:', archiveErr.message);
     }
 
     // The submission is already committed. Report audit failure as a partial

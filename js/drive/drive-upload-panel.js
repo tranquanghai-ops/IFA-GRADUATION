@@ -424,14 +424,16 @@ window.renderStudentSubmissionPanel = function(act, round) {
         </div>
         <div>
           <div class="flex items-center justify-between">
-            <span class="text-[10px] text-slate-400 block uppercase font-bold">Lượt nộp còn lại</span>
+            <span class="text-[10px] text-slate-400 block uppercase font-bold">Số lần đã nộp / Tối đa</span>
             ${state.isAdmin ? `
               <button type="button" onclick="openSubmissionOverrideModal('${userMssv}', '${act.id}', '${round.id}')" title="Cấp thêm lượt cho sinh viên" class="text-[10px] px-1.5 py-0.2 bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold rounded cursor-pointer transition-colors">
                 + Thêm lượt
               </button>
             ` : ''}
           </div>
-          <span class="font-bold font-mono text-xs sm:text-sm ${rules.remainingAttempts > 0 ? 'text-emerald-700' : 'text-rose-600'}">${rules.remainingAttempts} / ${rules.totalAllowedAttempts}</span>
+          <span class="font-bold font-mono text-xs sm:text-sm ${rules.remainingAttempts > 0 ? 'text-emerald-700' : 'text-rose-600'}">
+            ${rules.completedAttempts}/${rules.totalAllowedAttempts} lần${rules.remainingAttempts <= 0 ? ' – Hết lượt nộp' : ''}
+          </span>
         </div>
       </div>
 
@@ -449,50 +451,83 @@ window.renderStudentSubmissionPanel = function(act, round) {
         </div>
       ` : ''}
 
-      <!-- Expected filename display intentionally hidden: system auto-normalizes the uploaded
-           file name to the configured template, students can upload with any file name. -->
+      <!-- Official Submission View Card (Ưu tiên 5) -->
+      ${(rules.currentSubmission && rules.currentSubmission.status === 'submitted') ? `
+        <div class="p-3 bg-white border border-emerald-300 rounded-xl text-xs space-y-2 shadow-2xs">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="text-xl select-none leading-none">📄</span>
+              <div>
+                <span class="font-bold text-emerald-950 block">Bài nộp chính thức (Lần ${rules.currentSubmission.attempt || rules.completedAttempts}/${rules.totalAllowedAttempts}):</span>
+                <span class="text-[11px] font-mono text-slate-700 block">${rules.currentSubmission.files?.[0]?.validatedName || rules.currentSubmission.files?.[0]?.originalName || 'Tài liệu đã nộp'} ${rules.currentSubmission.files?.[0]?.size ? `(${(rules.currentSubmission.files[0].size / (1024 * 1024)).toFixed(1)} MB)` : ''}</span>
+                <span class="text-[10px] text-slate-400 font-mono block">Biên nhận: ${rules.currentSubmission.receiptId || '--'} • ${rules.currentSubmission.submittedAt ? fmtIsoToVietnameseDateTime(rules.currentSubmission.submittedAt) : ''}</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5 ml-auto sm:ml-0">
+              ${(rules.currentSubmission.files?.[0]?.providerUrl || rules.currentSubmission.files?.[0]?.viewUrl) ? `
+                <a href="${rules.currentSubmission.files[0].providerUrl || rules.currentSubmission.files[0].viewUrl}" target="_blank" rel="noopener noreferrer" id="btn-view-submission-${act.id}" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer" title="Xem file đã nộp trên Google Drive">
+                  👁️ Xem bài đã nộp
+                </a>
+              ` : ''}
+              ${rules.currentSubmission.files?.[0]?.downloadUrl ? `
+                <a href="${rules.currentSubmission.files[0].downloadUrl}" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-300 text-xs inline-flex items-center gap-1 transition-colors cursor-pointer" title="Tải file về máy">
+                  📥 Tải về
+                </a>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      ` : ''}
 
       <!-- Upload Section -->
-      ${rules.canSubmit ? `
-        <div class="space-y-2">
-          <div class="flex items-center gap-2">
-            <input type="file" id="sub-input-file-${act.id}" accept="${acceptAttr}" ${isMultiple ? 'multiple' : ''} onchange="onStudentFileSelected('${act.id}')" class="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer">
-          </div>
-          <div id="sub-selected-file-info-${act.id}" class="hidden p-2 bg-white rounded-lg border border-slate-200 text-[11px] font-mono text-slate-700">
-            <!-- Populated on file select -->
-          </div>
+      <div class="space-y-2">
+        <div class="flex items-center gap-2">
+          <input type="file" id="sub-input-file-${act.id}" accept="${acceptAttr}" ${isMultiple ? 'multiple' : ''} onchange="onStudentFileSelected('${act.id}')" ${!rules.canSubmit ? 'disabled' : ''} class="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer ${!rules.canSubmit ? 'opacity-50 cursor-not-allowed' : ''}">
+        </div>
+        <div id="sub-selected-file-info-${act.id}" class="hidden p-2 bg-white rounded-lg border border-slate-200 text-[11px] font-mono text-slate-700">
+          <!-- Populated on file select -->
+        </div>
 
-          <!-- Upload Progress -->
-          <div id="sub-progress-wrap-${act.id}" class="hidden space-y-1">
-            <div class="flex items-center justify-between text-[11px] font-semibold">
-              <span id="sub-progress-text-${act.id}" class="text-emerald-800">Đang tải: 0%</span>
-              <button type="button" onclick="cancelStudentUpload('${act.id}')" class="text-rose-600 hover:underline font-bold text-[10px]">Hủy tải</button>
-            </div>
-            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-              <div id="sub-progress-bar-${act.id}" class="bg-emerald-600 h-2 transition-all duration-200" style="width: 0%"></div>
-            </div>
+        <!-- Upload Progress -->
+        <div id="sub-progress-wrap-${act.id}" class="hidden space-y-1">
+          <div class="flex items-center justify-between text-[11px] font-semibold">
+            <span id="sub-progress-text-${act.id}" class="text-emerald-800">Đang tải: 0%</span>
+            <button type="button" onclick="cancelStudentUpload('${act.id}')" class="text-rose-600 hover:underline font-bold text-[10px]">Hủy tải</button>
           </div>
-
-          <!-- Error notice box -->
-          <div id="sub-error-box-${act.id}" class="hidden p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-[11px] space-y-1">
+          <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+            <div id="sub-progress-bar-${act.id}" class="bg-emerald-600 h-2 transition-all duration-200" style="width: 0%"></div>
           </div>
+        </div>
 
-          <div class="flex items-center gap-2 pt-1">
-            <button type="button" onclick="checkStudentFileSubmission('${act.id}')" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-300 transition-colors">
-              🔍 Kiểm tra file
+        <!-- Error notice box -->
+        <div id="sub-error-box-${act.id}" class="hidden p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-[11px] space-y-1">
+        </div>
+
+        <!-- Submit Button Row (Ưu tiên 4: Bỏ nút Kiểm tra file; Ưu tiên 3: Khóa nút khi hết lượt/hết hạn) -->
+        <div class="flex items-center gap-2 pt-1">
+          ${rules.remainingAttempts <= 0 ? `
+            <button type="button" id="btn-submit-file-${act.id}" disabled class="px-4 py-2 bg-slate-300 text-slate-500 font-bold rounded-xl cursor-not-allowed">
+              🚫 Đã hết lượt nộp
             </button>
-            <button type="button" id="btn-submit-file-${act.id}" onclick="submitStudentFiles('${act.id}')" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-colors">
+          ` : (rules.isNotStarted ? `
+            <button type="button" id="btn-submit-file-${act.id}" disabled class="px-4 py-2 bg-slate-300 text-slate-500 font-bold rounded-xl cursor-not-allowed">
+              ⏳ Chưa mở nhận bài
+            </button>
+          ` : (rules.isPastDeadline && !rules.allowLate ? `
+            <button type="button" id="btn-submit-file-${act.id}" disabled class="px-4 py-2 bg-slate-300 text-slate-500 font-bold rounded-xl cursor-not-allowed">
+              ⏰ Đã hết hạn nộp bài
+            </button>
+          ` : (!act.submissionEnabled ? `
+            <button type="button" id="btn-submit-file-${act.id}" disabled class="px-4 py-2 bg-slate-300 text-slate-500 font-bold rounded-xl cursor-not-allowed">
+              🔒 Mốc đã khóa nhận bài
+            </button>
+          ` : `
+            <button type="button" id="btn-submit-file-${act.id}" onclick="submitStudentFiles('${act.id}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer">
               📤 Nộp bài (Lần ${rules.completedAttempts + 1}/${rules.totalAllowedAttempts})
             </button>
-          </div>
+          `)))}
         </div>
-      ` : `
-        <div class="p-3 bg-slate-100 border border-slate-200 rounded-xl text-center text-slate-600 font-semibold text-xs">
-          ${rules.remainingAttempts <= 0
-            ? 'Bạn đã hết số lần nộp bài cho mốc này.'
-            : (rules.isPastDeadline ? 'Mốc này đã kết thúc hạn nộp bài.' : 'Mốc kế hoạch chưa mở nhận bài.')}
-        </div>
-      `}
+      </div>
 
       ${historyHtml}
     </div>
@@ -500,9 +535,13 @@ window.renderStudentSubmissionPanel = function(act, round) {
 };
 
 window.onStudentFileSelected = function(actId) {
+  const round = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.rounds?.[0];
+  const act = (round?.activities || []).find(a => a.id === actId);
   const fileInput = document.getElementById('sub-input-file-' + actId);
   const infoEl = document.getElementById('sub-selected-file-info-' + actId);
   const errBox = document.getElementById('sub-error-box-' + actId);
+  const submitBtn = document.getElementById('btn-submit-file-' + actId);
+
   if (errBox) errBox.classList.add('hidden');
 
   if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
@@ -511,10 +550,56 @@ window.onStudentFileSelected = function(actId) {
   }
 
   const files = Array.from(fileInput.files);
-  const infoText = files.map(f => `• ${f.name} (${(f.size / (1024 * 1024)).toFixed(2)} MB)`).join('<br>');
+  const userMssv = state.userStudentId || (state.user?.email ? state.user.email.split('@')[0] : '');
+  const targetStudent =
+    (round?.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
+    (state.eligibleStudents || []).find(s => (s.studentId || s.mssv) === userMssv) ||
+    (state.adminReviewData?.registrations || []).find(r => r.studentId === userMssv) || {
+      studentId: userMssv,
+      studentName: getEffectiveActor().displayName || (userMssv ? userMssv : 'Sinh viên')
+    };
+
+  // Immediate automatic client validation (Ưu tiên 4 - Tự kiểm tra không cần bấm nút)
+  const valRes = typeof validateFileSubmission === 'function'
+    ? validateFileSubmission(files, targetStudent, act, round)
+    : { valid: true, errors: [] };
+
+  if (!valRes.valid) {
+    if (errBox) {
+      errBox.innerHTML = `<strong>⚠️ Tệp không hợp lệ:</strong><br>${valRes.errors.map(e => '• ' + e).join('<br>')}`;
+      errBox.classList.remove('hidden');
+    }
+    if (infoEl) {
+      infoEl.innerHTML = files.map(f => `• ${f.name} (${(f.size / (1024 * 1024)).toFixed(2)} MB) <span class="text-rose-600 font-bold">(Không hợp lệ)</span>`).join('<br>');
+      infoEl.classList.remove('hidden');
+    }
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.className = 'px-4 py-2 bg-slate-300 text-slate-500 font-bold rounded-xl cursor-not-allowed';
+    }
+    return;
+  }
+
+  // Valid file selected
   if (infoEl) {
+    const infoText = files.map(f => {
+      const mb = (f.size / (1024 * 1024)).toFixed(2);
+      const renameNote = valRes.expectedFilename && valRes.expectedFilename !== f.name
+        ? `<br><span class="text-emerald-700 font-semibold">↳ Tên chuẩn hóa khi nộp: ${valRes.expectedFilename}</span>`
+        : '';
+      return `• <strong>${f.name}</strong> (${mb} MB) <span class="text-emerald-600 font-bold">✓ Hợp lệ</span>${renameNote}`;
+    }).join('<br>');
     infoEl.innerHTML = infoText;
     infoEl.classList.remove('hidden');
+  }
+
+  if (submitBtn) {
+    const rules = valRes.rules || getEffectiveSubmissionRules(userMssv, act, round);
+    if (rules.remainingAttempts > 0 && rules.canSubmit) {
+      submitBtn.disabled = false;
+      submitBtn.className = 'px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer';
+      submitBtn.textContent = `📤 Nộp bài (Lần ${rules.completedAttempts + 1}/${rules.totalAllowedAttempts})`;
+    }
   }
 };
 

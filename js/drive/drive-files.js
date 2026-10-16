@@ -81,6 +81,15 @@ window.submitStudentFiles = async function(actId) {
     return;
   }
 
+  if (valRes.rules.remainingAttempts <= 0) {
+    if (errBox) {
+      errBox.innerHTML = `<strong>⚠️ Hết lượt nộp:</strong><br>Bạn đã nộp đủ ${valRes.rules.totalAllowedAttempts} lần cho mốc này.`;
+      errBox.classList.remove('hidden');
+    }
+    showToast('Bạn đã hết lượt nộp bài cho mốc này!', 'error');
+    return;
+  }
+
   if (errBox) errBox.classList.add('hidden');
   if (submitBtn) {
     submitBtn.disabled = true;
@@ -234,7 +243,24 @@ window.submitStudentFiles = async function(actId) {
   } finally {
     window._currentUploadAbort = null;
     if (submitBtn) {
-      submitBtn.disabled = false;
+      const updatedRules = (typeof getEffectiveSubmissionRules === 'function')
+        ? getEffectiveSubmissionRules(userMssv, act, round)
+        : null;
+      if (updatedRules && updatedRules.remainingAttempts <= 0) {
+        submitBtn.disabled = true;
+        submitBtn.className = 'px-4 py-2 bg-slate-300 text-slate-500 font-bold rounded-xl cursor-not-allowed';
+        submitBtn.textContent = '🚫 Đã hết lượt nộp';
+      } else if (updatedRules && !updatedRules.canSubmit) {
+        submitBtn.disabled = true;
+        submitBtn.className = 'px-4 py-2 bg-slate-300 text-slate-500 font-bold rounded-xl cursor-not-allowed';
+        submitBtn.textContent = updatedRules.isPastDeadline ? '⏰ Đã hết hạn nộp bài' : '⏳ Chưa mở nhận bài';
+      } else if (updatedRules) {
+        submitBtn.disabled = false;
+        submitBtn.className = 'px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer';
+        submitBtn.textContent = `📤 Nộp bài (Lần ${updatedRules.completedAttempts + 1}/${updatedRules.totalAllowedAttempts})`;
+      } else {
+        submitBtn.disabled = false;
+      }
     }
     if (progWrap) progWrap.classList.add('hidden');
   }

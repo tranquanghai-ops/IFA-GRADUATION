@@ -60,8 +60,9 @@ function generateExpectedFilename({ template, student, activity, round, fileType
     .replace(/\s+/g, ' ')
     .trim();
 
-  const ext = extension ? ('.' + String(extension).toLowerCase().replace(/^\./, '')) : '';
-  return base + ext;
+  const ext = extension ? ('.' + String(extension).toLowerCase().replace(/^\.+/, '')) : '';
+  const cleanBase = base.replace(/\.[^/.]+$/, '');
+  return cleanBase + ext;
 }
 window.generateExpectedFilename = generateExpectedFilename;
 
@@ -70,13 +71,16 @@ function validateFilename({ filename, template, student, activity, round, fileTy
     return { valid: false, error: 'Chưa có tệp nào được chọn' };
   }
 
-  const parts = filename.split('.');
-  const ext = parts.length > 1 ? parts.pop().toLowerCase() : '';
+  const cleanName = filename.trim();
+  const lastDot = cleanName.lastIndexOf('.');
+  const ext = (lastDot !== -1 && lastDot < cleanName.length - 1)
+    ? cleanName.slice(lastDot + 1).toLowerCase()
+    : '';
 
   // Extension check
   const allowed = Array.isArray(acceptedExtensions) && acceptedExtensions.length > 0
     ? acceptedExtensions.map(e => String(e).toLowerCase().replace(/^\./, ''))
-    : ['pdf'];
+    : ['pdf', 'pptx'];
   if (!allowed.includes(ext)) {
     return {
       valid: false,

@@ -7,7 +7,12 @@
 
 'use strict';
 
-const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
+let SecretManagerServiceClient;
+try {
+  ({ SecretManagerServiceClient } = require('@google-cloud/secret-manager'));
+} catch (e) {
+  SecretManagerServiceClient = class MockSecretManagerServiceClient {};
+}
 
 const PROJECT_ID = 'ifa-activities';
 let client = null;
