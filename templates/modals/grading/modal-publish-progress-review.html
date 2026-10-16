@@ -55,6 +55,16 @@
         </ul>
       </div>
 
+      <!-- Partial Publication Confirmation Checkbox (shown only when pendingCount > 0) -->
+      <div id="pub-modal-partial-warning" class="hidden p-3 bg-orange-50 rounded-xl border border-orange-200 text-orange-950 space-y-2 text-xs">
+        <div class="flex items-start gap-2">
+          <input type="checkbox" id="chk-confirm-partial-publish" onchange="onPartialPublishCheckboxChanged()" class="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+          <label for="chk-confirm-partial-publish" class="font-bold text-[11px] leading-tight cursor-pointer select-none text-orange-900">
+            Xác nhận công bố từng phần: Tôi hiểu rằng còn <span id="pub-modal-partial-pending-num" class="font-black text-rose-700">0</span> sinh viên chưa chốt điểm. Tôi xác nhận chỉ công bố kết quả cho các sinh viên đã chốt chính thức; các sinh viên còn lại sẽ tiếp tục ở trạng thái Chưa công bố.
+          </label>
+        </div>
+      </div>
+
       <div id="pub-modal-error-box" class="hidden p-3 bg-rose-50 rounded-xl border border-rose-200 text-rose-800 font-bold text-xs">
         <!-- Error message -->
       </div>

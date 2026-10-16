@@ -404,6 +404,20 @@ test('Comprehensive Progress Review Publication & Pass/Fail Suite', async (t) =>
     assert.match(prelimSource, /Đã công bố điểm/);
   });
 
+  await t.test('C5: Partial publication warning and checkbox gating when pendingCount > 0', () => {
+    assert.match(compiledIndexHtml, /id="pub-modal-partial-warning"/);
+    assert.match(compiledIndexHtml, /id="chk-confirm-partial-publish"/);
+    assert.match(compiledIndexHtml, /id="pub-modal-partial-pending-num"/);
+    assert.match(prelimSource, /onPartialPublishCheckboxChanged/);
+    assert.match(prelimSource, /chk-confirm-partial-publish/);
+  });
+
+  await t.test('C6: Subcollection publishedStudentResults and auditLogs payload verification', () => {
+    assert.match(prelimSource, /publishedStudentResults/);
+    assert.match(prelimSource, /pub_duyet_\$\{phase\}_/);
+    assert.match(prelimSource, /Công bố điểm Duyệt đợt/);
+  });
+
   // =========================================================================
   // SUITE D: STUDENT & SUPERVISOR PORTAL ISOLATION
   // =========================================================================

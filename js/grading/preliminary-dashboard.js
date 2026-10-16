@@ -422,19 +422,39 @@ export function openPublishProgressReviewModal(phase) {
 
   const btnConfirm = document.getElementById('btn-confirm-publish-scores');
   const errBox = document.getElementById('pub-modal-error-box');
+  const partialWarn = document.getElementById('pub-modal-partial-warning');
+  const partialNum = document.getElementById('pub-modal-partial-pending-num');
+  const partialChk = document.getElementById('chk-confirm-partial-publish');
 
   if (eligibleCount === 0) {
     if (errBox) {
       errBox.textContent = `Chưa có kết quả điểm chốt nào từ Hội đồng cho mốc ${actTitle}. Vui lòng chốt điểm Hội đồng trước khi thực hiện công bố.`;
       errBox.classList.remove('hidden');
     }
+    if (partialWarn) partialWarn.classList.add('hidden');
     if (btnConfirm) btnConfirm.disabled = true;
   } else {
     if (errBox) errBox.classList.add('hidden');
-    if (btnConfirm) btnConfirm.disabled = false;
+    if (pendingCount > 0) {
+      if (partialWarn) partialWarn.classList.remove('hidden');
+      if (partialNum) partialNum.textContent = pendingCount;
+      if (partialChk) partialChk.checked = false;
+      if (btnConfirm) btnConfirm.disabled = true; // Wait for explicit confirmation checkbox
+    } else {
+      if (partialWarn) partialWarn.classList.add('hidden');
+      if (btnConfirm) btnConfirm.disabled = false;
+    }
   }
 
   modal.classList.remove('hidden');
+}
+
+export function onPartialPublishCheckboxChanged() {
+  const chk = document.getElementById('chk-confirm-partial-publish');
+  const btnConfirm = document.getElementById('btn-confirm-publish-scores');
+  if (btnConfirm && chk) {
+    btnConfirm.disabled = !chk.checked;
+  }
 }
 
 export function closePublishProgressReviewModal() {
@@ -511,11 +531,49 @@ export async function confirmPublishProgressReview() {
         updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : new Date().toISOString()
       });
 
-      // Safe Subcollection write (Phase B Lớp B độc lập)
+      // Safe Subcollection writes (Phase B: Lớp B độc lập & Audit Log)
       try {
         if (rawSet) {
+          // 1. Snapshot tổng hợp mốc duyệt
           const subDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedProgressReviews', `duyet_${phase}`);
           await rawSet(subDocRef, pubRecord);
+
+          // 2. Tách dữ liệu công bố riêng theo từng sinh viên (Least-Privilege RBAC)
+          for (const [stId, sRes] of Object.entries(studentResults)) {
+            const stDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedStudentResults', stId);
+            await rawSet(stDocRef, {
+              studentId: stId,
+              studentName: sRes.studentName || stId,
+              reviews: {
+                [`duyet_${phase}`]: {
+                  phase: Number(phase),
+                  activityId: act ? act.id : `act_duyet_${phase}`,
+                  letterGrade: sRes.letterGrade,
+                  isPassed: sRes.isPassed,
+                  status: sRes.status,
+                  publishedAt: pubRecord.publishedAt,
+                  publishedBy: pubRecord.publishedBy
+                }
+              },
+              updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : new Date().toISOString()
+            }, { merge: true });
+          }
+
+          // 3. Ghi nhật ký kiểm toán (Audit Log)
+          const auditLogId = `pub_duyet_${phase}_${Date.now()}`;
+          const auditDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'auditLogs', auditLogId);
+          await rawSet(auditDocRef, {
+            by: state.user?.email || 'admin',
+            actorEmail: state.user?.email || 'admin',
+            action: `Công bố điểm Duyệt đợt ${phase}`,
+            roundId: targetRound.id,
+            activityId: act ? act.id : `act_duyet_${phase}`,
+            phase: Number(phase),
+            publishedCount: eligibleCount,
+            pendingCount: allStudents.length - eligibleCount,
+            studentIds: Object.keys(studentResults),
+            publishedAt: pubRecord.publishedAt
+          });
         }
       } catch (subErr) {
         console.warn('[PublishedProgressReviews] Subcollection write pending rules approval:', subErr.message);
@@ -724,6 +782,7 @@ if (typeof window !== 'undefined') {
   window.openPublishProgressReviewModal = openPublishProgressReviewModal;
   window.closePublishProgressReviewModal = closePublishProgressReviewModal;
   window.confirmPublishProgressReview = confirmPublishProgressReview;
+  window.onPartialPublishCheckboxChanged = onPartialPublishCheckboxChanged;
   window.openCouncilScoreDetailModal = openCouncilScoreDetailModal;
   window.closeCouncilScoreDetailModal = closeCouncilScoreDetailModal;
   window.findProgressReviewActivity = findProgressReviewActivity;
