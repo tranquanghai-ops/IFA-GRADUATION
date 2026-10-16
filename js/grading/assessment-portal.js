@@ -644,7 +644,15 @@ window.renderAssessmentDuyetList = function(phase) {
     }
     const sc = targetRound.progressReviews?.['duyet_' + phase]?.[sid];
     if (sc && (sc.status === 'passed' || sc.status === 'failed' || sc.status === 'completed')) {
-      return { status: 'completed', score: sc.score, isPassed: sc.score >= 5 };
+      const passCheck = (typeof window.isProgressReviewPassed === 'function')
+        ? window.isProgressReviewPassed
+        : ((letter, num) => {
+            if (letter) return ['A+', 'A', 'A-', 'B+', 'B', 'B-'].includes(String(letter).trim().toUpperCase());
+            return num !== null && Number(num) >= 7.0;
+          });
+      const letter = sc.letterGrade || (typeof sc.value === 'string' && /[A-DF]/i.test(sc.value) ? sc.value : null);
+      const isPassed = sc.status === 'passed' ? true : (sc.status === 'failed' ? false : passCheck(letter, sc.score));
+      return { status: 'completed', score: sc.score, letterGrade: letter, isPassed };
     }
     if (sc && sc.status === 'draft') {
       return { status: 'draft', score: sc.score };
@@ -677,7 +685,7 @@ window.renderAssessmentDuyetList = function(phase) {
     if (scInfo.status === 'completed') {
       statusBadge = scInfo.isPassed
         ? '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đạt yêu cầu</span>'
-        : '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">✕ Không đạt</span>';
+        : '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">✕ Không đạt yêu cầu</span>';
       if (scInfo.letterGrade) {
         const refTxt = scInfo.referenceScore ? ` <span class="text-[10px] text-slate-400 font-normal">(${scInfo.referenceScore})</span>` : '';
         scoreDisplay = `<span class="text-sm font-black text-purple-900">${scInfo.letterGrade}</span>${refTxt}`;

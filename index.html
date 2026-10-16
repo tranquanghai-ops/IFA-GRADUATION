@@ -2574,11 +2574,16 @@
                 <option value="all">Tất cả sinh viên</option>
                 <option value="passed">Đạt yêu cầu</option>
                 <option value="revision">Cần bổ sung / chỉnh sửa</option>
-                <option value="failed">Không đạt</option>
+                <option value="failed">Không đạt yêu cầu</option>
                 <option value="pending">Chưa duyệt</option>
               </select>
             </div>
-            <input type="text" id="admin-duyet-1-search" oninput="renderAdminProgressReviewTable(1)" placeholder="Tìm MSSV, họ tên, đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <div id="admin-duyet-1-publish-zone" class="flex items-center">
+                <!-- Dynamically rendered Publish Button or Status Badge -->
+              </div>
+              <input type="text" id="admin-duyet-1-search" oninput="renderAdminProgressReviewTable(1)" placeholder="Tìm MSSV, họ tên, đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+            </div>
           </div>
           <div class="card-surface overflow-x-auto">
             <table class="w-full text-left text-xs border-collapse">
@@ -2609,11 +2614,16 @@
                 <option value="all">Tất cả sinh viên</option>
                 <option value="passed">Đạt yêu cầu</option>
                 <option value="revision">Cần bổ sung / chỉnh sửa</option>
-                <option value="failed">Không đạt</option>
+                <option value="failed">Không đạt yêu cầu</option>
                 <option value="pending">Chưa duyệt</option>
               </select>
             </div>
-            <input type="text" id="admin-duyet-2-search" oninput="renderAdminProgressReviewTable(2)" placeholder="Tìm MSSV, họ tên, đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <div id="admin-duyet-2-publish-zone" class="flex items-center">
+                <!-- Dynamically rendered Publish Button or Status Badge -->
+              </div>
+              <input type="text" id="admin-duyet-2-search" oninput="renderAdminProgressReviewTable(2)" placeholder="Tìm MSSV, họ tên, đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+            </div>
           </div>
           <div class="card-surface overflow-x-auto">
             <table class="w-full text-left text-xs border-collapse">
@@ -2644,11 +2654,16 @@
                 <option value="all">Tất cả sinh viên</option>
                 <option value="passed">Đạt yêu cầu</option>
                 <option value="revision">Cần bổ sung / chỉnh sửa</option>
-                <option value="failed">Không đạt</option>
+                <option value="failed">Không đạt yêu cầu</option>
                 <option value="pending">Chưa duyệt</option>
               </select>
             </div>
-            <input type="text" id="admin-duyet-3-search" oninput="renderAdminProgressReviewTable(3)" placeholder="Tìm MSSV, họ tên, đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <div id="admin-duyet-3-publish-zone" class="flex items-center">
+                <!-- Dynamically rendered Publish Button or Status Badge -->
+              </div>
+              <input type="text" id="admin-duyet-3-search" oninput="renderAdminProgressReviewTable(3)" placeholder="Tìm MSSV, họ tên, đề tài..." class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs max-w-xs">
+            </div>
           </div>
           <div class="card-surface overflow-x-auto">
             <table class="w-full text-left text-xs border-collapse">
@@ -6275,6 +6290,206 @@
   </div>
 
   <!-- ============================================================================
+
+<!-- ============================================================================
+     MODAL: CHI TIẾT ĐÁNH GIÁ HỘI ĐỒNG (ADMIN & OWNER ONLY)
+     ============================================================================ -->
+<div id="modal-council-score-details" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+  <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 text-xs animate-in fade-in zoom-in duration-150">
+    <!-- Modal Header -->
+    <div class="flex items-start justify-between p-4 sm:p-5 border-b border-slate-200 bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <span class="badge bg-purple-500/30 text-purple-200 border border-purple-400/30 font-bold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+            🏛️ ĐÁNH GIÁ HỘI ĐỒNG
+          </span>
+          <span id="council-detail-phase-badge" class="badge bg-white/20 text-white font-mono text-[10px] px-2 py-0.5 rounded-full font-bold">
+            Duyệt đợt 1
+          </span>
+        </div>
+        <h3 id="council-detail-title" class="font-black text-sm sm:text-base text-white tracking-tight mt-1">
+          Chi tiết Đánh giá Hội đồng: Nguyễn Văn A (12345678)
+        </h3>
+        <p id="council-detail-subtitle" class="text-[11px] text-purple-200/80">
+          Đợt: -- • Hội đồng: --
+        </p>
+      </div>
+      <button type="button" onclick="closeCouncilScoreDetailModal()" class="text-slate-300 hover:text-white font-bold p-1 text-lg rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title="Đóng">
+        ✕
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0 text-slate-700">
+      <!-- Thông tin sinh viên & đề tài -->
+      <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+          <div>
+            <span class="text-slate-400 block text-[10px] uppercase font-bold">Sinh viên:</span>
+            <span id="council-detail-student-info" class="font-black text-slate-900 font-mono">--</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px] uppercase font-bold">Giảng viên Hướng dẫn:</span>
+            <span id="council-detail-supervisor-info" class="font-bold text-slate-800">--</span>
+          </div>
+        </div>
+        <div class="pt-2 border-t border-slate-200">
+          <span class="text-slate-400 block text-[10px] uppercase font-bold">Đề tài chính thức:</span>
+          <p id="council-detail-topic-info" class="font-bold text-slate-900 text-xs mt-0.5 leading-snug">--</p>
+        </div>
+        <div class="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-400 font-bold">Trạng thái chốt:</span>
+            <span id="council-detail-status-pill">--</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-400 font-bold">Trạng thái công bố:</span>
+            <span id="council-detail-publish-pill">--</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bảng điểm từng thành viên Hội đồng -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h4 class="font-black text-xs text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+            <span>📋</span> BẢNG ĐIỂM TỪNG THÀNH VIÊN HỘI ĐỒNG
+          </h4>
+          <span class="text-[10px] text-slate-400 italic">Dữ liệu nội bộ chỉ dành cho Admin / Owner</span>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slate-100 text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
+              <tr>
+                <th class="p-2.5 text-center">STT</th>
+                <th class="p-2.5">Vai trò</th>
+                <th class="p-2.5">Thành viên</th>
+                <th class="p-2.5 text-center">Điểm chữ</th>
+                <th class="p-2.5 text-center">Điểm số tham khảo</th>
+                <th class="p-2.5 text-center">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody id="council-detail-members-tbody" class="divide-y divide-slate-100 font-medium">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tổng kết & Đánh giá chính thức -->
+      <div class="p-4 bg-gradient-to-br from-purple-50/70 via-white to-slate-50 rounded-xl border border-purple-200 space-y-3">
+        <div class="flex items-center justify-between border-b border-purple-100 pb-2">
+          <h4 class="font-black text-xs text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+            <span>🏁</span> TỔNG KẾT KẾT QUẢ CHÍNH THỨC
+          </h4>
+          <span id="council-detail-valid-votes" class="text-xs font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-full font-mono">
+            Hợp lệ: 0/0
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          <div class="p-2.5 bg-white rounded-xl border border-purple-100 shadow-2xs">
+            <span class="text-[10px] uppercase font-bold text-slate-400 block">Điểm chữ</span>
+            <span id="council-detail-final-letter" class="text-lg font-black font-mono text-purple-950">--</span>
+          </div>
+          <div class="p-2.5 bg-white rounded-xl border border-purple-100 shadow-2xs">
+            <span class="text-[10px] uppercase font-bold text-slate-400 block">Điểm quy đổi</span>
+            <span id="council-detail-final-num" class="text-lg font-black font-mono text-slate-700">--</span>
+          </div>
+          <div class="p-2.5 bg-white rounded-xl border border-purple-100 shadow-2xs col-span-2">
+            <span class="text-[10px] uppercase font-bold text-slate-400 block">Kết luận</span>
+            <div id="council-detail-verdict-badge" class="mt-0.5 font-bold text-xs">--</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+      <span class="text-[11px] text-slate-500">
+        Chỉ Quản trị viên và Chủ sở hữu mới được xem chi tiết phiếu chấm từng thành viên.
+      </span>
+      <button type="button" onclick="closeCouncilScoreDetailModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer shadow-xs">
+        Đóng
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================================
+     MODAL: XÁC NHẬN CÔNG BỐ ĐIỂM DUYỆT TIẾN ĐỘ (ADMIN & OWNER ONLY)
+     ============================================================================ -->
+<div id="modal-publish-progress-review" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+  <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col overflow-hidden border border-slate-200 text-xs animate-in fade-in zoom-in duration-150">
+    <!-- Modal Header -->
+    <div class="flex items-start justify-between p-4 sm:p-5 border-b border-slate-200 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <span class="badge bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 font-bold text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+            📢 QUẢN LÝ CÔNG BỐ ĐIỂM
+          </span>
+          <span id="pub-modal-phase-badge" class="badge bg-white/20 text-white font-mono text-[10px] px-2 py-0.5 rounded-full font-bold">
+            Duyệt đợt 1
+          </span>
+        </div>
+        <h3 class="font-black text-sm sm:text-base text-white tracking-tight mt-1">
+          Xác nhận Công bố Điểm Đánh giá Hội đồng
+        </h3>
+        <p id="pub-modal-round-title" class="text-[11px] text-indigo-200/80">
+          Đợt tốt nghiệp: --
+        </p>
+      </div>
+      <button type="button" onclick="closePublishProgressReviewModal()" class="text-slate-300 hover:text-white font-bold p-1 text-lg rounded-lg hover:bg-white/10 transition-colors cursor-pointer" title="Đóng">
+        ✕
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-4 sm:p-5 space-y-4 text-slate-700">
+      <div class="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100 space-y-2.5">
+        <div class="flex items-center justify-between text-xs font-bold">
+          <span class="text-indigo-950">Mốc công bố:</span>
+          <span id="pub-modal-act-title" class="text-indigo-900 font-black">--</span>
+        </div>
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-slate-600">Số sinh viên đã chốt điểm hợp lệ:</span>
+          <span id="pub-modal-eligible-count" class="font-black text-emerald-700 font-mono text-sm">0 sinh viên</span>
+        </div>
+        <div class="flex items-center justify-between text-xs" id="pub-modal-pending-row">
+          <span class="text-slate-600">Sinh viên chưa chốt điểm / chưa duyệt:</span>
+          <span id="pub-modal-pending-count" class="font-bold text-amber-700 font-mono">0 sinh viên</span>
+        </div>
+      </div>
+
+      <!-- Warning & Data Isolation Notice -->
+      <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 space-y-1.5 text-[11px]">
+        <div class="flex items-center gap-1.5 font-bold">
+          <span>⚠️</span> <span>LƯU Ý QUAN TRỌNG VỀ PHÂN QUYỀN VÀ BẢO MẬT:</span>
+        </div>
+        <ul class="list-disc pl-4 space-y-1 text-amber-800 leading-relaxed">
+          <li>Chỉ kết quả <strong>điểm chữ chính thức</strong> (A/B/C) và kết luận <strong>Đạt / Không đạt</strong> sẽ được công bố cho Sinh viên và GVHD.</li>
+          <li>Điểm số quy đổi tham khảo và phiếu chấm của từng thành viên Hội đồng được <strong>bảo mật tuyệt đối</strong>, không hiển thị cho sinh viên và GVHD.</li>
+          <li>Thao tác công bố là độc lập cho từng mốc (Duyệt 1, 2, 3), không tự động công bố các mốc khác.</li>
+        </ul>
+      </div>
+
+      <div id="pub-modal-error-box" class="hidden p-3 bg-rose-50 rounded-xl border border-rose-200 text-rose-800 font-bold text-xs">
+        <!-- Error message -->
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5">
+      <button type="button" onclick="closePublishProgressReviewModal()" class="px-4 py-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 rounded-xl font-bold text-xs transition-colors cursor-pointer">
+        Hủy bỏ
+      </button>
+      <button type="button" id="btn-confirm-publish-scores" onclick="confirmPublishProgressReview()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer">
+        <span>📢</span> <span>Xác nhận Công bố</span>
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ============================================================================
        MODAL: GENERIC SCORE ENTRY FOR SUPERVISOR / PRELIMINARY / REVIEWER (v1.9.0-beta.1)

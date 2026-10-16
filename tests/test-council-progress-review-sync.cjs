@@ -177,13 +177,27 @@ test('Council Progress Review Synchronization Suite', async (t) => {
     return act || null;
   }
 
+  const PASSING_PROGRESS_LETTER_GRADES = ['A+', 'A', 'A-', 'B+', 'B', 'B-'];
+  const FAILING_PROGRESS_LETTER_GRADES = ['C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'];
+  function isProgressReviewPassed(letterGrade, numericScore = null) {
+    if (letterGrade && typeof letterGrade === 'string') {
+      const clean = letterGrade.trim().toUpperCase();
+      if (PASSING_PROGRESS_LETTER_GRADES.includes(clean)) return true;
+      if (FAILING_PROGRESS_LETTER_GRADES.includes(clean)) return false;
+    }
+    if (numericScore !== null && numericScore !== undefined && !isNaN(Number(numericScore))) {
+      return Number(numericScore) >= 7.0;
+    }
+    return false;
+  }
+
   function getProgressReviewData(studentId, phase, targetRound) {
     if (!targetRound || !studentId) {
       return { status: 'pending', score: null, letterGrade: null, letterLabel: '', displayScore: '--', referenceScore: null, isPassed: false, isFinalized: false, source: 'none' };
     }
     const sid = String(studentId).trim();
 
-    if (targetRound.councilScores && typeof mockGlobal.state !== 'undefined') {
+    if (targetRound.councilScores && mockGlobal.state) {
       mockGlobal.state.councilScores = { ...(targetRound.councilScores || {}), ...(mockGlobal.state.councilScores || {}) };
     }
 
@@ -201,7 +215,7 @@ test('Council Progress Review Synchronization Suite', async (t) => {
           const cached = council.finalDefenseScores[sid];
           const letter = cached.letterGrade || (act.scoringConfig?.mode === 'letter' && cached.formattedScore !== '--' ? cached.formattedScore : null);
           const numScore = cached.score !== undefined && cached.score !== null ? Number(cached.score) : null;
-          const isPassed = numScore !== null ? (numScore >= 5) : (letter ? !['D', 'D-', 'F'].includes(letter) : false);
+          const isPassed = isProgressReviewPassed(letter, numScore);
           return {
             status: isPassed ? 'passed' : 'failed',
             score: numScore,
@@ -222,7 +236,7 @@ test('Council Progress Review Synchronization Suite', async (t) => {
           if (official && (official.score !== null || official.letterGrade !== null)) {
             const letter = official.letterGrade || (act.scoringConfig?.mode === 'letter' && official.formattedScore !== '--' ? official.formattedScore : null);
             const numScore = official.score !== null ? Number(official.score) : null;
-            const isPassed = numScore !== null ? (numScore >= 5) : (letter ? !['D', 'D-', 'F'].includes(letter) : false);
+            const isPassed = isProgressReviewPassed(letter, numScore);
             return {
               status: isPassed ? 'passed' : 'failed',
               score: numScore,
@@ -260,9 +274,9 @@ test('Council Progress Review Synchronization Suite', async (t) => {
       const rawScore = legacy.score !== undefined && legacy.score !== null ? Number(legacy.score) : null;
       const letter = legacy.letterGrade || (typeof legacy.value === 'string' && /[A-DF]/i.test(legacy.value) ? legacy.value : null);
       const status = legacy.status || 'pending';
-      const isPassed = status === 'passed' || (rawScore !== null && rawScore >= 5) || (letter ? !['D', 'D-', 'F'].includes(letter) : false);
+      const isPassed = status === 'passed' ? true : (status === 'failed' ? false : isProgressReviewPassed(letter, rawScore));
       return {
-        status,
+        status: isPassed ? 'passed' : (status === 'revision' ? 'revision' : (status === 'pending' ? 'pending' : 'failed')),
         score: rawScore,
         letterGrade: letter,
         letterLabel: legacy.letterLabel || '',
@@ -283,7 +297,6 @@ test('Council Progress Review Synchronization Suite', async (t) => {
       referenceScore: null,
       isPassed: false,
       isFinalized: false,
-      source: 'none'
     };
   }
 
@@ -360,11 +373,13 @@ test('Council Progress Review Synchronization Suite', async (t) => {
 
   await t.test('1. Hội đồng đã chốt: Hiển thị đúng trạng thái đã duyệt trên bảng điểm Duyệt đợt 1', () => {
     const res1 = getProgressReviewData('11900335', 1, mockRound);
-    assert.equal(res1.status, 'passed');
-    assert.equal(res1.isPassed, true);
+    // Under new rule: C+ is 'failed'
+    assert.equal(res1.status, 'failed');
+    assert.equal(res1.isPassed, false);
     assert.equal(res1.isFinalized, true);
 
     const res5 = getProgressReviewData('11900412', 1, mockRound);
+    // Under new rule: B+ is 'passed'
     assert.equal(res5.status, 'passed');
     assert.equal(res5.isPassed, true);
     assert.equal(res5.isFinalized, true);
@@ -412,12 +427,20 @@ test('Council Progress Review Synchronization Suite', async (t) => {
     assert.equal(resUnscored.displayScore, '--');
   });
 
-  await t.test('6. Đồng bộ đúng 6 sinh viên hiện tại theo đúng MSSV', () => {
-    const expectedStudents = ['11900335', '11900375', '11900382', '11900395', '11900412', '12200254'];
-    expectedStudents.forEach(sid => {
+  await t.test('6. Đồng bộ đúng 6 sinh viên hiện tại theo đúng MSSV và quy tắc Đạt / Không đạt mới', () => {
+    const studentExpectations = [
+      { sid: '11900335', grade: 'C+', status: 'failed', isPassed: false },
+      { sid: '11900375', grade: 'B-', status: 'passed', isPassed: true },
+      { sid: '11900382', grade: 'B', status: 'passed', isPassed: true },
+      { sid: '11900395', grade: 'C+', status: 'failed', isPassed: false },
+      { sid: '11900412', grade: 'B+', status: 'passed', isPassed: true },
+      { sid: '12200254', grade: 'B+', status: 'passed', isPassed: true }
+    ];
+    studentExpectations.forEach(({ sid, grade, status, isPassed }) => {
       const data = getProgressReviewData(sid, 1, mockRound);
-      assert.ok(data.letterGrade, `Student ${sid} should have letter grade`);
-      assert.equal(data.status, 'passed');
+      assert.equal(data.letterGrade, grade, `Student ${sid} grade mismatch`);
+      assert.equal(data.status, status, `Student ${sid} status mismatch`);
+      assert.equal(data.isPassed, isPassed, `Student ${sid} isPassed mismatch`);
     });
   });
 
@@ -437,7 +460,8 @@ test('Council Progress Review Synchronization Suite', async (t) => {
       finalizedAt: '2026-10-16T10:00:00.000Z'
     };
     const reloadRes = getProgressReviewData('11900335', 1, cachedRound);
-    assert.equal(reloadRes.status, 'passed');
+    assert.equal(reloadRes.status, 'failed');
+    assert.equal(reloadRes.isPassed, false);
     assert.equal(reloadRes.letterGrade, 'C+');
     assert.equal(reloadRes.isFinalized, true);
   });

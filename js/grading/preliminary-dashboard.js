@@ -185,6 +185,34 @@ export function findProgressReviewActivity(targetRound, phase) {
   return act || null;
 }
 
+export const PASSING_PROGRESS_LETTER_GRADES = ['A+', 'A', 'A-', 'B+', 'B', 'B-'];
+export const FAILING_PROGRESS_LETTER_GRADES = ['C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'];
+
+export function isProgressReviewPassed(letterGrade, numericScore = null) {
+  if (letterGrade && typeof letterGrade === 'string') {
+    const clean = letterGrade.trim().toUpperCase();
+    if (PASSING_PROGRESS_LETTER_GRADES.includes(clean)) return true;
+    if (FAILING_PROGRESS_LETTER_GRADES.includes(clean)) return false;
+  }
+  if (numericScore !== null && numericScore !== undefined && !isNaN(Number(numericScore))) {
+    return Number(numericScore) >= 7.0;
+  }
+  return false;
+}
+
+export function isProgressReviewPublished(phase, targetRound) {
+  if (!targetRound) return false;
+  const pKey = 'duyet_' + phase;
+  const pub = targetRound.publishedReviews?.[pKey] || targetRound.publicationState?.[pKey];
+  return Boolean(pub && (pub.status === 'published' || pub.isPublished === true));
+}
+
+export function getProgressReviewPublicationInfo(phase, targetRound) {
+  if (!targetRound) return null;
+  const pKey = 'duyet_' + phase;
+  return targetRound.publishedReviews?.[pKey] || targetRound.publicationState?.[pKey] || null;
+}
+
 export function getProgressReviewData(studentId, phase, targetRound) {
   if (!targetRound || !studentId) {
     return { status: 'pending', score: null, letterGrade: null, letterLabel: '', displayScore: '--', referenceScore: null, isPassed: false, isFinalized: false, source: 'none' };
@@ -213,7 +241,7 @@ export function getProgressReviewData(studentId, phase, targetRound) {
         const cached = council.finalDefenseScores[sid];
         const letter = cached.letterGrade || (act.scoringConfig?.mode === 'letter' && cached.formattedScore !== '--' ? cached.formattedScore : null);
         const numScore = cached.score !== undefined && cached.score !== null ? Number(cached.score) : null;
-        const isPassed = numScore !== null ? (numScore >= 5) : (letter ? !['D', 'D-', 'F'].includes(letter) : false);
+        const isPassed = isProgressReviewPassed(letter, numScore);
         return {
           status: isPassed ? 'passed' : 'failed',
           score: numScore,
@@ -240,7 +268,7 @@ export function getProgressReviewData(studentId, phase, targetRound) {
         if (official && (official.score !== null || official.letterGrade !== null)) {
           const letter = official.letterGrade || (act.scoringConfig?.mode === 'letter' && official.formattedScore !== '--' ? official.formattedScore : null);
           const numScore = official.score !== null ? Number(official.score) : null;
-          const isPassed = numScore !== null ? (numScore >= 5) : (letter ? !['D', 'D-', 'F'].includes(letter) : false);
+          const isPassed = isProgressReviewPassed(letter, numScore);
           return {
             status: isPassed ? 'passed' : 'failed',
             score: numScore,
@@ -280,9 +308,9 @@ export function getProgressReviewData(studentId, phase, targetRound) {
     const rawScore = legacy.score !== undefined && legacy.score !== null ? Number(legacy.score) : null;
     const letter = legacy.letterGrade || (typeof legacy.value === 'string' && /[A-DF]/i.test(legacy.value) ? legacy.value : null);
     const status = legacy.status || 'pending';
-    const isPassed = status === 'passed' || (rawScore !== null && rawScore >= 5) || (letter ? !['D', 'D-', 'F'].includes(letter) : false);
+    const isPassed = status === 'passed' ? true : (status === 'failed' ? false : isProgressReviewPassed(letter, rawScore));
     return {
-      status,
+      status: isPassed ? 'passed' : (status === 'revision' ? 'revision' : (status === 'pending' ? 'pending' : 'failed')),
       score: rawScore,
       letterGrade: letter,
       letterLabel: legacy.letterLabel || '',
@@ -307,12 +335,405 @@ export function getProgressReviewData(studentId, phase, targetRound) {
   };
 }
 
+let currentPublishPhase = null;
+
+export function renderPublishProgressReviewToolbar(phase) {
+  const container = document.getElementById(`admin-duyet-${phase}-publish-zone`);
+  if (!container) return;
+
+  const targetRound = (typeof state !== 'undefined' && (state.rounds || []).find(r => r.id === state.selectedRoundId)) || state?.activeRound;
+  if (!targetRound) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const isAdminOrOwner = (typeof state !== 'undefined' && state.isAdmin && !state.impersonation) || (typeof isUserAdminOrOwner === 'function' && isUserAdminOrOwner());
+  if (!isAdminOrOwner) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const isPublished = isProgressReviewPublished(phase, targetRound);
+  const pubInfo = getProgressReviewPublicationInfo(phase, targetRound);
+
+  if (isPublished) {
+    const pubDateStr = pubInfo?.publishedAt ? new Date(pubInfo.publishedAt).toLocaleDateString('vi-VN') : '';
+    const pubUserStr = pubInfo?.publishedBy ? ` bởi ${pubInfo.publishedBy}` : '';
+    container.innerHTML = `
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold" title="Đã công bố ngày ${pubDateStr}${pubUserStr}">
+        <span class="text-emerald-600">✓</span>
+        <span>Đã công bố điểm</span>
+        ${pubDateStr ? `<span class="text-[10px] text-emerald-600 font-normal">(${pubDateStr})</span>` : ''}
+      </div>
+    `;
+  } else {
+    container.innerHTML = `
+      <button type="button" onclick="openPublishProgressReviewModal(${phase})" class="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer" title="Công bố kết quả chính thức cho sinh viên và GVHD">
+        <span>📢</span>
+        <span>Công bố điểm</span>
+      </button>
+    `;
+  }
+}
+
+export function openPublishProgressReviewModal(phase) {
+  const isAdminOrOwner = (typeof state !== 'undefined' && state.isAdmin && !state.impersonation) || (typeof isUserAdminOrOwner === 'function' && isUserAdminOrOwner());
+  if (!isAdminOrOwner) {
+    if (typeof showToast === 'function') showToast('Chỉ Quản trị viên và Chủ sở hữu mới có quyền công bố điểm.', 'warning');
+    return;
+  }
+
+  const pNum = Number(phase);
+  currentPublishPhase = pNum;
+  const targetRound = (typeof state !== 'undefined' && (state.rounds || []).find(r => r.id === state.selectedRoundId)) || state?.activeRound;
+  if (!targetRound) return;
+
+  const act = findProgressReviewActivity(targetRound, pNum);
+  const actTitle = act ? (act.title || act.name || `Duyệt đợt ${pNum}`) : `Duyệt đợt ${pNum}`;
+  const allStudents = getScoringRoundStudents(targetRound);
+
+  let eligibleCount = 0;
+  let pendingCount = 0;
+
+  allStudents.forEach(s => {
+    const sid = s.mssv || s.studentId;
+    const rev = getProgressReviewData(sid, pNum, targetRound);
+    if (rev.isFinalized && (rev.letterGrade || (rev.score !== null && !isNaN(rev.score)))) {
+      eligibleCount++;
+    } else {
+      pendingCount++;
+    }
+  });
+
+  const modal = document.getElementById('modal-publish-progress-review');
+  if (!modal) return;
+
+  const badgeEl = document.getElementById('pub-modal-phase-badge');
+  const roundTitleEl = document.getElementById('pub-modal-round-title');
+  const actTitleEl = document.getElementById('pub-modal-act-title');
+  const eligibleEl = document.getElementById('pub-modal-eligible-count');
+  const pendingEl = document.getElementById('pub-modal-pending-count');
+
+  if (badgeEl) badgeEl.textContent = `Duyệt đợt ${pNum}`;
+  if (roundTitleEl) roundTitleEl.textContent = `Đợt tốt nghiệp: ${targetRound.name || targetRound.title || targetRound.id}`;
+  if (actTitleEl) actTitleEl.textContent = actTitle;
+  if (eligibleEl) eligibleEl.textContent = `${eligibleCount} sinh viên`;
+  if (pendingEl) pendingEl.textContent = `${pendingCount} sinh viên`;
+
+  const btnConfirm = document.getElementById('btn-confirm-publish-scores');
+  const errBox = document.getElementById('pub-modal-error-box');
+
+  if (eligibleCount === 0) {
+    if (errBox) {
+      errBox.textContent = `Chưa có kết quả điểm chốt nào từ Hội đồng cho mốc ${actTitle}. Vui lòng chốt điểm Hội đồng trước khi thực hiện công bố.`;
+      errBox.classList.remove('hidden');
+    }
+    if (btnConfirm) btnConfirm.disabled = true;
+  } else {
+    if (errBox) errBox.classList.add('hidden');
+    if (btnConfirm) btnConfirm.disabled = false;
+  }
+
+  modal.classList.remove('hidden');
+}
+
+export function closePublishProgressReviewModal() {
+  const modal = document.getElementById('modal-publish-progress-review');
+  if (modal) modal.classList.add('hidden');
+  currentPublishPhase = null;
+}
+
+export async function confirmPublishProgressReview() {
+  const phase = currentPublishPhase;
+  if (!phase) return;
+
+  const targetRound = (typeof state !== 'undefined' && (state.rounds || []).find(r => r.id === state.selectedRoundId)) || state?.activeRound;
+  if (!targetRound) return;
+
+  const btnConfirm = document.getElementById('btn-confirm-publish-scores');
+  if (btnConfirm) {
+    btnConfirm.disabled = true;
+    btnConfirm.innerHTML = '<span>⏳</span> <span>Đang công bố…</span>';
+  }
+
+  try {
+    const act = findProgressReviewActivity(targetRound, phase);
+    const allStudents = getScoringRoundStudents(targetRound);
+
+    const studentResults = {};
+    let eligibleCount = 0;
+
+    allStudents.forEach(s => {
+      const sid = s.mssv || s.studentId;
+      const rev = getProgressReviewData(sid, phase, targetRound);
+      if (rev.isFinalized && (rev.letterGrade || (rev.score !== null && !isNaN(rev.score)))) {
+        eligibleCount++;
+        studentResults[sid] = {
+          studentId: sid,
+          studentName: s.fullName || s.studentName || sid,
+          letterGrade: rev.letterGrade,
+          isPassed: rev.isPassed,
+          status: rev.isPassed ? 'passed' : 'failed',
+          finalizedAt: new Date().toISOString()
+        };
+      }
+    });
+
+    if (eligibleCount === 0) {
+      throw new Error('Không có sinh viên nào có điểm chốt hợp lệ để công bố.');
+    }
+
+    const pubRecord = {
+      status: 'published',
+      publishedAt: new Date().toISOString(),
+      publishedBy: state.user?.email || 'admin',
+      activityId: act ? act.id : `act_duyet_${phase}`,
+      phase: Number(phase),
+      roundId: targetRound.id,
+      eligibleCount: eligibleCount,
+      studentResults: studentResults
+    };
+
+    // Update in-memory round
+    targetRound.publishedReviews = targetRound.publishedReviews || {};
+    targetRound.publishedReviews['duyet_' + phase] = pubRecord;
+
+    // Persist to Firestore if online
+    const rawUpdate = (typeof window !== 'undefined') ? (window.updateDoc || window.rawUpdateDoc) : null;
+    const rawSet = (typeof window !== 'undefined') ? (window.setDoc || window.rawSetDoc) : null;
+    const docFn = (typeof window !== 'undefined') ? window.doc : null;
+    const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
+
+    if (dbObj && rawUpdate && docFn) {
+      const roundRef = docFn(dbObj, 'graduationRounds', targetRound.id);
+      await rawUpdate(roundRef, {
+        [`publishedReviews.duyet_${phase}`]: pubRecord,
+        updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : new Date().toISOString()
+      });
+
+      // Safe Subcollection write (Phase B Lớp B độc lập)
+      try {
+        if (rawSet) {
+          const subDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedProgressReviews', `duyet_${phase}`);
+          await rawSet(subDocRef, pubRecord);
+        }
+      } catch (subErr) {
+        console.warn('[PublishedProgressReviews] Subcollection write pending rules approval:', subErr.message);
+      }
+    }
+
+    if (typeof showToast === 'function') {
+      showToast(`Đã công bố điểm Duyệt đợt ${phase} thành công cho ${eligibleCount} sinh viên!`, 'success');
+    }
+
+    closePublishProgressReviewModal();
+    renderAdminProgressReviewTable(phase);
+  } catch (err) {
+    console.error('[PublishProgressReview] Error:', err);
+    const errBox = document.getElementById('pub-modal-error-box');
+    if (errBox) {
+      errBox.textContent = `Lỗi công bố điểm: ${err.message}`;
+      errBox.classList.remove('hidden');
+    } else if (typeof showToast === 'function') {
+      showToast(`Lỗi công bố điểm: ${err.message}`, 'error');
+    }
+  } finally {
+    if (btnConfirm) {
+      btnConfirm.disabled = false;
+      btnConfirm.innerHTML = '<span>📢</span> <span>Xác nhận Công bố</span>';
+    }
+  }
+}
+
+export function openCouncilScoreDetailModal(studentId, phase) {
+  const isAdminOrOwner = (typeof state !== 'undefined' && state.isAdmin && !state.impersonation) || (typeof isUserAdminOrOwner === 'function' && isUserAdminOrOwner());
+  if (!isAdminOrOwner) {
+    if (typeof showToast === 'function') showToast('Chỉ Quản trị viên và Chủ sở hữu mới có quyền xem chi tiết phiếu chấm Hội đồng.', 'warning');
+    return;
+  }
+
+  const sid = String(studentId || '').trim();
+  const pNum = Number(phase);
+  const targetRound = (typeof state !== 'undefined' && (state.rounds || []).find(r => r.id === state.selectedRoundId)) || state?.activeRound;
+  if (!targetRound) return;
+
+  const act = findProgressReviewActivity(targetRound, pNum);
+  const allStudents = getScoringRoundStudents(targetRound);
+  const student = allStudents.find(s => String(s.mssv || s.studentId).trim() === sid) || { studentId: sid, fullName: sid };
+  const studentName = student.fullName || student.studentName || sid;
+  const topicTitle = (typeof window.getOfficialApprovedTopicTitle === 'function')
+    ? window.getOfficialApprovedTopicTitle(student, student.topicTitle || '')
+    : (student.topicTitle || 'Chưa cập nhật đề tài');
+  const supName = student.acceptedSupervisorName || student.supervisorName || (Array.isArray(student.officialSupervisors) && student.officialSupervisors[0]?.supervisorName) || (Array.isArray(student.supervisors) && student.supervisors[0]?.supervisorName) || '--';
+
+  const reviewData = getProgressReviewData(sid, pNum, targetRound);
+
+  let council = null;
+  if (act && Array.isArray(act.councils)) {
+    const asgns = act.councilStudentAssignments || [];
+    const studentAsgn = asgns.find(a => String(a.studentId).trim() === sid);
+    council = studentAsgn ? act.councils.find(c => c.id === studentAsgn.councilId) : act.councils[0];
+  }
+
+  const modal = document.getElementById('modal-council-score-details');
+  if (!modal) return;
+
+  const phaseBadgeEl = document.getElementById('council-detail-phase-badge');
+  const titleEl = document.getElementById('council-detail-title');
+  const subtitleEl = document.getElementById('council-detail-subtitle');
+  const stInfoEl = document.getElementById('council-detail-student-info');
+  const supInfoEl = document.getElementById('council-detail-supervisor-info');
+  const topicInfoEl = document.getElementById('council-detail-topic-info');
+
+  if (phaseBadgeEl) phaseBadgeEl.textContent = `Duyệt đợt ${pNum}`;
+  if (titleEl) titleEl.textContent = `Chi tiết Đánh giá Hội đồng: ${studentName} (${sid})`;
+  if (subtitleEl) subtitleEl.textContent = `Đợt: ${targetRound.name || targetRound.title || targetRound.id} • Hội đồng: ${council?.name || 'Chưa gán'}`;
+  if (stInfoEl) stInfoEl.textContent = `${studentName} • ${sid}`;
+  if (supInfoEl) supInfoEl.textContent = supName;
+  if (topicInfoEl) topicInfoEl.textContent = topicTitle;
+
+  // Status pills
+  const cStat = council?.status || 'preparing';
+  const isCouncilFinished = (cStat === 'finalized' || cStat === 'ended' || cStat === 'completed');
+  const statusPillEl = document.getElementById('council-detail-status-pill');
+  if (statusPillEl) {
+    statusPillEl.innerHTML = isCouncilFinished
+      ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã chốt kết quả</span>'
+      : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Đang đánh giá</span>';
+  }
+
+  const isPub = isProgressReviewPublished(pNum, targetRound);
+  const pubInfo = getProgressReviewPublicationInfo(pNum, targetRound);
+  const pubPillEl = document.getElementById('council-detail-publish-pill');
+  if (pubPillEl) {
+    pubPillEl.innerHTML = isPub
+      ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-300">📢 Đã công bố (${pubInfo?.publishedAt ? new Date(pubInfo.publishedAt).toLocaleDateString('vi-VN') : ''})</span>`
+      : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Chưa công bố</span>';
+  }
+
+  // Members scoring breakdown
+  const tbody = document.getElementById('council-detail-members-tbody');
+  let validVoteCount = 0;
+  let totalAssignedScorers = 0;
+
+  if (tbody) {
+    if (council && act) {
+      const slots = (typeof window.getCouncilMemberSlots === 'function')
+        ? window.getCouncilMemberSlots(council, act)
+        : (Array.isArray(council.memberSlots) ? council.memberSlots : (act.councilStructure?.slots || []));
+      const membersBySlot = council.membersBySlot || {};
+
+      const resolveScorerId = (typeof window.getCouncilMemberScorerId === 'function')
+        ? window.getCouncilMemberScorerId
+        : (m => {
+            if (!m) return '';
+            const email = String(m.memberEmail || m.email || '').toLowerCase().trim();
+            return (m.type === 'guest' || m.isExternalGuest || (email && !email.endsWith('@tdtu.edu.vn')))
+              ? email || m.memberId || ''
+              : m.memberId || email || m.memberName || '';
+          });
+
+      const escapeFn = (typeof window.escapeHtml === 'function') ? window.escapeHtml : (str => String(str || '').replace(/[&<>"']/g, ''));
+
+      tbody.innerHTML = slots.map((s, idx) => {
+        const assigned = membersBySlot[s.key] || {};
+        const scorerId = resolveScorerId(assigned);
+        const memberName = assigned.memberName || assigned.name || (scorerId ? scorerId : '(Chưa phân công)');
+        const roleLabel = assigned.role || s.label || s.name || s.key;
+
+        if (assigned.memberName || assigned.name || scorerId) {
+          totalAssignedScorers++;
+        }
+
+        let memberLetter = '--';
+        let memberNum = '--';
+        let statusHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">Chưa chấm</span>';
+
+        if (scorerId) {
+          const k = `${act.id}_${council.id}_${sid}_${scorerId}`;
+          const kEmail = assigned.memberEmail ? `${act.id}_${council.id}_${sid}_${String(assigned.memberEmail).toLowerCase().trim()}` : null;
+          const sc = state.councilScores?.[k] || (kEmail ? state.councilScores?.[kEmail] : null) || targetRound?.councilScores?.[k] || (kEmail ? targetRound?.councilScores?.[kEmail] : null);
+
+          if (sc && sc.status === 'completed') {
+            validVoteCount++;
+            memberLetter = sc.value || sc.selectedLetterCode || '--';
+            if (sc.numericValue !== undefined && sc.numericValue !== null) {
+              memberNum = Number(sc.numericValue).toFixed(2);
+            } else if (typeof sc.value === 'number') {
+              memberNum = Number(sc.value).toFixed(2);
+            }
+            statusHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Đã chấm</span>';
+          } else if (sc && sc.status === 'draft') {
+            memberLetter = sc.value || '--';
+            if (sc.numericValue !== undefined && sc.numericValue !== null) memberNum = Number(sc.numericValue).toFixed(2);
+            statusHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Đang chấm (nháp)</span>';
+          }
+        }
+
+        return `
+          <tr class="hover:bg-slate-50 transition-colors">
+            <td class="p-2.5 text-center font-mono font-bold text-slate-400">${idx + 1}</td>
+            <td class="p-2.5 font-bold text-slate-800 whitespace-nowrap">${escapeFn(roleLabel)}</td>
+            <td class="p-2.5 text-slate-700 whitespace-nowrap">${escapeFn(memberName)}</td>
+            <td class="p-2.5 text-center font-mono font-bold text-purple-900">${escapeFn(memberLetter)}</td>
+            <td class="p-2.5 text-center font-mono text-slate-600">${escapeFn(memberNum)}</td>
+            <td class="p-2.5 text-center whitespace-nowrap">${statusHtml}</td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Không tìm thấy thông tin thành viên Hội đồng.</td></tr>';
+    }
+  }
+
+  // Summary section
+  const validVotesEl = document.getElementById('council-detail-valid-votes');
+  const finalLetterEl = document.getElementById('council-detail-final-letter');
+  const finalNumEl = document.getElementById('council-detail-final-num');
+
+  if (validVotesEl) validVotesEl.textContent = `Hợp lệ: ${validVoteCount}/${totalAssignedScorers}`;
+  if (finalLetterEl) finalLetterEl.textContent = reviewData.letterGrade || '--';
+  if (finalNumEl) finalNumEl.textContent = reviewData.referenceScore || '--';
+
+  const verdictEl = document.getElementById('council-detail-verdict-badge');
+  if (verdictEl) {
+    if (reviewData.isFinalized) {
+      if (reviewData.isPassed) {
+        verdictEl.innerHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đạt yêu cầu</span>';
+      } else {
+        verdictEl.innerHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">✕ Không đạt yêu cầu</span>';
+      }
+    } else {
+      verdictEl.innerHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">Chưa duyệt</span>';
+    }
+  }
+
+  modal.classList.remove('hidden');
+}
+
+export function closeCouncilScoreDetailModal() {
+  const modal = document.getElementById('modal-council-score-details');
+  if (modal) modal.classList.add('hidden');
+}
+
 if (typeof window !== 'undefined') {
+  window.isProgressReviewPassed = isProgressReviewPassed;
+  window.isProgressReviewPublished = isProgressReviewPublished;
+  window.getProgressReviewPublicationInfo = getProgressReviewPublicationInfo;
+  window.renderPublishProgressReviewToolbar = renderPublishProgressReviewToolbar;
+  window.openPublishProgressReviewModal = openPublishProgressReviewModal;
+  window.closePublishProgressReviewModal = closePublishProgressReviewModal;
+  window.confirmPublishProgressReview = confirmPublishProgressReview;
+  window.openCouncilScoreDetailModal = openCouncilScoreDetailModal;
+  window.closeCouncilScoreDetailModal = closeCouncilScoreDetailModal;
   window.findProgressReviewActivity = findProgressReviewActivity;
   window.getProgressReviewData = getProgressReviewData;
 }
 
 window.renderAdminProgressReviewTable = function(phase) {
+  // Update publish toolbar
+  renderPublishProgressReviewToolbar(phase);
+
   const tbody = document.getElementById('admin-duyet-' + phase + '-tbody');
   if (!tbody) return;
 
@@ -354,6 +775,8 @@ window.renderAdminProgressReviewTable = function(phase) {
     return;
   }
 
+  const canViewDetail = (typeof state !== 'undefined' && state.isAdmin && !state.impersonation) || (typeof isUserAdminOrOwner === 'function' && isUserAdminOrOwner());
+
   tbody.innerHTML = filtered.map((s, idx) => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || sid;
@@ -371,15 +794,23 @@ window.renderAdminProgressReviewTable = function(phase) {
     } else if (status === 'revision') {
       statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">⚠️ Cần bổ sung</span>';
     } else if (status === 'failed') {
-      statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">✕ Không đạt</span>';
+      statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">✕ Không đạt yêu cầu</span>';
     }
 
     let scoreDisplay = '<span class="text-slate-400 font-mono">--</span>';
     if (reviewData.letterGrade) {
       const refText = reviewData.referenceScore ? ` <span class="text-[10px] text-slate-400 font-normal">(${reviewData.referenceScore})</span>` : '';
-      scoreDisplay = `<span class="badge bg-purple-50 text-purple-900 font-black font-mono text-xs px-2.5 py-0.5 rounded-lg border border-purple-200">${reviewData.letterGrade}</span>${refText}`;
+      if (canViewDetail) {
+        scoreDisplay = `<button type="button" onclick="openCouncilScoreDetailModal('${sid}', ${phase})" class="badge bg-purple-50 hover:bg-purple-100 text-purple-900 font-black font-mono text-xs px-2.5 py-0.5 rounded-lg border border-purple-200 cursor-pointer transition-all shadow-2xs" title="Bấm để xem chi tiết phiếu chấm Hội đồng">${reviewData.letterGrade}</button>${refText}`;
+      } else {
+        scoreDisplay = `<span class="badge bg-purple-50 text-purple-900 font-black font-mono text-xs px-2.5 py-0.5 rounded-lg border border-purple-200">${reviewData.letterGrade}</span>${refText}`;
+      }
     } else if (reviewData.score !== null && reviewData.score !== undefined) {
-      scoreDisplay = `<span class="badge bg-blue-50 text-blue-800 font-bold font-mono text-xs px-2.5 py-0.5 rounded-lg border border-blue-200">${Number(reviewData.score).toFixed(1)}</span>`;
+      if (canViewDetail) {
+        scoreDisplay = `<button type="button" onclick="openCouncilScoreDetailModal('${sid}', ${phase})" class="badge bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold font-mono text-xs px-2.5 py-0.5 rounded-lg border border-blue-200 cursor-pointer transition-all shadow-2xs" title="Bấm để xem chi tiết phiếu chấm Hội đồng">${Number(reviewData.score).toFixed(1)}</button>`;
+      } else {
+        scoreDisplay = `<span class="badge bg-blue-50 text-blue-800 font-bold font-mono text-xs px-2.5 py-0.5 rounded-lg border border-blue-200">${Number(reviewData.score).toFixed(1)}</span>`;
+      }
     }
 
     return `

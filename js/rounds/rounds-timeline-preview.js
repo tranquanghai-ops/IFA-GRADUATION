@@ -178,6 +178,62 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
   const details = activity?.descriptionHtml
     ? sanitizeRichHtml(activity.descriptionHtml)
     : escapeHtml(activity?.description || '').replace(/\n/g, '<br>');
+  // If this activity is a progress review milestone (Duyệt đợt 1, 2, 3), prepare publication card
+  let progressReviewResultHtml = '';
+  const actText = `${activity?.title || ''} ${activity?.name || ''} ${activity?.milestoneType || ''} ${activity?.type || ''}`.toLowerCase();
+  const mMatch = /(?:duyệt|duyet)\s*(?:đồ\s*án|do\s*an)?\s*(?:tốt\s*nghiệp|tot\s*nghiep)?\s*(?:đợt|dot)?\s*([1-3])/i.exec(actText);
+  if (mMatch && submissionRound) {
+    const phase = Number(mMatch[1]);
+    const isPub = (typeof window.isProgressReviewPublished === 'function')
+      ? window.isProgressReviewPublished(phase, submissionRound)
+      : Boolean(submissionRound.publishedReviews?.['duyet_' + phase]?.status === 'published');
+    const mySid = state.userProfile?.studentId || state.currentUser?.studentId || (state.user?.email && /^\d{8}@/.test(state.user.email) ? state.user.email.split('@')[0] : null);
+
+    if (isPub) {
+      const pubInfo = (typeof window.getProgressReviewPublicationInfo === 'function')
+        ? window.getProgressReviewPublicationInfo(phase, submissionRound)
+        : submissionRound.publishedReviews?.['duyet_' + phase];
+      const stRes = mySid ? pubInfo?.studentResults?.[mySid] : null;
+      if (stRes) {
+        const passClass = stRes.isPassed ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300';
+        const passLabel = stRes.isPassed ? '✓ Đạt yêu cầu' : '✕ Không đạt yêu cầu';
+        const pubDateStr = pubInfo?.publishedAt ? new Date(pubInfo.publishedAt).toLocaleDateString('vi-VN') : '';
+        progressReviewResultHtml = `
+          <div class="mb-4 p-4 bg-gradient-to-br from-purple-50 via-white to-slate-50 rounded-2xl border border-purple-200 shadow-2xs space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black uppercase text-purple-950 tracking-wider flex items-center gap-1.5">
+                <span>📢</span> KẾT QUẢ ĐÁNH GIÁ DUYỆT ĐỢT ${phase}
+              </span>
+              ${pubDateStr ? `<span class="text-[10px] text-slate-400 font-medium">Công bố: ${pubDateStr}</span>` : ''}
+            </div>
+            <div class="flex items-center justify-between gap-4 pt-1">
+              <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 block">Điểm chữ chính thức</span>
+                <span class="text-2xl font-black font-mono text-purple-950">${escapeHtml(stRes.letterGrade || '--')}</span>
+              </div>
+              <div class="text-right">
+                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Kết luận</span>
+                <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${passClass}">${passLabel}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (mySid) {
+        progressReviewResultHtml = `
+          <div class="mb-4 p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-slate-500 font-medium text-xs flex items-center gap-2">
+            <span>ℹ️</span> <span>Kết quả mốc Duyệt đợt ${phase} đã được công bố, tuy nhiên mã số ${escapeHtml(mySid)} chưa có trong danh sách kết quả đợt này.</span>
+          </div>
+        `;
+      }
+    } else {
+      progressReviewResultHtml = `
+        <div class="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-500 font-semibold text-xs flex items-center gap-2">
+          <span class="text-base">⏳</span> <span>Hội đồng đang tiến hành đánh giá. Kết quả chính thức chưa công bố.</span>
+        </div>
+      `;
+    }
+  }
+
   const dialog = document.createElement('div');
   dialog.id = 'student-timeline-event-dialog';
   dialog.className = 'fixed inset-0 z-[120] modal-backdrop flex items-center justify-center bg-slate-950/60 p-4';
@@ -213,6 +269,7 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
       ` : ''}
     </div>
     <div class="student-timeline-event-scroll mx-5 mt-5 mb-5 border-t border-slate-200 pt-5 sm:mx-8 sm:mb-7">
+      ${progressReviewResultHtml}
       ${details ? `<div class="rich-rendered-content text-sm sm:text-base leading-relaxed text-slate-800">${details}</div>` : ''}
       ${showSubmission ? '<div id="student-timeline-submission-slot" class="mt-5"></div>' : ''}
     </div>

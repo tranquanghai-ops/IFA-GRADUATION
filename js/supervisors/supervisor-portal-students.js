@@ -565,13 +565,46 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
         if (rules?.currentSubmission) {
           stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">✓ Đã nộp bài</span>';
         }
+
+        // Check if milestone is a progress review (Duyệt đợt 1, 2, 3)
+        const actText = `${act.title || ''} ${act.name || ''} ${act.milestoneType || ''} ${act.type || ''}`.toLowerCase();
+        const mMatch = /(?:duyệt|duyet)\s*(?:đồ\s*án|do\s*an)?\s*(?:tốt\s*nghiệp|tot\s*nghiep)?\s*(?:đợt|dot)?\s*([1-3])/i.exec(actText);
+        let reviewBadge = '';
+        if (mMatch) {
+          const phase = Number(mMatch[1]);
+          const isPub = (typeof window.isProgressReviewPublished === 'function')
+            ? window.isProgressReviewPublished(phase, round)
+            : Boolean(round?.publishedReviews?.['duyet_' + phase]?.status === 'published');
+          if (isPub) {
+            const pubInfo = round?.publishedReviews?.['duyet_' + phase];
+            const stRes = pubInfo?.studentResults?.[studentId];
+            if (stRes) {
+              const passClass = stRes.isPassed ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300';
+              const passLabel = stRes.isPassed ? '✓ Đạt' : '✕ Không đạt';
+              reviewBadge = `
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span class="badge bg-purple-50 text-purple-900 font-black font-mono text-[11px] px-2 py-0.5 rounded border border-purple-200">${stRes.letterGrade || '--'}</span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${passClass}">${passLabel}</span>
+                </div>
+              `;
+            } else {
+              reviewBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Chưa có kết quả</span>';
+            }
+          } else {
+            reviewBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Chưa công bố</span>';
+          }
+        }
+
         return `
-          <div class="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs">
-            <div class="flex items-center gap-2">
-              <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-[10px]">${idx + 1}</span>
-              <span class="font-bold text-slate-800">${act.title}</span>
+          <div class="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-[10px] shrink-0">${idx + 1}</span>
+              <span class="font-bold text-slate-800 truncate">${act.title}</span>
             </div>
-            ${stBadge}
+            <div class="flex items-center gap-2 shrink-0">
+              ${reviewBadge}
+              ${stBadge}
+            </div>
           </div>
         `;
       }).join('');
