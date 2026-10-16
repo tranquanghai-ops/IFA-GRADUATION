@@ -431,10 +431,10 @@ window.autoDistributeUnassignedStudents = async function() {
     return;
   }
 
-  const roundStudents = getRoundAllStudents();
+  const roundStudents = getRoundAllStudents(state.activeCouncilManagement?.roundId || state.selectedRoundId);
   const assignments = act.councilStudentAssignments || [];
-  const assignedSids = new Set(assignments.filter(a => !!a.councilId).map(a => a.studentId));
-  const unassignedStudents = roundStudents.filter(s => !assignedSids.has(s.mssv || s.studentId));
+  const assignedSids = new Set(assignments.filter(a => !!a.councilId).map(a => String(a.studentId).trim()));
+  const unassignedStudents = roundStudents.filter(s => !assignedSids.has(String(s.mssv || s.studentId).trim()));
 
   if (unassignedStudents.length === 0) {
     showToast('Tất cả sinh viên đã được phân công vào Hội đồng.', 'info');
@@ -486,14 +486,15 @@ function renderCouncilStudentsTab(act) {
 
   const councils = act.councils || [];
   const assignments = act.councilStudentAssignments || [];
-  const roundStudents = getRoundAllStudents();
+  const roundStudents = getRoundAllStudents(state.activeCouncilManagement?.roundId || state.selectedRoundId);
 
-  const assignedStudentIds = new Set(assignments.filter(a => !!a.councilId).map(a => a.studentId));
-  const unassignedCount = roundStudents.filter(s => !assignedStudentIds.has(s.mssv || s.studentId)).length;
+  const assignedStudentIds = new Set(assignments.filter(a => !!a.councilId).map(a => String(a.studentId).trim()));
+  const totalStudentsCount = Math.max(roundStudents.length, assignedStudentIds.size);
+  const unassignedCount = Math.max(0, totalStudentsCount - assignedStudentIds.size);
   const assignedCount = assignedStudentIds.size;
 
   const studentsCountBadge = document.getElementById('cbadge-students-count');
-  if (studentsCountBadge) studentsCountBadge.textContent = `${assignedCount}/${roundStudents.length}`;
+  if (studentsCountBadge) studentsCountBadge.textContent = `${assignedCount}/${totalStudentsCount}`;
 
   // Determine current active subtab
   let activeSubTab = state.activeCouncilManagement.studentSubTab;
@@ -866,32 +867,93 @@ async function loadCouncilRoundStudents(roundId) {
 window.loadCouncilRoundStudents = loadCouncilRoundStudents;
 
 // Helper: Get all students registered or eligible in round
-function getRoundAllStudents() {
-  const { roundId } = state.activeCouncilManagement;
+function getRoundAllStudents(optRoundId = null) {
+  const roundId = optRoundId
+    || state.activeCouncilManagement?.roundId
+    || state.selectedRoundId
+    || document.getElementById('admin-round-councils-select')?.value
+    || state.activeRound?.id;
   if (!roundId) return [];
 
+  const targetRound = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  const studentMap = new Map();
+
+  const addStudent = (s) => {
+    if (!s) return;
+    const sid = String(s.studentId || s.mssv || s.id || '').trim();
+    if (!sid) return;
+    if (!studentMap.has(sid)) {
+      studentMap.set(sid, {
+        studentId: sid,
+        mssv: sid,
+        name: s.name || s.studentName || s.fullName || ('Sinh viên ' + sid),
+        fullName: s.fullName || s.name || s.studentName || ('Sinh viên ' + sid),
+        className: s.className || s.studentClass || s.currentClass || '--',
+        studentClass: s.studentClass || s.className || s.currentClass || '--',
+        major: s.major || '',
+        topicTitle: s.topicTitle || s.topic || '',
+        ...s
+      });
+    } else {
+      const existing = studentMap.get(sid);
+      if ((!existing.name || existing.name === sid) && (s.name || s.fullName || s.studentName)) {
+        existing.name = s.name || s.fullName || s.studentName;
+        existing.fullName = s.fullName || s.name || s.studentName;
+      }
+      if ((!existing.className || existing.className === '--') && (s.className || s.studentClass || s.currentClass)) {
+        existing.className = s.className || s.studentClass || s.currentClass;
+        existing.studentClass = existing.className;
+      }
+      if (!existing.topicTitle && (s.topicTitle || s.topic)) {
+        existing.topicTitle = s.topicTitle || s.topic;
+      }
+    }
+  };
+
   // Priority 1: cached council students for this round
-  if (state.councilStudentsByRound?.[roundId] && state.councilStudentsByRound[roundId].length > 0) {
-    return state.councilStudentsByRound[roundId];
+  if (state.councilStudentsByRound?.[roundId] && Array.isArray(state.councilStudentsByRound[roundId])) {
+    state.councilStudentsByRound[roundId].forEach(addStudent);
   }
 
-  const targetRound = (state.rounds || []).find(r => r.id === roundId);
-  if (targetRound?.councilStudents && targetRound.councilStudents.length > 0) {
-    return targetRound.councilStudents;
+  // Priority 2: round.councilStudents
+  if (Array.isArray(targetRound?.councilStudents)) {
+    targetRound.councilStudents.forEach(addStudent);
   }
 
-  // Priority 2: registrations in adminReviewData
-  if (state.adminReviewData?.roundId === targetRound?.id && state.adminReviewData?.registrations && state.adminReviewData.registrations.length > 0) {
-    return state.adminReviewData.registrations;
+  // Priority 3: round.eligibleStudents
+  if (Array.isArray(targetRound?.eligibleStudents)) {
+    targetRound.eligibleStudents.forEach(addStudent);
   }
 
-  // Priority 3: eligibleStudents in targetRound
-  if (Array.isArray(targetRound?.eligibleStudents) && targetRound.eligibleStudents.length > 0) {
-    return targetRound.eligibleStudents;
+  // Priority 4: state.eligibleStudents if matching round
+  if ((state.selectedRoundId === roundId || state.activeRound?.id === roundId) && Array.isArray(state.eligibleStudents)) {
+    state.eligibleStudents.forEach(addStudent);
   }
 
-  return [];
+  // Priority 5: registrations in adminReviewData or targetRound
+  if (state.adminReviewData?.roundId === roundId && Array.isArray(state.adminReviewData?.registrations)) {
+    state.adminReviewData.registrations.forEach(addStudent);
+  }
+  if (Array.isArray(targetRound?.registrations)) {
+    targetRound.registrations.forEach(addStudent);
+  }
+
+  // Priority 6: activities' councilStudentAssignments
+  (targetRound?.activities || []).forEach(act => {
+    (act.councilStudentAssignments || []).forEach(asgn => {
+      if (asgn.studentId) {
+        addStudent({
+          studentId: asgn.studentId,
+          name: asgn.studentName,
+          topicTitle: asgn.topicTitle
+        });
+      }
+    });
+  });
+
+  return Array.from(studentMap.values());
 }
+window.getRoundAllStudents = getRoundAllStudents;
 
 function findStudentInRound(studentId) {
   const all = getRoundAllStudents();
@@ -1271,7 +1333,7 @@ window.filterAdminRoundCouncils = function(roundId = null) {
   const searchQuery = (document.getElementById('admin-councils-search')?.value || '').toLowerCase().trim();
 
   const activities = (targetRound.activities || []).filter(a => a.councilEnabled || (a.councils && a.councils.length > 0));
-  const roundStudents = getRoundAllStudents();
+  const roundStudents = getRoundAllStudents(targetRoundId);
 
   // Metrics computation
   let totalCouncils = 0;
@@ -1282,7 +1344,7 @@ window.filterAdminRoundCouncils = function(roundId = null) {
     const councils = act.councils || [];
     totalCouncils += councils.length;
     (act.councilStudentAssignments || []).forEach(asgn => {
-      if (asgn.councilId) assignedStudentSet.add(asgn.studentId);
+      if (asgn.councilId) assignedStudentSet.add(String(asgn.studentId).trim());
     });
     councils.forEach(c => {
       const slots = c.membersBySlot || {};
@@ -1295,6 +1357,9 @@ window.filterAdminRoundCouncils = function(roundId = null) {
     });
   });
 
+  const totalStudentsCount = Math.max(roundStudents.length, assignedStudentSet.size);
+  const unassignedCount = Math.max(0, totalStudentsCount - assignedStudentSet.size);
+
   // Render Stats
   const statTotalEl = document.getElementById('adm-councils-stat-total');
   const statMilestonesEl = document.getElementById('adm-councils-stat-milestones');
@@ -1305,8 +1370,8 @@ window.filterAdminRoundCouncils = function(roundId = null) {
 
   if (statTotalEl) statTotalEl.textContent = totalCouncils;
   if (statMilestonesEl) statMilestonesEl.textContent = `Trên ${activities.length} mốc kế hoạch có Hội đồng`;
-  if (statStudentsEl) statStudentsEl.textContent = `${assignedStudentSet.size} / ${roundStudents.length} SV`;
-  if (statUnassignedEl) statUnassignedEl.textContent = `${roundStudents.length - assignedStudentSet.size} sinh viên chưa phân HĐ`;
+  if (statStudentsEl) statStudentsEl.textContent = `${assignedStudentSet.size} / ${totalStudentsCount} SV`;
+  if (statUnassignedEl) statUnassignedEl.textContent = `${unassignedCount} sinh viên chưa phân HĐ`;
   if (statMembersEl) statMembersEl.textContent = `${allCouncilMembers.size} thành viên`;
 
   let activeCount = 0;
@@ -1509,7 +1574,7 @@ window.exportAdminRoundCouncilsExcel = function() {
   if (!targetRound) return;
 
   const activities = (targetRound.activities || []).filter(a => a.councilEnabled || (a.councils && a.councils.length > 0));
-  const roundStudents = getRoundAllStudents();
+  const roundStudents = getRoundAllStudents(roundId);
 
   const headers = ['Mốc kế hoạch', 'Tên Hội đồng', 'Phòng', 'Ngày', 'Giờ', 'Chức danh / Slot', 'Họ và tên thành viên', 'Email thành viên', 'Đơn vị', 'MSSV SV Báo cáo', 'Họ tên SV', 'Tên đề tài', 'Thứ tự báo cáo'];
   const rows = [];

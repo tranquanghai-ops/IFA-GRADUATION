@@ -483,13 +483,156 @@ window.switchSupervisorDetailModalTab = function(tabKey = 'profile') {
   }
 };
 
-window.openSupervisorStudentDetailModal = function(studentId, focusSection = null) {
+// Submissions hydration helper for student
+window.ensureStudentSubmissionsLoaded = async function(roundId, studentId) {
+  if (!roundId || !studentId) return;
+  const sid = String(studentId).trim();
+  const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  if (!round) return;
+
+  if (!round.activitySubmissions) round.activitySubmissions = {};
+  if (!state.cachedSubmissions) state.cachedSubmissions = {};
+  if (!state.cachedSubmissions[roundId]) state.cachedSubmissions[roundId] = {};
+
+  try {
+    const normalizeSubDoc = (data, fallbackActId = null) => {
+      if (!data) return null;
+      const actId = data.activityId || fallbackActId;
+      if (!actId) return null;
+
+      const files = Array.isArray(data.files) && data.files.length > 0 ? data.files : [{
+        validatedName: data.fileName || data.name || 'Tài liệu đã nộp',
+        originalName: data.fileName || data.name || 'Tài liệu đã nộp',
+        providerFileId: data.fileId,
+        providerUrl: data.webViewLink || (data.fileId ? `https://drive.google.com/file/d/${data.fileId}/view` : ''),
+        downloadUrl: data.webContentLink || (data.fileId ? `https://drive.google.com/uc?id=${data.fileId}&export=download` : ''),
+        size: data.fileSize || 0
+      }];
+
+      return {
+        attempt: data.attemptNumber || data.attempt || 1,
+        attemptNumber: data.attemptNumber || data.attempt || 1,
+        submittedAt: data.submittedAt || data.createdAt,
+        createdAt: data.createdAt || data.submittedAt,
+        status: data.status || 'submitted',
+        isLate: Boolean(data.isLate),
+        fileId: data.fileId,
+        fileName: data.fileName || data.name || files[0]?.validatedName || 'Tài liệu đã nộp',
+        name: data.fileName || data.name || files[0]?.validatedName || 'Tài liệu đã nộp',
+        fileSize: data.fileSize || files[0]?.size || 0,
+        webViewLink: data.webViewLink || files[0]?.providerUrl || (data.fileId ? `https://drive.google.com/file/d/${data.fileId}/view` : ''),
+        webContentLink: data.webContentLink || files[0]?.downloadUrl || (data.fileId ? `https://drive.google.com/uc?id=${data.fileId}&export=download` : ''),
+        files,
+        activityId: actId,
+        roundId: data.roundId || roundId,
+        studentId: sid
+      };
+    };
+
+    const registerSubmissions = (subList) => {
+      subList.forEach(item => {
+        if (!item || !item.activityId) return;
+        const actId = item.activityId;
+        if (!round.activitySubmissions[actId]) round.activitySubmissions[actId] = {};
+        if (!state.cachedSubmissions[roundId][actId]) state.cachedSubmissions[roundId][actId] = {};
+
+        const existingRecord = round.activitySubmissions[actId][sid] || state.cachedSubmissions[roundId][actId][sid];
+        const existingAttempts = Array.isArray(existingRecord?.attempts) ? [...existingRecord.attempts] : [];
+        const exists = existingAttempts.some(x => (x.fileId && x.fileId === item.fileId) || x.attempt === item.attempt);
+        if (!exists) {
+          existingAttempts.push(item);
+        }
+        existingAttempts.sort((a, b) => (a.attempt || 0) - (b.attempt || 0));
+        const currentSub = existingAttempts[existingAttempts.length - 1] || item;
+
+        const subRecord = {
+          currentSubmission: currentSub,
+          attempts: existingAttempts
+        };
+
+        round.activitySubmissions[actId][sid] = subRecord;
+        round.activitySubmissions[actId][sid.toUpperCase()] = subRecord;
+        round.activitySubmissions[actId][sid.toLowerCase()] = subRecord;
+
+        state.cachedSubmissions[roundId][actId][sid] = subRecord;
+        state.cachedSubmissions[roundId][actId][sid.toUpperCase()] = subRecord;
+        state.cachedSubmissions[roundId][actId][sid.toLowerCase()] = subRecord;
+      });
+    };
+
+    const foundDocs = [];
+
+    // 1. Query subcollection: graduationRounds/{roundId}/submissions where studentId == sid
+    try {
+      if (typeof db !== 'undefined' && typeof collection === 'function' && typeof query === 'function' && typeof where === 'function' && typeof getDocs === 'function') {
+        const subCol = collection(db, 'graduationRounds', roundId, 'submissions');
+        const q1 = query(subCol, where('studentId', '==', sid));
+        const snap1 = await getDocs(q1);
+        snap1.forEach(d => {
+          const norm = normalizeSubDoc(d.data());
+          if (norm) foundDocs.push(norm);
+        });
+
+        if (snap1.empty && sid !== sid.toUpperCase()) {
+          const q1Upper = query(subCol, where('studentId', '==', sid.toUpperCase()));
+          const snap1Upper = await getDocs(q1Upper);
+          snap1Upper.forEach(d => {
+            const norm = normalizeSubDoc(d.data());
+            if (norm) foundDocs.push(norm);
+          });
+        }
+      }
+    } catch (errCol) {
+      console.warn('[ensureStudentSubmissionsLoaded] Subcollection query error:', errCol.message);
+    }
+
+    // 2. Deterministic doc checks for target recovery documents
+    const activities = Array.isArray(round.activities) ? round.activities : [];
+    for (const act of activities) {
+      const stableDocId = `sub_${roundId}_${act.id}_${sid}_recov`;
+      if (typeof db !== 'undefined' && typeof doc === 'function' && typeof getDoc === 'function') {
+        try {
+          const dRef = doc(db, 'graduationRounds', roundId, 'submissions', stableDocId);
+          const dSnap = await getDoc(dRef);
+          if (dSnap.exists()) {
+            const norm = normalizeSubDoc(dSnap.data(), act.id);
+            if (norm) foundDocs.push(norm);
+          }
+        } catch (e) {}
+
+        try {
+          const rRef = doc(db, 'activitySubmissions', stableDocId);
+          const rSnap = await getDoc(rRef);
+          if (rSnap.exists()) {
+            const norm = normalizeSubDoc(rSnap.data(), act.id);
+            if (norm) foundDocs.push(norm);
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (foundDocs.length > 0) {
+      registerSubmissions(foundDocs);
+    }
+  } catch (err) {
+    console.warn('[ensureStudentSubmissionsLoaded] Failed:', err);
+  }
+};
+
+window.openSupervisorStudentDetailModal = async function(studentId, focusSection = null) {
   const modal = document.getElementById('supervisor-student-detail-modal');
   if (!modal) return;
 
+  modal.classList.remove('hidden');
   window.switchSupervisorDetailModalTab(focusSection === 'progress' ? 'progress' : 'profile');
 
   const round = state.activeRound;
+  if (round?.id && typeof window.ensureStudentSubmissionsLoaded === 'function') {
+    try {
+      await window.ensureStudentSubmissionsLoaded(round.id, studentId);
+    } catch (e) {}
+  }
+
   const st = (state.supervisorAssignedStudents || []).find(s => (s.studentId || s.id) === studentId) ||
     findStudentInRound(studentId);
   const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(studentId) : null;
@@ -559,12 +702,27 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
   const activities = Array.isArray(round?.activities) ? round.activities : [];
   if (milestonesEl) {
     if (activities.length > 0) {
+      const now = new Date();
       milestonesEl.innerHTML = activities.map((act, idx) => {
         const rules = (typeof getEffectiveSubmissionRules === 'function') ? getEffectiveSubmissionRules(studentId, act, round) : null;
-        let stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Chưa nộp</span>';
-        if (rules?.currentSubmission) {
-          stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">✓ Đã nộp bài</span>';
+        
+        // Decouple submission status
+        let stBadge = '';
+        if (act.submissionEnabled) {
+          if (rules?.currentSubmission) {
+            stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã nộp bài</span>';
+          } else if (rules?.isNotStarted) {
+            stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Chưa mở nộp</span>';
+          } else {
+            stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Chưa nộp</span>';
+          }
         }
+
+        // Time status
+        const actStart = act.startAt ? new Date(act.startAt) : null;
+        const actEnd = act.endAt ? new Date(act.endAt) : null;
+        const isUpcoming = actStart ? (now < actStart) : false;
+        const isOngoing = (actStart && actEnd) ? (now >= actStart && now <= actEnd) : false;
 
         // Check if milestone is a progress review (Duyệt đợt 1, 2, 3)
         const actText = `${act.title || ''} ${act.name || ''} ${act.milestoneType || ''} ${act.type || ''}`.toLowerCase();
@@ -575,23 +733,40 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
           const isPub = (typeof window.isProgressReviewPublished === 'function')
             ? window.isProgressReviewPublished(phase, round)
             : Boolean(round?.publishedReviews?.['duyet_' + phase]?.status === 'published');
+          const pubRecord = round?.publishedReviews?.['duyet_' + phase];
+          const isRevoked = Boolean(pubRecord?.status === 'revoked');
+
           if (isPub) {
             const pubInfo = round?.publishedReviews?.['duyet_' + phase];
-            const stRes = pubInfo?.studentResults?.[studentId];
+            const stRes = pubInfo?.studentResults?.[studentId] || pubInfo?.studentResults?.[String(studentId).toUpperCase()];
             if (stRes) {
               const passClass = stRes.isPassed ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300';
               const passLabel = stRes.isPassed ? '✓ Đạt' : '✕ Không đạt';
               reviewBadge = `
                 <div class="flex items-center gap-1.5 shrink-0">
-                  <span class="badge bg-purple-50 text-purple-900 font-black font-mono text-[11px] px-2 py-0.5 rounded border border-purple-200">${stRes.letterGrade || '--'}</span>
+                  <span class="badge bg-purple-50 text-purple-900 font-black font-mono text-[11px] px-2 py-0.5 rounded border border-purple-200">${escapeHtml(stRes.letterGrade || '--')}</span>
                   <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${passClass}">${passLabel}</span>
                 </div>
               `;
             } else {
               reviewBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Chưa có kết quả</span>';
             }
+          } else if (isRevoked) {
+            reviewBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">Đã thu hồi công bố</span>';
+          } else if (isUpcoming) {
+            reviewBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Chưa bắt đầu</span>';
+          } else if (isOngoing) {
+            reviewBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">Đang đánh giá</span>';
           } else {
+            // Milestone has ended or date has passed, but admin hasn't published
             reviewBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Chưa công bố</span>';
+          }
+        } else {
+          // General non-review milestone
+          if (isUpcoming) {
+            reviewBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500">Chưa bắt đầu</span>';
+          } else if (isOngoing) {
+            reviewBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">Đang diễn ra</span>';
           }
         }
 
@@ -599,7 +774,7 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
           <div class="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs gap-2">
             <div class="flex items-center gap-2 min-w-0">
               <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-[10px] shrink-0">${idx + 1}</span>
-              <span class="font-bold text-slate-800 truncate">${act.title}</span>
+              <span class="font-bold text-slate-800 truncate">${escapeHtml(act.title)}</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
               ${reviewBadge}
@@ -624,9 +799,11 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
       attemptsCount += rules.attemptsHistory.length;
 
       return rules.attemptsHistory.map((att, idx) => {
-        const fName = att.files?.[0]?.validatedName || att.files?.[0]?.originalName || 'Tệp đính kèm';
-        const fSize = att.files?.[0]?.size ? (att.files[0].size / (1024 * 1024)).toFixed(1) + ' MB' : '';
+        const fileObj = att.files?.[0];
+        const fName = fileObj?.validatedName || fileObj?.originalName || att.fileName || att.name || 'Tệp đính kèm';
+        const fSize = fileObj?.size ? (fileObj.size / (1024 * 1024)).toFixed(1) + ' MB' : (att.fileSize ? (att.fileSize / (1024 * 1024)).toFixed(1) + ' MB' : '');
         const timeStr = att.submittedAt ? fmtIsoToVietnameseDateTime(att.submittedAt) : '--';
+        const driveLink = fileObj?.providerUrl || att.webViewLink || (att.fileId ? `https://drive.google.com/file/d/${att.fileId}/view` : '#');
 
         let statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">✓ Đã nộp</span>';
         if (att.status === 'withdrawn') {
@@ -639,10 +816,15 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
           <div class="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-3 text-xs">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
-                <span class="font-bold text-slate-900 truncate">${act.title} (Lần ${att.attempt || idx + 1})</span>
+                <span class="font-bold text-slate-900 truncate">${escapeHtml(act.title)} (Lần ${att.attempt || idx + 1}/${rules.totalAllowedAttempts || 3})</span>
                 <span class="text-[10px] text-slate-400 font-mono shrink-0">${timeStr}</span>
               </div>
-              <span class="text-[11px] text-slate-600 font-mono block mt-0.5 truncate">${fName} ${fSize ? '(' + fSize + ')' : ''}</span>
+              <a href="${driveLink}" target="_blank" rel="noopener noreferrer" class="text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-mono inline-flex items-center gap-1 mt-0.5 truncate max-w-full">
+                <span>📎</span>
+                <span class="truncate">${escapeHtml(fName)}</span>
+                ${fSize ? `<span class="text-slate-400 font-sans shrink-0">(${fSize})</span>` : ''}
+                <span class="text-[10px] text-blue-500 font-sans shrink-0">↗</span>
+              </a>
             </div>
             <div class="shrink-0">
               ${statusBadge}

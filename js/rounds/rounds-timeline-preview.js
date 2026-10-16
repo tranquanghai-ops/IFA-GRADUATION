@@ -187,13 +187,21 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
     const isPub = (typeof window.isProgressReviewPublished === 'function')
       ? window.isProgressReviewPublished(phase, submissionRound)
       : Boolean(submissionRound.publishedReviews?.['duyet_' + phase]?.status === 'published');
-    const mySid = state.userProfile?.studentId || state.currentUser?.studentId || (state.user?.email && /^\d{8}@/.test(state.user.email) ? state.user.email.split('@')[0] : null);
+    const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : (state.user || {});
+    const mySid = state.myRegistration?.studentId
+      || state.userProfile?.studentId
+      || state.currentUser?.studentId
+      || actor?.studentId
+      || (actor?.email && /^\d{7,10}@/.test(actor.email) ? actor.email.split('@')[0] : null)
+      || (state.user?.email && /^\d{7,10}@/.test(state.user.email) ? state.user.email.split('@')[0] : null);
 
     if (isPub) {
       const pubInfo = (typeof window.getProgressReviewPublicationInfo === 'function')
         ? window.getProgressReviewPublicationInfo(phase, submissionRound)
         : submissionRound.publishedReviews?.['duyet_' + phase];
-      const stRes = mySid ? pubInfo?.studentResults?.[mySid] : null;
+      const stRes = mySid
+        ? (pubInfo?.studentResults?.[mySid] || pubInfo?.studentResults?.[String(mySid).toUpperCase()] || pubInfo?.studentResults?.[String(mySid).toLowerCase()])
+        : null;
       if (stRes) {
         const passClass = stRes.isPassed ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300';
         const passLabel = stRes.isPassed ? '✓ Đạt yêu cầu' : '✕ Không đạt yêu cầu';

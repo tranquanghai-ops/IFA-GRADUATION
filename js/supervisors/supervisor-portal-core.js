@@ -673,6 +673,18 @@ window.loadSupervisorPortalData = async function(roundId) {
 
   state.supervisorAssignedStudents = displayStudents;
 
+  // Preload submissions for assigned students in background so cards show accurate submission status
+  if (typeof window.ensureStudentSubmissionsLoaded === 'function' && round?.id) {
+    Promise.allSettled(displayStudents.map(st => {
+      const sid = st.studentId || st.id;
+      return sid ? window.ensureStudentSubmissionsLoaded(round.id, sid) : Promise.resolve();
+    })).then(() => {
+      if (typeof window.renderSupervisorStudentsTable === 'function') {
+        window.renderSupervisorStudentsTable();
+      }
+    }).catch(() => {});
+  }
+
   // 5. Compute Hero Stats
   const totalAssignedCount = displayStudents.length;
   const statAssignedEl = document.getElementById('sup-stat-assigned-total');

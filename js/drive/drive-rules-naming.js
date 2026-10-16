@@ -522,12 +522,44 @@ window.getEffectiveSubmissionRules = function(studentId, activity, round) {
   const baseMaxAttempts = cfg.maxAttempts ?? 3;
   const totalAllowedAttempts = baseMaxAttempts + extraAttempts;
 
-  // Submissions record
-  const subRecord = round?.activitySubmissions?.[activity?.id]?.[studentId] || null;
-  const attemptsList = Array.isArray(subRecord?.attempts)
-    ? subRecord.attempts
-    : (subRecord?.currentSubmission ? [subRecord.currentSubmission] : []);
-  const completedAttempts = attemptsList.filter(a => a.status !== 'withdrawn').length;
+  // Submissions record: support string normalization, cached subcollections, and direct attempt normalization
+  const sid = String(studentId || '').trim();
+  const actId = activity?.id;
+  const subRecord = round?.activitySubmissions?.[actId]?.[sid]
+    || round?.activitySubmissions?.[actId]?.[studentId]
+    || (typeof state !== 'undefined' && state.cachedSubmissions?.[round?.id]?.[actId]?.[sid])
+    || (typeof state !== 'undefined' && state.cachedSubmissions?.[round?.id]?.[actId]?.[studentId])
+    || null;
+
+  const normalizeAttempt = (att, idx = 0) => {
+    if (!att) return null;
+    const files = Array.isArray(att.files) && att.files.length > 0 ? att.files : [{
+      validatedName: att.fileName || att.name || 'Tài liệu đã nộp',
+      originalName: att.fileName || att.name || 'Tài liệu đã nộp',
+      providerFileId: att.fileId,
+      providerUrl: att.webViewLink || (att.fileId ? `https://drive.google.com/file/d/${att.fileId}/view` : ''),
+      downloadUrl: att.webContentLink || (att.fileId ? `https://drive.google.com/uc?id=${att.fileId}&export=download` : ''),
+      size: att.fileSize || 0
+    }];
+    return {
+      ...att,
+      attempt: att.attempt || att.attemptNumber || (idx + 1),
+      attemptNumber: att.attemptNumber || att.attempt || (idx + 1),
+      files,
+      submittedAt: att.submittedAt || att.createdAt,
+      status: att.status || 'submitted',
+      isLate: att.isLate !== undefined ? Boolean(att.isLate) : (effectiveDeadline && att.submittedAt ? new Date(att.submittedAt) > effectiveDeadline : false)
+    };
+  };
+
+  const attemptsList = Array.isArray(subRecord?.attempts) && subRecord.attempts.length > 0
+    ? subRecord.attempts.map((att, i) => normalizeAttempt(att, i))
+    : (subRecord?.currentSubmission ? [normalizeAttempt(subRecord.currentSubmission, 0)] : []);
+  const currentSub = subRecord?.currentSubmission
+    ? normalizeAttempt(subRecord.currentSubmission, attemptsList.length > 0 ? attemptsList.length - 1 : 0)
+    : (attemptsList.length > 0 ? attemptsList[attemptsList.length - 1] : null);
+
+  const completedAttempts = attemptsList.filter(a => a && a.status !== 'withdrawn').length;
   const remainingAttempts = Math.max(0, totalAllowedAttempts - completedAttempts);
 
   // Time status: startAt lấy từ cfg.openAt độc lập, không mặc định lấy thời gian hoạt động trừ khi bản ghi cũ
@@ -568,8 +600,8 @@ window.getEffectiveSubmissionRules = function(studentId, activity, round) {
     isLate,
     allowLate,
     canSubmit,
-    currentSubmission: subRecord?.currentSubmission || null,
-    attemptsHistory: Array.isArray(subRecord?.attempts) ? subRecord.attempts : []
+    currentSubmission: currentSub,
+    attemptsHistory: attemptsList
   };
 };
 

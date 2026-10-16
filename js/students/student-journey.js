@@ -683,6 +683,57 @@ window.renderStudentTimelineWeeks = function() {
         ? `<p class="text-[10px] text-slate-500 mt-1 leading-tight line-clamp-2">${card.subtitle}</p>`
         : '';
       const circleContent = card.status === 'completed' ? '✓' : (card.status === 'ongoing' || card.status === 'active') ? '●' : (card.num > 12 ? (card.num === 13 ? '📄' : card.num === 14 ? '🎓' : '📌') : card.num);
+
+      // Check if this week corresponds to a review milestone (Duyệt đợt 1, 2, 3)
+      let reviewResultHtml = '';
+      const weekSearchText = `${card.milestone || ''} ${card.title || ''} ${card.subtitle || ''} ${(card.events || []).map(e => e.title).join(' ')}`.toLowerCase();
+      const mMatch = /(?:duyệt|duyet)\s*(?:đồ\s*án|do\s*an)?\s*(?:đợt|dot)?\s*([1-3])/i.exec(weekSearchText);
+      if (mMatch) {
+        const phase = Number(mMatch[1]);
+        const isPub = (typeof window.isProgressReviewPublished === 'function')
+          ? window.isProgressReviewPublished(phase, round)
+          : Boolean(round?.publishedReviews?.['duyet_' + phase]?.status === 'published');
+        const pubInfo = round?.publishedReviews?.['duyet_' + phase];
+        const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : (state.user || {});
+        const mySid = state.myRegistration?.studentId
+          || state.userProfile?.studentId
+          || state.currentUser?.studentId
+          || actor?.studentId
+          || (actor?.email && /^\d{7,10}@/.test(actor.email) ? actor.email.split('@')[0] : null)
+          || (state.user?.email && /^\d{7,10}@/.test(state.user.email) ? state.user.email.split('@')[0] : null);
+
+        if (isPub) {
+          const stRes = mySid ? (pubInfo?.studentResults?.[mySid] || pubInfo?.studentResults?.[String(mySid).toUpperCase()] || pubInfo?.studentResults?.[String(mySid).toLowerCase()]) : null;
+          if (stRes) {
+            const passClass = stRes.isPassed ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300';
+            const passLabel = stRes.isPassed ? '✓ Đạt yêu cầu' : '✕ Không đạt yêu cầu';
+            reviewResultHtml = `
+              <div class="mt-2 w-full p-2.5 rounded-xl bg-purple-50/90 border border-purple-200 text-left shadow-2xs">
+                <div class="text-[10px] font-black uppercase text-purple-900 tracking-wider flex items-center justify-between">
+                  <span class="flex items-center gap-1"><span>⚖️</span> HỘI ĐỒNG</span>
+                  <span class="font-mono font-black text-xs px-2 py-0.5 rounded bg-purple-200 text-purple-950">${escapeHtml(stRes.letterGrade || '--')}</span>
+                </div>
+                <div class="mt-1 flex items-center justify-between text-[11px] font-bold">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] ${passClass}">${passLabel}</span>
+                </div>
+              </div>
+            `;
+          } else {
+            reviewResultHtml = `
+              <div class="mt-2 w-full p-1.5 rounded-lg bg-slate-100 text-slate-500 text-[10px] text-center border border-slate-200">
+                Đã công bố kết quả
+              </div>
+            `;
+          }
+        } else if (card.status === 'completed') {
+          reviewResultHtml = `
+            <div class="mt-2 w-full p-1.5 rounded-lg bg-slate-50 text-slate-400 text-[10px] text-center border border-slate-200 italic">
+              Chưa công bố kết quả
+            </div>
+          `;
+        }
+      }
+
       return `<div class="ifa-timeline-card flex-shrink-0 rounded-2xl border ${st.card} flex flex-col items-center text-center p-3 shadow-xs relative overflow-hidden transition-all ${isActive ? 'shadow-md' : ''}"
                    style="width:${cardPxWidth}px;min-width:${cardPxWidth}px;">
         <div class="flex items-center justify-between gap-1 w-full mb-1.5">
@@ -696,6 +747,7 @@ window.renderStudentTimelineWeeks = function() {
         <span class="text-[13px] font-mono font-bold text-slate-700 tracking-tight">${card.dateText}</span>
         ${renderTimelineWeekDays(card.days, card.events, card.num)}
         ${renderTimelineWeekEvents(card.events, card.num)}
+        ${reviewResultHtml}
         ${noteHtml}
       </div>`;
     } else {
