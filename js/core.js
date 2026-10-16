@@ -609,6 +609,8 @@ let countdownInterval = null;
 export function showLoading(msg = 'Đang tải IFA+ Graduation...') {
   const overlay = document.getElementById('app-loading-overlay');
   const msgEl = document.getElementById('app-loading-msg');
+  const spinner = document.getElementById('app-loading-spinner');
+  if (spinner) spinner.classList.remove('hidden');
   if (msgEl) msgEl.textContent = msg;
   if (overlay) {
     overlay.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
@@ -623,7 +625,13 @@ export function hideLoading() {
   const overlay = document.getElementById('app-loading-overlay');
   if (overlay) {
     overlay.classList.add('opacity-0', 'pointer-events-none');
-    setTimeout(() => overlay.classList.add('hidden'), 300);
+    setTimeout(() => {
+      overlay.classList.add('hidden');
+      const spinner = document.getElementById('app-loading-spinner');
+      if (spinner) spinner.classList.remove('hidden');
+      const msgEl = document.getElementById('app-loading-msg');
+      if (msgEl) msgEl.textContent = 'Đang tải IFA+ Graduation...';
+    }, 300);
   }
 }
 

@@ -22,10 +22,10 @@ window.isSystemOwner = isSystemOwner;
 export async function setupAuthListener() {
   showLoading('Đang khởi tạo IFA+ Graduation...');
 
-  // Fallback an toàn: Loading overlay bắt buộc phải ẩn sau tối đa 6 giây
+  // Fallback an toàn: Loading overlay tự động tắt sau tối đa 60 giây nếu có sự cố
   const safetyTimer = setTimeout(() => {
     hideLoading();
-  }, 6000);
+  }, 60000);
 
   onAuthStateChanged(auth, async user => {
     state.realUser = user;
