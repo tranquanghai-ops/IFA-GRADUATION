@@ -18,7 +18,7 @@ window.onRubricComponentChange = function(critKey, val) {
   state.councilLocalDrafts = state.councilLocalDrafts || {};
   state.councilLocalDrafts[sid] = state.councilLocalDrafts[sid] || {};
   state.councilLocalDrafts[sid].components = state.councilLocalDrafts[sid].components || {};
-  
+
   if (val === '' || val === null || val === undefined) {
     delete state.councilLocalDrafts[sid].components[critKey];
   } else {
@@ -158,7 +158,27 @@ export function getOfficialDefenseScore(studentId, council, act, round) {
     const scorerId = getCouncilMemberScorerId(assigned);
     if (!scorerId) continue;
     const scoreKey = `${activityId}_${councilId}_${studentId}_${scorerId}`;
-    const score = state.councilScores?.[scoreKey] || round?.councilScores?.[scoreKey];
+    const scoreKeyEmail = assigned.memberEmail ? `${activityId}_${councilId}_${studentId}_${String(assigned.memberEmail).toLowerCase().trim()}` : null;
+    const scoreKeyMemberId = assigned.memberId ? `${activityId}_${councilId}_${studentId}_${String(assigned.memberId).trim()}` : null;
+    let score = state.councilScores?.[scoreKey]
+      || (scoreKeyEmail ? state.councilScores?.[scoreKeyEmail] : null)
+      || (scoreKeyMemberId ? state.councilScores?.[scoreKeyMemberId] : null)
+      || round?.councilScores?.[scoreKey]
+      || (scoreKeyEmail ? round?.councilScores?.[scoreKeyEmail] : null)
+      || (scoreKeyMemberId ? round?.councilScores?.[scoreKeyMemberId] : null)
+      || round?.councilRubricScores?.[scoreKey]
+      || (scoreKeyEmail ? round?.councilRubricScores?.[scoreKeyEmail] : null);
+
+    if (!score && state.councilScores) {
+      score = Object.values(state.councilScores).find(item =>
+        item && item.studentId === studentId && item.councilId === councilId && (
+          item.scorerId === scorerId ||
+          (assigned.memberEmail && String(item.scorerEmail || item.decidedBy || '').toLowerCase() === String(assigned.memberEmail).toLowerCase()) ||
+          (assigned.memberId && item.scorerId === assigned.memberId) ||
+          item.slotKey === s.key
+        )
+      ) || null;
+    }
     const isCompleted = (score?.status === 'completed');
     const resolvedNumeric = resolveScoreNumericValue(score, act);
 
@@ -243,7 +263,7 @@ window.finalizeCouncilSession = async function() {
   // Verification: all mandatory scorers must have completed scores for all students
   const reqSlots = getRequiredScorers(council, act);
   const assignments = (act.councilStudentAssignments || []).filter(a => a.councilId === councilId);
-  
+
   const missingStudents = [];
   for (const asgn of assignments) {
     const sId = asgn.studentId;

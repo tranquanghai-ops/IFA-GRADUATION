@@ -360,10 +360,16 @@ export function renderPublishProgressReviewToolbar(phase) {
     const pubDateStr = pubInfo?.publishedAt ? new Date(pubInfo.publishedAt).toLocaleDateString('vi-VN') : '';
     const pubUserStr = pubInfo?.publishedBy ? ` bởi ${pubInfo.publishedBy}` : '';
     container.innerHTML = `
-      <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold" title="Đã công bố ngày ${pubDateStr}${pubUserStr}">
-        <span class="text-emerald-600">✓</span>
-        <span>Đã công bố điểm</span>
-        ${pubDateStr ? `<span class="text-[10px] text-emerald-600 font-normal">(${pubDateStr})</span>` : ''}
+      <div class="flex items-center gap-2">
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold" title="Đã công bố ngày ${pubDateStr}${pubUserStr}">
+          <span class="text-emerald-600">✓</span>
+          <span>Đã công bố điểm</span>
+          ${pubDateStr ? `<span class="text-[10px] text-emerald-600 font-normal">(${pubDateStr})</span>` : ''}
+        </div>
+        <button type="button" onclick="openRevokeProgressReviewModal(${phase})" class="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-2xs" title="Thu hồi công bố kết quả mốc duyệt">
+          <span>↩️</span>
+          <span>Thu hồi công bố</span>
+        </button>
       </div>
     `;
   } else {
@@ -707,10 +713,31 @@ export function openCouncilScoreDetailModal(studentId, phase) {
         let memberNum = '--';
         let statusHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">Chưa chấm</span>';
 
+        let sc = null;
         if (scorerId) {
           const k = `${act.id}_${council.id}_${sid}_${scorerId}`;
           const kEmail = assigned.memberEmail ? `${act.id}_${council.id}_${sid}_${String(assigned.memberEmail).toLowerCase().trim()}` : null;
-          const sc = state.councilScores?.[k] || (kEmail ? state.councilScores?.[kEmail] : null) || targetRound?.councilScores?.[k] || (kEmail ? targetRound?.councilScores?.[kEmail] : null);
+          const kMemberId = assigned.memberId ? `${act.id}_${council.id}_${sid}_${String(assigned.memberId).trim()}` : null;
+
+          sc = state.councilScores?.[k]
+            || (kEmail ? state.councilScores?.[kEmail] : null)
+            || (kMemberId ? state.councilScores?.[kMemberId] : null)
+            || targetRound?.councilScores?.[k]
+            || (kEmail ? targetRound?.councilScores?.[kEmail] : null)
+            || (kMemberId ? targetRound?.councilScores?.[kMemberId] : null)
+            || targetRound?.councilRubricScores?.[k]
+            || (kEmail ? targetRound?.councilRubricScores?.[kEmail] : null);
+
+          if (!sc && state.councilScores) {
+            sc = Object.values(state.councilScores).find(item =>
+              item && item.studentId === sid && item.councilId === council.id && (
+                item.scorerId === scorerId ||
+                (assigned.memberEmail && String(item.scorerEmail || item.decidedBy || '').toLowerCase() === String(assigned.memberEmail).toLowerCase()) ||
+                (assigned.memberId && item.scorerId === assigned.memberId) ||
+                item.slotKey === s.key
+              )
+            ) || null;
+          }
 
           if (sc && sc.status === 'completed') {
             validVoteCount++;
@@ -720,7 +747,7 @@ export function openCouncilScoreDetailModal(studentId, phase) {
             } else if (typeof sc.value === 'number') {
               memberNum = Number(sc.value).toFixed(2);
             }
-            statusHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Đã chấm</span>';
+            statusHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">✓ Đã chấm</span>';
           } else if (sc && sc.status === 'draft') {
             memberLetter = sc.value || '--';
             if (sc.numericValue !== undefined && sc.numericValue !== null) memberNum = Number(sc.numericValue).toFixed(2);
@@ -739,6 +766,46 @@ export function openCouncilScoreDetailModal(studentId, phase) {
           </tr>
         `;
       }).join('');
+
+      if (validVoteCount < totalAssignedScorers && typeof window !== 'undefined' && !window._fetchingCouncilReviewDecisions) {
+        const dbObj = window.db || (typeof db !== 'undefined' ? db : null);
+        const colFn = window.collection;
+        const qFn = window.query;
+        const whereFn = window.where;
+        const getDocsFn = window.getDocs;
+        if (dbObj && colFn && qFn && whereFn && getDocsFn && targetRound?.id && council?.id) {
+          window._fetchingCouncilReviewDecisions = true;
+          const q = qFn(
+            colFn(dbObj, 'graduationRounds', targetRound.id, 'reviewDecisions'),
+            whereFn('councilId', '==', council.id),
+            whereFn('studentId', '==', sid)
+          );
+          getDocsFn(q).then(snap => {
+            window._fetchingCouncilReviewDecisions = false;
+            if (snap && !snap.empty) {
+              let updated = false;
+              state.councilScores = state.councilScores || {};
+              snap.docs.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data && data.scorerId) {
+                  const key = `${data.activityId || act.id}_${data.councilId || council.id}_${sid}_${data.scorerId}`;
+                  state.councilScores[key] = data;
+                  if (data.scorerEmail) {
+                    state.councilScores[`${data.activityId || act.id}_${data.councilId || council.id}_${sid}_${String(data.scorerEmail).toLowerCase().trim()}`] = data;
+                  }
+                  updated = true;
+                }
+              });
+              if (updated) {
+                openCouncilScoreDetailModal(sid, pNum);
+              }
+            }
+          }).catch(err => {
+            window._fetchingCouncilReviewDecisions = false;
+            console.warn('Review decisions async lookup notice:', err);
+          });
+        }
+      }
     } else {
       tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Không tìm thấy thông tin thành viên Hội đồng.</td></tr>';
     }
@@ -766,12 +833,463 @@ export function openCouncilScoreDetailModal(studentId, phase) {
     }
   }
 
+  currentCouncilDetailContext = {
+    studentId: sid,
+    studentName,
+    phase: pNum,
+    targetRound,
+    act,
+    council,
+    letterGrade: reviewData.letterGrade,
+    numericScore: reviewData.score,
+    isPassed: reviewData.isPassed,
+    isFinalized: reviewData.isFinalized
+  };
+
+  const btnAdjust = document.getElementById('btn-open-adjust-council-score');
+  if (btnAdjust) {
+    btnAdjust.style.display = isAdminOrOwner ? 'inline-flex' : 'none';
+  }
+
   modal.classList.remove('hidden');
 }
 
 export function closeCouncilScoreDetailModal() {
   const modal = document.getElementById('modal-council-score-details');
   if (modal) modal.classList.add('hidden');
+}
+
+let currentRevokePhase = null;
+let currentCouncilDetailContext = null;
+
+export function openRevokeProgressReviewModal(phase) {
+  const isAdminOrOwner = (typeof state !== 'undefined' && state.isAdmin && !state.impersonation) || (typeof isUserAdminOrOwner === 'function' && isUserAdminOrOwner());
+  if (!isAdminOrOwner) {
+    if (typeof showToast === 'function') showToast('Chỉ Quản trị viên và Chủ sở hữu mới có quyền thu hồi công bố.', 'warning');
+    return;
+  }
+
+  const pNum = Number(phase);
+  currentRevokePhase = pNum;
+  const targetRound = (typeof state !== 'undefined' && (state.rounds || []).find(r => r.id === state.selectedRoundId)) || state?.activeRound;
+  if (!targetRound) return;
+
+  const modal = document.getElementById('modal-revoke-progress-review');
+  if (!modal) return;
+
+  const pubInfo = getProgressReviewPublicationInfo(pNum, targetRound);
+  const badgeEl = document.getElementById('revoke-review-phase-badge');
+  const subEl = document.getElementById('revoke-review-subtitle');
+  const atEl = document.getElementById('revoke-review-published-at');
+  const byEl = document.getElementById('revoke-review-published-by');
+
+  if (badgeEl) badgeEl.textContent = `Duyệt đợt ${pNum}`;
+  if (subEl) subEl.textContent = `Đợt: ${targetRound.name || targetRound.title || targetRound.id}`;
+  if (atEl) atEl.textContent = pubInfo?.publishedAt ? new Date(pubInfo.publishedAt).toLocaleString('vi-VN') : '--';
+  if (byEl) byEl.textContent = pubInfo?.publishedBy || 'Quản trị viên';
+
+  const reasonInput = document.getElementById('revoke-publish-reason');
+  const chkConfirm = document.getElementById('chk-confirm-revoke-publish');
+  const btnConfirm = document.getElementById('btn-confirm-revoke-publish');
+
+  if (reasonInput) reasonInput.value = '';
+  if (chkConfirm) chkConfirm.checked = false;
+  if (btnConfirm) btnConfirm.disabled = true;
+
+  modal.classList.remove('hidden');
+}
+
+export function closeRevokeProgressReviewModal() {
+  const modal = document.getElementById('modal-revoke-progress-review');
+  if (modal) modal.classList.add('hidden');
+}
+
+export function onRevokeReasonInputChanged() {
+  const reason = document.getElementById('revoke-publish-reason')?.value?.trim() || '';
+  const chk = document.getElementById('chk-confirm-revoke-publish')?.checked || false;
+  const btn = document.getElementById('btn-confirm-revoke-publish');
+  if (btn) {
+    btn.disabled = !(reason.length >= 10 && chk);
+  }
+}
+
+export async function confirmRevokeProgressReview() {
+  const phase = currentRevokePhase;
+  if (!phase) return;
+
+  const isAdminOrOwner = (typeof state !== 'undefined' && state.isAdmin && !state.impersonation) || (typeof isUserAdminOrOwner === 'function' && isUserAdminOrOwner());
+  if (!isAdminOrOwner) {
+    if (typeof showToast === 'function') showToast('Chỉ Quản trị viên và Chủ sở hữu mới có quyền thu hồi công bố.', 'warning');
+    return;
+  }
+
+  const targetRound = (typeof state !== 'undefined' && (state.rounds || []).find(r => r.id === state.selectedRoundId)) || state?.activeRound;
+  if (!targetRound) return;
+
+  const reason = document.getElementById('revoke-publish-reason')?.value?.trim() || '';
+  if (reason.length < 10) {
+    if (typeof showToast === 'function') showToast('Vui lòng nhập lý do thu hồi (tối thiểu 10 ký tự).', 'warning');
+    return;
+  }
+
+  const chk = document.getElementById('chk-confirm-revoke-publish')?.checked || false;
+  if (!chk) {
+    if (typeof showToast === 'function') showToast('Vui lòng tích xác nhận thu hồi công bố.', 'warning');
+    return;
+  }
+
+  const btnConfirm = document.getElementById('btn-confirm-revoke-publish');
+  if (btnConfirm) {
+    btnConfirm.disabled = true;
+    btnConfirm.innerHTML = '<span>⏳</span> <span>Đang thu hồi...</span>';
+  }
+
+  try {
+    const act = findProgressReviewActivity(targetRound, phase);
+    const pKey = 'duyet_' + phase;
+    const prevPub = (targetRound.publishedReviews && targetRound.publishedReviews[pKey]) || {};
+
+    const currentUserEmail = (typeof state !== 'undefined' && state.user?.email) || 'admin';
+    const revokeTimestamp = new Date().toISOString();
+
+    const revokeRecord = {
+      ...prevPub,
+      status: 'revoked',
+      isPublished: false,
+      revokedAt: revokeTimestamp,
+      revokedBy: currentUserEmail,
+      revokeReason: reason
+    };
+
+    targetRound.publishedReviews = targetRound.publishedReviews || {};
+    targetRound.publishedReviews[pKey] = revokeRecord;
+
+    const rawUpdate = (typeof window !== 'undefined') ? (window.updateDoc || window.rawUpdateDoc) : null;
+    const rawSet = (typeof window !== 'undefined') ? (window.setDoc || window.rawSetDoc) : null;
+    const docFn = (typeof window !== 'undefined') ? window.doc : null;
+    const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
+
+    if (dbObj && rawUpdate && docFn) {
+      const roundRef = docFn(dbObj, 'graduationRounds', targetRound.id);
+      await rawUpdate(roundRef, {
+        [`publishedReviews.${pKey}`]: revokeRecord,
+        updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : revokeTimestamp
+      });
+
+      try {
+        if (rawSet) {
+          const subDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedProgressReviews', pKey);
+          await rawSet(subDocRef, revokeRecord);
+
+          if (prevPub.studentResults) {
+            for (const stId of Object.keys(prevPub.studentResults)) {
+              const stDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedStudentResults', stId);
+              await rawUpdate(stDocRef, {
+                [`reviews.${pKey}.status`]: 'revoked',
+                [`reviews.${pKey}.isPublished`]: false,
+                [`reviews.${pKey}.revokedAt`]: revokeTimestamp,
+                [`reviews.${pKey}.revokeReason`]: reason
+              }).catch(() => {});
+            }
+          }
+
+          const auditRef = docFn(dbObj, 'auditLogs', `audit_revoke_${targetRound.id}_${pKey}_${Date.now()}`);
+          await rawSet(auditRef, {
+            action: 'REVOKE_PROGRESS_REVIEW_PUBLISH',
+            roundId: targetRound.id,
+            phase: Number(phase),
+            activityId: act ? act.id : `act_duyet_${phase}`,
+            reason: reason,
+            performedBy: currentUserEmail,
+            timestamp: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : revokeTimestamp
+          });
+        }
+      } catch (subErr) {
+        console.warn('[RevokeReview] Non-blocking subcollection error:', subErr.message);
+      }
+    }
+
+    closeRevokeProgressReviewModal();
+    renderPublishProgressReviewToolbar(phase);
+    renderAdminProgressReviewTable(phase);
+    if (typeof showToast === 'function') {
+      showToast(`✓ Đã thu hồi công bố kết quả Duyệt đợt ${phase} thành công.`, 'success');
+    }
+  } catch (err) {
+    console.error('[RevokeReview] Error:', err);
+    if (typeof showToast === 'function') showToast(`Lỗi thu hồi công bố: ${err.message}`, 'error');
+  } finally {
+    if (btnConfirm) {
+      btnConfirm.disabled = false;
+      btnConfirm.innerHTML = '<span>↩️</span> <span>Xác nhận Thu hồi</span>';
+    }
+  }
+}
+
+export function openAdjustCouncilScoreModal() {
+  const isAdminOrOwner = (typeof state !== 'undefined' && state.isAdmin && !state.impersonation) || (typeof isUserAdminOrOwner === 'function' && isUserAdminOrOwner());
+  if (!isAdminOrOwner) {
+    if (typeof showToast === 'function') showToast('Chỉ Quản trị viên và Chủ sở hữu mới có quyền điều chỉnh điểm.', 'warning');
+    return;
+  }
+
+  const ctx = currentCouncilDetailContext;
+  if (!ctx || !ctx.targetRound) {
+    if (typeof showToast === 'function') showToast('Không tìm thấy ngữ cảnh đánh giá của sinh viên.', 'error');
+    return;
+  }
+
+  const modal = document.getElementById('modal-adjust-council-score');
+  if (!modal) return;
+
+  const isPub = isProgressReviewPublished(ctx.phase || 1, ctx.targetRound);
+  const warnEl = document.getElementById('adjust-score-published-warning');
+  const formEl = document.getElementById('adjust-score-form-fields');
+  const btnConfirm = document.getElementById('btn-confirm-adjust-score');
+
+  if (isPub) {
+    if (warnEl) warnEl.classList.remove('hidden');
+    if (formEl) formEl.classList.add('opacity-50', 'pointer-events-none');
+    if (btnConfirm) btnConfirm.disabled = true;
+    if (typeof showToast === 'function') {
+      showToast('Đợt duyệt đang ở trạng thái ĐÃ CÔNG BỐ. Hãy thực hiện Thu hồi công bố trước khi điều chỉnh điểm.', 'warning');
+    }
+  } else {
+    if (warnEl) warnEl.classList.add('hidden');
+    if (formEl) formEl.classList.remove('opacity-50', 'pointer-events-none');
+  }
+
+  const phaseBadgeEl = document.getElementById('adjust-score-phase-badge');
+  const subtitleEl = document.getElementById('adjust-score-subtitle');
+  const stInfoEl = document.getElementById('adjust-score-student-info');
+  const councilInfoEl = document.getElementById('adjust-score-council-info');
+  const curLetterEl = document.getElementById('adjust-score-current-letter');
+  const curNumEl = document.getElementById('adjust-score-current-num');
+  const curVerdictEl = document.getElementById('adjust-score-current-verdict');
+
+  if (phaseBadgeEl) phaseBadgeEl.textContent = `Duyệt đợt ${ctx.phase || 1}`;
+  if (subtitleEl) subtitleEl.textContent = `Đợt: ${ctx.targetRound.name || ctx.targetRound.title || ctx.targetRound.id} • Hội đồng: ${ctx.council?.name || 'Chưa gán'}`;
+  if (stInfoEl) stInfoEl.textContent = `${ctx.studentName} (${ctx.studentId})`;
+  if (councilInfoEl) councilInfoEl.textContent = ctx.council?.name || 'Hội đồng';
+  if (curLetterEl) curLetterEl.textContent = ctx.letterGrade || '--';
+  if (curNumEl) curNumEl.textContent = (ctx.numericScore !== null && ctx.numericScore !== undefined) ? `(${Number(ctx.numericScore).toFixed(2)})` : '(--)';
+  if (curVerdictEl) {
+    if (ctx.isFinalized) {
+      curVerdictEl.innerHTML = ctx.isPassed
+        ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đạt yêu cầu</span>'
+        : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">✕ Không đạt</span>';
+    } else {
+      curVerdictEl.innerHTML = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Chưa duyệt</span>';
+    }
+  }
+
+  const letterSelect = document.getElementById('adjust-score-new-letter');
+  const basisInput = document.getElementById('adjust-score-basis');
+  const reasonInput = document.getElementById('adjust-score-reason');
+  const chkConfirm = document.getElementById('chk-confirm-adjust-score');
+  const previewBox = document.getElementById('adjust-score-new-preview');
+
+  if (letterSelect) letterSelect.value = '';
+  if (basisInput) basisInput.value = '';
+  if (reasonInput) reasonInput.value = '';
+  if (chkConfirm) chkConfirm.checked = false;
+  if (previewBox) previewBox.classList.add('hidden');
+  if (btnConfirm) btnConfirm.disabled = true;
+
+  modal.classList.remove('hidden');
+}
+
+export function closeAdjustCouncilScoreModal() {
+  const modal = document.getElementById('modal-adjust-council-score');
+  if (modal) modal.classList.add('hidden');
+}
+
+const LETTER_SCORE_MAP = {
+  'A': { score: 9.0, label: 'Xuất sắc', passed: true },
+  'A-': { score: 8.2, label: 'Giỏi', passed: true },
+  'B+': { score: 7.7, label: 'Khá giỏi', passed: true },
+  'B': { score: 7.2, label: 'Khá', passed: true },
+  'B-': { score: 6.7, label: 'Trung bình khá', passed: true },
+  'C+': { score: 6.2, label: 'Trung bình', passed: false },
+  'C': { score: 5.7, label: 'Trung bình yếu', passed: false },
+  'F': { score: 0.0, label: 'Kém', passed: false }
+};
+
+export function onAdjustScoreLetterChanged() {
+  const letter = document.getElementById('adjust-score-new-letter')?.value;
+  const previewBox = document.getElementById('adjust-score-new-preview');
+  const previewNum = document.getElementById('adjust-score-preview-num');
+  const previewVerdict = document.getElementById('adjust-score-preview-verdict');
+
+  if (letter && LETTER_SCORE_MAP[letter]) {
+    const item = LETTER_SCORE_MAP[letter];
+    if (previewNum) previewNum.textContent = item.score.toFixed(1);
+    if (previewVerdict) {
+      previewVerdict.innerHTML = item.passed
+        ? '<span class="text-emerald-700 font-bold">✓ Đạt yêu cầu</span>'
+        : '<span class="text-rose-700 font-bold">✕ Không đạt</span>';
+    }
+    if (previewBox) previewBox.classList.remove('hidden');
+  } else {
+    if (previewBox) previewBox.classList.add('hidden');
+  }
+
+  onAdjustScoreInputChanged();
+}
+
+export function onAdjustScoreInputChanged() {
+  const ctx = currentCouncilDetailContext;
+  const isPub = ctx ? isProgressReviewPublished(ctx.phase || 1, ctx.targetRound) : false;
+
+  const letter = document.getElementById('adjust-score-new-letter')?.value || '';
+  const basis = document.getElementById('adjust-score-basis')?.value?.trim() || '';
+  const reason = document.getElementById('adjust-score-reason')?.value?.trim() || '';
+  const chk = document.getElementById('chk-confirm-adjust-score')?.checked || false;
+  const btn = document.getElementById('btn-confirm-adjust-score');
+
+  const isValid = !isPub && Boolean(letter) && basis.length > 0 && reason.length >= 10 && chk;
+  if (btn) btn.disabled = !isValid;
+}
+
+export async function confirmAdjustCouncilScore() {
+  const ctx = currentCouncilDetailContext;
+  if (!ctx || !ctx.targetRound || !ctx.council) {
+    if (typeof showToast === 'function') showToast('Không tìm thấy thông tin hội đồng cần điều chỉnh.', 'error');
+    return;
+  }
+
+  const isAdminOrOwner = (typeof state !== 'undefined' && state.isAdmin && !state.impersonation) || (typeof isUserAdminOrOwner === 'function' && isUserAdminOrOwner());
+  if (!isAdminOrOwner) {
+    if (typeof showToast === 'function') showToast('Chỉ Quản trị viên và Chủ sở hữu mới có quyền điều chỉnh điểm.', 'warning');
+    return;
+  }
+
+  const isPub = isProgressReviewPublished(ctx.phase || 1, ctx.targetRound);
+  if (isPub) {
+    if (typeof showToast === 'function') showToast('Đợt duyệt đang công bố. Bạn cần Thu hồi công bố trước khi điều chỉnh điểm.', 'error');
+    return;
+  }
+
+  const letter = document.getElementById('adjust-score-new-letter')?.value;
+  const basis = document.getElementById('adjust-score-basis')?.value?.trim() || '';
+  const reason = document.getElementById('adjust-score-reason')?.value?.trim() || '';
+  const chk = document.getElementById('chk-confirm-adjust-score')?.checked || false;
+
+  if (!letter || !LETTER_SCORE_MAP[letter]) {
+    if (typeof showToast === 'function') showToast('Vui lòng chọn mức điểm chữ hợp lệ.', 'warning');
+    return;
+  }
+  if (!basis) {
+    if (typeof showToast === 'function') showToast('Vui lòng nhập căn cứ / số biên bản họp.', 'warning');
+    return;
+  }
+  if (reason.length < 10) {
+    if (typeof showToast === 'function') showToast('Vui lòng nhập lý do điều chỉnh (tối thiểu 10 ký tự).', 'warning');
+    return;
+  }
+  if (!chk) {
+    if (typeof showToast === 'function') showToast('Vui lòng tích xác nhận điều chỉnh kết quả.', 'warning');
+    return;
+  }
+
+  const btnConfirm = document.getElementById('btn-confirm-adjust-score');
+  if (btnConfirm) {
+    btnConfirm.disabled = true;
+    btnConfirm.innerHTML = '<span>⏳</span> <span>Đang lưu...</span>';
+  }
+
+  try {
+    const mapped = LETTER_SCORE_MAP[letter];
+    const newScore = mapped.score;
+    const newVerdict = mapped.passed ? 'passed' : 'failed';
+    const currentUserEmail = (typeof state !== 'undefined' && state.user?.email) || 'admin';
+    const adjustTimestamp = new Date().toISOString();
+
+    const scorePayload = {
+      score: newScore,
+      formattedScore: letter,
+      letterGrade: letter,
+      letterLabel: mapped.label,
+      isPassed: mapped.passed,
+      verdict: newVerdict,
+      isFinalized: true,
+      adjusted: true,
+      adjustedAt: adjustTimestamp,
+      adjustedBy: currentUserEmail,
+      adjustReason: reason,
+      adjustBasis: basis
+    };
+
+    // Update in-memory council
+    ctx.council.finalDefenseScores = ctx.council.finalDefenseScores || {};
+    ctx.council.finalDefenseScores[ctx.studentId] = scorePayload;
+
+    // Update round-level cache if present
+    ctx.targetRound.councilScores = ctx.targetRound.councilScores || {};
+    ctx.targetRound.councilScores[`${ctx.act?.id}_${ctx.council.id}_${ctx.studentId}`] = scorePayload;
+
+    if (typeof state !== 'undefined' && state.councilScores) {
+      state.councilScores[`${ctx.act?.id}_${ctx.council.id}_${ctx.studentId}`] = scorePayload;
+    }
+
+    const rawUpdate = (typeof window !== 'undefined') ? (window.updateDoc || window.rawUpdateDoc) : null;
+    const rawSet = (typeof window !== 'undefined') ? (window.setDoc || window.rawSetDoc) : null;
+    const docFn = (typeof window !== 'undefined') ? window.doc : null;
+    const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
+
+    if (dbObj && rawUpdate && docFn) {
+      const roundRef = docFn(dbObj, 'graduationRounds', ctx.targetRound.id);
+      await rawUpdate(roundRef, {
+        [`activities`]: ctx.targetRound.activities,
+        [`councilScores.${ctx.act?.id}_${ctx.council.id}_${ctx.studentId}`]: scorePayload,
+        updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : adjustTimestamp
+      });
+
+      // Write immutable audit log
+      try {
+        if (rawSet) {
+          const auditRef = docFn(dbObj, 'auditLogs', `audit_adjust_${ctx.targetRound.id}_${ctx.studentId}_${Date.now()}`);
+          await rawSet(auditRef, {
+            action: 'ADJUST_COUNCIL_SCORE',
+            studentId: ctx.studentId,
+            studentName: ctx.studentName,
+            roundId: ctx.targetRound.id,
+            councilId: ctx.council.id,
+            councilName: ctx.council.name,
+            phase: ctx.phase || 1,
+            oldLetter: ctx.letterGrade || '--',
+            oldScore: ctx.numericScore,
+            oldVerdict: ctx.isPassed ? 'passed' : 'failed',
+            newLetter: letter,
+            newScore: newScore,
+            newVerdict: newVerdict,
+            basis: basis,
+            reason: reason,
+            performedBy: currentUserEmail,
+            timestamp: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : adjustTimestamp
+          });
+        }
+      } catch (auditErr) {
+        console.warn('[AdjustScore] Non-blocking audit error:', auditErr.message);
+      }
+    }
+
+    closeAdjustCouncilScoreModal();
+    openCouncilScoreDetailModal(ctx.studentId, ctx.phase || 1);
+    renderAdminProgressReviewTable(ctx.phase || 1);
+
+    if (typeof showToast === 'function') {
+      showToast(`✓ Đã điều chỉnh điểm của sinh viên ${ctx.studentId} thành ${letter} (${newScore.toFixed(1)}).`, 'success');
+    }
+  } catch (err) {
+    console.error('[AdjustScore] Error:', err);
+    if (typeof showToast === 'function') showToast(`Lỗi điều chỉnh điểm: ${err.message}`, 'error');
+  } finally {
+    if (btnConfirm) {
+      btnConfirm.disabled = false;
+      btnConfirm.innerHTML = '<span>✏️</span> <span>Xác nhận Điều chỉnh</span>';
+    }
+  }
 }
 
 if (typeof window !== 'undefined') {
@@ -787,6 +1305,17 @@ if (typeof window !== 'undefined') {
   window.closeCouncilScoreDetailModal = closeCouncilScoreDetailModal;
   window.findProgressReviewActivity = findProgressReviewActivity;
   window.getProgressReviewData = getProgressReviewData;
+
+  // Revoke & Adjust bindings (Nhóm E)
+  window.openRevokeProgressReviewModal = openRevokeProgressReviewModal;
+  window.closeRevokeProgressReviewModal = closeRevokeProgressReviewModal;
+  window.onRevokeReasonInputChanged = onRevokeReasonInputChanged;
+  window.confirmRevokeProgressReview = confirmRevokeProgressReview;
+  window.openAdjustCouncilScoreModal = openAdjustCouncilScoreModal;
+  window.closeAdjustCouncilScoreModal = closeAdjustCouncilScoreModal;
+  window.onAdjustScoreLetterChanged = onAdjustScoreLetterChanged;
+  window.onAdjustScoreInputChanged = onAdjustScoreInputChanged;
+  window.confirmAdjustCouncilScore = confirmAdjustCouncilScore;
 }
 
 window.renderAdminProgressReviewTable = function(phase) {
@@ -956,7 +1485,7 @@ window.loadAdminScoringDashboard = async function(targetRoundId, targetTab = 'du
   }
   const sel = document.getElementById('admin-scoring-round-select');
   if (sel) {
-    sel.innerHTML = (state.rounds || []).map(r => 
+    sel.innerHTML = (state.rounds || []).map(r =>
       `<option value="${r.id}" ${r.id === state.selectedRoundId ? 'selected' : ''}>${r.title || r.code || r.id}</option>`
     ).join('');
     if (state.selectedRoundId) sel.value = state.selectedRoundId;

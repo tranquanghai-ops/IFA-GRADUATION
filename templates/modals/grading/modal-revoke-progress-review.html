@@ -1,0 +1,65 @@
+<!-- Modal: Thu hồi công bố điểm Duyệt tiến độ (E1) -->
+<div id="modal-revoke-progress-review" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity" role="dialog" aria-modal="true" aria-labelledby="revoke-review-title">
+  <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100">
+    <!-- Header -->
+    <div class="flex items-start justify-between border-b border-slate-100 pb-4">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl select-none leading-none">↩️</span>
+          <h3 id="revoke-review-title" class="text-base sm:text-lg font-black text-rose-950 tracking-tight">
+            Thu hồi Công bố Điểm
+          </h3>
+          <span id="revoke-review-phase-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+            Duyệt đợt 1
+          </span>
+        </div>
+        <p id="revoke-review-subtitle" class="text-xs text-slate-500 font-medium pl-8">
+          Đang tải thông tin đợt…
+        </p>
+      </div>
+      <button type="button" onclick="closeRevokeProgressReviewModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors text-lg leading-none cursor-pointer" aria-label="Đóng modal">
+        ✕
+      </button>
+    </div>
+
+    <!-- Warning Alert -->
+    <div class="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs space-y-1.5 text-rose-900">
+      <div class="font-bold flex items-center gap-1.5">
+        <span>⚠️</span> <span>Cảnh báo quan trọng:</span>
+      </div>
+      <p class="leading-relaxed text-[11px] text-rose-800">
+        Khi thu hồi công bố, <b>Sinh viên</b> và <b>Giảng viên hướng dẫn</b> sẽ <b>không còn quyền xem</b> kết quả đánh giá của mốc duyệt này. Toàn bộ điểm chữ và kết luận Đạt/Không đạt sẽ bị ẩn đi cho đến khi Quản trị viên tiến hành công bố lại.
+      </p>
+      <div class="text-[10px] text-rose-700/80 pt-1 border-t border-rose-200/60 flex items-center justify-between">
+        <span>Thời gian công bố: <b id="revoke-review-published-at">--</b></span>
+        <span>Người công bố: <b id="revoke-review-published-by">--</b></span>
+      </div>
+    </div>
+
+    <!-- Mandatory Reason Input -->
+    <div class="space-y-1.5">
+      <label for="revoke-publish-reason" class="text-xs font-bold text-slate-800 block">
+        Lý do thu hồi công bố <span class="text-rose-500">*</span>
+      </label>
+      <textarea id="revoke-publish-reason" rows="3" oninput="onRevokeReasonInputChanged()" placeholder="Nhập lý do thu hồi bắt buộc (ví dụ: Cần đối soát và điều chỉnh lại điểm theo biên bản họp Hội đồng)..." class="w-full text-xs p-3 rounded-xl border border-slate-300 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none transition-all placeholder:text-slate-400"></textarea>
+    </div>
+
+    <!-- Confirmation Checkbox -->
+    <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-start gap-2.5">
+      <input type="checkbox" id="chk-confirm-revoke-publish" onchange="onRevokeReasonInputChanged()" class="mt-0.5 w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer">
+      <label for="chk-confirm-revoke-publish" class="text-xs text-slate-700 select-none cursor-pointer">
+        Tôi xác nhận thu hồi công bố kết quả mốc duyệt này. Thao tác này sẽ được ghi vào nhật ký kiểm toán hệ thống.
+      </label>
+    </div>
+
+    <!-- Footer Actions -->
+    <div class="flex items-center justify-end gap-2.5 border-t border-slate-100 pt-3">
+      <button type="button" onclick="closeRevokeProgressReviewModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all cursor-pointer">
+        Hủy bỏ
+      </button>
+      <button type="button" id="btn-confirm-revoke-publish" onclick="confirmRevokeProgressReview()" disabled class="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer">
+        <span>↩️</span> <span>Xác nhận Thu hồi</span>
+      </button>
+    </div>
+  </div>
+</div>

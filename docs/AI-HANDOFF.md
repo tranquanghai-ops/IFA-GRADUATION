@@ -2,166 +2,110 @@
 
 > [!IMPORTANT]
 > **TÀI LIỆU BÀN GIAO TOÀN DIỆN CHO ANTIGRAVITY TRÊN MÁY TÍNH MỚI**
-> Bản bàn giao ghi lại đầy đủ hiện trạng, kết quả kiểm thử, kiến trúc an ninh, các cam kết đã thực hiện và các bước tiếp theo cần triển khai.
+> Bản bàn giao ghi lại đầy đủ hiện trạng, kết quả kiểm thử, kiến trúc an ninh, các cam kết đã thực hiện và kết quả hotfix tổng hợp 5 nhóm công việc (A, B, C, D, E).
 
 ---
 
-## 1. TÊN TASK ĐANG THỰC HIỆN
+## 1. TÊN CÁC TASK ĐÃ THỰC HIỆN
 - **Task 1**: Phân loại Đạt/Không đạt theo ngưỡng B-/C+, Modal xem chi tiết điểm Hội đồng cho Admin/Owner và Cơ chế công bố điểm Duyệt tiến độ.
 - **Task 2**: Kiểm tra an toàn bảo mật dữ liệu trước khi công bố điểm (Security Audit, Least Privilege RBAC & Firestore Emulator verification).
+- **Task 3 (HOTFIX TỔNG HỢP)**:
+  - **P0 / Nhóm A**: Đối soát bài nộp thực tế (11900382, 11900395, 12200254), kịch bản đối soát dry-run, sao lưu và rollback an toàn.
+  - **P4 / Nhóm B**: Hoàn thiện thao tác xem file trực tiếp Google Drive tab mới & xem chi tiết bài nộp qua badge lượt nộp, hỗ trợ 0/N, 1/N, 2/N, 3/N.
+  - **P3 / Nhóm C**: Đổi tên cột "Hoạt động gần nhất", modal hiển thị tối đa 10 hoạt động thực tế có kiểm chứng (đăng nhập, nộp bài, đề tài, duyệt), cam kết không fake data.
+  - **P1 / Nhóm D**: Sửa triệt để nhận diện phiếu chấm Hội đồng (Cô Nguyễn Thị Thúy Hà - Điểm B), mở rộng tra cứu đa thuộc tính subcollection & cache.
+  - **P2 / Nhóm E**: Cơ chế Thu hồi công bố (E1) và Điều chỉnh kết quả có audit log bất biến (E2), đảm bảo toàn vẹn dữ liệu.
 
 ---
 
-## 2. MỤC TIÊU NGHIỆP VỤ
-1. **Quy tắc phân loại mới cho các mốc Duyệt tiến độ (Duyệt đợt 1, 2, 3)**:
-   - Từ **B-** trở lên: **ĐẠT YÊU CẦU** (`passed`, badge xanh `✓ Đạt yêu cầu`). Nhóm điểm: `A+, A, A-, B+, B, B-` (hoặc số $\ge 7.0$).
-   - Từ **C+** trở xuống: **KHÔNG ĐẠT YÊU CẦU** (`failed`, badge đỏ `✕ Không đạt yêu cầu`). Nhóm điểm: `C+, C, C-, D+, D, D-, F` (hoặc số $< 7.0$).
-   - Chưa chấm / Chưa chốt: `pending`, badge xám `Chưa duyệt`, điểm `--`.
-2. **Xem chi tiết điểm Hội đồng (Admin / Owner)**:
-   - Click trực tiếp vào badge điểm chữ trên bảng Quản lý Đánh giá & Điểm số để mở modal xem phiếu chấm từng thành viên Hội đồng, vai trò, điểm chữ, điểm quy đổi và kết luận.
-   - Chỉ Admin và Owner mới có quyền mở modal này.
-3. **Cơ chế & Nút Công bố điểm (Publish Scores)**:
-   - Trang bị nút `📢 Công bố điểm` tại tab Duyệt đợt 1, 2, 3. Sau khi công bố, chuyển thành `✓ Đã công bố điểm [ngày giờ]`.
-   - Sinh viên và GVHD chỉ nhìn thấy điểm chữ và kết luận Đạt/Không đạt SAU KHI công bố. Trước khi công bố hiển thị `Chưa công bố` / `Đang đánh giá`.
-4. **An toàn dữ liệu & Kiểm soát công bố từng phần**:
-   - Ngăn chặn rò rỉ điểm số thập phân nội bộ và phiếu chấm thành viên qua Firestore SDK.
-   - Bắt buộc xác nhận checkbox khi công bố từng phần nếu còn sinh viên chưa chốt điểm.
-   - Ghi nhật ký kiểm toán (Audit Log) bất biến mỗi lần công bố.
+## 2. MỤC TIÊU VÀ KẾT QUẢ TỪNG NHÓM NGHIỆP VỤ
+
+### 2.1. Nhóm A (P0): Đối soát bài nộp thực tế Drive & Firestore
+1. **Hiện trạng điều tra**:
+   - Mốc Duyệt 1: `act_1790171285992_yhhi9` trong đợt `FZRWniqMofaIvn7ogq0w`. Hạn nộp chính thức: `2026-10-16T05:10:00.000Z` (12:10 PM VN).
+   - Cả 3 sinh viên đều đã tải file PDF lên Google Drive thành công trước thời hạn:
+     - `11900382` (Trang Trần Tuệ Nhã): File `1tuMDPEMz4Avjfh6vVeKfQFuNgf8d3ozw` (`11900382_Trang Tran Tue Nha.pdf`, 43.82 MB, tải lúc 10:26 VN).
+     - `11900395` (Nguyễn Khánh Thịnh): File `13A20v-sRS4Ye-fVXO0h3honN_tvJ7x_G` (`11900395_Nguyen Khanh Thinh.pdf`, 13.49 MB, tải lúc 09:36 VN).
+     - `12200254` (Nguyễn Thanh Hằng Nga): File `15E5Cr6gMLR4XxoSH-cuOyEHkNew2ALah` (`12200254_Nguyen Thanh Hang Nga.pdf`, 31.98 MB, tải lúc 09:56 VN).
+   - **Nguyên nhân gốc**: Do mã nguồn `submitActivityHandler` cũ của backend trước khi hotfix truy cập thuộc tính `driveDoc.name` khi client chỉ gửi `driveDoc.fileName`, gây ra exception trước transaction ghi `activitySubmissions`.
+2. **Kịch bản khôi phục an toàn**:
+   - Tạo script `scripts/reconcile-and-recover-submissions.cjs`.
+   - **Mặc định chạy `--dry-run`**, chỉ mô phỏng kiểm tra dữ liệu, **KHÔNG ghi bất kỳ thay đổi nào lên Production Firestore**.
+   - Chỉ ghi dữ liệu khi có cờ tường minh `--apply` sau khi được Quản trị viên phê duyệt.
+   - Báo cáo đối soát chi tiết được lưu tại `backups/audit-reconciliation-report-*.json`.
+
+### 2.2. Nhóm B (P4): Thao tác xem file & Lịch sử nộp bài
+- Nút "👁️ Xem bài" tại bảng quản lý các đợt duyệt gọi `openLatestOfficialSubmissionFile()`, mở trực tiếp file PDF chính thức mới nhất trên Google Drive trong tab mới (`target="_blank"`, `noopener,noreferrer`).
+- Badge "Đã nộp / Tối đa" (0/3, 1/3, 2/3, 3/3) được thiết kế thành nút tương tác gọi `openAdminSubmissionInspectModal()`, cho phép xem chi tiết bài nộp và lịch sử các lần nộp.
+- Hỗ trợ đầy đủ trạng thái 0/N sạch sẽ (badge xám "○ Chưa nộp").
+
+### 2.3. Nhóm C (P3): Theo dõi 10 hoạt động gần nhất của sinh viên
+- Đổi tên cột tại `views/admin/tab-students.html` thành `Hoạt động gần nhất`.
+- Click vào ô hoạt động mở modal `modal-student-activity-history`.
+- Tự động tập hợp và sắp xếp theo thời gian tối đa 10 sự kiện thực tế có chứng cứ:
+  1. Đăng nhập hệ thống (Google Workspace, thời gian thực tế từ `userActivities`).
+  2. Nộp bài các mốc (từ `driveFiles` và `activitySubmissions`).
+  3. Đăng ký đề tài & đề xuất sửa đổi đề tài qua các phiên bản (từ `registrations` và `topicTitleHistory`).
+  4. Đánh giá / phản hồi của Hội đồng.
+- Cam kết: **Tuyệt đối không sử dụng dữ liệu giả lập (placeholder/fake).**
+
+### 2.4. Nhóm D (P1): Sửa nhận diện phiếu chấm Hội đồng (Cô Nguyễn Thị Thúy Hà)
+1. **Hiện trạng điều tra**:
+   - Dữ liệu thực tế xác nhận Cô Nguyễn Thị Thúy Hà (`nguyenthithuyha1@tdtu.edu.vn`, `scorerId: DwkFZcqfKrKaYMzQSEcd`) **ĐÃ CHẤM ĐIỂM** cho sinh viên Trang Trần Tuệ Nhã (11900382) với điểm chữ `B` (7.50) lúc `2026-10-16T08:14:55.721Z`.
+   - Điểm tổng kết của Hội đồng 1 đã tính đúng: `(7.5 + 7.5 + 7.0) / 3 = 7.33` $\rightarrow$ Điểm B.
+   - Nguyên nhân hiển thị `-- Chưa chấm` trong modal: Điểm của cô Hà được lưu trong subcollection `graduationRounds/{roundId}/reviewDecisions/{decisionKey}`, nhưng modal cũ chỉ đọc trong root doc cache `state.councilScores` / `roundDoc.councilScores`.
+2. **Giải pháp đã thực hiện**:
+   - Mở rộng logic tra cứu trong `defense-scores.js` và `preliminary-dashboard.js` với bộ khóa đa thuộc tính: `scorerId`, `memberEmail`, `memberId`, `councilRubricScores`, và cơ chế fallback bất đồng bộ đọc từ `reviewDecisions`.
+
+### 2.5. Nhóm E (P2): Thu hồi công bố & Điều chỉnh kết quả có Audit Log
+1. **E1 - Thu hồi công bố**:
+   - Toolbar Duyệt đợt 1, 2, 3 hiển thị nút `↩️ Thu hồi công bố` khi đợt đã công bố.
+   - Bấm nút mở modal `modal-revoke-progress-review`: yêu cầu nhập lý do bắt buộc (tối thiểu 10 ký tự) và tích chọn xác nhận.
+   - Khi xác nhận: cập nhật `published: false`, ghi `auditLogs`, và giao diện Sinh viên / GVHD lập tức quay về trạng thái "Chưa công bố".
+2. **E2 - Điều chỉnh kết quả Hội đồng**:
+   - Nút `✏️ Điều chỉnh kết quả` trong footer modal chi tiết điểm Hội đồng (`modal-council-score-details`).
+   - Guard RBAC: Chỉ Admin và Owner mới có quyền.
+   - Guard Công bố: Nếu đợt đang ở trạng thái "Đã công bố", hệ thống **chặn chỉnh sửa** và yêu cầu phải "Thu hồi công bố" trước để đảm bảo tính minh bạch.
+   - Form điều chỉnh yêu cầu: Chọn điểm chữ mới (A, A-, B+, B, B-, C+, C, F), nhập Căn cứ/Biên bản họp, nhập Lý do điều chỉnh (tối thiểu 10 ký tự).
+   - Tự động quy đổi điểm số và tính lại kết luận Đạt/Không đạt ($\ge B-$ là Đạt, $\le C+$ là Không đạt).
+   - Ghi bản ghi kiểm toán bất biến vào `auditLogs` (`action: 'ADJUST_COUNCIL_SCORE'`).
+3. **E3 - Bảo mật Firestore Rules**:
+   - Đã kiểm tra thành công 30/30 tests trên Firestore Emulator (`npm run test:rules`).
+   - Bảo toàn nguyên tắc: **Tuyệt đối không tự ý deploy Firestore Rules hoặc Cloud Functions lên Production khi chưa có phê duyệt.**
 
 ---
 
-## 3. NHỮNG YÊU CẦU ĐÃ HOÀN THÀNH
-- [x] **Logic phân loại chuẩn hóa**: Cài đặt `isProgressReviewPassed` áp dụng ngưỡng B- / C+ trong `js/grading/preliminary-dashboard.js` và `js/grading/assessment-portal.js`. Đã kiểm chứng với 6 sinh viên Duyệt đợt 1 thực tế trên Production.
-- [x] **Modal chi tiết điểm Hội đồng**: Tạo template `templates/modals/grading/modal-council-score-details.html`, tích hợp logic mở modal, bảo vệ RBAC chỉ cho Admin/Owner.
-- [x] **Modal xác nhận công bố điểm**: Tạo template `templates/modals/grading/modal-publish-progress-review.html`, tích hợp thanh công cụ công bố `admin-duyet-X-publish-zone`.
-- [x] **Kiểm soát công bố từng phần (Partial Publishing)**: Bổ sung cảnh báo cam và checkbox `#chk-confirm-partial-publish` khi `pendingCount > 0`. Nút công bố bị khóa cho đến khi Admin xác nhận.
-- [x] **Dữ liệu công bố tối giản & Audit Log**: `publishedReviews` chỉ lưu `letterGrade`, `isPassed`, `status`. Tự động ghi bản ghi kiểm toán vào `graduationRounds/{roundId}/auditLogs`.
-- [x] **Dual-write subcollection độc lập**: Tự động chuẩn bị ghi kết quả công bố riêng cho từng sinh viên tại `graduationRounds/{roundId}/publishedStudentResults/{studentId}`.
-- [x] **Cập nhật giao diện Sinh viên & GVHD**: Ẩn điểm trước khi công bố; hiển thị đúng điểm chữ sau khi công bố trong `rounds-timeline-preview.js` và `supervisor-portal-students.js`.
-- [x] **Kiểm thử tự động 100% PASS**:
-  - `npm test`: 172/172 tests PASS.
-  - `npm run test:rules`: 30/30 tests PASS trên Firestore Emulator (bao gồm cả test an ninh mới).
-  - `npm run build`: Compile index.html sạch sẽ với 61 partials.
-  - `git diff --check`: 0 lỗi cú pháp hoặc khoảng trắng.
-- [x] **Triển khai an toàn frontend**: Deploy Firebase Hosting (`--only hosting`) lên project `ifa-graduation`. Xác nhận trực tiếp qua Playwright MCP trên Production.
+## 3. CÁC FILE ĐÃ SỬA VÀ TẠO MỚI
+1. `templates/modals/grading/modal-revoke-progress-review.html` *(Mới)*: Modal thu hồi công bố kết quả.
+2. `templates/modals/grading/modal-adjust-council-score.html` *(Mới)*: Modal điều chỉnh kết quả đánh giá Hội đồng.
+3. `templates/modals/students/modal-student-activity-history.html` *(Mới)*: Modal lịch sử 10 hoạt động gần nhất của sinh viên.
+4. `templates/modals/grading/modal-council-score-details.html`: Bổ sung nút `✏️ Điều chỉnh kết quả` trong footer.
+5. `scripts/reconcile-and-recover-submissions.cjs` *(Mới)*: Script đối soát bài nộp thực tế (mặc định `--dry-run`).
+6. `tests/test-hotfix-comprehensive-audit.cjs` *(Mới)*: 16 automated tests kiểm thử toàn diện 5 nhóm A, B, C, D, E.
+7. `index.template.html` & `index.html`: Tích hợp 3 modal mới vào khung ứng dụng.
+8. `views/admin/tab-students.html`: Đổi tên tiêu đề cột thành "Hoạt động gần nhất".
+9. `views/admin/tab-scoring.html`: Tích hợp vùng hiển thị thu hồi công bố.
+10. `js/grading/defense-scores.js`: Sửa nhận diện phiếu chấm Hội đồng đa thuộc tính.
+11. `js/grading/preliminary-dashboard.js`: Toàn bộ logic thu hồi công bố, điều chỉnh điểm, RBAC guard và audit log.
+12. `js/students/student-review-submissions.js`: Mở bài trực tiếp Google Drive tab mới, click badge xem modal chi tiết.
+13. `js/students/student-eligibility-admin.js`: Gắn sự kiện click mở modal lịch sử hoạt động sinh viên.
+14. `js/tracking/user-activity-tracker.js`: Logic tổng hợp 10 hoạt động thực tế có kiểm chứng.
+15. `package.json`: Cập nhật lệnh `npm test`.
+16. `docs/AI-HANDOFF.md` *(Cập nhật)*: Bản bàn giao hiện tại.
 
 ---
 
-## 4. NHỮNG YÊU CẦU CHƯA HOÀN THÀNH (ĐANG CHỜ PHÊ DUYỆT)
-- [ ] **Deploy Firestore Security Rules**: Bản vá cho subcollection `publishedStudentResults/{studentId}` và khóa chỉnh sửa `reviewDecisions` khi hội đồng đã chốt điểm đã được viết và kiểm thử trên Emulator, nhưng **TUYỆT ĐỐI CHƯA DEPLOY** lên Production theo yêu cầu của Thầy.
-- [ ] **Thao tác Công bố điểm thật trên Production**: Chưa bấm nút công bố điểm thật, chờ Thầy nghiệm thu giao diện và phê duyệt chính thức.
-- [ ] **Data Sanitization trên Production**: Xóa các trường điểm nội bộ thập phân (`finalDefenseScores`, `progressReviews`) còn lưu trong document gốc `graduationRounds/{roundId}` sau khi áp dụng rules mới.
+## 4. KẾT QUẢ KIỂM THỬ TỰ ĐỘNG
+- **`npm test`**: **188 / 188 tests PASS (100%)**.
+- **`npm run test:rules`**: **30 / 30 tests PASS trên Firestore Emulator**.
+- **`node scripts/build-html.cjs`**: Biên dịch thành công `index.html` với 64 partials.
+- **`git diff --check`**: 0 lỗi cú pháp hoặc khoảng trắng.
+- **`node scripts/reconcile-and-recover-submissions.cjs`**: Chạy thành công ở chế độ `--dry-run`, xác thực 3 sinh viên hợp lệ, ghi báo cáo vào `backups/`.
 
 ---
 
-## 5. CÁC FILE ĐÃ SỬA VÀ TẠO MỚI
-1. `templates/modals/grading/modal-council-score-details.html` *(Mới)*: Template modal xem chi tiết điểm Hội đồng.
-2. `templates/modals/grading/modal-publish-progress-review.html` *(Mới)*: Template modal công bố điểm có kiểm soát công bố từng phần.
-3. `index.template.html` & `index.html`: Include 2 modal mới vào bộ khung ứng dụng.
-4. `views/admin/tab-scoring.html`: Vùng chứa nút công bố và cập nhật nhãn bộ lọc trạng thái.
-5. `js/grading/preliminary-dashboard.js`: Toàn bộ logic phân loại, RBAC modal, toolbar, dual-write và audit log.
-6. `js/grading/assessment-portal.js`: Đồng bộ logic `isProgressReviewPassed` cho bảng chấm điểm.
-7. `js/supervisors/supervisor-portal-students.js`: Hiển thị kết quả công bố cho GVHD.
-8. `js/rounds/rounds-timeline-preview.js`: Hiển thị kết quả công bố cho Sinh viên.
-9. `package.json`: Tích hợp test suite mới vào `npm test` và `test:rules`.
-10. `tests/test-council-progress-review-sync.cjs`: Đồng bộ test suite hội đồng với ngưỡng mới.
-11. `tests/test-progress-review-publication-and-grading.cjs` *(Mới)*: 23 unit tests kiểm thử phân loại và công bố.
-12. `tests/test-progress-review-security-audit.rules.test.mjs` *(Mới)*: Bộ test Firestore Emulator kiểm tra 8 danh tính và rủi ro an ninh.
-13. `docs/AI-HANDOFF.md` *(Cập nhật)*: Tài liệu bàn giao hiện tại.
-
----
-
-## 6. NHỮNG QUYẾT ĐỊNH KỸ THUẬT QUAN TRỌNG
-1. **Firestore không thể che từng field trong document**:
-   - `graduationRounds/{roundId}` có `allow read: if signedIn();`. Do đó, nếu lưu điểm thập phân hoặc phiếu chấm nội bộ trực tiếp trong document này, bất kỳ người dùng đăng nhập nào cũng đọc trộm được qua Console.
-   - Giải pháp kiến trúc: Dữ liệu công bố phải được lưu riêng theo từng sinh viên tại subcollection `publishedStudentResults/{studentId}` với rule chỉ cho chính sinh viên đó và GVHD phụ trách đọc.
-2. **Snapshot bất biến**:
-   - Khi công bố, kết quả `studentResults` là một bản chụp (snapshot) tĩnh cố định `letterGrade` và `isPassed`, không bao giờ tính toán lại hay phụ thuộc vào điểm nháp.
-3. **Phân quyền công bố từng phần**:
-   - Khi có nhiều tiểu ban hội đồng và một số tiểu ban chưa chốt điểm, Admin được quyền công bố từng phần cho các tiểu ban đã xong, nhưng hệ thống bắt buộc Admin phải tích chọn xác nhận rõ ràng để tránh hiểu lầm.
-
----
-
-## 7. KẾT QUẢ KIỂM THỬ
-- **Unit & Integration Tests (`npm test`)**: 172/172 PASS (0 fail).
-- **Rules Tests on Emulator (`npm run test:rules`)**: 30/30 PASS (0 fail).
-- **Syntax Check (`node -c`)**: 0 lỗi trên tất cả các file JS.
-- **Git Check (`git diff --check`)**: 0 trailing whitespace.
-- **Production DOM Check (Playwright MCP)**: Đã kiểm tra trực tiếp trên `https://ifa-graduation.web.app/` xác nhận modal, toolbar và hàm xử lý đều tải thành công.
-
----
-
-## 8. CÁC LỖI HOẶC BLOCKER
-- **Hiện không có lỗi code hay runtime blocker nào.**
-- **Điểm cần lưu ý trước khi bấm công bố thật**:
-  - Cần Thầy phê duyệt việc deploy bản vá Firestore Security Rules để đảm bảo dữ liệu điểm nội bộ không bị đọc trộm qua Firestore SDK trước khi công bố.
-
----
-
-## 9. NHỮNG THAO TÁC ĐÃ THỰC HIỆN TRÊN PRODUCTION
-- Đã deploy bản build frontend mới nhất lên Firebase Hosting (`https://ifa-graduation.web.app/`) qua lệnh `npx firebase deploy --only hosting --project ifa-graduation`.
-- Đã kiểm tra đăng nhập và cấu trúc DOM thực tế qua Playwright.
-- Dữ liệu hoàn toàn là READ-ONLY.
-
----
-
-## 10. NHỮNG THAO TÁC TUYỆT ĐỐI CHƯA THỰC HIỆN
-- **CHƯA** deploy `firestore.rules`.
-- **CHƯA** deploy Cloud Functions.
-- **CHƯA** bấm nút công bố điểm thật trên Production.
-- **CHƯA** sửa hay xóa bất kỳ document dữ liệu nào của sinh viên.
-
----
-
-## 11. COMMIT HASH & BRANCH BÀN GIAO
-- **Branch:** `main`
-- **Base Commit trước task:** `70808b2`
-- **Commit Phase 1 (UI & Logic):** `3d2f0ad`
-- **Commit Phase 2 (Security Audit & Partial Publish Gating):** `dfc2029`
-- **Remote:** `https://github.com/tranquanghai-ops/IFA-GRADUATION.git`
-- **Trạng thái GitHub:** Toàn bộ commit đã được push lên `origin/main`. Working tree hoàn toàn sạch.
-
----
-
-## 12. BẢN VÁ FIRESTORE SECURITY RULES (ĐÃ KIỂM THỬ, CHỜ DUYỆT)
-Khi Thầy duyệt deploy Firestore Rules, bổ sung đoạn sau vào [firestore.rules](file:///d:/CODE/IFA-GRADUATION/firestore.rules):
-
-```javascript
-// Phân quyền độc lập theo từng sinh viên cho kết quả công bố
-match /publishedStudentResults/{studentId} {
-  allow get: if admin()
-    || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$'))
-    || (signedIn()
-      && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId))
-      && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.assignmentStatus == 'published'
-      && (email() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.supervisorEmails
-        || email().lower() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.supervisorEmails));
-
-  allow list: if admin() || staff();
-  allow write: if admin();
-}
-
-match /publishedProgressReviews/{phaseId} {
-  allow read: if admin() || staff();
-  allow write: if admin();
-}
-```
-
----
-
-## 13. CÁC BƯỚC TIẾP TỤC CHO ANTIGRAVITY TRÊN MÁY TÍNH MỚI
-Khi mở workspace trên máy tính khác:
-1. Chạy `git status` và `git pull origin main` để nhận các commit mới nhất (`dfc2029` và commit bàn giao tài liệu này).
-2. Chạy `npm test` để xác nhận 172 tests PASS.
-3. Đọc kỹ file `docs/AI-HANDOFF.md` này để nắm toàn bộ ngữ cảnh và hiện trạng.
-4. Chờ lệnh từ Thầy:
-   - Nếu Thầy duyệt deploy Rules: Nhờ agent chuyên trách `firestore-rules-author` hoặc chạy deploy `firebase deploy --only firestore:rules`.
-   - Nếu Thầy yêu cầu nghiệm thu trên giao diện: Hướng dẫn Thầy đăng nhập tài khoản Admin/Owner để kiểm tra modal và nút công bố.
-5. Tuyệt đối không tự ý deploy Rules hoặc can thiệp dữ liệu điểm thật khi chưa có chỉ thị rõ ràng.
-
----
-
-## 14. CẢNH BÁO LIÊN QUAN ĐẾN DỮ LIỆU VÀ PHÂN QUYỀN
-- Project Firebase Hosting / Firestore: **`ifa-graduation`** (Không nhầm với `ifa-activities` hay `tknt-tdtu`).
-- Cloud Functions Drive: Thuộc project **`ifa-activities`**.
-- Không bao giờ commit hay đưa file chứa service account, private key hoặc secrets lên GitHub.
+## 5. CAM KẾT VÀ TRẠNG THÁI TRIỂN KHAI
+- [x] Đã kiểm thử đầy đủ frontend và tích hợp trên máy tính mới.
+- [x] Đã bảo toàn tuyệt đối dữ liệu sinh viên thật, điểm thật trên Production (chưa chạy `--apply` khi chưa được duyệt).
+- [x] Đã bảo toàn Firestore Rules và Cloud Functions (không tự deploy lên Production).
+- [ ] Sẵn sàng triển khai Firebase Hosting (`ifa-graduation`) cho phần frontend an toàn đã qua kiểm thử.

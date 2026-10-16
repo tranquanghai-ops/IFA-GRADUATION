@@ -1,0 +1,126 @@
+<!-- ============================================================================
+     MODAL: ĐIỀU CHỈNH KẾT QUẢ ĐÁNH GIÁ HỘI ĐỒNG (ADMIN & OWNER ONLY - NHÓM E2)
+     ============================================================================ -->
+<div id="modal-adjust-council-score" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity" role="dialog" aria-modal="true" aria-labelledby="adjust-council-score-title">
+  <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100 max-h-[92vh] flex flex-col">
+    <!-- Header -->
+    <div class="flex items-start justify-between border-b border-slate-100 pb-4 shrink-0">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl select-none leading-none">✏️</span>
+          <h3 id="adjust-council-score-title" class="text-base sm:text-lg font-black text-amber-950 tracking-tight">
+            Điều chỉnh Kết quả Đánh giá Hội đồng
+          </h3>
+          <span id="adjust-score-phase-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+            Duyệt đợt 1
+          </span>
+        </div>
+        <p id="adjust-score-subtitle" class="text-xs text-slate-500 font-medium pl-8">
+          Đang tải thông tin…
+        </p>
+      </div>
+      <button type="button" onclick="closeAdjustCouncilScoreModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors text-lg leading-none cursor-pointer" aria-label="Đóng modal">
+        ✕
+      </button>
+    </div>
+
+    <!-- Body Scrollable -->
+    <div class="space-y-4 overflow-y-auto flex-1 min-h-0 pr-1 text-xs text-slate-700">
+      <!-- Published Guard Alert (shown if round is published) -->
+      <div id="adjust-score-published-warning" class="hidden p-3.5 bg-rose-50 border border-rose-300 rounded-2xl text-xs space-y-1.5 text-rose-900">
+        <div class="font-bold flex items-center gap-1.5 text-rose-800">
+          <span>🚫</span> <span>Không thể điều chỉnh điểm khi đợt đã công bố</span>
+        </div>
+        <p class="text-[11px] leading-relaxed text-rose-700">
+          Kết quả của mốc duyệt này hiện đang ở trạng thái <b>ĐÃ CÔNG BỐ</b> cho sinh viên và GVHD. Để tránh xung đột dữ liệu, bạn cần <b>Thu hồi công bố</b> mốc duyệt trước khi thực hiện điều chỉnh điểm.
+        </p>
+      </div>
+
+      <!-- Current Evaluation Card -->
+      <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <span class="text-slate-400 block text-[10px] uppercase font-bold">Sinh viên:</span>
+            <span id="adjust-score-student-info" class="font-bold text-slate-900">--</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px] uppercase font-bold">Hội đồng:</span>
+            <span id="adjust-score-council-info" class="font-bold text-slate-900">--</span>
+          </div>
+        </div>
+        <div class="pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px]">
+          <div>
+            <span class="text-slate-400 block text-[10px] uppercase font-bold">Điểm hiện tại:</span>
+            <div class="flex items-center gap-1.5 font-bold mt-0.5">
+              <span id="adjust-score-current-letter" class="text-sm font-mono font-black text-purple-900">--</span>
+              <span id="adjust-score-current-num" class="text-slate-500 font-mono">(--)</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-slate-400 block text-[10px] uppercase font-bold">Kết luận hiện tại:</span>
+            <div id="adjust-score-current-verdict" class="mt-0.5">--</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Adjustment Form Inputs -->
+      <div id="adjust-score-form-fields" class="space-y-3.5">
+        <!-- New Grade Selection -->
+        <div class="space-y-1.5">
+          <label for="adjust-score-new-letter" class="text-xs font-bold text-slate-800 block">
+            Điểm chữ sau điều chỉnh <span class="text-rose-500">*</span>
+          </label>
+          <select id="adjust-score-new-letter" onchange="onAdjustScoreLetterChanged()" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all font-bold">
+            <option value="">-- Chọn mức điểm chữ --</option>
+            <option value="A">A (Xuất sắc / 9.0)</option>
+            <option value="A-">A- (Giỏi / 8.2)</option>
+            <option value="B+">B+ (Khá giỏi / 7.7)</option>
+            <option value="B">B (Khá / 7.2)</option>
+            <option value="B-">B- (Trung bình khá - Ngưỡng Đạt tối thiểu / 6.7)</option>
+            <option value="C+">C+ (Trung bình - Không đạt / 6.2)</option>
+            <option value="C">C (Trung bình yếu - Không đạt / 5.7)</option>
+            <option value="F">F (Kém - Không đạt / 0.0)</option>
+          </select>
+          <div id="adjust-score-new-preview" class="hidden text-[11px] p-2 bg-amber-50 rounded-lg border border-amber-200/80 text-amber-900 flex items-center justify-between font-medium">
+            <span>Điểm quy đổi: <b id="adjust-score-preview-num" class="font-mono">--</b></span>
+            <span>Kết luận mới: <b id="adjust-score-preview-verdict">--</b></span>
+          </div>
+        </div>
+
+        <!-- Legal Basis / Minutes -->
+        <div class="space-y-1.5">
+          <label for="adjust-score-basis" class="text-xs font-bold text-slate-800 block">
+            Căn cứ / Số biên bản họp Hội đồng <span class="text-rose-500">*</span>
+          </label>
+          <input type="text" id="adjust-score-basis" oninput="onAdjustScoreInputChanged()" placeholder="Ví dụ: Biên bản họp đối soát Hội đồng số 01/BB-HĐ ngày 16/10/2026" class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all placeholder:text-slate-400">
+        </div>
+
+        <!-- Mandatory Reason -->
+        <div class="space-y-1.5">
+          <label for="adjust-score-reason" class="text-xs font-bold text-slate-800 block">
+            Lý do điều chỉnh kết quả <span class="text-rose-500">*</span> (Tối thiểu 10 ký tự)
+          </label>
+          <textarea id="adjust-score-reason" rows="3" oninput="onAdjustScoreInputChanged()" placeholder="Nhập lý do điều chỉnh cụ thể theo biên bản đối soát..." class="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all placeholder:text-slate-400"></textarea>
+        </div>
+
+        <!-- Confirmation Checkbox -->
+        <div class="p-3 bg-amber-50/70 rounded-xl border border-amber-200 flex items-start gap-2.5">
+          <input type="checkbox" id="chk-confirm-adjust-score" onchange="onAdjustScoreInputChanged()" class="mt-0.5 w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer">
+          <label for="chk-confirm-adjust-score" class="text-xs text-amber-950 select-none cursor-pointer">
+            Tôi xác nhận kết quả điều chỉnh này đã được Hội đồng chuyên môn thông qua và chịu trách nhiệm về thay đổi này trong nhật ký kiểm toán hệ thống.
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Actions -->
+    <div class="flex items-center justify-end gap-2.5 border-t border-slate-100 pt-3 shrink-0">
+      <button type="button" onclick="closeAdjustCouncilScoreModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all cursor-pointer">
+        Hủy bỏ
+      </button>
+      <button type="button" id="btn-confirm-adjust-score" onclick="confirmAdjustCouncilScore()" disabled class="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs shadow-md transition-all inline-flex items-center gap-1.5 cursor-pointer">
+        <span>✏️</span> <span>Xác nhận Điều chỉnh</span>
+      </button>
+    </div>
+  </div>
+</div>

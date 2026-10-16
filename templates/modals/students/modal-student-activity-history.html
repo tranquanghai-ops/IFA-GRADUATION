@@ -1,0 +1,54 @@
+<!-- Modal: Lịch sử hoạt động sinh viên (C2: Hiển thị tối đa 10 sự kiện gần nhất) -->
+<div id="modal-student-activity-history" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity" role="dialog" aria-modal="true" aria-labelledby="student-activity-history-title">
+  <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100 max-h-[90vh] flex flex-col">
+    <!-- Header -->
+    <div class="flex items-start justify-between border-b border-slate-100 pb-4 shrink-0">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl select-none leading-none">⏱️</span>
+          <h3 id="student-activity-history-title" class="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+            Lịch sử hoạt động sinh viên
+          </h3>
+          <span id="student-activity-history-count-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+            10 hoạt động gần nhất
+          </span>
+        </div>
+        <p id="student-activity-history-subtitle" class="text-xs text-slate-500 font-medium pl-8">
+          Đang tải thông tin sinh viên…
+        </p>
+      </div>
+      <button type="button" onclick="closeStudentActivityHistoryModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors text-lg leading-none cursor-pointer" aria-label="Đóng modal">
+        ✕
+      </button>
+    </div>
+
+    <!-- Student Info Pill -->
+    <div id="student-activity-history-info-card" class="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 shrink-0 text-xs flex flex-wrap items-center justify-between gap-2">
+      <div class="space-y-0.5">
+        <div class="flex items-center gap-2">
+          <span id="student-activity-info-name" class="font-bold text-slate-900">--</span>
+          <span id="student-activity-info-mssv" class="font-mono text-slate-500 font-semibold">--</span>
+        </div>
+        <div id="student-activity-info-class-major" class="text-[11px] text-slate-500">--</div>
+      </div>
+      <div id="student-activity-info-login-pill"></div>
+    </div>
+
+    <!-- Timeline of Last 10 Activities -->
+    <div class="flex-1 overflow-y-auto pr-1 space-y-3 min-h-[200px]" id="student-activity-history-timeline">
+      <div class="p-8 text-center text-slate-400 font-medium text-xs">
+        Đang tải lịch sử hoạt động…
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-center justify-between border-t border-slate-100 pt-3.5 shrink-0 text-xs">
+      <span class="text-[11px] text-slate-400">
+        💡 Hiển thị tối đa 10 sự kiện nghiệp vụ thực tế có bằng chứng xác thực
+      </span>
+      <button type="button" onclick="closeStudentActivityHistoryModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all cursor-pointer">
+        Đóng
+      </button>
+    </div>
+  </div>
+</div>

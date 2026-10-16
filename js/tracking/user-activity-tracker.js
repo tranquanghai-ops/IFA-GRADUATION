@@ -38,7 +38,7 @@ export function formatActivityTimeAgo(ts) {
     return `Hôm qua ${timeStr}`;
   }
   if (diffDay < 7) return `${diffDay} ngày trước`;
-  
+
   return formatActivityDateTime(date);
 }
 
@@ -570,3 +570,222 @@ export function exportRoundAccessMonitoringCSV() {
   showToast('✓ Đã xuất file báo cáo đăng nhập & hoạt động thành công!', 'success');
 }
 window.exportRoundAccessMonitoringCSV = exportRoundAccessMonitoringCSV;
+
+/**
+ * Open Student Activity History Modal (Nhóm C / P3)
+ * Displays up to 10 most recent real historical events:
+ * - Login & authentication sessions
+ * - Submission & upload actions across activities
+ * - Topic registration & proposal updates
+ * - Review and grading notices
+ */
+export async function openStudentActivityHistoryModal(studentId) {
+  if (!studentId) return;
+  const sid = String(studentId).trim().toUpperCase();
+
+  const modal = document.getElementById('modal-student-activity-history');
+  if (!modal) return;
+
+  const master = (typeof window.getFacultyStudentByMssv === 'function') ? window.getFacultyStudentByMssv(sid) : null;
+  const eligibleItem = (state.eligibleStudents || []).find(s => String(s.studentId || s.mssv || s.id).trim().toUpperCase() === sid);
+  const fullName = master?.fullName || master?.name || eligibleItem?.name || eligibleItem?.fullName || sid;
+  const className = master?.className || eligibleItem?.className || eligibleItem?.studentClass || '--';
+  const major = master?.major || eligibleItem?.major || 'Thiết kế Nội thất';
+  const email = master?.email || eligibleItem?.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`;
+
+  const subtitleEl = document.getElementById('student-activity-history-subtitle');
+  const nameEl = document.getElementById('student-activity-info-name');
+  const mssvEl = document.getElementById('student-activity-info-mssv');
+  const classMajorEl = document.getElementById('student-activity-info-class-major');
+  const loginPillEl = document.getElementById('student-activity-info-login-pill');
+  const timelineEl = document.getElementById('student-activity-history-timeline');
+  const countBadgeEl = document.getElementById('student-activity-history-count-badge');
+
+  if (subtitleEl) subtitleEl.textContent = `MSSV: ${sid} • Lớp: ${className}`;
+  if (nameEl) nameEl.textContent = fullName;
+  if (mssvEl) mssvEl.textContent = sid;
+  if (classMajorEl) classMajorEl.textContent = `Lớp: ${className} • Ngành: ${major}`;
+
+  if (loginPillEl) {
+    loginPillEl.innerHTML = renderUserActivityBadge(sid, { compact: true });
+  }
+
+  if (timelineEl) {
+    timelineEl.innerHTML = `
+      <div class="p-8 text-center text-slate-400 font-medium text-xs flex flex-col items-center justify-center gap-2">
+        <span class="animate-spin text-lg">⏳</span>
+        <span>Đang tổng hợp lịch sử hoạt động thực tế...</span>
+      </div>
+    `;
+  }
+
+  modal.classList.remove('hidden');
+
+  try {
+    const events = [];
+
+    // 1. User login & active session from userActivities
+    const actInfo = getUserActivityInfo(sid) || getUserActivityInfo(email);
+    if (actInfo.hasLoggedIn && actInfo.raw) {
+      const raw = actInfo.raw;
+      if (raw.lastLoginAt) {
+        events.push({
+          type: 'login',
+          title: 'Đăng nhập hệ thống',
+          details: 'Phiên làm việc xác thực qua Google Workspace TDTU',
+          timestamp: raw.lastLoginAt,
+          icon: '🔑',
+          badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        });
+      }
+      if (raw.lastActionAt && raw.lastAction && String(raw.lastAction) !== 'Đăng nhập hệ thống') {
+        events.push({
+          type: 'action',
+          title: raw.lastAction,
+          details: raw.lastActionDetails || 'Thao tác nghiệp vụ trên hệ thống',
+          timestamp: raw.lastActionAt,
+          icon: '⚡',
+          badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200'
+        });
+      }
+    }
+
+    // 2. Registrations & Topic Proposals
+    const targetRoundId = state.selectedRoundId || state.activeRound?.id;
+    if (targetRoundId) {
+      const reg = state.eligibleStudentDetails?.registrations?.get(sid);
+      if (reg) {
+        if (reg.registeredAt || reg.createdAt) {
+          events.push({
+            type: 'topic_registration',
+            title: 'Đăng ký đề tài tốt nghiệp',
+            details: `Đề tài: "${reg.topicTitle || 'Chưa đặt tên'}"${reg.acceptedSupervisorName ? ' • GVHD: ' + reg.acceptedSupervisorName : ''}`,
+            timestamp: reg.registeredAt || reg.createdAt,
+            icon: '📝',
+            badgeClass: 'bg-blue-50 text-blue-700 border-blue-200'
+          });
+        }
+        if (Array.isArray(reg.topicTitleHistory)) {
+          reg.topicTitleHistory.forEach(v => {
+            const vStatus = v.status === 'approved' ? '✓ Đã duyệt' : (v.status === 'rejected' ? '✕ Yêu cầu sửa' : '⏳ Chờ duyệt');
+            events.push({
+              type: 'topic_proposal',
+              title: `Đề xuất đổi tên đề tài (Lần ${v.version || 1})`,
+              details: `"${v.topicTitle}" • Trạng thái: ${vStatus}${v.reviewNote ? ' (Ghi chú: ' + v.reviewNote + ')' : ''}`,
+              timestamp: v.proposedAt || v.submittedAt || v.createdAt || reg.updatedAt,
+              icon: '💡',
+              badgeClass: v.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+            });
+          });
+        }
+      }
+    }
+
+    // 3. Submissions & Drive Files
+    const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
+    const getDocsFn = (typeof window !== 'undefined') ? (window.getDocs || (typeof getDocs !== 'undefined' ? getDocs : null)) : null;
+    const queryFn = (typeof window !== 'undefined') ? (window.query || (typeof query !== 'undefined' ? query : null)) : null;
+    const colFn = (typeof window !== 'undefined') ? (window.collection || (typeof collection !== 'undefined' ? collection : null)) : null;
+    const whereFn = (typeof window !== 'undefined') ? (window.where || (typeof where !== 'undefined' ? where : null)) : null;
+
+    if (dbObj && getDocsFn && queryFn && colFn && whereFn) {
+      try {
+        const driveSnap = await getDocsFn(queryFn(colFn(dbObj, 'driveFiles'), whereFn('studentId', '==', sid)));
+        driveSnap.docs.forEach(d => {
+          const df = d.data();
+          const fName = df.fileName || df.name || 'Tài liệu nộp bài';
+          const sizeMb = df.fileSize ? ` (${(df.fileSize / (1024 * 1024)).toFixed(2)} MB)` : '';
+          events.push({
+            type: 'submission',
+            title: `Nộp bài mốc: ${df.activityTitle || df.activityId || 'Duyệt đồ án'}`,
+            details: `File: "${fName}"${sizeMb}${df.attemptNumber ? ' • Lần nộp ' + df.attemptNumber : ''}`,
+            timestamp: df.createdAt || df.uploadedAt,
+            icon: '📤',
+            badgeClass: 'bg-purple-50 text-purple-700 border-purple-200'
+          });
+        });
+      } catch (err) {
+        console.warn('[UserTracker] Notice fetching driveFiles for history:', err.message);
+      }
+    }
+
+    // Normalize timestamps and sort descending
+    const toMs = ts => {
+      if (!ts) return 0;
+      if (typeof ts.toMillis === 'function') return ts.toMillis();
+      if (typeof ts.toDate === 'function') return ts.toDate().getTime();
+      if (ts instanceof Date) return ts.getTime();
+      const parsed = new Date(ts).getTime();
+      return isNaN(parsed) ? 0 : parsed;
+    };
+
+    events.sort((a, b) => toMs(b.timestamp) - toMs(a.timestamp));
+
+    // Dedup identical titles within 5 seconds
+    const deduped = [];
+    events.forEach(e => {
+      const ms = toMs(e.timestamp);
+      const isDuplicate = deduped.some(prev => prev.title === e.title && Math.abs(toMs(prev.timestamp) - ms) < 5000);
+      if (!isDuplicate) deduped.push(e);
+    });
+
+    const top10 = deduped.slice(0, 10);
+
+    if (countBadgeEl) {
+      countBadgeEl.textContent = `${top10.length} hoạt động gần nhất`;
+    }
+
+    if (!timelineEl) return;
+
+    if (top10.length === 0) {
+      timelineEl.innerHTML = `
+        <div class="p-8 text-center text-slate-400 font-medium text-xs">
+          Chưa ghi nhận hoạt động nào của sinh viên này trong hệ thống.
+        </div>
+      `;
+      return;
+    }
+
+    timelineEl.innerHTML = top10.map((item, idx) => {
+      const dateStr = formatActivityDateTime(item.timestamp);
+      const timeAgo = formatActivityTimeAgo(item.timestamp);
+      const escape = (typeof escapeHtml === 'function') ? escapeHtml : (str => String(str || '').replace(/[&<>"']/g, ''));
+
+      return `
+        <div class="p-3 rounded-2xl border border-slate-100 bg-white hover:bg-slate-50 transition-all shadow-2xs flex items-start gap-3 text-xs">
+          <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${item.badgeClass} text-sm">
+            ${item.icon || '📌'}
+          </div>
+          <div class="flex-1 min-w-0 space-y-1">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-bold text-slate-900 truncate">${escape(item.title)}</span>
+              <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap shrink-0">${timeAgo}</span>
+            </div>
+            <p class="text-[11px] text-slate-600 leading-relaxed">${escape(item.details)}</p>
+            <div class="text-[10px] text-slate-400 font-mono flex items-center gap-1.5 pt-0.5">
+              <span>🕒</span> <span>${dateStr}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.error('[UserTracker] Error loading student activity history:', err);
+    if (timelineEl) {
+      timelineEl.innerHTML = `
+        <div class="p-8 text-center text-rose-500 font-medium text-xs">
+          Lỗi khi tải lịch sử hoạt động: ${err.message}
+        </div>
+      `;
+    }
+  }
+}
+
+export function closeStudentActivityHistoryModal() {
+  const modal = document.getElementById('modal-student-activity-history');
+  if (modal) modal.classList.add('hidden');
+}
+
+window.openStudentActivityHistoryModal = openStudentActivityHistoryModal;
+window.closeStudentActivityHistoryModal = closeStudentActivityHistoryModal;

@@ -329,17 +329,17 @@ window.filterReviewSubmissionsTable = function() {
       ? escapeHtml(st.supNames.join(' · '))
       : '<span class="text-slate-400 italic">Chưa phân công</span>';
 
-    // Attempt counter badge
+    // Attempt counter badge (B2: Bấm vào số lượt để mở modal Chi tiết bài nộp & Lịch sử)
     const attemptBadge = `
-      <span class="font-mono font-bold px-2 py-0.5 rounded-lg text-xs ${
+      <button type="button" onclick="openAdminSubmissionInspectModal('${st.studentId}', '${activity.id}', '${roundId}')" class="font-mono font-bold px-2.5 py-1 rounded-lg text-xs hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-2xs ${
         st.completedAttempts >= st.totalAllowedAttempts
           ? 'bg-rose-100 text-rose-800 border border-rose-300'
           : (st.completedAttempts > 0
             ? 'bg-blue-100 text-blue-800 border border-blue-300'
             : 'bg-slate-100 text-slate-600 border border-slate-300')
-      }">
+      }" title="Bấm để xem chi tiết bài nộp & lịch sử các lần nộp">
         ${st.completedAttempts}/${st.totalAllowedAttempts}
-      </span>
+      </button>
     `;
 
     // Latest attempt & submission time
@@ -358,9 +358,9 @@ window.filterReviewSubmissionsTable = function() {
       statusBadgeHtml = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đúng hạn</span>';
     }
 
-    // Action / View file column
+    // Action / View file column (B1: Mở trực tiếp file chính thức mới nhất trên Google Drive, không mở modal lịch sử)
     const actionHtml = st.completedAttempts > 0
-      ? `<button type="button" onclick="openAdminSubmissionInspectModal('${st.studentId}', '${activity.id}', '${roundId}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-2xs inline-flex items-center gap-1 transition-all cursor-pointer" title="Xem chi tiết bài nộp và lịch sử">
+      ? `<button type="button" onclick="openLatestOfficialSubmissionFile('${st.studentId}', '${activity.id}', '${roundId}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-2xs inline-flex items-center gap-1 transition-all cursor-pointer" title="Mở trực tiếp tệp nộp chính thức mới nhất trên Google Drive trong tab mới">
            👁️ Xem bài
          </button>`
       : `<span class="px-2.5 py-1 rounded-lg text-slate-400 bg-slate-100 text-[11px] font-medium border border-slate-200 select-none">
@@ -599,3 +599,31 @@ window.openAdminSubmissionInspectModal = function(studentId, actId, roundId) {
 window.closeAdminSubmissionInspectModal = function() {
   document.getElementById('modal-admin-submission-inspect')?.classList.add('hidden');
 };
+
+/**
+ * Open latest official submission file directly on Google Drive in new tab (B1)
+ */
+export function openLatestOfficialSubmissionFile(studentId, actId, roundId) {
+  const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  const act = (round?.activities || []).find(a => a.id === actId);
+  if (!round || !act) {
+    if (typeof showToast === 'function') showToast('Không tìm thấy thông tin đợt hoặc mốc hoạt động.', 'warning');
+    return;
+  }
+  const rules = (typeof getEffectiveSubmissionRules === 'function')
+    ? getEffectiveSubmissionRules(studentId, act, round)
+    : { currentSubmission: null };
+
+  const cur = rules.currentSubmission;
+  const file = cur?.files?.[0];
+  const viewUrl = file?.providerUrl || file?.viewUrl || (file?.providerFileId ? `https://drive.google.com/file/d/${file.providerFileId}/view` : null);
+
+  if (viewUrl) {
+    window.open(viewUrl, '_blank', 'noopener,noreferrer');
+  } else {
+    if (typeof showToast === 'function') {
+      showToast('Không tìm thấy liên kết Google Drive của bài nộp hoặc sinh viên chưa có bài nộp.', 'warning');
+    }
+  }
+}
+window.openLatestOfficialSubmissionFile = openLatestOfficialSubmissionFile;

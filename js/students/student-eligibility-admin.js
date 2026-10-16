@@ -264,7 +264,7 @@ function renderAdminEligibleStudentsTable() {
       : (status.preferences.length
         ? `<div class="mt-1 text-[11px] text-slate-600">${status.preferences.map(escapeHtml).join(' · ')}</div>`
         : (directAssignment ? '<div class="mt-1 text-[11px] text-slate-500">GVHD: Chưa phân công</div>' : ''));
-    
+
     let topicBadge = '';
     if (status.topic) {
       if (status.pendingProposal && status.officialApprovedTitle) {
@@ -299,7 +299,11 @@ function renderAdminEligibleStudentsTable() {
       <td class="p-3 font-mono text-slate-700">${String(s.resolvedClass).includes('<span') ? s.resolvedClass : escapeHtml(s.resolvedClass)}</td>
       <td class="p-3 text-slate-700">${escapeHtml(s.resolvedMajor)}</td>
       <td class="p-3"><span class="badge badge-open">Đủ ĐK</span></td>
-      <td class="p-3 whitespace-nowrap">${activityBadge}</td>
+      <td class="p-3 whitespace-nowrap">
+        <button type="button" onclick="openStudentActivityHistoryModal('${s.studentId}')" class="text-left group hover:opacity-80 transition-all cursor-pointer p-0 bg-transparent border-0 inline-block" title="Bấm để xem lịch sử 10 hoạt động gần nhất">
+          ${activityBadge}
+        </button>
+      </td>
       <td class="p-3 text-right">
         <button type="button" onclick="deleteEligibleStudent('${s.studentId}')" class="text-rose-600 hover:underline font-bold text-xs cursor-pointer">Xóa</button>
       </td>
