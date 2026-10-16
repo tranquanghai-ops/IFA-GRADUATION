@@ -164,6 +164,154 @@ if (typeof window !== 'undefined') {
   window.getScoringRoundStudents = getScoringRoundStudents;
 }
 
+export function findProgressReviewActivity(targetRound, phase) {
+  if (!targetRound || !Array.isArray(targetRound.activities)) return null;
+  const pNum = Number(phase);
+  // 1. Direct match on phase or milestoneType
+  let act = targetRound.activities.find(a =>
+    Number(a.phase) === pNum ||
+    a.milestoneType === `duyet_${pNum}` ||
+    a.type === `duyet_${pNum}` ||
+    a.id === `act_duyet_${pNum}`
+  );
+  if (act) return act;
+
+  // 2. Regex match on title / name / slug (matching Duyệt đợt X or Duyệt X)
+  const regex = new RegExp(`(?:duyệt|duyet)\\s*(?:đồ\\s*án|do\\s*an)?\\s*(?:tốt\\s*nghiệp|tot\\s*nghiep)?\\s*(?:đợt|dot)?\\s*${pNum}\\b`, 'i');
+  act = targetRound.activities.find(a => {
+    const text = `${a.title || ''} ${a.name || ''} ${a.driveFolderName || ''} ${a.slug || ''}`;
+    return regex.test(text);
+  });
+  return act || null;
+}
+
+export function getProgressReviewData(studentId, phase, targetRound) {
+  if (!targetRound || !studentId) {
+    return { status: 'pending', score: null, letterGrade: null, letterLabel: '', displayScore: '--', referenceScore: null, isPassed: false, isFinalized: false, source: 'none' };
+  }
+  const sid = String(studentId).trim();
+
+  // Sync state.councilScores with targetRound.councilScores if available
+  if (targetRound.councilScores && typeof state !== 'undefined') {
+    state.councilScores = { ...(targetRound.councilScores || {}), ...(state.councilScores || {}) };
+  }
+
+  // 1. Check if there is an activity for this phase
+  const act = findProgressReviewActivity(targetRound, phase);
+  if (act && act.councilEnabled && Array.isArray(act.councils) && act.councils.length > 0) {
+    // Find council assigned to this student
+    const asgns = act.councilStudentAssignments || [];
+    const studentAsgn = asgns.find(a => String(a.studentId).trim() === sid);
+    const council = studentAsgn ? act.councils.find(c => c.id === studentAsgn.councilId) : act.councils[0];
+
+    if (council) {
+      const cStat = council.status || 'preparing';
+      const isCouncilFinished = (cStat === 'finalized' || cStat === 'ended' || cStat === 'completed');
+
+      // 1A. If council has cached finalDefenseScores for this student
+      if (council.finalDefenseScores?.[sid]) {
+        const cached = council.finalDefenseScores[sid];
+        const letter = cached.letterGrade || (act.scoringConfig?.mode === 'letter' && cached.formattedScore !== '--' ? cached.formattedScore : null);
+        const numScore = cached.score !== undefined && cached.score !== null ? Number(cached.score) : null;
+        const isPassed = numScore !== null ? (numScore >= 5) : (letter ? !['D', 'D-', 'F'].includes(letter) : false);
+        return {
+          status: isPassed ? 'passed' : 'failed',
+          score: numScore,
+          letterGrade: letter,
+          letterLabel: cached.letterLabel || '',
+          displayScore: letter || (numScore !== null ? numScore.toFixed(1) : '--'),
+          referenceScore: numScore !== null ? numScore.toFixed(2) : null,
+          isPassed,
+          isFinalized: true,
+          councilStatus: cStat,
+          councilName: council.name || '',
+          source: 'council_finalDefenseScores'
+        };
+      }
+
+      // 1B. If council is ended or finalized, compute official score from completed member scores
+      if (isCouncilFinished) {
+        const resolveOfficial = (typeof window !== 'undefined' && typeof window.getOfficialDefenseScore === 'function')
+          ? window.getOfficialDefenseScore
+          : (typeof getOfficialDefenseScore === 'function' ? getOfficialDefenseScore : null);
+
+        const official = resolveOfficial ? resolveOfficial(sid, council, act, targetRound) : null;
+
+        if (official && (official.score !== null || official.letterGrade !== null)) {
+          const letter = official.letterGrade || (act.scoringConfig?.mode === 'letter' && official.formattedScore !== '--' ? official.formattedScore : null);
+          const numScore = official.score !== null ? Number(official.score) : null;
+          const isPassed = numScore !== null ? (numScore >= 5) : (letter ? !['D', 'D-', 'F'].includes(letter) : false);
+          return {
+            status: isPassed ? 'passed' : 'failed',
+            score: numScore,
+            letterGrade: letter,
+            letterLabel: official.letterLabel || '',
+            displayScore: letter || (numScore !== null ? numScore.toFixed(1) : '--'),
+            referenceScore: numScore !== null ? numScore.toFixed(2) : null,
+            isPassed,
+            isFinalized: true,
+            councilStatus: cStat,
+            councilName: council.name || '',
+            source: 'council_calculated'
+          };
+        }
+      }
+
+      // Council is not finished (preparing / active) or student has not been scored yet
+      return {
+        status: 'pending',
+        score: null,
+        letterGrade: null,
+        letterLabel: '',
+        displayScore: '--',
+        referenceScore: null,
+        isPassed: false,
+        isFinalized: false,
+        councilStatus: cStat,
+        councilName: council.name || '',
+        source: 'council_pending'
+      };
+    }
+  }
+
+  // 2. Fallback to targetRound.progressReviews
+  const legacy = targetRound.progressReviews?.['duyet_' + phase]?.[sid];
+  if (legacy) {
+    const rawScore = legacy.score !== undefined && legacy.score !== null ? Number(legacy.score) : null;
+    const letter = legacy.letterGrade || (typeof legacy.value === 'string' && /[A-DF]/i.test(legacy.value) ? legacy.value : null);
+    const status = legacy.status || 'pending';
+    const isPassed = status === 'passed' || (rawScore !== null && rawScore >= 5) || (letter ? !['D', 'D-', 'F'].includes(letter) : false);
+    return {
+      status,
+      score: rawScore,
+      letterGrade: letter,
+      letterLabel: legacy.letterLabel || '',
+      displayScore: letter || (rawScore !== null ? rawScore.toFixed(1) : '--'),
+      referenceScore: rawScore !== null ? rawScore.toFixed(2) : null,
+      isPassed,
+      isFinalized: status === 'passed' || status === 'failed' || status === 'completed',
+      source: 'progressReviews'
+    };
+  }
+
+  return {
+    status: 'pending',
+    score: null,
+    letterGrade: null,
+    letterLabel: '',
+    displayScore: '--',
+    referenceScore: null,
+    isPassed: false,
+    isFinalized: false,
+    source: 'none'
+  };
+}
+
+if (typeof window !== 'undefined') {
+  window.findProgressReviewActivity = findProgressReviewActivity;
+  window.getProgressReviewData = getProgressReviewData;
+}
+
 window.renderAdminProgressReviewTable = function(phase) {
   const tbody = document.getElementById('admin-duyet-' + phase + '-tbody');
   if (!tbody) return;
@@ -180,12 +328,24 @@ window.renderAdminProgressReviewTable = function(phase) {
     const sid = (s.mssv || s.studentId || '').toLowerCase();
     const name = (s.fullName || s.studentName || '').toLowerCase();
     const topic = (s.topicTitle || '').toLowerCase();
-    if (q && !sid.includes(q) && !name.includes(q) && !topic.includes(q)) return false;
+    const supName = String(s.acceptedSupervisorName || s.supervisorName || '').toLowerCase();
+    if (q && !sid.includes(q) && !name.includes(q) && !topic.includes(q) && !supName.includes(q)) return false;
 
-    const reviewData = targetRound.progressReviews?.['duyet_' + phase]?.[s.mssv || s.studentId] || {};
+    const reviewData = getProgressReviewData(s.mssv || s.studentId, phase, targetRound);
     const status = reviewData.status || 'pending';
 
-    if (filterVal !== 'all' && status !== filterVal) return false;
+    if (filterVal === 'passed') {
+      return status === 'passed' || (reviewData.isPassed && reviewData.isFinalized);
+    }
+    if (filterVal === 'failed') {
+      return status === 'failed' || (!reviewData.isPassed && reviewData.isFinalized);
+    }
+    if (filterVal === 'revision') {
+      return status === 'revision';
+    }
+    if (filterVal === 'pending') {
+      return status === 'pending' || !reviewData.isFinalized;
+    }
     return true;
   });
 
@@ -202,9 +362,8 @@ window.renderAdminProgressReviewTable = function(phase) {
       : (s.topicTitle || '');
     const topicDisplay = topic || '<span class="text-slate-400 italic">Chưa đăng ký đề tài</span>';
     const supName = s.acceptedSupervisorName || s.supervisorName || (Array.isArray(s.officialSupervisors) && s.officialSupervisors[0]?.supervisorName) || (Array.isArray(s.supervisors) && s.supervisors[0]?.supervisorName) || (targetRound.supervisors || []).find(sup => sup.id === s.supervisorId)?.name || '--';
-    const reviewData = targetRound.progressReviews?.['duyet_' + phase]?.[sid] || {};
+    const reviewData = getProgressReviewData(sid, phase, targetRound);
     const status = reviewData.status || 'pending';
-    const score = reviewData.score !== undefined ? Number(reviewData.score).toFixed(1) : '--';
 
     let statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Chưa duyệt</span>';
     if (status === 'passed') {
@@ -215,6 +374,14 @@ window.renderAdminProgressReviewTable = function(phase) {
       statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">✕ Không đạt</span>';
     }
 
+    let scoreDisplay = '<span class="text-slate-400 font-mono">--</span>';
+    if (reviewData.letterGrade) {
+      const refText = reviewData.referenceScore ? ` <span class="text-[10px] text-slate-400 font-normal">(${reviewData.referenceScore})</span>` : '';
+      scoreDisplay = `<span class="badge bg-purple-50 text-purple-900 font-black font-mono text-xs px-2.5 py-0.5 rounded-lg border border-purple-200">${reviewData.letterGrade}</span>${refText}`;
+    } else if (reviewData.score !== null && reviewData.score !== undefined) {
+      scoreDisplay = `<span class="badge bg-blue-50 text-blue-800 font-bold font-mono text-xs px-2.5 py-0.5 rounded-lg border border-blue-200">${Number(reviewData.score).toFixed(1)}</span>`;
+    }
+
     return `
       <tr class="hover:bg-slate-50 transition-colors">
         <td class="p-3 text-center font-mono font-bold text-slate-400">${idx + 1}</td>
@@ -223,7 +390,7 @@ window.renderAdminProgressReviewTable = function(phase) {
         <td class="p-3 text-slate-600 max-w-xs truncate" title="${topic}">${topicDisplay}</td>
         <td class="p-3 text-slate-700 whitespace-nowrap">${supName}</td>
         <td class="p-3 text-center whitespace-nowrap">${statusBadge}</td>
-        <td class="p-3 text-center font-mono font-bold whitespace-nowrap">${score !== '--' ? `<span class="badge bg-blue-50 text-blue-800 font-bold">${score}</span>` : '--'}</td>
+        <td class="p-3 text-center whitespace-nowrap">${scoreDisplay}</td>
       </tr>
     `;
   }).join('');

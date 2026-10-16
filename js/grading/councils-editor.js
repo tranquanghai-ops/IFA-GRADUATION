@@ -868,10 +868,14 @@ async function persistActivityCouncilChanges(targetRound) {
   const roundId = targetRound.id;
   try {
     const roundRef = doc(db, 'graduationRounds', roundId);
-    await updateDoc(roundRef, {
+    const payload = {
       activities: targetRound.activities,
       updatedAt: serverTimestamp()
-    });
+    };
+    if (targetRound.progressReviews) {
+      payload.progressReviews = targetRound.progressReviews;
+    }
+    await updateDoc(roundRef, payload);
     // Keep authorization indexes aligned with every council/member/student edit.
     // The live presentation rules consult these small documents, not the large
     // round document. Removed members must be revoked, not merely omitted.

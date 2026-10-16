@@ -406,9 +406,16 @@ window.renderAssessmentHeroCard = function() {
       supervised.forEach(s => {
         neededCount++;
         const sid = s.mssv || s.studentId;
-        const sc = targetRound.progressReviews?.['duyet_' + phase]?.[sid];
-        if (sc && (sc.status === 'passed' || sc.status === 'failed' || sc.status === 'completed')) scoredCount++;
-        else if (sc && sc.status === 'draft') draftCount++;
+        const rev = (typeof window.getProgressReviewData === 'function')
+          ? window.getProgressReviewData(sid, phase, targetRound)
+          : null;
+        if (rev && (rev.isFinalized || rev.status === 'passed' || rev.status === 'failed' || rev.status === 'completed')) scoredCount++;
+        else if (rev && rev.status === 'draft') draftCount++;
+        else {
+          const sc = targetRound.progressReviews?.['duyet_' + phase]?.[sid];
+          if (sc && (sc.status === 'passed' || sc.status === 'failed' || sc.status === 'completed')) scoredCount++;
+          else if (sc && sc.status === 'draft') draftCount++;
+        }
       });
     });
   }
@@ -617,6 +624,24 @@ window.renderAssessmentDuyetList = function(phase) {
 
   const scoreResolver = (s) => {
     const sid = s.mssv || s.studentId;
+    if (typeof window.getProgressReviewData === 'function') {
+      const data = window.getProgressReviewData(sid, phase, targetRound);
+      if (data && (data.isFinalized || data.status === 'passed' || data.status === 'failed' || data.status === 'completed')) {
+        return {
+          status: 'completed',
+          score: data.score,
+          letterGrade: data.letterGrade,
+          letterLabel: data.letterLabel,
+          referenceScore: data.referenceScore,
+          displayScore: data.displayScore,
+          isPassed: data.isPassed
+        };
+      }
+      if (data && data.status === 'draft') {
+        return { status: 'draft', score: data.score };
+      }
+      return { status: 'unscored', score: null };
+    }
     const sc = targetRound.progressReviews?.['duyet_' + phase]?.[sid];
     if (sc && (sc.status === 'passed' || sc.status === 'failed' || sc.status === 'completed')) {
       return { status: 'completed', score: sc.score, isPassed: sc.score >= 5 };
@@ -653,7 +678,12 @@ window.renderAssessmentDuyetList = function(phase) {
       statusBadge = scInfo.isPassed
         ? '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đạt yêu cầu</span>'
         : '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">✕ Không đạt</span>';
-      scoreDisplay = `<span class="text-sm font-black text-purple-900">${Number(scInfo.score).toFixed(1)}/10</span>`;
+      if (scInfo.letterGrade) {
+        const refTxt = scInfo.referenceScore ? ` <span class="text-[10px] text-slate-400 font-normal">(${scInfo.referenceScore})</span>` : '';
+        scoreDisplay = `<span class="text-sm font-black text-purple-900">${scInfo.letterGrade}</span>${refTxt}`;
+      } else if (scInfo.score !== null) {
+        scoreDisplay = `<span class="text-sm font-black text-purple-900">${Number(scInfo.score).toFixed(1)}/10</span>`;
+      }
     } else if (scInfo.status === 'draft') {
       statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">Bản nháp</span>';
       scoreDisplay = `<span class="text-sm font-bold text-amber-700">${scInfo.score != null ? Number(scInfo.score).toFixed(1) : '--'}</span>`;

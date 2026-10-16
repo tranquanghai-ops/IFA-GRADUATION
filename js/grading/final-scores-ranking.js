@@ -14,6 +14,12 @@ export function getStudentDefenseScore(studentId, roundId = null) {
   const activities = targetRound.activities || [];
   for (const act of activities) {
     if (!act.councilEnabled) continue;
+    // Defense score must strictly come from the final defense activity (Bảo vệ),
+    // NOT from intermediate progress review activities (Duyệt đợt 1, 2, 3).
+    const actText = `${act.title || ''} ${act.name || ''} ${act.activityType || ''} ${act.slug || ''}`.toLowerCase();
+    if (/(?:duyệt|duyet)\s*(?:đồ\s*án|do\s*an)?\s*(?:tốt\s*nghiệp|tot\s*nghiep)?\s*(?:đợt|dot)?\s*[1-3]/i.test(actText)) {
+      continue;
+    }
     const councils = act.councils || [];
     for (const c of councils) {
       const asgns = act.councilStudentAssignments || [];

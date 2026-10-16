@@ -158,7 +158,7 @@ export function getOfficialDefenseScore(studentId, council, act, round) {
     const scorerId = getCouncilMemberScorerId(assigned);
     if (!scorerId) continue;
     const scoreKey = `${activityId}_${councilId}_${studentId}_${scorerId}`;
-    const score = state.councilScores?.[scoreKey];
+    const score = state.councilScores?.[scoreKey] || round?.councilScores?.[scoreKey];
     const isCompleted = (score?.status === 'completed');
     const resolvedNumeric = resolveScoreNumericValue(score, act);
 
@@ -188,7 +188,9 @@ export function getOfficialDefenseScore(studentId, council, act, round) {
   const mode = act.scoringConfig?.mode || 'numeric';
   let letterGrade = null;
   let letterLabel = null;
-  if (mode === 'letter' && rawAverage !== null) {
+  const hasLetterScores = mandatoryScores.some(s => typeof s.displayValue === 'string' && /[A-DF]/i.test(s.displayValue))
+    || includedGuestScores.some(s => typeof s.displayValue === 'string' && /[A-DF]/i.test(s.displayValue));
+  if ((mode === 'letter' || hasLetterScores) && rawAverage !== null) {
     const resolved = resolveNumericToLetter(rawAverage, act);
     if (resolved) {
       letterGrade = resolved.key;
@@ -200,7 +202,7 @@ export function getOfficialDefenseScore(studentId, council, act, round) {
   // in numeric/defense_rubric, displays 2 decimal places.
   let formattedScore = '--';
   if (rawAverage !== null) {
-    if (mode === 'letter') {
+    if (mode === 'letter' || hasLetterScores) {
       formattedScore = letterGrade || '--';
     } else {
       formattedScore = rawAverage.toFixed(2);
@@ -251,7 +253,7 @@ window.finalizeCouncilSession = async function() {
       const scorerId = getCouncilMemberScorerId(assignedMem);
       if (scorerId) {
         const k = `${activityId}_${councilId}_${sId}_${scorerId}`;
-        const sc = state.councilScores?.[k];
+        const sc = state.councilScores?.[k] || targetRound?.councilScores?.[k];
         if (sc?.status !== 'completed') {
           missingForStudent = true;
           break;
@@ -267,16 +269,20 @@ window.finalizeCouncilSession = async function() {
   }
 
   if (missingStudents.length > 0) {
-    showToast(`Không thể chốt điểm: Còn ${missingStudents.length} sinh viên chưa hoàn tất đủ các phiếu chấm bắt buộc!`, 'error');
-    return;
+    const confirmMissing = await showConfirm(
+      'Chốt điểm Hội đồng',
+      `Còn ${missingStudents.length} sinh viên chưa hoàn tất đủ phiếu chấm của tất cả thành viên bắt buộc (ví dụ có thành viên vắng mặt). Bạn có chắc chắn muốn khóa và chốt điểm chính thức cho toàn bộ ${assignments.length} sinh viên của Hội đồng "${council.name}" với các phiếu chấm hiện có?`,
+      { confirmText: 'Xác nhận Khóa & Chốt điểm', danger: true }
+    );
+    if (!confirmMissing) return;
+  } else {
+    const confirmed = await showConfirm(
+      'Chốt điểm Hội đồng',
+      `Xác nhận khóa và chốt điểm chính thức cho toàn bộ ${assignments.length} sinh viên của Hội đồng "${council.name}"?`,
+      { confirmText: 'Khóa & Chốt điểm', danger: false }
+    );
+    if (!confirmed) return;
   }
-
-  const confirmed = await showConfirm(
-    'Chốt điểm Hội đồng',
-    `Xác nhận khóa và chốt điểm chính thức cho toàn bộ ${assignments.length} sinh viên của Hội đồng "${council.name}"?`,
-    { confirmText: 'Khóa & Chốt điểm', danger: false }
-  );
-  if (!confirmed) return;
 
   council.finalDefenseScores = council.finalDefenseScores || {};
   for (const asgn of assignments) {
@@ -296,9 +302,37 @@ window.finalizeCouncilSession = async function() {
   council.finalizedAt = new Date().toISOString();
   council.finalizedBy = getEffectiveActor().email || 'admin';
 
+  // If this activity corresponds to a progress review (Duyệt 1/2/3), also sync to progressReviews map
+  const actTitle = String(act.title || '');
+  const progressMatch = actTitle.match(/(?:duyệt|duyet)\s*(?:đồ\s*án|do\s*an)?\s*(?:tốt\s*nghiệp|tot\s*nghiep)?\s*(?:đợt|dot)?\s*([1-3])/i);
+  if (progressMatch) {
+    const phase = progressMatch[1];
+    targetRound.progressReviews = targetRound.progressReviews || {};
+    targetRound.progressReviews['duyet_' + phase] = targetRound.progressReviews['duyet_' + phase] || {};
+    for (const asgn of assignments) {
+      const sId = asgn.studentId;
+      const fin = council.finalDefenseScores[sId];
+      if (fin && (fin.score !== null || fin.letterGrade !== null)) {
+        targetRound.progressReviews['duyet_' + phase][sId] = {
+          roundId: targetRound.id,
+          studentId: sId,
+          phase,
+          score: fin.score,
+          letterGrade: fin.letterGrade,
+          letterLabel: fin.letterLabel,
+          status: (fin.score !== null && fin.score >= 5) || (fin.letterGrade && !['D', 'D-', 'F'].includes(fin.letterGrade)) ? 'passed' : 'failed',
+          councilId: council.id,
+          councilName: council.name,
+          finalizedAt: council.finalizedAt,
+          updatedAt: council.finalizedAt
+        };
+      }
+    }
+  }
+
   await persistActivityCouncilChanges(targetRound);
   renderCouncilWorkspaceFull();
-  showToast(`✓ Đã chốt điểm Hội đồng "${council.name}" thành công! Điểm bảo vệ chính thức đã được ghi nhận.`, 'success');
+  showToast(`✓ Đã chốt điểm Hội đồng "${council.name}" thành công! Kết quả chính thức đã được ghi nhận.`, 'success');
 };
 
 window.openReopenCouncilModal = function() {
