@@ -172,10 +172,12 @@ async function run() {
   await cdp.send('CSS.enable');
   await cdp.send('Runtime.enable');
 
-  const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
-  console.log(`2. Navigating to compiled application: ${fileUrl}...`);
-  await cdp.send('Page.navigate', { url: fileUrl });
-  await wait(2000);
+  const targetUrl = process.argv.includes('--prod')
+    ? 'https://ifa-graduation.web.app'
+    : ('file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/'));
+  console.log(`2. Navigating to target application: ${targetUrl}...`);
+  await cdp.send('Page.navigate', { url: targetUrl });
+  await wait(3000);
 
   const auditReport = [];
 
