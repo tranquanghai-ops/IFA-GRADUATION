@@ -1,0 +1,788 @@
+[
+  {
+    "id": "modal-round",
+    "sourceFiles": [
+      "scripts/find-html-boundaries.cjs",
+      "templates/modals/rounds/modal-round.html"
+    ],
+    "triggers": [
+      "js/rounds/rounds-modal-form.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden\" | class=\"flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-slate-50\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-activity-councils",
+    "sourceFiles": [
+      "templates/modals/grading/modal-activity-councils.html"
+    ],
+    "triggers": [
+      "js/grading/councils-workspace.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4\" | class=\"bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[92vh] max-h-[94vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200\" | class=\"flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0 bg-slate-50/50\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-copy-councils-from-milestone",
+    "sourceFiles": [
+      "templates/modals/grading/modal-activity-councils.html"
+    ],
+    "triggers": [
+      "js/grading/councils-workspace.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col\" | class=\"p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-add-council-guest-member",
+    "sourceFiles": [
+      "templates/modals/grading/modal-add-council-guest-member.html"
+    ],
+    "triggers": [
+      "js/grading/councils-milestone.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200\" | class=\"flex items-center justify-between p-4 border-b border-slate-100 bg-amber-50/50\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-add-council-internal-member",
+    "sourceFiles": [
+      "templates/modals/grading/modal-add-council-internal-member.html"
+    ],
+    "triggers": [
+      "js/grading/councils-milestone.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200\" | class=\"flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-add-guest-slot",
+    "sourceFiles": [
+      "templates/modals/grading/modal-add-guest-slot.html"
+    ],
+    "triggers": [
+      "js/grading/councils-editor.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-sm w-full max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col border border-slate-200\" | class=\"flex items-center justify-between p-4 border-b border-slate-100\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-adjust-council-score",
+    "sourceFiles": [
+      "templates/modals/grading/modal-adjust-council-score.html"
+    ],
+    "triggers": [
+      "js/grading/preliminary-dashboard.js"
+    ],
+    "currentClasses": "class=\"fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity\" | class=\"bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100 max-h-[92vh] flex flex-col\" | class=\"flex items-start justify-between border-b border-slate-100 pb-4 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-admin-score-detail",
+    "sourceFiles": [
+      "templates/modals/grading/modal-admin-score-detail.html"
+    ],
+    "triggers": [
+      "js/grading/preliminary-dashboard.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 text-xs\" | class=\"flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-council-score-details",
+    "sourceFiles": [
+      "templates/modals/grading/modal-council-score-details.html"
+    ],
+    "triggers": [
+      "js/grading/preliminary-dashboard.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs\" | class=\"bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 text-xs animate-in fade-in zoom-in duration-150\" | class=\"flex items-start justify-between p-4 sm:p-5 border-b border-slate-200 bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-council-workspace",
+    "sourceFiles": [
+      "templates/modals/grading/modal-council-workspace.html"
+    ],
+    "triggers": [
+      "js/grading/rubrics-workspace.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[75] modal-backdrop flex items-center justify-center p-1 sm:p-4\" | class=\"bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[98vh] sm:h-[94vh] max-h-[98vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200\" | class=\"px-2.5 py-2 sm:px-4 sm:py-2.5 border-b border-slate-200 bg-slate-900 text-white shrink-0 shadow-xs\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-edit-council",
+    "sourceFiles": [
+      "templates/modals/grading/modal-edit-council.html"
+    ],
+    "triggers": [
+      "js/grading/councils-editor.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-xl w-full shadow-2xl flex flex-col max-h-[94vh] overflow-hidden border border-slate-200\" | class=\"flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-edit-council-title",
+    "sourceFiles": [
+      "templates/modals/grading/modal-edit-council.html"
+    ],
+    "triggers": [
+      "js/grading/councils-editor.js"
+    ],
+    "currentClasses": "class=\"font-bold text-base text-tdtu-blue\" | class=\"text-slate-400 hover:text-slate-600 font-bold p-1 text-base\" | class=\"flex flex-col flex-1 overflow-hidden\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-final-score-detail",
+    "sourceFiles": [
+      "templates/modals/grading/modal-final-score-detail.html"
+    ],
+    "triggers": [
+      "js/grading/final-scores-ranking.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs\" | class=\"p-4 border-b border-slate-200 bg-indigo-50 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-guest-passcode-entry",
+    "sourceFiles": [
+      "templates/modals/grading/modal-guest-passcode-entry.html"
+    ],
+    "triggers": [
+      "js/grading/defense-scores.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs\" | class=\"p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-milestone-quick-council",
+    "sourceFiles": [
+      "templates/modals/grading/modal-milestone-quick-council.html"
+    ],
+    "triggers": [
+      "js/grading/councils-milestone.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200\" | class=\"flex items-center justify-between p-4 border-b border-slate-100 bg-indigo-50/50\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-milestone-quick-council-title",
+    "sourceFiles": [
+      "templates/modals/grading/modal-milestone-quick-council.html"
+    ],
+    "triggers": [
+      "js/grading/councils-milestone.js"
+    ],
+    "currentClasses": "class=\"font-bold text-slate-900 text-sm\" | class=\"text-slate-400 hover:text-slate-600 font-bold p-1 text-base\" | class=\"p-4 space-y-3 text-xs\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-publish-progress-review",
+    "sourceFiles": [
+      "templates/modals/grading/modal-publish-progress-review.html"
+    ],
+    "triggers": [
+      "js/grading/preliminary-dashboard.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs\" | class=\"bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col overflow-hidden border border-slate-200 text-xs animate-in fade-in zoom-in duration-150\" | class=\"flex items-start justify-between p-4 sm:p-5 border-b border-slate-200 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-reopen-council",
+    "sourceFiles": [
+      "templates/modals/grading/modal-reopen-council.html"
+    ],
+    "triggers": [
+      "js/grading/defense-scores.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs\" | class=\"p-4 border-b border-slate-200 bg-rose-50 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-revoke-progress-review",
+    "sourceFiles": [
+      "templates/modals/grading/modal-revoke-progress-review.html"
+    ],
+    "triggers": [
+      "js/grading/preliminary-dashboard.js"
+    ],
+    "currentClasses": "class=\"fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity\" | class=\"bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100\" | class=\"flex items-start justify-between border-b border-slate-100 pb-4\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-rubric-criterion",
+    "sourceFiles": [
+      "templates/modals/grading/modal-rubric-criterion.html"
+    ],
+    "triggers": [
+      "js/grading/rubrics-config.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs max-h-[92vh] overflow-y-auto\" | class=\"p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-rubric-criterion-title",
+    "sourceFiles": [
+      "templates/modals/grading/modal-rubric-criterion.html"
+    ],
+    "triggers": [
+      "js/grading/rubrics-config.js"
+    ],
+    "currentClasses": "class=\"font-black text-sm text-slate-900\" | class=\"text-slate-400 hover:text-slate-600 font-bold p-1\" | class=\"p-4 space-y-3\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-score-calibration",
+    "sourceFiles": [
+      "templates/modals/grading/modal-score-calibration.html"
+    ],
+    "triggers": [
+      "js/grading/defense-scores.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs\" | class=\"p-4 border-b border-slate-200 bg-amber-50 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-score-entry",
+    "sourceFiles": [
+      "templates/modals/grading/modal-score-entry.html"
+    ],
+    "triggers": [
+      "js/grading/preliminary-entry.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs\" | class=\"p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-activity",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-activity.html"
+    ],
+    "triggers": [
+      "js/planning/activities-manager.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl w-full max-w-[min(94vw,1180px)] shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200\" | class=\"flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-activity-title",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-activity.html"
+    ],
+    "triggers": [
+      "js/planning/activities-manager.js"
+    ],
+    "currentClasses": "class=\"font-bold text-base text-tdtu-blue\" | class=\"text-[11px] text-slate-400 mt-0.5\" | class=\"text-slate-400 hover:text-slate-600 font-bold p-1 text-base\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-admin-lock-round",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-admin-lock-round.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-admin.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4\" | class=\"flex items-center gap-3 border-b pb-3\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-admin-lock-round-title",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-admin-lock-round.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-admin.js"
+    ],
+    "currentClasses": "class=\"space-y-3 text-xs text-slate-700\" | class=\"hidden p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900\" | class=\"font-bold\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-admin-lock-warning",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-admin-lock-round.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-admin.js"
+    ],
+    "currentClasses": "class=\"hidden p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900\" | class=\"font-bold\" | class=\"bg-slate-50 p-4 rounded-xl border space-y-2\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-admin-pending-sups-count",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-admin-lock-round.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-admin.js"
+    ],
+    "currentClasses": "class=\"font-bold\" | class=\"bg-slate-50 p-4 rounded-xl border space-y-2\" | class=\"font-bold text-slate-800\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-admin-lock-round-detail",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-admin-lock-round.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-admin.js"
+    ],
+    "currentClasses": "class=\"pt-2 text-[11px] font-semibold text-slate-600\" | class=\"flex justify-end gap-2 pt-3 border-t\" | class=\"px-4 py-2 bg-slate-100 rounded-xl font-bold text-xs hover:bg-slate-200\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-copy-round",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-copy-round.html"
+    ],
+    "triggers": [
+      "js/planning/activities-manager.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200\" | class=\"flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-reopen-round",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-reopen-round.html"
+    ],
+    "triggers": [
+      "js/grading/final-scores-ranking.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs\" | class=\"p-4 border-b border-slate-200 bg-rose-50 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-round-access-monitoring",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-round-access-monitoring.html"
+    ],
+    "triggers": [
+      "js/tracking/user-activity-tracker.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-2 sm:p-4\" | class=\"bg-white rounded-2xl w-full max-w-5xl h-[92vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden\" | class=\"px-5 py-4 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-round-workspace",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-round-workspace.html"
+    ],
+    "triggers": [
+      "js/rounds/rounds-cards.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[65] modal-backdrop flex items-center justify-center p-2 sm:p-4\" | class=\"bg-slate-50 rounded-2xl w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden\" | class=\"px-4 sm:px-5 py-3 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-round-workspace-title",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-round-workspace.html"
+    ],
+    "triggers": [
+      "js/rounds/rounds-cards.js"
+    ],
+    "currentClasses": "class=\"font-black text-base text-slate-950\" | class=\"text-[11px] text-slate-500 truncate\" | class=\"w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-lg transition\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-round-workspace-subtitle",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-round-workspace.html"
+    ],
+    "triggers": [
+      "js/rounds/rounds-cards.js"
+    ],
+    "currentClasses": "class=\"text-[11px] text-slate-500 truncate\" | class=\"w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-lg transition\" | class=\"flex-1 min-h-0 overflow-y-auto p-3 sm:p-5\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-round-workspace-body",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-round-workspace.html"
+    ],
+    "triggers": [
+      "js/rounds/rounds-cards.js",
+      "js/ui.js"
+    ],
+    "currentClasses": "class=\"flex-1 min-h-0 overflow-y-auto p-3 sm:p-5\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-round-title",
+    "sourceFiles": [
+      "templates/modals/rounds/modal-round.html"
+    ],
+    "triggers": [
+      "js/rounds/rounds-cards.js",
+      "js/rounds/rounds-modal-form.js"
+    ],
+    "currentClasses": "class=\"font-bold text-base text-tdtu-blue\" | class=\"text-[11px] text-slate-500 mt-0.5\" | class=\"text-slate-400 hover:text-slate-600 font-bold p-1 text-lg\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-activity-submissions",
+    "sourceFiles": [
+      "templates/modals/shared/modal-activity-submissions.html"
+    ],
+    "triggers": [
+      "js/drive/drive-files.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4\" | class=\"bg-white rounded-2xl max-w-5xl w-full h-[90vh] max-h-[92vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col text-xs\" | class=\"p-4 border-b border-slate-200 bg-emerald-50 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-add-admin",
+    "sourceFiles": [
+      "templates/modals/shared/modal-add-admin.html"
+    ],
+    "triggers": [
+      "js/admin-management.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[92vh]\" | class=\"p-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-admin-impersonate",
+    "sourceFiles": [
+      "templates/modals/shared/modal-admin-impersonate.html"
+    ],
+    "triggers": [
+      "js/impersonation/impersonation-modal.js",
+      "js/impersonation/impersonation-session.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[90vh]\" | class=\"p-4 border-b border-slate-200 bg-amber-500 text-slate-950 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-admin-submission-inspect",
+    "sourceFiles": [
+      "templates/modals/shared/modal-admin-submission-inspect.html"
+    ],
+    "triggers": [
+      "js/students/student-review-submissions.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[90vh]\" | class=\"p-4 border-b border-slate-200 bg-slate-100 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-confirm",
+    "sourceFiles": [
+      "templates/modals/shared/modal-confirm.html"
+    ],
+    "triggers": [
+      "js/core.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[9998] modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto\" | class=\"flex items-start gap-3\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-confirm-icon",
+    "sourceFiles": [
+      "templates/modals/shared/modal-confirm.html"
+    ],
+    "triggers": [
+      "js/core.js"
+    ],
+    "currentClasses": "class=\"w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xl font-bold bg-rose-100 text-rose-600\" | class=\"flex-1\" | class=\"font-bold text-base text-slate-900\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-confirm-title",
+    "sourceFiles": [
+      "templates/modals/shared/modal-confirm.html"
+    ],
+    "triggers": [
+      "js/core.js"
+    ],
+    "currentClasses": "class=\"font-bold text-base text-slate-900\" | class=\"text-xs text-slate-600 mt-1 leading-relaxed whitespace-pre-line\" | class=\"flex justify-end gap-2.5 pt-2 border-t border-slate-100\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-confirm-message",
+    "sourceFiles": [
+      "templates/modals/shared/modal-confirm.html"
+    ],
+    "triggers": [
+      "js/core.js"
+    ],
+    "currentClasses": "class=\"text-xs text-slate-600 mt-1 leading-relaxed whitespace-pre-line\" | class=\"flex justify-end gap-2.5 pt-2 border-t border-slate-100\" | class=\"px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-confirm-btn-cancel",
+    "sourceFiles": [
+      "templates/modals/shared/modal-confirm.html"
+    ],
+    "triggers": [
+      "js/core.js"
+    ],
+    "currentClasses": "class=\"px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors\" | class=\"px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md transition-colors\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-confirm-btn-ok",
+    "sourceFiles": [
+      "templates/modals/shared/modal-confirm.html"
+    ],
+    "triggers": [
+      "js/core.js"
+    ],
+    "currentClasses": "class=\"px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md transition-colors\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-project-type",
+    "sourceFiles": [
+      "templates/modals/shared/modal-project-type.html"
+    ],
+    "triggers": [
+      "js/rounds/project-types.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto\" | class=\"flex items-center justify-between border-b pb-3\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-submission-history",
+    "sourceFiles": [
+      "templates/modals/shared/modal-submission-history.html"
+    ],
+    "triggers": [
+      "js/drive/drive-files.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[85vh]\" | class=\"p-4 border-b border-slate-200 bg-slate-100 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-submission-override",
+    "sourceFiles": [
+      "templates/modals/shared/modal-submission-override.html"
+    ],
+    "triggers": [
+      "js/drive/drive-files.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs max-h-[92vh] overflow-y-auto\" | class=\"p-4 border-b border-slate-200 bg-amber-50 flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-teacher-profile",
+    "sourceFiles": [
+      "templates/modals/shared/modal-teacher-profile.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-admin.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4 relative border border-slate-200 animate-in fade-in zoom-in duration-200\" | class=\"absolute right-4 top-4 text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer leading-none\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-supervisor-topic-preview",
+    "sourceFiles": [
+      "templates/modals/shared/modal-topic-preview.html"
+    ],
+    "triggers": [
+      "js/students/student-topic-pdf.js",
+      "js/supervisors/supervisor-portal-topics.js"
+    ],
+    "currentClasses": "class=\"fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-2 sm:p-4\" | class=\"bg-slate-100 rounded-2xl shadow-2xl max-w-4xl w-full h-[92vh] max-h-[94vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200\" | class=\"px-5 py-3.5 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-add-eligible-student",
+    "sourceFiles": [
+      "templates/modals/students/modal-add-eligible-student.html"
+    ],
+    "triggers": [
+      "js/students/student-eligibility-modal.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[60] modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-3xl w-full h-[85vh] max-h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200\" | class=\"flex items-center justify-between p-5 border-b border-slate-100 shrink-0 bg-slate-50/50\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-add-letter-option",
+    "sourceFiles": [
+      "templates/modals/students/modal-add-letter-option.html"
+    ],
+    "triggers": [
+      "js/grading/rubrics-config.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden border border-slate-200 max-h-[92vh] overflow-y-auto\" | class=\"flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-letter-option-title",
+    "sourceFiles": [
+      "templates/modals/students/modal-add-letter-option.html"
+    ],
+    "triggers": [
+      "js/grading/rubrics-config.js"
+    ],
+    "currentClasses": "class=\"font-bold text-slate-900 text-sm\" | class=\"text-slate-400 hover:text-slate-600 font-bold p-1\" | class=\"p-4 space-y-3 text-xs\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-student-activity-history",
+    "sourceFiles": [
+      "templates/modals/students/modal-student-activity-history.html"
+    ],
+    "triggers": [
+      "js/tracking/user-activity-tracker.js"
+    ],
+    "currentClasses": "class=\"fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity\" | class=\"bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100 max-h-[90vh] flex flex-col\" | class=\"flex items-start justify-between border-b border-slate-100 pb-4 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-student-edit-topic",
+    "sourceFiles": [
+      "templates/modals/students/modal-student-edit-topic.html"
+    ],
+    "triggers": [
+      "js/students/registration.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[92vh]\" | class=\"p-4 border-b border-slate-200 bg-gradient-to-r from-slate-900 to-tdtu-blue text-white flex items-center justify-between\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-student-profile",
+    "sourceFiles": [
+      "templates/modals/students/modal-student-profile.html"
+    ],
+    "triggers": [
+      "js/students/student-sidebar.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4 relative\" | class=\"absolute right-4 top-4 text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-add-sup-to-round",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-add-sup-to-round.html"
+    ],
+    "triggers": [
+      "js/supervisors/supervisors-master.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden\" | class=\"flex items-center justify-between p-5 border-b border-slate-100 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-add-support-supervisor",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-add-support-supervisor.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-excel.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-md w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200\" | class=\"flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-admin-edit-supervisor",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-admin-edit-supervisor.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-admin.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto\" | class=\"flex items-center justify-between border-b pb-3\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-admin-inspect-sup",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-admin-inspect-sup.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-admin.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col\" | class=\"flex items-center justify-between border-b pb-3\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-admin-manual-assign",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-admin-manual-assign.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-admin.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto\" | class=\"flex items-center justify-between border-b pb-3\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-assignment-excel-preview",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-assignment-excel-preview.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-excel.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4\" | class=\"bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[90vh] max-h-[92vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200\" | class=\"flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-supervisor-confirm",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-supervisor-confirm.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-matching.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto\" | class=\"flex items-center gap-3 border-b pb-3\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-sup-confirm-round-title",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-supervisor-confirm.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-matching.js"
+    ],
+    "currentClasses": "class=\"space-y-3 text-xs text-slate-700\" | class=\"bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-1.5\" | class=\"text-indigo-700 text-sm font-black\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-sup-selected-count",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-supervisor-confirm.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-matching.js"
+    ],
+    "currentClasses": "class=\"text-indigo-700 text-sm font-black\" | class=\"text-amber-700 font-bold\" | class=\"text-slate-600 leading-relaxed\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-sup-rem-count",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-supervisor-confirm.html"
+    ],
+    "triggers": [
+      "js/supervisors/assignments-matching.js"
+    ],
+    "currentClasses": "class=\"text-amber-700 font-bold\" | class=\"text-slate-600 leading-relaxed\" | class=\"flex justify-end gap-2 pt-3 border-t\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-supervisor",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-supervisor.html"
+    ],
+    "triggers": [
+      "js/supervisors/supervisors-master.js"
+    ],
+    "currentClasses": "class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\" | class=\"bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden\" | class=\"flex items-center justify-between p-5 border-b border-slate-100 shrink-0\"",
+    "currentStyles": ""
+  },
+  {
+    "id": "modal-supervisor-title",
+    "sourceFiles": [
+      "templates/modals/supervisors/modal-supervisor.html"
+    ],
+    "triggers": [
+      "js/supervisors/supervisors-master.js"
+    ],
+    "currentClasses": "class=\"font-bold text-base text-tdtu-blue\" | class=\"text-slate-400 hover:text-slate-600 font-bold p-1\" | class=\"flex flex-col flex-1 overflow-hidden\"",
+    "currentStyles": ""
+  }
+]

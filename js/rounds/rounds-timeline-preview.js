@@ -238,7 +238,7 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
   dialog.id = 'student-timeline-event-dialog';
   dialog.className = 'fixed inset-0 z-[120] modal-backdrop flex items-center justify-center bg-slate-950/60 p-4';
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
-  dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Chi tiết mốc kế hoạch" class="student-timeline-event-panel max-w-3xl lg:max-w-4xl rounded-2xl sm:rounded-3xl bg-white shadow-2xl">
+  dialog.innerHTML = `<div role="dialog" aria-modal="true" aria-label="Chi tiết mốc kế hoạch" class="modal-size-detail student-timeline-event-panel max-w-3xl lg:max-w-4xl rounded-2xl sm:rounded-3xl bg-white shadow-2xl">
     <div class="flex items-start justify-between gap-4 px-5 pt-5 sm:px-8 sm:pt-7">
       <div>
         <div class="text-xs font-black uppercase tracking-wider text-blue-700">${activity ? 'Mốc kế hoạch' : 'Sự kiện trong tuần'}</div>
@@ -363,7 +363,7 @@ window.openAdminTimelineEventEditor = function(roundId, weekNumber, eventId) {
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
 
   dialog.innerHTML = `
-    <div role="dialog" aria-modal="true" aria-label="Chỉnh sửa sự kiện" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+    <div role="dialog" aria-modal="true" aria-label="Chỉnh sửa sự kiện" class="modal-size-form w-full rounded-2xl bg-white p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
         <div>
           <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">Chỉnh sửa sự kiện Tuần ${weekNumber}</span>
@@ -524,7 +524,7 @@ window.openAdminTimelineQuickCreateEvent = function(roundId, weekNumber, dateKey
   dialog.onclick = click => { if (click.target === dialog) window.closeStudentTimelineEvent(); };
 
   dialog.innerHTML = `
-    <div role="dialog" aria-modal="true" aria-label="Thêm sự kiện nhanh" class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+    <div role="dialog" aria-modal="true" aria-label="Thêm sự kiện nhanh" class="modal-size-form w-full rounded-2xl bg-white p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
         <div>
           <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">Thêm sự kiện nhanh · Tuần ${weekNumber}</span>

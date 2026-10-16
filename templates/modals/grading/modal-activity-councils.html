@@ -2,7 +2,7 @@
        MODAL: ACTIVITY COUNCIL MANAGEMENT (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-activity-councils" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[92vh] max-h-[94vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+    <div class="modal-size-management max-w-6xl bg-white rounded-2xl w-full h-[92vh] max-h-[94vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
       <!-- Header -->
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0 bg-slate-50/50">
         <div>
@@ -31,7 +31,7 @@
 
       <!-- Main Body -->
       <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 text-xs bg-slate-50/30">
-        
+
         <!-- TAB 1: DANH SÁCH HỘI ĐỒNG -->
         <div id="ctab-panel-councils" class="space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
@@ -87,7 +87,7 @@
 
         <!-- TAB 3: PHÂN CÔNG SINH VIÊN & THỨ TỰ TRÌNH BÀY (CÓ SUB-TABS HỘI ĐỒNG) -->
         <div id="ctab-panel-students" class="hidden space-y-4">
-          
+
           <!-- Sub-tabs bar: Chưa phân công / HĐ1 / HĐ2 / Tất cả -->
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
             <div id="council-student-subtabs" class="flex flex-wrap items-center gap-2">
@@ -138,7 +138,7 @@
 
   <!-- MODAL: COPY COUNCILS & STUDENTS FROM ANOTHER MILESTONE -->
   <div id="modal-copy-councils-from-milestone" class="hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col">
+    <div class="modal-size-form bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col">
       <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
         <div class="flex items-center gap-2">
           <span class="text-xl">📋</span>
@@ -194,4 +194,4 @@
         </button>
       </div>
     </div>
-  </div>
+  </div>

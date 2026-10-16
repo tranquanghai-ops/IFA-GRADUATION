@@ -1,0 +1,345 @@
+[
+  {
+    "id": "modal-activity-councils",
+    "file": "templates/modals/grading/modal-activity-councils.html",
+    "title": "QUẢN LÝ HỘI ĐỒNG — Mốc Kế hoạch",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[92vh] max-h-[94vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200"
+  },
+  {
+    "id": "modal-copy-councils-from-milestone",
+    "file": "templates/modals/grading/modal-activity-councils.html",
+    "title": "QUẢN LÝ HỘI ĐỒNG — Mốc Kế hoạch",
+    "outerClasses": "hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col"
+  },
+  {
+    "id": "modal-add-council-guest-member",
+    "file": "templates/modals/grading/modal-add-council-guest-member.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200"
+  },
+  {
+    "id": "modal-add-council-internal-member",
+    "file": "templates/modals/grading/modal-add-council-internal-member.html",
+    "title": "Thêm Thành viên Nội bộ",
+    "outerClasses": "hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200"
+  },
+  {
+    "id": "modal-add-guest-slot",
+    "file": "templates/modals/grading/modal-add-guest-slot.html",
+    "title": "Thêm vị trí Khách mời / Doanh nghiệp",
+    "outerClasses": "hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-sm w-full max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col border border-slate-200"
+  },
+  {
+    "id": "modal-adjust-council-score",
+    "file": "templates/modals/grading/modal-adjust-council-score.html",
+    "title": "",
+    "outerClasses": "fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity",
+    "innerClasses": "bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100 max-h-[92vh] flex flex-col"
+  },
+  {
+    "id": "modal-admin-score-detail",
+    "file": "templates/modals/grading/modal-admin-score-detail.html",
+    "title": "Chi tiết Điểm số: Nguyễn Văn A (12345678)",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 text-xs"
+  },
+  {
+    "id": "modal-council-score-details",
+    "file": "templates/modals/grading/modal-council-score-details.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs",
+    "innerClasses": "bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 text-xs animate-in fade-in zoom-in duration-150"
+  },
+  {
+    "id": "modal-council-workspace",
+    "file": "templates/modals/grading/modal-council-workspace.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-[75] modal-backdrop flex items-center justify-center p-1 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[98vh] sm:h-[94vh] max-h-[98vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200"
+  },
+  {
+    "id": "modal-edit-council",
+    "file": "templates/modals/grading/modal-edit-council.html",
+    "title": "Thêm Hội đồng mới",
+    "outerClasses": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-xl w-full shadow-2xl flex flex-col max-h-[94vh] overflow-hidden border border-slate-200"
+  },
+  {
+    "id": "modal-final-score-detail",
+    "file": "templates/modals/grading/modal-final-score-detail.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs"
+  },
+  {
+    "id": "modal-guest-passcode-entry",
+    "file": "templates/modals/grading/modal-guest-passcode-entry.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs"
+  },
+  {
+    "id": "modal-milestone-quick-council",
+    "file": "templates/modals/grading/modal-milestone-quick-council.html",
+    "title": "Thêm Hội đồng cho Mốc",
+    "outerClasses": "hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200"
+  },
+  {
+    "id": "modal-publish-progress-review",
+    "file": "templates/modals/grading/modal-publish-progress-review.html",
+    "title": "--",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs",
+    "innerClasses": "bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col overflow-hidden border border-slate-200 text-xs animate-in fade-in zoom-in duration-150"
+  },
+  {
+    "id": "modal-reopen-council",
+    "file": "templates/modals/grading/modal-reopen-council.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs"
+  },
+  {
+    "id": "modal-revoke-progress-review",
+    "file": "templates/modals/grading/modal-revoke-progress-review.html",
+    "title": "",
+    "outerClasses": "fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity",
+    "innerClasses": "bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100"
+  },
+  {
+    "id": "modal-rubric-criterion",
+    "file": "templates/modals/grading/modal-rubric-criterion.html",
+    "title": "Thêm tiêu chí Rubric",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs max-h-[92vh] overflow-y-auto"
+  },
+  {
+    "id": "modal-score-calibration",
+    "file": "templates/modals/grading/modal-score-calibration.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs"
+  },
+  {
+    "id": "modal-score-entry",
+    "file": "templates/modals/grading/modal-score-entry.html",
+    "title": "Nhập Điểm Đánh giá",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs"
+  },
+  {
+    "id": "modal-activity",
+    "file": "templates/modals/rounds/modal-activity.html",
+    "title": "Thêm Mốc Kế hoạch Đợt TN",
+    "outerClasses": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl w-full max-w-[min(94vw,1180px)] shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200"
+  },
+  {
+    "id": "modal-admin-lock-round",
+    "file": "templates/modals/rounds/modal-admin-lock-round.html",
+    "title": "Chốt Nguyện Vọng & Chuyển Vòng Xét",
+    "outerClasses": "hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4"
+  },
+  {
+    "id": "modal-copy-round",
+    "file": "templates/modals/rounds/modal-copy-round.html",
+    "title": "Sao chép Kế hoạch từ Đợt khác",
+    "outerClasses": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200"
+  },
+  {
+    "id": "modal-reopen-round",
+    "file": "templates/modals/rounds/modal-reopen-round.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs"
+  },
+  {
+    "id": "modal-round-access-monitoring",
+    "file": "templates/modals/rounds/modal-round-access-monitoring.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-2 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl w-full max-w-5xl h-[92vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+  },
+  {
+    "id": "modal-round-workspace",
+    "file": "templates/modals/rounds/modal-round-workspace.html",
+    "title": "Quản lý đợt tốt nghiệp",
+    "outerClasses": "hidden fixed inset-0 z-[65] modal-backdrop flex items-center justify-center p-2 sm:p-4",
+    "innerClasses": "bg-slate-50 rounded-2xl w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+  },
+  {
+    "id": "modal-round",
+    "file": "templates/modals/rounds/modal-round.html",
+    "title": "Tạo Đợt Đồ án Tốt nghiệp",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden"
+  },
+  {
+    "id": "modal-activity-submissions",
+    "file": "templates/modals/shared/modal-activity-submissions.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-5xl w-full h-[90vh] max-h-[92vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col text-xs"
+  },
+  {
+    "id": "modal-add-admin",
+    "file": "templates/modals/shared/modal-add-admin.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[92vh]"
+  },
+  {
+    "id": "modal-admin-impersonate",
+    "file": "templates/modals/shared/modal-admin-impersonate.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[90vh]"
+  },
+  {
+    "id": "modal-admin-submission-inspect",
+    "file": "templates/modals/shared/modal-admin-submission-inspect.html",
+    "title": "...",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[90vh]"
+  },
+  {
+    "id": "modal-confirm",
+    "file": "templates/modals/shared/modal-confirm.html",
+    "title": "Xác nhận",
+    "outerClasses": "hidden fixed inset-0 z-[9998] modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
+  },
+  {
+    "id": "modal-project-type",
+    "file": "templates/modals/shared/modal-project-type.html",
+    "title": "Thêm Loại hình Đồ án",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
+  },
+  {
+    "id": "modal-submission-history",
+    "file": "templates/modals/shared/modal-submission-history.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[85vh]"
+  },
+  {
+    "id": "modal-submission-override",
+    "file": "templates/modals/shared/modal-submission-override.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs max-h-[92vh] overflow-y-auto"
+  },
+  {
+    "id": "modal-teacher-profile",
+    "file": "templates/modals/shared/modal-teacher-profile.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4 relative border border-slate-200 animate-in fade-in zoom-in duration-200"
+  },
+  {
+    "id": "modal-supervisor-topic-preview",
+    "file": "templates/modals/shared/modal-topic-preview.html",
+    "title": "--",
+    "outerClasses": "fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-2 sm:p-4",
+    "innerClasses": "bg-slate-100 rounded-2xl shadow-2xl max-w-4xl w-full h-[92vh] max-h-[94vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200"
+  },
+  {
+    "id": "modal-add-eligible-student",
+    "file": "templates/modals/students/modal-add-eligible-student.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-[60] modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-3xl w-full h-[85vh] max-h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200"
+  },
+  {
+    "id": "modal-add-letter-option",
+    "file": "templates/modals/students/modal-add-letter-option.html",
+    "title": "Mức điểm chữ",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden border border-slate-200 max-h-[92vh] overflow-y-auto"
+  },
+  {
+    "id": "modal-student-activity-history",
+    "file": "templates/modals/students/modal-student-activity-history.html",
+    "title": "",
+    "outerClasses": "fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity",
+    "innerClasses": "bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100 max-h-[90vh] flex flex-col"
+  },
+  {
+    "id": "modal-student-edit-topic",
+    "file": "templates/modals/students/modal-student-edit-topic.html",
+    "title": "",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[92vh]"
+  },
+  {
+    "id": "modal-student-profile",
+    "file": "templates/modals/students/modal-student-profile.html",
+    "title": "Hồ sơ Sinh viên",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4 relative"
+  },
+  {
+    "id": "modal-add-sup-to-round",
+    "file": "templates/modals/supervisors/modal-add-sup-to-round.html",
+    "title": "Thêm Giảng viên vào Đợt Tốt nghiệp",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
+  },
+  {
+    "id": "modal-add-support-supervisor",
+    "file": "templates/modals/supervisors/modal-add-support-supervisor.html",
+    "title": "Thêm GVHD 2",
+    "outerClasses": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200"
+  },
+  {
+    "id": "modal-admin-edit-supervisor",
+    "file": "templates/modals/supervisors/modal-admin-edit-supervisor.html",
+    "title": "Chỉnh sửa phân công GVHD",
+    "outerClasses": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
+  },
+  {
+    "id": "modal-admin-inspect-sup",
+    "file": "templates/modals/supervisors/modal-admin-inspect-sup.html",
+    "title": "Chi tiết Xét duyệt: Thầy/Cô",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col"
+  },
+  {
+    "id": "modal-admin-manual-assign",
+    "file": "templates/modals/supervisors/modal-admin-manual-assign.html",
+    "title": "Phân công GVHD Thủ công",
+    "outerClasses": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
+  },
+  {
+    "id": "modal-assignment-excel-preview",
+    "file": "templates/modals/supervisors/modal-assignment-excel-preview.html",
+    "title": "Xem trước phân công GVHD từ Excel",
+    "outerClasses": "hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[90vh] max-h-[92vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200"
+  },
+  {
+    "id": "modal-supervisor-confirm",
+    "file": "templates/modals/supervisors/modal-supervisor-confirm.html",
+    "title": "Xác nhận Kết thúc Lựa chọn Vòng",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
+  },
+  {
+    "id": "modal-supervisor",
+    "file": "templates/modals/supervisors/modal-supervisor.html",
+    "title": "Thêm Giảng viên Hướng dẫn",
+    "outerClasses": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "innerClasses": "bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+  }
+]

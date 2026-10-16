@@ -1,0 +1,320 @@
+[
+  {
+    "id": "dynamic-dialog-core",
+    "file": "js/core.js",
+    "classAttr": "fixed inset-0 z-[10000] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4",
+    "fullTag": "JS Dynamic"
+  },
+  {
+    "id": "rich-hyperlink-modal",
+    "file": "js/planning/activities-manager.js",
+    "classAttr": "fixed inset-0 z-[100000] modal-backdrop bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4",
+    "fullTag": "JS Dynamic"
+  },
+  {
+    "id": "student-timeline-event-dialog",
+    "file": "js/rounds/rounds-timeline-preview.js",
+    "classAttr": "fixed inset-0 z-[120] modal-backdrop flex items-center justify-center bg-slate-950/60 p-4",
+    "fullTag": "JS Dynamic"
+  },
+  {
+    "id": "modal-activity-councils",
+    "file": "templates/modals/grading/modal-activity-councils.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4",
+    "fullTag": "<div id=\"modal-activity-councils\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4\">"
+  },
+  {
+    "id": "modal-copy-councils-from-milestone",
+    "file": "templates/modals/grading/modal-activity-councils.html",
+    "classAttr": "hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-copy-councils-from-milestone\" class=\"hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-add-council-guest-member",
+    "file": "templates/modals/grading/modal-add-council-guest-member.html",
+    "classAttr": "hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-add-council-guest-member\" class=\"hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-add-council-internal-member",
+    "file": "templates/modals/grading/modal-add-council-internal-member.html",
+    "classAttr": "hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-add-council-internal-member\" class=\"hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-add-guest-slot",
+    "file": "templates/modals/grading/modal-add-guest-slot.html",
+    "classAttr": "hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-add-guest-slot\" class=\"hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-adjust-council-score",
+    "file": "templates/modals/grading/modal-adjust-council-score.html",
+    "classAttr": "fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity",
+    "fullTag": "<div id=\"modal-adjust-council-score\" class=\"fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"adjust-council-score-title\">"
+  },
+  {
+    "id": "modal-admin-score-detail",
+    "file": "templates/modals/grading/modal-admin-score-detail.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-admin-score-detail\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-council-score-details",
+    "file": "templates/modals/grading/modal-council-score-details.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs",
+    "fullTag": "<div id=\"modal-council-score-details\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs\">"
+  },
+  {
+    "id": "modal-council-workspace",
+    "file": "templates/modals/grading/modal-council-workspace.html",
+    "classAttr": "hidden fixed inset-0 z-[75] modal-backdrop flex items-center justify-center p-1 sm:p-4",
+    "fullTag": "<div id=\"modal-council-workspace\" class=\"hidden fixed inset-0 z-[75] modal-backdrop flex items-center justify-center p-1 sm:p-4\">"
+  },
+  {
+    "id": "modal-edit-council",
+    "file": "templates/modals/grading/modal-edit-council.html",
+    "classAttr": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-edit-council\" class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-final-score-detail",
+    "file": "templates/modals/grading/modal-final-score-detail.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-final-score-detail\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-guest-passcode-entry",
+    "file": "templates/modals/grading/modal-guest-passcode-entry.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-guest-passcode-entry\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-milestone-quick-council",
+    "file": "templates/modals/grading/modal-milestone-quick-council.html",
+    "classAttr": "hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-milestone-quick-council\" class=\"hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-publish-progress-review",
+    "file": "templates/modals/grading/modal-publish-progress-review.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs",
+    "fullTag": "<div id=\"modal-publish-progress-review\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs\">"
+  },
+  {
+    "id": "modal-reopen-council",
+    "file": "templates/modals/grading/modal-reopen-council.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-reopen-council\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-revoke-progress-review",
+    "file": "templates/modals/grading/modal-revoke-progress-review.html",
+    "classAttr": "fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity",
+    "fullTag": "<div id=\"modal-revoke-progress-review\" class=\"fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"revoke-review-title\">"
+  },
+  {
+    "id": "modal-rubric-criterion",
+    "file": "templates/modals/grading/modal-rubric-criterion.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-rubric-criterion\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-score-calibration",
+    "file": "templates/modals/grading/modal-score-calibration.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-score-calibration\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-score-entry",
+    "file": "templates/modals/grading/modal-score-entry.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-score-entry\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-activity",
+    "file": "templates/modals/rounds/modal-activity.html",
+    "classAttr": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-activity\" class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-admin-lock-round",
+    "file": "templates/modals/rounds/modal-admin-lock-round.html",
+    "classAttr": "hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-admin-lock-round\" class=\"hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-copy-round",
+    "file": "templates/modals/rounds/modal-copy-round.html",
+    "classAttr": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-copy-round\" class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-reopen-round",
+    "file": "templates/modals/rounds/modal-reopen-round.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-reopen-round\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-round-access-monitoring",
+    "file": "templates/modals/rounds/modal-round-access-monitoring.html",
+    "classAttr": "hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-2 sm:p-4",
+    "fullTag": "<div id=\"modal-round-access-monitoring\" class=\"hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-2 sm:p-4\" onclick=\"if(event.target === this) closeRoundAccessMonitoringModal()\">"
+  },
+  {
+    "id": "modal-round-workspace",
+    "file": "templates/modals/rounds/modal-round-workspace.html",
+    "classAttr": "hidden fixed inset-0 z-[65] modal-backdrop flex items-center justify-center p-2 sm:p-4",
+    "fullTag": "<div id=\"modal-round-workspace\" class=\"hidden fixed inset-0 z-[65] modal-backdrop flex items-center justify-center p-2 sm:p-4\" onclick=\"if(event.target === this) closeRoundWorkspaceModal()\">"
+  },
+  {
+    "id": "modal-round",
+    "file": "templates/modals/rounds/modal-round.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-round\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-activity-submissions",
+    "file": "templates/modals/shared/modal-activity-submissions.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4",
+    "fullTag": "<div id=\"modal-activity-submissions\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4\">"
+  },
+  {
+    "id": "modal-add-admin",
+    "file": "templates/modals/shared/modal-add-admin.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-add-admin\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-admin-impersonate",
+    "file": "templates/modals/shared/modal-admin-impersonate.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-admin-impersonate\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-admin-submission-inspect",
+    "file": "templates/modals/shared/modal-admin-submission-inspect.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-admin-submission-inspect\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-confirm",
+    "file": "templates/modals/shared/modal-confirm.html",
+    "classAttr": "hidden fixed inset-0 z-[9998] modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-confirm\" class=\"hidden fixed inset-0 z-[9998] modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-project-type",
+    "file": "templates/modals/shared/modal-project-type.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-project-type\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-submission-history",
+    "file": "templates/modals/shared/modal-submission-history.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-submission-history\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-submission-override",
+    "file": "templates/modals/shared/modal-submission-override.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-submission-override\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-teacher-profile",
+    "file": "templates/modals/shared/modal-teacher-profile.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-teacher-profile\" class=\"hidden fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-supervisor-topic-preview",
+    "file": "templates/modals/shared/modal-topic-preview.html",
+    "classAttr": "fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-2 sm:p-4",
+    "fullTag": "<div id=\"modal-supervisor-topic-preview\" class=\"fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-2 sm:p-4\">"
+  },
+  {
+    "id": "modal-add-eligible-student",
+    "file": "templates/modals/students/modal-add-eligible-student.html",
+    "classAttr": "hidden fixed inset-0 z-[60] modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-add-eligible-student\" class=\"hidden fixed inset-0 z-[60] modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-add-letter-option",
+    "file": "templates/modals/students/modal-add-letter-option.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-add-letter-option\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-student-activity-history",
+    "file": "templates/modals/students/modal-student-activity-history.html",
+    "classAttr": "fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity",
+    "fullTag": "<div id=\"modal-student-activity-history\" class=\"fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"student-activity-history-title\">"
+  },
+  {
+    "id": "modal-student-edit-topic",
+    "file": "templates/modals/students/modal-student-edit-topic.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-student-edit-topic\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-student-profile",
+    "file": "templates/modals/students/modal-student-profile.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-student-profile\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-add-sup-to-round",
+    "file": "templates/modals/supervisors/modal-add-sup-to-round.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-add-sup-to-round\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-add-support-supervisor",
+    "file": "templates/modals/supervisors/modal-add-support-supervisor.html",
+    "classAttr": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-add-support-supervisor\" class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-admin-edit-supervisor",
+    "file": "templates/modals/supervisors/modal-admin-edit-supervisor.html",
+    "classAttr": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-admin-edit-supervisor\" class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-admin-inspect-sup",
+    "file": "templates/modals/supervisors/modal-admin-inspect-sup.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-admin-inspect-sup\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-admin-manual-assign",
+    "file": "templates/modals/supervisors/modal-admin-manual-assign.html",
+    "classAttr": "hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-admin-manual-assign\" class=\"hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-assignment-excel-preview",
+    "file": "templates/modals/supervisors/modal-assignment-excel-preview.html",
+    "classAttr": "hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4",
+    "fullTag": "<div id=\"modal-assignment-excel-preview\" class=\"hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4\">"
+  },
+  {
+    "id": "modal-supervisor-confirm",
+    "file": "templates/modals/supervisors/modal-supervisor-confirm.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-supervisor-confirm\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "modal-supervisor",
+    "file": "templates/modals/supervisors/modal-supervisor.html",
+    "classAttr": "hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4",
+    "fullTag": "<div id=\"modal-supervisor\" class=\"hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4\">"
+  },
+  {
+    "id": "supervisor-student-detail-modal",
+    "file": "views/supervisor.html",
+    "classAttr": "fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-1 sm:p-4",
+    "fullTag": "<div id=\"supervisor-student-detail-modal\" class=\"fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-1 sm:p-4\">"
+  }
+]

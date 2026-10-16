@@ -2,8 +2,8 @@
      MODAL: COUNCIL WORKSPACE / ĐIỀU HÀNH & CHẤM ĐIỂM HỘI ĐỒNG (v2.7.4)
      ============================================================================ -->
 <div id="modal-council-workspace" class="hidden fixed inset-0 z-[75] modal-backdrop flex items-center justify-center p-1 sm:p-4">
-  <div class="bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[98vh] sm:h-[94vh] max-h-[98vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
-    
+  <div class="modal-size-fullscreen bg-white rounded-2xl w-full h-[98vh] sm:h-[94vh] max-h-[98vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+
     <!-- Ultra-Compact Top Header -->
     <div class="px-2.5 py-2 sm:px-4 sm:py-2.5 border-b border-slate-200 bg-slate-900 text-white shrink-0 shadow-xs">
       <div class="cws-header-layout flex items-center justify-between gap-1.5 sm:gap-3">
@@ -103,7 +103,7 @@
 
     <!-- Main Body: 3 Columns Responsive (Students | Grading | Ranking) -->
     <div class="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
-      
+
       <!-- LEFT COLUMN: DANH SÁCH SINH VIÊN (Visible on md+ desktop/tablet) -->
       <div id="cws-col-students" class="w-full md:w-80 lg:w-[30rem] xl:w-[34rem] border-b md:border-b-0 md:border-r border-slate-200 hidden md:flex flex-col bg-slate-50/40 shrink-0 overflow-hidden flex-1 md:flex-none min-h-0 h-full">
         <div class="p-2.5 sm:p-3 border-b border-slate-200 bg-white space-y-2 shrink-0">
@@ -113,7 +113,7 @@
           </div>
           <input type="text" id="cws-student-search" oninput="filterCouncilWorkspaceStudents(this.value)" placeholder="Tìm MSSV, họ tên, đề tài..." class="w-full p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
         </div>
-        
+
         <div id="cws-students-list" class="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5 text-xs touch-pan-y overscroll-contain pb-28 sm:pb-6">
           <!-- Rendered dynamically -->
         </div>
@@ -121,7 +121,7 @@
 
       <!-- RIGHT COLUMN: WORKSPACE FOR SELECTED STUDENT -->
       <div id="cws-col-grading" class="flex-1 flex flex-col overflow-y-auto p-2.5 sm:p-6 space-y-2.5 sm:space-y-4 bg-white min-w-0">
-        
+
         <!-- MOBILE STUDENT STEPPER BAR (< md) - DIRECTLY BELOW HEADER -->
         <div class="flex items-center justify-between p-2 bg-slate-100/90 border border-slate-200 rounded-xl md:hidden text-xs shrink-0">
           <button type="button" onclick="navigateCouncilPrevStudent()" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 shadow-2xs flex items-center gap-1 cursor-pointer">

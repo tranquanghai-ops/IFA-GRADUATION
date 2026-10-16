@@ -1,7 +1,7 @@
 
   <!-- CREATE / EDIT ACTIVITY MODAL (v1.9.0-beta.1) -->
   <div id="modal-activity" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl w-full max-w-[min(94vw,1180px)] shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
+    <div class="modal-size-form max-w-[min(94vw,1180px)] bg-white rounded-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
         <div>
           <h3 id="modal-activity-title" class="font-bold text-base text-tdtu-blue">Thêm Mốc Kế hoạch Đợt TN</h3>
@@ -166,13 +166,13 @@
               }
             </style>
             <label class="font-bold text-slate-700 block mb-1">Nội dung / Hướng dẫn chi tiết</label>
-            
+
             <!-- Toolbar -->
             <div class="rich-editor-toolbar">
               <!-- Undo / Redo -->
               <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('undo')" title="Hoàn tác (Undo)">↶</button>
               <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('redo')" title="Làm lại (Redo)">↷</button>
-              
+
               <div class="rich-separator"></div>
 
               <!-- Heading / Normal -->
@@ -339,7 +339,7 @@
                   <p class="text-[11px] text-slate-600 leading-relaxed">
                     Thời gian nhận bài độc lập với thời gian diễn ra hoạt động. Sinh viên chỉ được nộp bài trong khoảng thời gian tiếp nhận được thiết lập.
                   </p>
-                  
+
                   <!-- 2. BẮT ĐẦU NHẬN BÀI -->
                   <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
                     <div class="flex items-center justify-between">
@@ -597,7 +597,7 @@
                     <input type="checkbox" id="activity-form-scoring-enabled" onchange="toggleActivityScoringConfig(this.checked)" class="rounded text-tdtu-blue">
                     <span class="font-bold text-xs text-emerald-700">📝 Cho phép chấm điểm tại mốc này (scoringEnabled)</span>
                   </label>
-                  
+
                   <div id="activity-scoring-config-panel" class="hidden pl-2 space-y-3 bg-emerald-50/50 p-3 rounded-xl border border-emerald-200">
                     <div>
                       <label class="font-bold text-slate-700 block mb-1 text-xs">Kiểu chấm điểm:</label>
@@ -616,7 +616,7 @@
                         </label>
                       </div>
                     </div>
-                    
+
                     <!-- Numeric Config -->
                     <div id="activity-scoring-numeric-wrap" class="grid grid-cols-3 gap-2">
                       <div>

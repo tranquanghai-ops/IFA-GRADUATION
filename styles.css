@@ -212,6 +212,107 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ==========================================================================
+   GLOBAL MODAL DESIGN SYSTEM & SIZING TOKENS
+   Standardized modal size tiers:
+   - Group A (Large Management): width: min(90vw, 1440px)
+   - Group B (Detail):          width: min(90vw, 1200px)
+   - Group C (Form):            width: min(90vw, 900px)
+   - Group D (Confirm):         width: min(90vw, 600px)
+   - Group E (Fullscreen):      width: min(98vw, 1720px), height: 96vh
+   ========================================================================== */
+
+.modal-size-management,
+.modal-tier-management,
+.modal-size-xl {
+  width: min(90vw, 1440px) !important;
+  max-width: min(90vw, 1440px) !important;
+}
+
+.modal-size-detail,
+.modal-tier-detail,
+.modal-size-lg {
+  width: min(90vw, 1200px) !important;
+  max-width: min(90vw, 1200px) !important;
+}
+
+.modal-size-form,
+.modal-tier-form,
+.modal-size-md {
+  width: min(90vw, 900px) !important;
+  max-width: min(90vw, 900px) !important;
+}
+
+.modal-size-confirm,
+.modal-tier-confirm,
+.modal-size-sm {
+  width: min(90vw, 600px) !important;
+  max-width: min(90vw, 600px) !important;
+}
+
+.modal-size-fullscreen,
+.modal-tier-fullscreen {
+  width: min(98vw, 1720px) !important;
+  max-width: min(98vw, 1720px) !important;
+  height: 96vh !important;
+  max-height: 98vh !important;
+}
+
+/* Modal layout standardizations */
+.modal-container-card {
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+  overflow: hidden;
+  border-radius: 1rem;
+  background-color: #ffffff;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header-standard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+  flex-shrink: 0;
+  background-color: #f8fafc;
+}
+
+.modal-body-standard {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.5rem;
+}
+
+.modal-footer-standard {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #f1f5f9;
+  flex-shrink: 0;
+  background-color: #f8fafc;
+}
+
+/* Mobile responsive fallback */
+@media (max-width: 640px) {
+  .modal-size-management,
+  .modal-size-detail,
+  .modal-size-form,
+  .modal-size-confirm,
+  .modal-tier-management,
+  .modal-tier-detail,
+  .modal-tier-form,
+  .modal-tier-confirm {
+    width: min(95vw, 100%) !important;
+    max-width: min(95vw, 100%) !important;
+  }
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

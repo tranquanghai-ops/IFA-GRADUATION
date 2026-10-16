@@ -1060,7 +1060,7 @@
 
       <!-- STUDENT DETAIL MODAL / DRAWER (PHASE 3) -->
       <div id="supervisor-student-detail-modal" class="fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-1 sm:p-4">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
+        <div class="modal-size-detail bg-white rounded-2xl shadow-2xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
           <!-- Modal Header -->
           <div class="p-4 sm:p-5 bg-gradient-to-r from-slate-900 to-tdtu-blue text-white flex items-start justify-between gap-4">
             <div class="flex items-center gap-3 sm:gap-3.5">
@@ -3525,7 +3525,7 @@
 
 <!-- === MODALS & DIALOGS === -->
   <div id="modal-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+    <div class="modal-size-management bg-white rounded-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
       <!-- MODAL HEADER -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-slate-50">
         <div>
@@ -3583,7 +3583,7 @@
             <!-- 24H TIME PICKERS: Mở & Đóng -->
             <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
               <span class="font-bold text-slate-700 block uppercase tracking-wide text-[11px]">Thời gian mở & đóng đợt (Hệ 24h)</span>
-              
+
               <!-- Open Time -->
               <div>
                 <div class="flex items-center justify-between mb-1.5">
@@ -3935,7 +3935,7 @@
 
   <!-- MODAL: TÌM VÀ THÊM SINH VIÊN VÀO ĐỢT (TỪ FACULTY STUDENT MASTER) -->
   <div id="modal-add-eligible-student" class="hidden fixed inset-0 z-[60] modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-3xl w-full h-[85vh] max-h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+    <div class="modal-size-management bg-white rounded-2xl w-full h-[85vh] max-h-[90vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
       <!-- Modal Header -->
       <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0 bg-slate-50/50">
         <div>
@@ -3994,7 +3994,7 @@
 
   <!-- 2. CREATE / EDIT SUPERVISOR MASTER MODAL -->
   <div id="modal-supervisor" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+    <div class="modal-size-form bg-white rounded-2xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
       <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0">
         <h3 id="modal-supervisor-title" class="font-bold text-base text-tdtu-blue">Thêm Giảng viên Hướng dẫn</h3>
         <button type="button" onclick="closeSupervisorModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
@@ -4057,7 +4057,7 @@
             </div>
           </div>
           <p class="text-[11px] text-slate-400">💡 Quy định hạn mức: Giảng viên Cơ hữu tối đa 10 SV, Giảng viên Thỉnh giảng tối đa 5 SV.</p>
-          
+
           <!-- Image upload & Preview (Storage + Auto-resize/compress) -->
           <div>
             <label class="font-bold text-slate-700 block mb-1">Ảnh chân dung (Portrait)</label>
@@ -4109,7 +4109,7 @@
 
   <!-- 3. ADD SUPERVISORS TO ROUND MODAL -->
   <div id="modal-add-sup-to-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div class="modal-size-form bg-white rounded-2xl w-full shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
       <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0">
         <div>
           <h3 class="font-bold text-base text-tdtu-blue">Thêm Giảng viên vào Đợt Tốt nghiệp</h3>
@@ -4138,7 +4138,7 @@
 
   <!-- 4. ADD / EDIT PROJECT TYPE MODAL -->
   <div id="modal-project-type" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+    <div class="modal-size-confirm bg-white rounded-2xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b pb-3">
         <h3 class="font-bold text-base text-tdtu-blue">Thêm Loại hình Đồ án</h3>
         <button onclick="closeProjectTypeModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
@@ -4171,7 +4171,7 @@
 
   <!-- 4.5. STUDENT PROFILE MODAL -->
   <div id="modal-student-profile" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4 relative">
+    <div class="modal-size-detail bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4 relative">
       <button type="button" onclick="closeStudentProfileModal()" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer">✕</button>
 
       <div class="flex items-center gap-2 border-b border-slate-100 pb-3">
@@ -4185,7 +4185,7 @@
     </div>
   </div>
   <div id="modal-student-edit-topic" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[92vh]">
+    <div class="modal-size-form bg-white rounded-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[92vh]">
       <!-- Modal Header -->
       <div class="p-4 border-b border-slate-200 bg-gradient-to-r from-slate-900 to-tdtu-blue text-white flex items-center justify-between">
         <div class="flex items-center gap-2.5">
@@ -4246,7 +4246,7 @@
 
 <!-- MODAL: HỒ SƠ & LÝ LỊCH GIẢNG VIÊN DÙNG CHUNG TOÀN HỆ THỐNG (SV, GVHD, HỘI ĐỒNG & ADMIN) -->
 <div id="modal-teacher-profile" class="hidden fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4 relative border border-slate-200 animate-in fade-in zoom-in duration-200">
+  <div class="modal-size-detail bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4 relative border border-slate-200 animate-in fade-in zoom-in duration-200">
     <button type="button" onclick="closeTeacherProfileModal()" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 font-bold text-lg cursor-pointer leading-none" title="Đóng">✕</button>
 
     <div class="flex items-center gap-4 border-b border-slate-100 pb-4">
@@ -4309,7 +4309,7 @@
 
   <!-- 6. SUPERVISOR CONFIRM ROUND COMPLETION MODAL -->
   <div id="modal-supervisor-confirm" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+    <div class="modal-size-confirm bg-white rounded-2xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
       <div class="flex items-center gap-3 border-b pb-3">
         <span class="text-2xl">🚀</span>
         <div>
@@ -4340,7 +4340,7 @@
 
   <!-- 7. ADMIN LOCK ROUND MODAL -->
   <div id="modal-admin-lock-round" class="hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4">
+    <div class="modal-size-confirm bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto p-6 shadow-2xl space-y-4">
       <div class="flex items-center gap-3 border-b pb-3">
         <span class="text-2xl">🔒</span>
         <div>
@@ -4377,7 +4377,7 @@
 
   <!-- 8. ADMIN INSPECT SUPERVISOR DECISIONS MODAL -->
   <div id="modal-admin-inspect-sup" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+    <div class="modal-size-detail bg-white rounded-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
       <div class="flex items-center justify-between border-b pb-3">
         <div>
           <h3 id="inspect-sup-name" class="font-bold text-base text-tdtu-blue">Chi tiết Xét duyệt: Thầy/Cô</h3>
@@ -4409,7 +4409,7 @@
 
   <!-- 9. ADMIN MANUAL ASSIGN MODAL -->
   <div id="modal-admin-edit-supervisor" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+    <div class="modal-size-form bg-white rounded-2xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b pb-3">
         <h3 class="font-bold text-base text-tdtu-blue">Chỉnh sửa phân công GVHD</h3>
         <button onclick="closeAdminEditSupervisorModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
@@ -4457,7 +4457,7 @@
   </div>
 
   <div id="modal-admin-manual-assign" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+    <div class="modal-size-form bg-white rounded-2xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b pb-3">
         <h3 class="font-bold text-base text-tdtu-blue">Phân công GVHD Thủ công</h3>
         <button onclick="closeAdminManualAssignModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
@@ -4487,7 +4487,7 @@
   </div>
 
   <div id="modal-assignment-excel-preview" class="hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[90vh] max-h-[92vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+    <div class="modal-size-management bg-white rounded-2xl w-full h-[90vh] max-h-[92vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50 shrink-0">
         <div>
           <h3 class="font-bold text-base text-slate-900">Xem trước phân công GVHD từ Excel</h3>
@@ -4515,7 +4515,7 @@
 
   <!-- ROUND WORKSPACE POPUP: reuses the live admin panels without duplicating IDs or state -->
   <div id="modal-round-workspace" class="hidden fixed inset-0 z-[65] modal-backdrop flex items-center justify-center p-2 sm:p-4" onclick="if(event.target === this) closeRoundWorkspaceModal()">
-    <div class="bg-slate-50 rounded-2xl w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+    <div class="modal-size-management max-w-6xl bg-slate-50 rounded-2xl w-full h-[94vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
       <div class="px-4 sm:px-5 py-3 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
         <div class="min-w-0">
           <h3 id="modal-round-workspace-title" class="font-black text-base text-slate-950">Quản lý đợt tốt nghiệp</h3>
@@ -4528,7 +4528,7 @@
   </div>
 <!-- === MODAL: ROUND ACCESS & LOGIN MONITORING DASHBOARD === -->
 <div id="modal-round-access-monitoring" class="hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-2 sm:p-4" onclick="if(event.target === this) closeRoundAccessMonitoringModal()">
-  <div class="bg-white rounded-2xl w-full max-w-5xl h-[92vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+  <div class="modal-size-management bg-white rounded-2xl w-full h-[92vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
     <!-- Header -->
     <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0">
       <div>
@@ -4631,7 +4631,7 @@
 
   <!-- CREATE / EDIT ACTIVITY MODAL (v1.9.0-beta.1) -->
   <div id="modal-activity" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl w-full max-w-[min(94vw,1180px)] shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
+    <div class="modal-size-form max-w-[min(94vw,1180px)] bg-white rounded-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
         <div>
           <h3 id="modal-activity-title" class="font-bold text-base text-tdtu-blue">Thêm Mốc Kế hoạch Đợt TN</h3>
@@ -4796,13 +4796,13 @@
               }
             </style>
             <label class="font-bold text-slate-700 block mb-1">Nội dung / Hướng dẫn chi tiết</label>
-            
+
             <!-- Toolbar -->
             <div class="rich-editor-toolbar">
               <!-- Undo / Redo -->
               <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('undo')" title="Hoàn tác (Undo)">↶</button>
               <button type="button" class="rich-btn" onmousedown="event.preventDefault(); document.execCommand('redo')" title="Làm lại (Redo)">↷</button>
-              
+
               <div class="rich-separator"></div>
 
               <!-- Heading / Normal -->
@@ -4969,7 +4969,7 @@
                   <p class="text-[11px] text-slate-600 leading-relaxed">
                     Thời gian nhận bài độc lập với thời gian diễn ra hoạt động. Sinh viên chỉ được nộp bài trong khoảng thời gian tiếp nhận được thiết lập.
                   </p>
-                  
+
                   <!-- 2. BẮT ĐẦU NHẬN BÀI -->
                   <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
                     <div class="flex items-center justify-between">
@@ -5227,7 +5227,7 @@
                     <input type="checkbox" id="activity-form-scoring-enabled" onchange="toggleActivityScoringConfig(this.checked)" class="rounded text-tdtu-blue">
                     <span class="font-bold text-xs text-emerald-700">📝 Cho phép chấm điểm tại mốc này (scoringEnabled)</span>
                   </label>
-                  
+
                   <div id="activity-scoring-config-panel" class="hidden pl-2 space-y-3 bg-emerald-50/50 p-3 rounded-xl border border-emerald-200">
                     <div>
                       <label class="font-bold text-slate-700 block mb-1 text-xs">Kiểu chấm điểm:</label>
@@ -5246,7 +5246,7 @@
                         </label>
                       </div>
                     </div>
-                    
+
                     <!-- Numeric Config -->
                     <div id="activity-scoring-numeric-wrap" class="grid grid-cols-3 gap-2">
                       <div>
@@ -5315,7 +5315,7 @@
 
   <!-- COPY ACTIVITIES FROM ANOTHER ROUND MODAL -->
   <div id="modal-copy-round" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+    <div class="modal-size-form bg-white rounded-2xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
         <div>
           <h3 class="font-bold text-base text-tdtu-blue">Sao chép Kế hoạch từ Đợt khác</h3>
@@ -5365,7 +5365,7 @@
 
   <!-- MODAL: ADD SUPPORT SUPERVISOR -->
   <div id="modal-add-support-supervisor" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+    <div class="modal-size-form bg-white rounded-2xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
         <div>
           <h3 class="font-bold text-base text-tdtu-blue">Thêm GVHD 2</h3>
@@ -5416,7 +5416,7 @@
        MODAL: ACTIVITY COUNCIL MANAGEMENT (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-activity-councils" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[92vh] max-h-[94vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+    <div class="modal-size-management max-w-6xl bg-white rounded-2xl w-full h-[92vh] max-h-[94vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
       <!-- Header -->
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0 bg-slate-50/50">
         <div>
@@ -5445,7 +5445,7 @@
 
       <!-- Main Body -->
       <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 text-xs bg-slate-50/30">
-        
+
         <!-- TAB 1: DANH SÁCH HỘI ĐỒNG -->
         <div id="ctab-panel-councils" class="space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs">
@@ -5501,7 +5501,7 @@
 
         <!-- TAB 3: PHÂN CÔNG SINH VIÊN & THỨ TỰ TRÌNH BÀY (CÓ SUB-TABS HỘI ĐỒNG) -->
         <div id="ctab-panel-students" class="hidden space-y-4">
-          
+
           <!-- Sub-tabs bar: Chưa phân công / HĐ1 / HĐ2 / Tất cả -->
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
             <div id="council-student-subtabs" class="flex flex-wrap items-center gap-2">
@@ -5552,7 +5552,7 @@
 
   <!-- MODAL: COPY COUNCILS & STUDENTS FROM ANOTHER MILESTONE -->
   <div id="modal-copy-councils-from-milestone" class="hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col">
+    <div class="modal-size-form bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 flex flex-col">
       <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
         <div class="flex items-center gap-2">
           <span class="text-xl">📋</span>
@@ -5612,7 +5612,7 @@
 
   <!-- MODAL: CREATE / EDIT / COPY COUNCIL -->
   <div id="modal-edit-council" class="hidden fixed inset-0 z-[80] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl flex flex-col max-h-[94vh] overflow-hidden border border-slate-200">
+    <div class="modal-size-form bg-white rounded-2xl w-full shadow-2xl flex flex-col max-h-[94vh] overflow-hidden border border-slate-200">
       <div class="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
         <h3 id="modal-edit-council-title" class="font-bold text-base text-tdtu-blue">Thêm Hội đồng mới</h3>
         <button type="button" onclick="closeEditCouncilModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
@@ -5759,7 +5759,7 @@
 
   <!-- MODAL: ADD GUEST SLOT TO ACTIVITY COUNCIL STRUCTURE -->
   <div id="modal-add-guest-slot" class="hidden fixed inset-0 z-[70] modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-sm w-full max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col border border-slate-200">
+    <div class="modal-size-form bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col border border-slate-200">
       <div class="flex items-center justify-between p-4 border-b border-slate-100">
         <h4 class="font-bold text-sm text-slate-900">Thêm vị trí Khách mời / Doanh nghiệp</h4>
         <button type="button" onclick="closeAddGuestSlotModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
@@ -5786,7 +5786,7 @@
 
   <!-- CUSTOM CONFIRM MODAL -->
   <div id="modal-confirm" class="hidden fixed inset-0 z-[9998] modal-backdrop flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+    <div class="modal-size-confirm bg-white rounded-2xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
       <div class="flex items-start gap-3">
         <div id="modal-confirm-icon" class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xl font-bold bg-rose-100 text-rose-600">⚠️</div>
         <div class="flex-1">
@@ -5807,7 +5807,7 @@
        MODAL: LETTER OPTION EDITOR (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-add-letter-option" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden border border-slate-200 max-h-[92vh] overflow-y-auto">
+    <div class="modal-size-confirm bg-white rounded-2xl w-full shadow-2xl overflow-hidden border border-slate-200 max-h-[92vh] overflow-y-auto">
       <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
         <h4 id="modal-letter-option-title" class="font-bold text-slate-900 text-sm">Mức điểm chữ</h4>
         <button type="button" onclick="closeLetterOptionModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
@@ -5846,7 +5846,7 @@
        MODAL: QUICK COUNCIL IN MILESTONE (Item D)
        ============================================================================ -->
   <div id="modal-milestone-quick-council" class="hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200">
+    <div class="modal-size-form bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200">
       <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-indigo-50/50">
         <h4 id="modal-milestone-quick-council-title" class="font-bold text-slate-900 text-sm">Thêm Hội đồng cho Mốc</h4>
         <button type="button" onclick="closeMilestoneQuickCouncilModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1 text-base">✕</button>
@@ -5884,7 +5884,7 @@
        MODAL: ADD INTERNAL MEMBER TO COUNCIL (Item D)
        ============================================================================ -->
   <div id="modal-add-council-internal-member" class="hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200">
+    <div class="modal-size-form bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200">
       <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
         <div>
           <h4 class="font-bold text-slate-900 text-sm">Thêm Thành viên Nội bộ</h4>
@@ -5923,7 +5923,7 @@
        MODAL: ADD GUEST MEMBER TO COUNCIL (Item D)
        ============================================================================ -->
   <div id="modal-add-council-guest-member" class="hidden fixed inset-0 z-[90] modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200">
+    <div class="modal-size-form bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200">
       <div class="flex items-center justify-between p-4 border-b border-slate-100 bg-amber-50/50">
         <div>
           <h4 class="font-bold text-slate-900 text-sm flex items-center gap-1.5">
@@ -5973,8 +5973,8 @@
      MODAL: COUNCIL WORKSPACE / ĐIỀU HÀNH & CHẤM ĐIỂM HỘI ĐỒNG (v2.7.4)
      ============================================================================ -->
 <div id="modal-council-workspace" class="hidden fixed inset-0 z-[75] modal-backdrop flex items-center justify-center p-1 sm:p-4">
-  <div class="bg-white rounded-2xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1680px] w-full h-[98vh] sm:h-[94vh] max-h-[98vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
-    
+  <div class="modal-size-fullscreen bg-white rounded-2xl w-full h-[98vh] sm:h-[94vh] max-h-[98vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+
     <!-- Ultra-Compact Top Header -->
     <div class="px-2.5 py-2 sm:px-4 sm:py-2.5 border-b border-slate-200 bg-slate-900 text-white shrink-0 shadow-xs">
       <div class="cws-header-layout flex items-center justify-between gap-1.5 sm:gap-3">
@@ -6074,7 +6074,7 @@
 
     <!-- Main Body: 3 Columns Responsive (Students | Grading | Ranking) -->
     <div class="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
-      
+
       <!-- LEFT COLUMN: DANH SÁCH SINH VIÊN (Visible on md+ desktop/tablet) -->
       <div id="cws-col-students" class="w-full md:w-80 lg:w-[30rem] xl:w-[34rem] border-b md:border-b-0 md:border-r border-slate-200 hidden md:flex flex-col bg-slate-50/40 shrink-0 overflow-hidden flex-1 md:flex-none min-h-0 h-full">
         <div class="p-2.5 sm:p-3 border-b border-slate-200 bg-white space-y-2 shrink-0">
@@ -6084,7 +6084,7 @@
           </div>
           <input type="text" id="cws-student-search" oninput="filterCouncilWorkspaceStudents(this.value)" placeholder="Tìm MSSV, họ tên, đề tài..." class="w-full p-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
         </div>
-        
+
         <div id="cws-students-list" class="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5 text-xs touch-pan-y overscroll-contain pb-28 sm:pb-6">
           <!-- Rendered dynamically -->
         </div>
@@ -6092,7 +6092,7 @@
 
       <!-- RIGHT COLUMN: WORKSPACE FOR SELECTED STUDENT -->
       <div id="cws-col-grading" class="flex-1 flex flex-col overflow-y-auto p-2.5 sm:p-6 space-y-2.5 sm:space-y-4 bg-white min-w-0">
-        
+
         <!-- MOBILE STUDENT STEPPER BAR (< md) - DIRECTLY BELOW HEADER -->
         <div class="flex items-center justify-between p-2 bg-slate-100/90 border border-slate-200 rounded-xl md:hidden text-xs shrink-0">
           <button type="button" onclick="navigateCouncilPrevStudent()" class="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-700 shadow-2xs flex items-center gap-1 cursor-pointer">
@@ -6195,7 +6195,7 @@
        MODAL: ADMIN STUDENT SCORE DETAIL (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-admin-score-detail" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 text-xs">
+    <div class="modal-size-detail bg-white rounded-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 text-xs">
       <div class="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
         <div>
           <h3 id="admin-score-detail-title" class="font-black text-sm sm:text-base text-slate-900">Chi tiết Điểm số: Nguyễn Văn A (12345678)</h3>
@@ -6205,7 +6205,7 @@
       </div>
 
       <div class="p-5 space-y-5 overflow-y-auto flex-1 min-h-0">
-        
+
         <!-- SƠ KHẢO DETAIL -->
         <div class="p-4 bg-amber-50/50 rounded-2xl border border-amber-200 space-y-3">
           <div class="flex items-center justify-between">
@@ -6269,7 +6269,7 @@
      MODAL: CHI TIẾT ĐÁNH GIÁ HỘI ĐỒNG (ADMIN & OWNER ONLY)
      ============================================================================ -->
 <div id="modal-council-score-details" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
-  <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 text-xs animate-in fade-in zoom-in duration-150">
+  <div class="modal-size-detail bg-white rounded-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200 text-xs animate-in fade-in zoom-in duration-150">
     <!-- Modal Header -->
     <div class="flex items-start justify-between p-4 sm:p-5 border-b border-slate-200 bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white">
       <div class="space-y-1">
@@ -6400,7 +6400,7 @@
      MODAL: XÁC NHẬN CÔNG BỐ ĐIỂM DUYỆT TIẾN ĐỘ (ADMIN & OWNER ONLY)
      ============================================================================ -->
 <div id="modal-publish-progress-review" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
-  <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl flex flex-col overflow-hidden border border-slate-200 text-xs animate-in fade-in zoom-in duration-150">
+  <div class="modal-size-confirm bg-white rounded-2xl w-full shadow-2xl flex flex-col overflow-hidden border border-slate-200 text-xs animate-in fade-in zoom-in duration-150">
     <!-- Modal Header -->
     <div class="flex items-start justify-between p-4 sm:p-5 border-b border-slate-200 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white">
       <div class="space-y-1">
@@ -6482,7 +6482,7 @@
 
 <!-- Modal: Thu hồi công bố điểm Duyệt tiến độ (E1) -->
 <div id="modal-revoke-progress-review" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity" role="dialog" aria-modal="true" aria-labelledby="revoke-review-title">
-  <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100">
+  <div class="modal-size-confirm bg-white rounded-3xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100">
     <!-- Header -->
     <div class="flex items-start justify-between border-b border-slate-100 pb-4">
       <div class="space-y-1">
@@ -6550,7 +6550,7 @@
      MODAL: ĐIỀU CHỈNH KẾT QUẢ ĐÁNH GIÁ HỘI ĐỒNG (ADMIN & OWNER ONLY - NHÓM E2)
      ============================================================================ -->
 <div id="modal-adjust-council-score" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity" role="dialog" aria-modal="true" aria-labelledby="adjust-council-score-title">
-  <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100 max-h-[92vh] flex flex-col">
+  <div class="modal-size-form bg-white rounded-3xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100 max-h-[92vh] flex flex-col">
     <!-- Header -->
     <div class="flex items-start justify-between border-b border-slate-100 pb-4 shrink-0">
       <div class="space-y-1">
@@ -6675,7 +6675,7 @@
 
 <!-- Modal: Lịch sử hoạt động sinh viên (C2: Hiển thị tối đa 10 sự kiện gần nhất) -->
 <div id="modal-student-activity-history" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden transition-opacity" role="dialog" aria-modal="true" aria-labelledby="student-activity-history-title">
-  <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100 max-h-[90vh] flex flex-col">
+  <div class="modal-size-detail bg-white rounded-3xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 border border-slate-100 max-h-[90vh] flex flex-col">
     <!-- Header -->
     <div class="flex items-start justify-between border-b border-slate-100 pb-4 shrink-0">
       <div class="space-y-1">
@@ -6732,7 +6732,7 @@
        MODAL: GENERIC SCORE ENTRY FOR SUPERVISOR / PRELIMINARY / REVIEWER (v1.9.0-beta.1)
        ============================================================================ -->
   <div id="modal-score-entry" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
+    <div class="modal-size-form bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
       <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
         <div>
           <h4 id="score-entry-modal-title" class="font-black text-sm text-slate-900">Nhập Điểm Đánh giá</h4>
@@ -6780,7 +6780,7 @@
        MODAL: RUBRIC CRITERION EDITOR (v2.0.0-beta.1)
        ============================================================================ -->
   <div id="modal-rubric-criterion" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs max-h-[92vh] overflow-y-auto">
+    <div class="modal-size-form bg-white rounded-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs max-h-[92vh] overflow-y-auto">
       <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
         <h4 id="modal-rubric-criterion-title" class="font-black text-sm text-slate-900">Thêm tiêu chí Rubric</h4>
         <button type="button" onclick="closeRubricCriterionModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
@@ -6816,7 +6816,7 @@
        MODAL: POST-COUNCIL SCORE CALIBRATION (v2.0.0-beta.1)
        ============================================================================ -->
   <div id="modal-score-calibration" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
+    <div class="modal-size-form bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
       <div class="p-4 border-b border-slate-200 bg-amber-50 flex items-center justify-between">
         <div>
           <h4 class="font-black text-sm text-amber-950 flex items-center gap-1.5">
@@ -6870,7 +6870,7 @@
        MODAL: REOPEN FINALIZED COUNCIL (ADMIN ONLY) (v2.0.0-beta.1)
        ============================================================================ -->
   <div id="modal-reopen-council" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
+    <div class="modal-size-confirm bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
       <div class="p-4 border-b border-slate-200 bg-rose-50 flex items-center justify-between">
         <div>
           <h4 class="font-black text-sm text-rose-950 flex items-center gap-1.5">
@@ -6901,7 +6901,7 @@
        MODAL: GUEST PASSCODE ENTRY (UI PLACEHOLDER PER SECTION 37) (v2.0.0-beta.1)
        ============================================================================ -->
   <div id="modal-guest-passcode-entry" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
+    <div class="modal-size-confirm bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
       <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
         <h4 class="font-black text-sm text-slate-900 flex items-center gap-1.5">
           <span>🔑</span> Đăng nhập Khách mời bằng Passcode
@@ -6933,7 +6933,7 @@
        MODAL: REOPEN FINALIZED ROUND RESULTS (ADMIN ONLY) (v2.1.0-beta.1)
        ============================================================================ -->
   <div id="modal-reopen-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
+    <div class="modal-size-confirm bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
       <div class="p-4 border-b border-slate-200 bg-rose-50 flex items-center justify-between">
         <h4 class="font-black text-sm text-rose-950 flex items-center gap-1.5">
           <span>🔓</span> Mở lại Kết quả Đợt Tốt nghiệp
@@ -6959,7 +6959,7 @@
        MODAL: STUDENT FINAL SCORE FORMULA & DETAIL (v2.1.0-beta.1)
        ============================================================================ -->
   <div id="modal-final-score-detail" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
+    <div class="modal-size-detail bg-white rounded-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 text-xs">
       <div class="p-4 border-b border-slate-200 bg-indigo-50 flex items-center justify-between">
         <div>
           <h4 class="font-black text-sm text-indigo-950 flex items-center gap-1.5">
@@ -7043,7 +7043,7 @@
        MODAL: ADMIN ACTIVITY SUBMISSIONS DASHBOARD (v2.2.0-beta.1)
        ============================================================================ -->
   <div id="modal-activity-submissions" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-2 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-5xl w-full h-[90vh] max-h-[92vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col text-xs">
+    <div class="modal-size-management bg-white rounded-2xl w-full h-[90vh] max-h-[92vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col text-xs">
       <div class="p-4 border-b border-slate-200 bg-emerald-50 flex items-center justify-between">
         <div>
           <h4 id="sub-dash-title" class="font-black text-sm sm:text-base text-emerald-950 flex items-center gap-1.5">
@@ -7125,7 +7125,7 @@
        MODAL: ADMIN DEADLINE & ATTEMPTS OVERRIDE (v2.2.0-beta.1)
        ============================================================================ -->
   <div id="modal-submission-override" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-200 text-xs max-h-[92vh] overflow-y-auto">
+    <div class="modal-size-form bg-white rounded-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs max-h-[92vh] overflow-y-auto">
       <div class="p-4 border-b border-slate-200 bg-amber-50 flex items-center justify-between">
         <h4 class="font-black text-sm text-amber-950 flex items-center gap-1.5">
           <span>⭐</span> Gia hạn / Cấp thêm lượt nộp cho Sinh viên
@@ -7183,7 +7183,7 @@
        MODAL: SUBMISSION ATTEMPTS HISTORY (v2.2.0-beta.1)
        ============================================================================ -->
   <div id="modal-submission-history" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[85vh]">
+    <div class="modal-size-detail bg-white rounded-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[85vh]">
       <div class="p-4 border-b border-slate-200 bg-slate-100 flex items-center justify-between">
         <h4 class="font-black text-sm text-slate-900 flex items-center gap-1.5">
           <span>📜</span> Lịch sử các lần nộp bài (Version History)
@@ -7211,7 +7211,7 @@
      MODAL: ADMIN INSPECT STUDENT SUBMISSION & HISTORY (v1.0.1)
      ============================================================================ -->
 <div id="modal-admin-submission-inspect" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-  <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[90vh]">
+  <div class="modal-size-detail bg-white rounded-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[90vh]">
     <!-- MODAL HEADER -->
     <div class="p-4 border-b border-slate-200 bg-slate-100 flex items-center justify-between">
       <div class="flex items-center gap-2">
@@ -7298,7 +7298,7 @@
      MODAL: ADMIN IMPERSONATION / EXACT ACT-AS TEST MODE (v2.7.0-beta.1)
      ============================================================================ -->
 <div id="modal-admin-impersonate" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-  <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[90vh]">
+  <div class="modal-size-form bg-white rounded-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[90vh]">
     <div class="p-4 border-b border-slate-200 bg-amber-500 text-slate-950 flex items-center justify-between">
       <div class="flex items-center gap-2.5">
         <span class="text-2xl">🎭</span>
@@ -7309,7 +7309,7 @@
       </div>
       <button type="button" onclick="closeAdminImpersonateModal()" class="text-slate-900 hover:text-black font-bold p-1 text-base cursor-pointer">✕</button>
     </div>
-    
+
     <div class="p-4 bg-slate-50 border-b border-slate-200 space-y-3">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <!-- Filter: Round -->
@@ -7369,7 +7369,7 @@
      MODAL: ADD SYSTEM ADMIN / CẤP QUYỀN QUẢN TRỊ VIÊN (OWNER ONLY)
      ============================================================================ -->
 <div id="modal-add-admin" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-  <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[92vh]">
+  <div class="modal-size-form bg-white rounded-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[92vh]">
     <!-- Header -->
     <div class="p-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
       <div class="flex items-center gap-2.5">
@@ -7392,12 +7392,12 @@
           Email tài khoản Google <span class="text-rose-500">*</span>:
         </label>
         <div class="relative">
-          <input 
-            type="email" 
-            id="add-admin-email" 
-            name="email" 
-            required 
-            placeholder="vd: giaovien@tdtu.edu.vn hoặc account@gmail.com" 
+          <input
+            type="email"
+            id="add-admin-email"
+            name="email"
+            required
+            placeholder="vd: giaovien@tdtu.edu.vn hoặc account@gmail.com"
             class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             autocomplete="email"
           >
@@ -7414,11 +7414,11 @@
           Họ và tên (Tùy chọn):
         </label>
         <div class="relative">
-          <input 
-            type="text" 
-            id="add-admin-fullname" 
-            name="fullName" 
-            placeholder="vd: TS. Nguyễn Văn A (chưa bắt buộc khi thêm)" 
+          <input
+            type="text"
+            id="add-admin-fullname"
+            name="fullName"
+            placeholder="vd: TS. Nguyễn Văn A (chưa bắt buộc khi thêm)"
             class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
           >
           <span class="absolute left-3 top-2.5 text-slate-400 text-sm">👤</span>
@@ -7441,16 +7441,16 @@
 
       <!-- Footer Buttons -->
       <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
-        <button 
-          type="button" 
-          onclick="closeAddAdminModal()" 
+        <button
+          type="button"
+          onclick="closeAddAdminModal()"
           class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
         >
           Hủy
         </button>
-        <button 
-          type="submit" 
-          id="btn-submit-add-admin" 
+        <button
+          type="submit"
+          id="btn-submit-add-admin"
           class="px-5 py-2.5 bg-slate-900 hover:bg-black text-white font-bold rounded-xl text-xs shadow-md transition flex items-center gap-2 cursor-pointer"
         >
           <span>🛡️</span>
@@ -7463,7 +7463,7 @@
 
 <!-- MODAL: XEM VÀ DUYỆT PHIẾU ĐĂNG KÝ ĐỀ TÀI CHÍNH THỨC (MÔ PHỎNG A4 PDF CHO SV, GVHD & ADMIN) -->
 <div id="modal-supervisor-topic-preview" class="fixed inset-0 z-50 modal-backdrop bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-2 sm:p-4">
-  <div class="bg-slate-100 rounded-2xl shadow-2xl max-w-4xl w-full h-[92vh] max-h-[94vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
+  <div class="modal-size-detail bg-slate-100 rounded-2xl shadow-2xl w-full h-[92vh] max-h-[94vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
     <!-- Sticky Header -->
     <div class="px-5 py-3.5 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
       <div class="flex items-center gap-3 min-w-0">
@@ -7510,7 +7510,7 @@
     <!-- A4 Paper Body Scroll Area -->
     <div class="topic-preview-scroll flex-1 p-3 sm:p-6" style="background:#e2e8f0; overflow-y: auto;">
       <div id="topic-preview-paper" class="topic-preview-a4 bg-white shadow-lg border border-slate-300 mx-auto text-slate-900" style="font-family:'Times New Roman','Tinos',Times,serif;font-size:12pt;line-height:1.4;color:#000000;">
-        
+
         <!-- Header Section: TDTU & Quốc hiệu -->
         <table style="width:100%;border-collapse:collapse;margin-bottom:20px;table-layout:fixed;">
           <tr>

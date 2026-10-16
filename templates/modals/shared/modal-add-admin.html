@@ -2,7 +2,7 @@
      MODAL: ADD SYSTEM ADMIN / CẤP QUYỀN QUẢN TRỊ VIÊN (OWNER ONLY)
      ============================================================================ -->
 <div id="modal-add-admin" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-  <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[92vh]">
+  <div class="modal-size-form bg-white rounded-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[92vh]">
     <!-- Header -->
     <div class="p-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
       <div class="flex items-center gap-2.5">
@@ -25,12 +25,12 @@
           Email tài khoản Google <span class="text-rose-500">*</span>:
         </label>
         <div class="relative">
-          <input 
-            type="email" 
-            id="add-admin-email" 
-            name="email" 
-            required 
-            placeholder="vd: giaovien@tdtu.edu.vn hoặc account@gmail.com" 
+          <input
+            type="email"
+            id="add-admin-email"
+            name="email"
+            required
+            placeholder="vd: giaovien@tdtu.edu.vn hoặc account@gmail.com"
             class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             autocomplete="email"
           >
@@ -47,11 +47,11 @@
           Họ và tên (Tùy chọn):
         </label>
         <div class="relative">
-          <input 
-            type="text" 
-            id="add-admin-fullname" 
-            name="fullName" 
-            placeholder="vd: TS. Nguyễn Văn A (chưa bắt buộc khi thêm)" 
+          <input
+            type="text"
+            id="add-admin-fullname"
+            name="fullName"
+            placeholder="vd: TS. Nguyễn Văn A (chưa bắt buộc khi thêm)"
             class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
           >
           <span class="absolute left-3 top-2.5 text-slate-400 text-sm">👤</span>
@@ -74,16 +74,16 @@
 
       <!-- Footer Buttons -->
       <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
-        <button 
-          type="button" 
-          onclick="closeAddAdminModal()" 
+        <button
+          type="button"
+          onclick="closeAddAdminModal()"
           class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
         >
           Hủy
         </button>
-        <button 
-          type="submit" 
-          id="btn-submit-add-admin" 
+        <button
+          type="submit"
+          id="btn-submit-add-admin"
           class="px-5 py-2.5 bg-slate-900 hover:bg-black text-white font-bold rounded-xl text-xs shadow-md transition flex items-center gap-2 cursor-pointer"
         >
           <span>🛡️</span>

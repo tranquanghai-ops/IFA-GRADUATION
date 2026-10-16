@@ -240,7 +240,7 @@ window.showInputDialog = function(title, message, { defaultValue = '', placehold
   return new Promise(resolve => {
     const overlay = document.createElement('div');
     overlay.className = 'fixed inset-0 z-[10000] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4';
-    overlay.innerHTML = `<div role="dialog" aria-modal="true" aria-labelledby="app-input-title" class="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+    overlay.innerHTML = `<div role="dialog" aria-modal="true" aria-labelledby="app-input-title" class="modal-size-confirm w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
       <div class="border-b border-slate-100 bg-slate-50 px-5 py-4"><h3 id="app-input-title" class="text-base font-black text-slate-900"></h3><p class="mt-1 text-xs leading-relaxed text-slate-600"></p></div>
       <div class="p-5"><input type="text" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></div>
       <div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-3"><button type="button" data-cancel class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">Hủy</button><button type="button" data-confirm class="rounded-xl bg-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-800"></button></div>
