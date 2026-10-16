@@ -163,7 +163,9 @@ window.renderSupervisorPreliminaryList = function() {
   const filtered = allStudents.filter(s => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || '';
-    const topic = s.topicTitle || '';
+    const topic = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? window.getOfficialApprovedTopicTitle(s, s.topicTitle || '')
+      : (s.topicTitle || '');
     if (q && !sid.toLowerCase().includes(q) && !name.toLowerCase().includes(q) && !topic.toLowerCase().includes(q)) {
       return false;
     }
@@ -189,7 +191,9 @@ window.renderSupervisorPreliminaryList = function() {
   container.innerHTML = filtered.map(s => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || sid;
-    const topic = s.topicTitle || '--';
+    const topic = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? window.getOfficialApprovedTopicTitle(s, s.topicTitle || '--')
+      : (s.topicTitle || '--');
     const pType = s.projectType || '--';
     const supervisorsStr = formatStudentSupervisorsForDisplay(s);
 
@@ -263,7 +267,9 @@ window.renderSupervisorReviewerList = function() {
   container.innerHTML = assignedStudents.map(s => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || sid;
-    const topic = s.topicTitle || '--';
+    const topic = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? window.getOfficialApprovedTopicTitle(s, s.topicTitle || '--')
+      : (s.topicTitle || '--');
     const supervisorsStr = formatStudentSupervisorsForDisplay(s);
 
     const sc = targetRound.thesisScores?.[sid]?.pb;

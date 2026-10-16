@@ -97,6 +97,9 @@ export function getScoringRoundStudents(targetRound) {
     regs.forEach(r => {
       const sid = String(r.studentId || r.mssv || r.id || '').trim().toUpperCase();
       if (sid) {
+        const rTopic = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function')
+          ? window.getOfficialApprovedTopicTitle(r, r.topicTitle || '')
+          : (r.topicTitle || '');
         studentMap.set(sid, {
           ...r,
           studentId: sid,
@@ -104,7 +107,7 @@ export function getScoringRoundStudents(targetRound) {
           studentName: r.studentName || r.name || r.fullName || sid,
           className: r.currentClass || r.studentClass || r.className || '--',
           acceptedSupervisorName: r.acceptedSupervisorName || '',
-          topicTitle: r.topicTitle || ''
+          topicTitle: rTopic
         });
       }
     });
@@ -115,6 +118,9 @@ export function getScoringRoundStudents(targetRound) {
       if (sid) {
         const existing = studentMap.get(sid) || {};
         const primary = (a.supervisors || []).find(s => s.role === 'primary') || (a.supervisors || [])[0];
+        const aTopic = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function')
+          ? window.getOfficialApprovedTopicTitle(a, a.topicTitle || '')
+          : (a.topicTitle || '');
         studentMap.set(sid, {
           ...existing,
           ...a,
@@ -123,7 +129,7 @@ export function getScoringRoundStudents(targetRound) {
           studentName: a.studentName || existing.studentName || existing.name || sid,
           className: a.className || a.studentClass || existing.className || existing.currentClass || '--',
           acceptedSupervisorName: a.acceptedSupervisorName || primary?.supervisorName || existing.acceptedSupervisorName || '',
-          topicTitle: a.topicTitle || existing.topicTitle || ''
+          topicTitle: existing.topicTitle || aTopic || ''
         });
       }
     });
@@ -191,7 +197,10 @@ window.renderAdminProgressReviewTable = function(phase) {
   tbody.innerHTML = filtered.map((s, idx) => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || sid;
-    const topic = s.topicTitle || '<span class="text-slate-400 italic">Chưa đăng ký đề tài</span>';
+    const topic = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? window.getOfficialApprovedTopicTitle(s, s.topicTitle || '')
+      : (s.topicTitle || '');
+    const topicDisplay = topic || '<span class="text-slate-400 italic">Chưa đăng ký đề tài</span>';
     const supName = s.acceptedSupervisorName || s.supervisorName || (Array.isArray(s.officialSupervisors) && s.officialSupervisors[0]?.supervisorName) || (Array.isArray(s.supervisors) && s.supervisors[0]?.supervisorName) || (targetRound.supervisors || []).find(sup => sup.id === s.supervisorId)?.name || '--';
     const reviewData = targetRound.progressReviews?.['duyet_' + phase]?.[sid] || {};
     const status = reviewData.status || 'pending';
@@ -211,7 +220,7 @@ window.renderAdminProgressReviewTable = function(phase) {
         <td class="p-3 text-center font-mono font-bold text-slate-400">${idx + 1}</td>
         <td class="p-3 font-mono font-bold text-slate-900 whitespace-nowrap">${sid}</td>
         <td class="p-3 font-semibold text-slate-800 whitespace-nowrap">${name}</td>
-        <td class="p-3 text-slate-600 max-w-xs truncate" title="${s.topicTitle || ''}">${topic}</td>
+        <td class="p-3 text-slate-600 max-w-xs truncate" title="${topic}">${topicDisplay}</td>
         <td class="p-3 text-slate-700 whitespace-nowrap">${supName}</td>
         <td class="p-3 text-center whitespace-nowrap">${statusBadge}</td>
         <td class="p-3 text-center font-mono font-bold whitespace-nowrap">${score !== '--' ? `<span class="badge bg-blue-50 text-blue-800 font-bold">${score}</span>` : '--'}</td>

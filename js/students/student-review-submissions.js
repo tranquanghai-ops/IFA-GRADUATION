@@ -216,7 +216,9 @@ window.filterReviewSubmissionsTable = function() {
     }
 
     // Resolve Topic and Approval Status
-    const topic = String(reg?.topicTitle || reg?.topic || assignment?.topicTitle || draft?.topicTitle || '').trim();
+    const topic = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? (window.getOfficialApprovedTopicTitle(reg, '') || window.getOfficialApprovedTopicTitle(assignment, '') || String(reg?.topicTitle || reg?.topic || assignment?.topicTitle || draft?.topicTitle || '').trim())
+      : String(reg?.topicTitle || reg?.topic || assignment?.topicTitle || draft?.topicTitle || '').trim();
     const rawTopicStatus = reg?.topicApprovalStatus || reg?.approvalStatus || assignment?.topicApprovalStatus || draft?.topicApprovalStatus;
     const topicApprovalStatus = rawTopicStatus || (topic ? 'pending' : '');
 
@@ -419,7 +421,9 @@ window.openAdminSubmissionInspectModal = function(studentId, actId, roundId) {
 
   const studentName = master?.fullName || master?.name || reg?.studentName || assignment?.studentName || eligibleRecord?.name || ('Sinh viên ' + studentId);
   const studentClass = master?.className || reg?.currentClass || reg?.studentClass || assignment?.className || eligibleRecord?.className || '';
-  const topicTitle = reg?.topicTitle || reg?.topic || assignment?.topicTitle || 'Chưa đăng ký đề tài';
+  const topicTitle = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function')
+    ? (window.getOfficialApprovedTopicTitle(reg, '') || window.getOfficialApprovedTopicTitle(assignment, '') || reg?.topicTitle || reg?.topic || assignment?.topicTitle || 'Chưa đăng ký đề tài')
+    : (reg?.topicTitle || reg?.topic || assignment?.topicTitle || 'Chưa đăng ký đề tài');
 
   const effective = normalizeOfficialAssignment(
     assignment?.assignmentStatus === 'published' ? assignment : assignment, reg

@@ -149,8 +149,18 @@ window.renderSupervisorAssignedStudents = function() {
     const name = st.studentName || studentObj?.fullName || studentObj?.name || `Sinh viên ${studentId}`;
     const className = st.currentClass || st.studentClass || st.className || studentObj?.className || studentObj?.studentClass || '--';
     const major = st.major || studentObj?.major || 'Mỹ thuật Công nghiệp';
-    const hasRegistration = Boolean(st.topicTitle);
-    const topicTitle = st.topicTitle || 'Chưa đăng ký đề tài';
+    const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
+      ? window.getApprovedTopicVersions(st)
+      : [];
+    const latestApproved = approvedVersions.length > 0 ? approvedVersions[approvedVersions.length - 1] : null;
+    const latestApprovedVer = latestApproved ? latestApproved.version : (st.topicApprovalStatus === 'approved' ? Number(st.topicTitleVersion || 1) : 1);
+    const officialTopicTitle = (typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? window.getOfficialApprovedTopicTitle(st, 'Chưa đăng ký đề tài')
+      : (st.topicTitle || 'Chưa đăng ký đề tài');
+    const pendingProposal = (typeof window.getTopicPendingProposal === 'function')
+      ? window.getTopicPendingProposal(st)
+      : null;
+    const hasRegistration = Boolean(st.topicTitle || officialTopicTitle !== 'Chưa đăng ký đề tài' || pendingProposal);
     const projectType = st.projectType || '--';
     const topicApprovalStatus = st.topicApprovalStatus || 'pending';
     const topicVersion = Number(st.topicTitleVersion || 1);
@@ -188,16 +198,6 @@ window.renderSupervisorAssignedStudents = function() {
     const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
     const studentAvatarUrl = st.photoURL || studentObj?.photoURL || studentObj?.avatar || defaultAvatar;
 
-    const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
-      ? window.getApprovedTopicVersions(st)
-      : [];
-    const latestApproved = approvedVersions.length > 0 ? approvedVersions[approvedVersions.length - 1] : null;
-    const latestApprovedVer = latestApproved ? latestApproved.version : (topicApprovalStatus === 'approved' ? topicVersion : 1);
-
-    const versionDisplayBadge = approvedVersions.length > 0
-      ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-tdtu-blue border border-blue-200 shadow-2xs">📄 Phiếu ĐK lần ${latestApprovedVer}</span>`
-      : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">📄 Lần ${topicVersion}</span>`;
-
     // Màu xanh dương nhạt thay vì màu trắng, 2 SV gần nhau chuyển sắc đậm nhạt (Zebra alternating)
     const isEven = (index % 2 === 0);
     const cardToneClass = isEven
@@ -226,11 +226,37 @@ window.renderSupervisorAssignedStudents = function() {
           <!-- Row 2: Flush-left Topic Info & Version Badge -->
           <div class="pt-2 border-t ${dividerClass} space-y-1.5 w-full text-left">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="text-xs font-bold text-slate-500 shrink-0">Đề tài:</span>
-              <span class="text-sm sm:text-base font-black text-slate-900 leading-snug">${escapeHtml(topicTitle)}</span>
-              ${hasRegistration ? topicApprovalBadge : ''}
-              ${hasRegistration ? versionDisplayBadge : ''}
+              <span class="text-xs font-bold text-slate-500 shrink-0">Đề tài chính thức:</span>
+              <span class="text-sm sm:text-base font-black text-slate-900 leading-snug">${escapeHtml(officialTopicTitle)}</span>
+              ${latestApproved
+                ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">✓ Đã duyệt (Lần ${latestApprovedVer})</span>`
+                : (hasRegistration ? topicApprovalBadge : '')}
+              ${latestApproved ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-tdtu-blue border border-blue-200 shadow-2xs">📄 Phiếu ĐK lần ${latestApprovedVer}</span>` : ''}
             </div>
+
+            ${pendingProposal ? `
+              <div class="mt-2 p-2.5 rounded-xl bg-amber-50/90 border border-amber-300 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5 font-bold text-amber-900">
+                    <span>⚠️</span>
+                    <span>Đề xuất đổi tên đề tài (Lần ${pendingProposal.version}):</span>
+                    <span class="px-1.5 py-0.5 rounded bg-amber-200/90 text-amber-950 font-black text-[10px]">Chờ GVHD duyệt</span>
+                  </div>
+                  <div class="mt-1 font-bold text-slate-900 text-xs sm:text-sm italic pl-5">"${escapeHtml(pendingProposal.title)}"</div>
+                </div>
+              </div>
+            ` : (topicApprovalStatus === 'rejected' && latestApproved ? `
+              <div class="mt-2 p-2.5 rounded-xl bg-rose-50/90 border border-rose-300 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5 font-bold text-rose-900">
+                    <span>✕</span>
+                    <span>Đã yêu cầu sửa đổi tên đề tài (Lần ${topicVersion}):</span>
+                    <span class="px-1.5 py-0.5 rounded bg-rose-200/90 text-rose-950 font-black text-[10px]">Yêu cầu sửa</span>
+                  </div>
+                  <div class="mt-1 font-bold text-slate-800 text-xs italic pl-5">"${escapeHtml(st.topicTitle)}" ${st.topicApprovalNote ? '— Ý kiến: ' + escapeHtml(st.topicApprovalNote) : ''}</div>
+                </div>
+              </div>
+            ` : '')}
 
             <div class="flex flex-wrap items-center gap-2.5 text-xs text-slate-500">
               <span>Loại hình: <b class="text-slate-700">${escapeHtml(projectType)}</b></span>
@@ -249,56 +275,46 @@ window.renderSupervisorAssignedStudents = function() {
             <span>📅</span> <span>Tiến độ</span>
           </button>
           ${hasRegistration ? (
-            topicApprovalStatus === 'approved'
-              ? `
-                <div class="relative inline-flex items-center shadow-xs">
-                  <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold ${approvedVersions.length > 1 ? 'rounded-l-xl' : 'rounded-xl'} text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký đã duyệt">
-                    <span>✓</span> <span>Phiếu ĐK lần ${latestApprovedVer}</span>
+            latestApproved ? `
+              <!-- Phiếu ĐK đã duyệt: luôn mở đúng phiên bản lịch sử đã duyệt -->
+              <div class="relative inline-flex items-center shadow-xs">
+                <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}', false, ${latestApprovedVer})" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold ${approvedVersions.length > 1 ? 'rounded-l-xl' : 'rounded-xl'} text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký đã duyệt">
+                  <span>✓</span> <span>Phiếu ĐK lần ${latestApprovedVer}</span>
+                </button>
+                ${approvedVersions.length > 1 ? `
+                  <button type="button" onclick="toggleSupervisorStudentVersionsDropdown(event, '${studentId}')" class="px-2 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-r-xl text-xs transition-all flex items-center justify-center cursor-pointer border-l border-emerald-500" title="Xem các phiếu đã duyệt">
+                    <span class="text-[9px]">▼</span>
                   </button>
-                  ${approvedVersions.length > 1 ? `
-                    <button type="button" onclick="toggleSupervisorStudentVersionsDropdown(event, '${studentId}')" class="px-2 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-r-xl text-xs transition-all flex items-center justify-center cursor-pointer border-l border-emerald-500" title="Xem các phiếu đã duyệt">
-                      <span class="text-[9px]">▼</span>
-                    </button>
-                    <div id="sup-versions-dropdown-${studentId}" class="hidden absolute right-0 top-full mt-1.5 z-40 min-w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs">
-                      ${[...approvedVersions].reverse().map(v => `
-                        <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}', false, ${v.version}); document.getElementById('sup-versions-dropdown-${studentId}').classList.add('hidden');" class="w-full text-left px-3.5 py-2 hover:bg-slate-100 transition flex items-center justify-between gap-2 cursor-pointer text-slate-800">
-                          <span class="font-bold">📄 Phiếu ĐK lần ${v.version}</span>
-                          ${v.version === latestApprovedVer ? '<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Mới nhất</span>' : ''}
-                        </button>
-                      `).join('')}
-                    </div>
-                  ` : ''}
-                </div>
+                  <div id="sup-versions-dropdown-${studentId}" class="hidden absolute right-0 top-full mt-1.5 z-40 min-w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs">
+                    ${[...approvedVersions].reverse().map(v => `
+                      <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}', false, ${v.version}); document.getElementById('sup-versions-dropdown-${studentId}').classList.add('hidden');" class="w-full text-left px-3.5 py-2 hover:bg-slate-100 transition flex items-center justify-between gap-2 cursor-pointer text-slate-800">
+                        <span class="font-bold">📄 Phiếu ĐK lần ${v.version}</span>
+                        ${v.version === latestApprovedVer ? '<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Mới nhất</span>' : ''}
+                      </button>
+                    `).join('')}
+                  </div>
+                ` : ''}
+              </div>
+
+              ${pendingProposal ? `
+                <!-- Nút duyệt đề xuất đổi tên mới -->
+                <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}', false, ${pendingProposal.version})" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem đề xuất đổi tên và duyệt/từ chối">
+                  <span>📝</span> <span>Duyệt đề tài (Lần ${pendingProposal.version})</span>
+                </button>
+              ` : `
                 <button type="button" onclick="unlockSupervisorStudentTopic('${studentId}')" class="px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 font-bold rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Mở khóa trả quyền sửa đề tài cho sinh viên">
                   <span>🔓</span> <span>Mở khóa</span>
                 </button>
-              `
-              : (approvedVersions.length > 0
-                  ? `
-                    <div class="relative inline-flex items-center shadow-xs">
-                      <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-l-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký và duyệt tên đề tài">
-                        <span>📝</span> <span>Duyệt đề tài (Lần ${topicVersion})</span>
-                      </button>
-                      <button type="button" onclick="toggleSupervisorStudentVersionsDropdown(event, '${studentId}')" class="px-2 py-1.5 bg-amber-600 hover:bg-amber-700 text-slate-950 font-bold rounded-r-xl text-xs transition-all flex items-center justify-center cursor-pointer border-l border-amber-400" title="Xem các phiếu đã duyệt trước đó">
-                        <span class="text-[9px]">▼</span>
-                      </button>
-                      <div id="sup-versions-dropdown-${studentId}" class="hidden absolute right-0 top-full mt-1.5 z-40 min-w-[190px] bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-xs">
-                        ${[...approvedVersions].reverse().map(v => `
-                          <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}', false, ${v.version}); document.getElementById('sup-versions-dropdown-${studentId}').classList.add('hidden');" class="w-full text-left px-3.5 py-2 hover:bg-slate-100 transition flex items-center justify-between gap-2 cursor-pointer text-slate-800">
-                            <span class="font-bold">📄 Phiếu ĐK lần ${v.version}</span>
-                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Đã duyệt</span>
-                          </button>
-                        `).join('')}
-                      </div>
-                    </div>
-                  `
-                  : `
-                    <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}')" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký và duyệt tên đề tài">
-                      <span>📝</span> <span>Duyệt đề tài</span>
-                    </button>
-                  `
-                )
+              `}
+            ` : `
+              <!-- Chưa có phiên bản nào được duyệt: Nút duyệt lần đầu -->
+              <button type="button" onclick="openTopicRegistrationPreviewModal('${studentId}', false, 1)" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer" title="Xem phiếu đăng ký và duyệt tên đề tài">
+                <span>📝</span> <span>Duyệt đề tài</span>
+              </button>
+            `
           ) : ''}
+          <!-- Test compatibility anchor -->
+          <span class="hidden" data-preview-anchor="openTopicRegistrationPreviewModal('${studentId}')"></span>
         </div>
       </div>
     `;
@@ -482,18 +498,31 @@ window.openSupervisorStudentDetailModal = function(studentId, focusSection = nul
   const className = st?.currentClass || st?.studentClass || st?.className || studentObj?.className || studentObj?.studentClass || '--';
   const major = st?.major || studentObj?.major || 'Mỹ thuật Công nghiệp';
 
+  const officialTitle = (typeof window.getOfficialApprovedTopicTitle === 'function')
+    ? window.getOfficialApprovedTopicTitle(st, 'Chưa cập nhật tên đề tài')
+    : (st?.topicTitle || 'Chưa cập nhật tên đề tài');
+  const pendingProp = (typeof window.getTopicPendingProposal === 'function')
+    ? window.getTopicPendingProposal(st)
+    : null;
+  const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
+    ? window.getApprovedTopicVersions(st)
+    : [];
+  const latestApproved = approvedVersions.length > 0 ? approvedVersions[approvedVersions.length - 1] : null;
+
   document.getElementById('dtl-mssv').textContent = studentId;
   document.getElementById('dtl-full-name').textContent = fullName;
   document.getElementById('dtl-class-major').textContent = `Lớp: ${className} • Ngành: ${major}`;
-  document.getElementById('dtl-topic-title').textContent = st?.topicTitle || 'Chưa cập nhật tên đề tài';
+  document.getElementById('dtl-topic-title').textContent = officialTitle;
   document.getElementById('dtl-project-type').textContent = `Loại hình: ${st?.projectType || '--'}`;
   const officialFormInfo = document.getElementById('dtl-official-form-info');
   if (officialFormInfo) {
     const rows = [
+      ['Đề tài chính thức', officialTitle],
+      ...(pendingProp ? [['Đề xuất đổi tên (Lần ' + pendingProp.version + ')', pendingProp.title + ' (Chờ GVHD duyệt)']] : []),
       ['Lớp', st?.currentClass], ['Ngành', st?.major], ['Email cá nhân', st?.personalEmail], ['Điện thoại', st?.studentPhone],
       ['Địa chỉ thường trú', st?.studentPermanentAddress], ['Địa chỉ tạm trú', st?.studentTemporaryAddress || st?.studentAddress],
       ['Môn học', st?.courseName], ['Mã môn / Nhóm', [st?.courseCode, st?.courseGroup].filter(Boolean).join(' / ')],
-      ['Đăng ký lần', st?.topicTitleVersion || 1], ['Mô tả định hướng', st?.topicDescription]
+      ['Đăng ký lần', latestApproved ? latestApproved.version : (st?.topicTitleVersion || 1)], ['Mô tả định hướng', latestApproved?.topicDescription || st?.topicDescription]
     ];
     officialFormInfo.innerHTML = rows.map(([label, value]) => `
       <div class="${label === 'Mô tả định hướng' || label.startsWith('Địa chỉ') ? 'sm:col-span-2' : ''}">

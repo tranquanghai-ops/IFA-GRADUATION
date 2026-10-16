@@ -77,6 +77,17 @@ export function getStudentFullProfile(sid, arg2 = null, arg3 = null, arg4 = null
   sObj.fullName = sObj.fullName || sObj.studentName || sObj.name || cleanId;
   sObj.topicTitle = (sObj.topicTitle && sObj.topicTitle !== '--') ? sObj.topicTitle : (sObj.topic || sObj.topicVietnamese || sObj.topicName || topicReg?.topicTitle || topicReg?.topic || fac?.topicTitle || fac?.topic || 'Chưa đăng ký đề tài');
 
+  // Enforce official approved topic title over any pending proposals
+  if (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function') {
+    const candidateSource = (reg && (reg.topicTitleHistory || reg.topicTitle)) ? reg
+      : ((off && (off.topicTitleHistory || off.topicTitle)) ? off
+      : ((topicReg && (topicReg.topicTitleHistory || topicReg.topicTitle)) ? topicReg : sObj));
+    const officialApproved = window.getOfficialApprovedTopicTitle(candidateSource, null);
+    if (officialApproved) {
+      sObj.topicTitle = officialApproved;
+    }
+  }
+
   if (!sObj.acceptedSupervisorName && !sObj.supervisorName) {
     const adminRegMatch = (state.adminReviewData?.registrations || []).find(r => r.studentId === cleanId);
     if (adminRegMatch) {

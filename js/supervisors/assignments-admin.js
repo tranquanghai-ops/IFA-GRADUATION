@@ -937,7 +937,8 @@ window.openAdminEditSupervisorModal = function(studentId) {
   const secondary = officials.find(s => s.role === 'support');
 
   document.getElementById('edit-sup-student-info').textContent = `${reg.studentId} — ${resolveStudentName(reg.studentId, reg.studentName)}`;
-  document.getElementById('edit-sup-topic-info').textContent = `Đề tài: ${reg.topicTitle || '--'}${reg.projectType ? ' (' + reg.projectType + ')' : ''}`;
+  const editTopic = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function') ? window.getOfficialApprovedTopicTitle(reg, reg.topicTitle || '--') : (reg.topicTitle || '--');
+  document.getElementById('edit-sup-topic-info').textContent = `Đề tài: ${editTopic}${reg.projectType ? ' (' + reg.projectType + ')' : ''}`;
   document.getElementById('edit-sup-round-info').textContent = `Đợt tốt nghiệp: ${state.activeRound?.title || state.activeRound?.name || state.selectedRoundId || '--'}`;
   document.getElementById('edit-sup-current-primary').textContent = primary?.supervisorName || 'Chưa phân công';
   document.getElementById('edit-sup-current-secondary').textContent = secondary?.supervisorName || 'Chưa có';

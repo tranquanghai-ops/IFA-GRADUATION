@@ -222,14 +222,20 @@ function renderAdminEligibleStudentsTable() {
       const fallback = effective?.acceptedSupervisorName || effective?.assignedSupervisorName || effective?.supervisorName || registration?.acceptedSupervisorName;
       if (fallback) names.push(fallback);
     }
-    const topic = String(registration?.topicTitle || registration?.topic || published?.topicTitle || draft?.topicTitle || '').trim();
-    const rawTopicStatus = registration?.topicApprovalStatus || registration?.approvalStatus || published?.topicApprovalStatus || draft?.topicApprovalStatus;
+    const officialApprovedTitle = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? (window.getOfficialApprovedTopicTitle(registration, '') || window.getOfficialApprovedTopicTitle(published, ''))
+      : '';
+    const pendingProposal = (typeof window !== 'undefined' && typeof window.getTopicPendingProposal === 'function')
+      ? window.getTopicPendingProposal(registration || published)
+      : null;
+    const topic = officialApprovedTitle || String(registration?.topicTitle || registration?.topic || published?.topicTitle || draft?.topicTitle || '').trim();
+    const rawTopicStatus = pendingProposal ? 'pending' : (officialApprovedTitle ? 'approved' : (registration?.topicApprovalStatus || registration?.approvalStatus || published?.topicApprovalStatus || draft?.topicApprovalStatus));
     const topicApprovalStatus = rawTopicStatus || (topic ? 'pending' : '');
     const preferences = !directAssignment && !names.length && Array.isArray(registration?.preferences)
       ? registration.preferences.slice().sort((a, b) => Number(a.rank) - Number(b.rank))
         .map(pref => `NV${pref.rank}: ${pref.supervisorName || pref.name || ''}`).filter(item => !item.endsWith(': '))
       : [];
-    return { topic, names, preferences, topicApprovalStatus, registration };
+    return { topic, names, preferences, topicApprovalStatus, registration, pendingProposal, officialApprovedTitle };
   };
 
   const filtered = mergedList.filter(s => {
@@ -261,7 +267,9 @@ function renderAdminEligibleStudentsTable() {
     
     let topicBadge = '';
     if (status.topic) {
-      if (status.topicApprovalStatus === 'approved') {
+      if (status.pendingProposal && status.officialApprovedTitle) {
+        topicBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">✓ Đã duyệt</span> <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">⏳ Chờ duyệt Lần ' + status.pendingProposal.version + '</span>';
+      } else if (status.topicApprovalStatus === 'approved') {
         topicBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">✓ Đã duyệt</span>';
       } else if (status.topicApprovalStatus === 'rejected') {
         topicBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">✕ Yêu cầu sửa</span>';

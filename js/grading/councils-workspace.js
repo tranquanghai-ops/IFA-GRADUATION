@@ -587,7 +587,9 @@ function renderCouncilStudentsTab(act) {
   const filteredStudents = roundStudents.filter(s => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || '';
-    const topic = s.topicTitle || '';
+    const topic = (typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? window.getOfficialApprovedTopicTitle(s, s.topicTitle || '')
+      : (s.topicTitle || '');
     const supName = (typeof formatStudentSupervisorsForDisplay === 'function') ? formatStudentSupervisorsForDisplay(s) : (s.supervisorName || '');
     if (q && !sid.toLowerCase().includes(q) && !name.toLowerCase().includes(q) && !topic.toLowerCase().includes(q) && !supName.toLowerCase().includes(q)) {
       return false;
@@ -640,7 +642,9 @@ function renderCouncilStudentsTab(act) {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || '--';
     const className = s.className || s.studentClass || '';
-    const topic = s.topicTitle || '--';
+    const topic = (typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? window.getOfficialApprovedTopicTitle(s, s.topicTitle || '--')
+      : (s.topicTitle || '--');
     const asgn = assignments.find(a => a.studentId === sid);
     const assignedCouncilId = asgn?.councilId || '';
     const order = asgn?.order || (idx + 1);
@@ -798,6 +802,9 @@ async function loadCouncilRoundStudents(roundId) {
       if (!mssv) return;
       const existing = studentMap.get(mssv) || { studentId: mssv, mssv: mssv };
       const supName = data.acceptedSupervisorName || data.supervisorName || existing.supervisorName || '';
+      const approvedTopic = (typeof window.getOfficialApprovedTopicTitle === 'function')
+        ? window.getOfficialApprovedTopicTitle(data, existing.topicTitle || '')
+        : (data.topicApprovalStatus === 'approved' ? data.topicTitle : (existing.topicTitle || data.topicTitle || ''));
       studentMap.set(mssv, {
         ...existing,
         ...data,
@@ -806,7 +813,7 @@ async function loadCouncilRoundStudents(roundId) {
         fullName: data.studentName || data.fullName || existing.fullName || '',
         studentName: data.studentName || data.fullName || existing.studentName || '',
         className: data.currentClass || data.className || existing.className || '',
-        topicTitle: data.topicTitle || existing.topicTitle || '',
+        topicTitle: approvedTopic || existing.topicTitle || '',
         supervisorName: supName,
         acceptedSupervisorName: supName
       });
@@ -819,7 +826,9 @@ async function loadCouncilRoundStudents(roundId) {
         : ((typeof window.getFacultyStudentByMssv === 'function') ? window.getFacultyStudentByMssv(s.mssv) : null);
       const topicReg = targetRound?.topicRegistrations?.[s.mssv] || targetRound?.topicRegistrations?.[s.mssv.toLowerCase()];
       const resolvedName = s.fullName || s.studentName || fac?.fullName || fac?.name || s.name || s.mssv;
-      const resolvedTopic = (s.topicTitle && s.topicTitle !== '--') ? s.topicTitle : (s.topic || topicReg?.topicTitle || topicReg?.topic || fac?.topicTitle || fac?.topic || 'Chưa đăng ký đề tài');
+      const resolvedTopic = (typeof window.getOfficialApprovedTopicTitle === 'function')
+        ? window.getOfficialApprovedTopicTitle(s, s.topicTitle || s.topic || topicReg?.topicTitle || topicReg?.topic || fac?.topicTitle || fac?.topic || 'Chưa đăng ký đề tài')
+        : ((s.topicTitle && s.topicTitle !== '--') ? s.topicTitle : (s.topic || topicReg?.topicTitle || topicReg?.topic || fac?.topicTitle || fac?.topic || 'Chưa đăng ký đề tài'));
       const resolvedSupervisor = s.acceptedSupervisorName || s.supervisorName || fac?.supervisorName || fac?.acceptedSupervisorName || '';
 
       return {
@@ -1530,7 +1539,7 @@ window.exportAdminRoundCouncilsExcel = function() {
             '--',
             asgn.studentId,
             `"${st?.fullName || st?.name || ''}"`,
-            `"${(st?.topicTitle || '').replace(/"/g, '""')}"`,
+            `"${((typeof window.getOfficialApprovedTopicTitle === 'function' ? window.getOfficialApprovedTopicTitle(st, st?.topicTitle || '') : st?.topicTitle) || '').replace(/"/g, '""')}"`,
             asgn.order || ''
           ]);
         });

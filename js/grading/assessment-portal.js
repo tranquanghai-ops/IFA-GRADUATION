@@ -550,7 +550,9 @@ function filterStudentList(students, scoreResolver) {
   return students.filter(s => {
     const sid = String(s.mssv || s.studentId || '').toLowerCase();
     const name = String(s.fullName || s.studentName || '').toLowerCase();
-    const topic = String(s.topicTitle || '').toLowerCase();
+    const topic = (typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? String(window.getOfficialApprovedTopicTitle(s, s.topicTitle || '')).toLowerCase()
+      : String(s.topicTitle || '').toLowerCase();
 
     if (q && !sid.includes(q) && !name.includes(q) && !topic.includes(q)) return false;
 
@@ -638,7 +640,9 @@ window.renderAssessmentDuyetList = function(phase) {
   container.innerHTML = filtered.map(s => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || sid;
-    const topic = s.topicTitle || 'Chưa cập nhật đề tài';
+    const topic = (typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? window.getOfficialApprovedTopicTitle(s, s.topicTitle || 'Chưa cập nhật đề tài')
+      : (s.topicTitle || 'Chưa cập nhật đề tài');
     const initial = (name || 'SV').charAt(0).toUpperCase();
     const supName = formatStudentSupervisorsForDisplay(s);
     const scInfo = scoreResolver(s);
@@ -756,7 +760,9 @@ window.renderAssessmentThesisList = function() {
   container.innerHTML = filtered.map(s => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || sid;
-    const topic = s.topicTitle || 'Chưa cập nhật đề tài';
+    const topic = (typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? window.getOfficialApprovedTopicTitle(s, s.topicTitle || 'Chưa cập nhật đề tài')
+      : (s.topicTitle || 'Chưa cập nhật đề tài');
     const initial = (name || 'SV').charAt(0).toUpperCase();
     const supName = formatStudentSupervisorsForDisplay(s);
 
@@ -858,7 +864,9 @@ window.renderAssessmentPreliminaryList = function() {
   container.innerHTML = filtered.map(s => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || sid;
-    const topic = s.topicTitle || 'Chưa cập nhật đề tài';
+    const topic = (typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? window.getOfficialApprovedTopicTitle(s, s.topicTitle || 'Chưa cập nhật đề tài')
+      : (s.topicTitle || 'Chưa cập nhật đề tài');
     const initial = (name || 'SV').charAt(0).toUpperCase();
     const supName = formatStudentSupervisorsForDisplay(s);
     const scInfo = scoreResolver(s);
@@ -1081,7 +1089,9 @@ window.renderAssessmentDefenseList = function() {
   container.innerHTML = filtered.map((s, idx) => {
     const sid = s.mssv || s.studentId;
     const name = s.fullName || s.studentName || s.name || sid;
-    const topic = s.topicTitle || 'Chưa cập nhật đề tài';
+    const topic = (typeof window.getOfficialApprovedTopicTitle === 'function')
+      ? window.getOfficialApprovedTopicTitle(s, s.topicTitle || 'Chưa cập nhật đề tài')
+      : (s.topicTitle || 'Chưa cập nhật đề tài');
     const supDisplay = formatStudentSupervisorsForDisplay(s, hideSupervisor);
     const orderNum = s.presentationOrder || s.order || (s._origIdx !== undefined ? s._origIdx + 1 : idx + 1);
 

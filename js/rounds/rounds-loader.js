@@ -442,16 +442,31 @@ function renderRoundHeader() {
   const topicReviewNoteEl = document.getElementById('hero-registered-topic-review-note');
   const topicDownloadBtn = document.getElementById('hero-download-topic-form-btn');
   const reg = state.myRegistration;
-  const registeredTopic = reg?.topicTitle || reg?.topic || reg?.proposalTitle || reg?.title || reg?.topicName;
+  const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
+    ? window.getApprovedTopicVersions(reg)
+    : [];
+  const latestApproved = approvedVersions.length > 0 ? approvedVersions[approvedVersions.length - 1] : null;
+  const officialTopicTitle = (typeof window.getOfficialApprovedTopicTitle === 'function')
+    ? window.getOfficialApprovedTopicTitle(reg, '')
+    : (reg?.topicTitle || '');
+  const pendingProposal = (typeof window.getTopicPendingProposal === 'function')
+    ? window.getTopicPendingProposal(reg)
+    : null;
+  const registeredTopic = officialTopicTitle || reg?.topicTitle || reg?.topic || reg?.proposalTitle || reg?.title || reg?.topicName;
 
   if (topicWrap) {
     if (registeredTopic) {
       topicWrap.classList.remove('hidden');
       if (topicNameEl) topicNameEl.textContent = registeredTopic;
 
-      const approvalStatus = reg?.topicApprovalStatus || 'pending';
+      const rawStatus = reg?.topicApprovalStatus || 'pending';
+      const approvalStatus = (latestApproved && !pendingProposal) ? 'approved' : rawStatus;
+
       if (topicApprovalBadge) {
-        if (approvalStatus === 'approved') {
+        if (latestApproved && pendingProposal) {
+          topicApprovalBadge.textContent = `✅ ĐÃ DUYỆT (LẦN ${latestApproved.version})`;
+          topicApprovalBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide bg-emerald-400 text-emerald-950 shadow-2xs';
+        } else if (approvalStatus === 'approved') {
           topicApprovalBadge.textContent = '✅ GVHD ĐÃ DUYỆT';
           topicApprovalBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide bg-emerald-400 text-emerald-950 shadow-2xs';
         } else if (approvalStatus === 'rejected') {
@@ -462,11 +477,6 @@ function renderRoundHeader() {
           topicApprovalBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide bg-amber-400 text-slate-950 shadow-2xs';
         }
       }
-
-      const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
-        ? window.getApprovedTopicVersions(reg)
-        : [];
-      const latestApproved = approvedVersions.length > 0 ? approvedVersions[approvedVersions.length - 1] : null;
 
       if (topicVersionBadge) {
         topicVersionBadge.textContent = latestApproved ? `Phiếu ĐK lần ${latestApproved.version}` : `Lần ${reg?.topicTitleVersion || 1}`;
@@ -485,8 +495,16 @@ function renderRoundHeader() {
         }
       }
 
+      if (previewBtn) {
+        const targetVer = latestApproved ? latestApproved.version : (reg?.topicTitleVersion || 1);
+        previewBtn.setAttribute('onclick', `openTopicRegistrationPreviewModal(null, false, ${targetVer})`);
+      }
+
+      const history = Array.isArray(reg?.topicTitleHistory) ? reg.topicTitleHistory : [];
+      const hasMultipleVersions = (approvedVersions.length > 1) || (approvedVersions.length > 0 && pendingProposal) || (history.length > 1);
+
       if (dropdownTrigger && previewBtn) {
-        if (approvedVersions.length > 1) {
+        if (hasMultipleVersions) {
           dropdownTrigger.classList.remove('hidden');
           previewBtn.classList.remove('rounded-xl');
           previewBtn.classList.add('rounded-l-xl', 'rounded-r-none', 'border-r-0');
@@ -506,18 +524,25 @@ function renderRoundHeader() {
       }
 
       if (topicReviewNoteEl) {
-        const hasNote = approvalStatus === 'rejected' && String(reg?.topicApprovalNote || '').trim();
-        if (hasNote) {
-          topicReviewNoteEl.innerHTML = `<span>💬 <strong>Ý kiến GVHD:</strong> ${escapeHtml(reg.topicApprovalNote)}</span>`;
+        if (pendingProposal) {
+          topicReviewNoteEl.innerHTML = `<span>⏳ <strong>Đang đề xuất đổi tên đề tài (Lần ${pendingProposal.version}):</strong> "${escapeHtml(pendingProposal.title)}" — <em>Đang chờ GVHD phê duyệt.</em></span>`;
+          topicReviewNoteEl.className = 'mt-2 p-2.5 rounded-xl bg-amber-400/25 border border-amber-300/40 text-amber-100 text-xs flex items-center gap-2';
           topicReviewNoteEl.classList.remove('hidden');
         } else {
-          topicReviewNoteEl.classList.add('hidden');
-          topicReviewNoteEl.innerHTML = '';
+          const hasNote = approvalStatus === 'rejected' && String(reg?.topicApprovalNote || '').trim();
+          if (hasNote) {
+            topicReviewNoteEl.innerHTML = `<span>💬 <strong>Ý kiến GVHD:</strong> ${escapeHtml(reg.topicApprovalNote)}</span>`;
+            topicReviewNoteEl.className = 'mt-2 p-2.5 rounded-xl bg-rose-500/20 border border-rose-400/30 text-rose-100 text-xs flex items-center gap-2';
+            topicReviewNoteEl.classList.remove('hidden');
+          } else {
+            topicReviewNoteEl.classList.add('hidden');
+            topicReviewNoteEl.innerHTML = '';
+          }
         }
       }
 
       if (topicDownloadBtn) {
-        topicDownloadBtn.classList.toggle('hidden', approvalStatus !== 'approved');
+        topicDownloadBtn.classList.toggle('hidden', !latestApproved && approvalStatus !== 'approved');
       }
     } else {
       topicWrap.classList.add('hidden');
@@ -544,17 +569,32 @@ window.toggleHeroTopicVersionsDropdown = function(event) {
   const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
     ? window.getApprovedTopicVersions(reg)
     : [];
-  if (approvedVersions.length === 0) return;
+  const history = Array.isArray(reg?.topicTitleHistory) ? reg.topicTitleHistory : [];
 
-  const sortedVersions = [...approvedVersions].sort((a, b) => b.version - a.version);
-  dropdown.innerHTML = sortedVersions.map((item, idx) => `
-    <button type="button" onclick="openTopicRegistrationPreviewModal(null, false, ${item.version}); document.getElementById('hero-topic-versions-dropdown').classList.add('hidden');" class="w-full text-left px-3.5 py-2 hover:bg-white/15 transition flex items-center justify-between gap-2 cursor-pointer">
-      <span class="font-bold flex items-center gap-1.5">
-        <span>📄</span> <span>Phiếu ĐK lần ${item.version}</span>
-      </span>
-      ${idx === 0 ? '<span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-300 font-bold">Mới nhất</span>' : ''}
-    </button>
-  `).join('');
+  const allMap = new Map();
+  approvedVersions.forEach(v => allMap.set(Number(v.version), { version: Number(v.version), title: v.title, status: 'approved' }));
+  history.forEach(h => {
+    const verNum = Number(h.version || 1);
+    if (!allMap.has(verNum)) {
+      allMap.set(verNum, { version: verNum, title: h.title, status: h.status || 'pending' });
+    }
+  });
+
+  const list = Array.from(allMap.values()).sort((a, b) => b.version - a.version);
+  if (list.length === 0) return;
+
+  dropdown.innerHTML = list.map((item, idx) => {
+    const isApp = item.status === 'approved';
+    const tag = isApp ? '<span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-300 font-bold">Đã duyệt</span>' : '<span class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-300 font-bold">Chờ duyệt</span>';
+    return `
+      <button type="button" onclick="openTopicRegistrationPreviewModal(null, false, ${item.version}); document.getElementById('hero-topic-versions-dropdown').classList.add('hidden');" class="w-full text-left px-3.5 py-2 hover:bg-white/15 transition flex items-center justify-between gap-2 cursor-pointer">
+        <span class="font-bold flex items-center gap-1.5">
+          <span>${isApp ? '📄' : '📝'}</span> <span>${isApp ? 'Phiếu ĐK' : 'Đề xuất'} lần ${item.version}</span>
+        </span>
+        ${tag}
+      </button>
+    `;
+  }).join('');
 
   dropdown.classList.remove('hidden');
 
@@ -566,6 +606,8 @@ window.toggleHeroTopicVersionsDropdown = function(event) {
   };
   setTimeout(() => document.addEventListener('click', closeDropdown), 10);
 };
+
+
 
 function startCountdown() {
   if (countdownInterval) clearInterval(countdownInterval);

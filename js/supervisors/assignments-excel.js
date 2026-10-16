@@ -37,7 +37,7 @@ window.exportSupervisorAssignmentsExcel = function() {
       sanitizeExcelCell(master?.fullName || master?.name || resolveStudentName(row.studentId, row.effective?.studentName)),
       sanitizeExcelCell(master?.major || row.eligibleStudent?.major || ''),
       sanitizeExcelCell(master?.className || master?.studentClass || ''),
-      sanitizeExcelCell(row.registration?.topicTitle || 'Chưa đăng ký đề tài'),
+      sanitizeExcelCell((typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function') ? window.getOfficialApprovedTopicTitle(row.registration || row.effective, 'Chưa đăng ký đề tài') : (row.registration?.topicTitle || 'Chưa đăng ký đề tài')),
       row.isRegistered ? 'Đã đăng ký' : 'Chưa đăng ký',
       sanitizeExcelCell(primary.supervisorEmail || ''),
       sanitizeExcelCell(primary.supervisorName || ''),
@@ -281,7 +281,7 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
     return row.studentId.toLowerCase().includes(q) ||
       (reg.studentName || '').toLowerCase().includes(q) ||
       name.toLowerCase().includes(q) ||
-      (reg.topicTitle || '').toLowerCase().includes(q) ||
+      ((typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function' ? window.getOfficialApprovedTopicTitle(reg, reg.topicTitle || '') : (reg.topicTitle || ''))).toLowerCase().includes(q) ||
       supNames.includes(q);
   });
 
@@ -350,7 +350,7 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
         <td class="p-3.5 font-mono font-bold text-slate-900">${mssv}</td>
         <td class="p-3.5 font-semibold text-slate-800 whitespace-nowrap">${escapeHtml(studentDisplayName)}</td>
         <td class="p-3.5 max-w-xs">
-          <span class="font-medium text-slate-900 block truncate" title="${escapeHtml(reg?.topicTitle || 'Chưa đăng ký đề tài')}">${escapeHtml(reg?.topicTitle || 'Chưa đăng ký đề tài')}</span>
+          <span class="font-medium text-slate-900 block truncate" title="${escapeHtml((typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function') ? window.getOfficialApprovedTopicTitle(reg, reg?.topicTitle || 'Chưa đăng ký đề tài') : (reg?.topicTitle || 'Chưa đăng ký đề tài'))}">${escapeHtml((typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function') ? window.getOfficialApprovedTopicTitle(reg, reg?.topicTitle || 'Chưa đăng ký đề tài') : (reg?.topicTitle || 'Chưa đăng ký đề tài'))}</span>
           <span class="text-[11px] text-slate-500">${escapeHtml(major)}${reg?.projectType ? ` • ${escapeHtml(reg.projectType)}` : ''}</span>
         </td>
         <td class="p-3.5 whitespace-nowrap">${regStatusHtml}</td>

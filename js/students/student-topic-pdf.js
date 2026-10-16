@@ -131,12 +131,15 @@ function getApprovedTopicVersions(reg) {
   history.forEach(item => {
     if (item && item.status === 'approved') {
       const v = Number(item.version || 1);
+      const t = item.title || item.topicTitle || reg.topicTitle || '';
       map.set(v, {
         version: v,
-        title: item.title || reg.topicTitle || '',
+        title: t,
+        topicTitle: t,
         topicDescription: item.topicDescription || reg.topicDescription || '',
         reviewedAt: item.reviewedAt || reg.topicReviewedAt || null,
         reviewedBy: item.reviewedBy || reg.topicReviewedBy || '',
+        note: item.note || '',
         status: 'approved'
       });
     }
@@ -145,12 +148,15 @@ function getApprovedTopicVersions(reg) {
   const isCurrentApproved = (reg.topicApprovalStatus === 'approved' || reg.approvalStatus === 'approved');
   const currentVersion = Number(reg.topicTitleVersion || 1);
   if (isCurrentApproved && !map.has(currentVersion)) {
+    const curT = reg.topicTitle || '';
     map.set(currentVersion, {
       version: currentVersion,
-      title: reg.topicTitle || '',
+      title: curT,
+      topicTitle: curT,
       topicDescription: reg.topicDescription || '',
       reviewedAt: reg.topicReviewedAt || null,
       reviewedBy: reg.topicReviewedBy || '',
+      note: reg.topicApprovalNote || '',
       status: 'approved'
     });
   }
@@ -158,6 +164,96 @@ function getApprovedTopicVersions(reg) {
   return Array.from(map.values()).sort((a, b) => a.version - b.version);
 }
 window.getApprovedTopicVersions = getApprovedTopicVersions;
+
+/**
+ * Lấy Tên Đề Tài Chính Thức = Tên đã được phê duyệt gần nhất
+ * Không trả về tên đề xuất đang chờ duyệt (pending) hoặc bị từ chối (rejected).
+ */
+function getOfficialApprovedTopicTitle(st, fallback = '') {
+  if (!st) return fallback;
+
+  // 1. Kiểm tra các phiên bản đã được phê duyệt từ lịch sử
+  const approvedVersions = getApprovedTopicVersions(st);
+  if (approvedVersions.length > 0) {
+    const latest = approvedVersions[approvedVersions.length - 1];
+    if (latest && latest.title && String(latest.title).trim()) {
+      return String(latest.title).trim();
+    }
+  }
+
+  // 2. Nếu trạng thái duyệt hiện tại là approved trực tiếp
+  const isApproved = (st.topicApprovalStatus === 'approved' || st.approvalStatus === 'approved');
+  if (isApproved && st.topicTitle && String(st.topicTitle).trim()) {
+    return String(st.topicTitle).trim();
+  }
+
+  // 3. Nếu là official assignment đã công bố và không có bằng chứng bị từ chối
+  if (st.assignmentStatus === 'published' && st.topicTitle && String(st.topicTitle).trim()) {
+    if (st.topicApprovalStatus !== 'rejected') {
+      return String(st.topicTitle).trim();
+    }
+  }
+
+  // 4. Khi chưa có bất kỳ phiên bản nào được duyệt (đăng ký ban đầu đang chờ duyệt)
+  const history = Array.isArray(st.topicTitleHistory) ? st.topicTitleHistory : [];
+  const v1 = history.find(h => Number(h.version) === 1);
+  const v1Title = v1 && (v1.title || v1.topicTitle);
+  if (v1Title && String(v1Title).trim() && approvedVersions.length === 0) {
+    return String(v1Title).trim();
+  }
+
+  // 5. Fallback các trường tương đương
+  const raw = st.topicTitle || st.topic || st.proposalTitle || st.title || st.topicName;
+  if (raw && String(raw).trim() && String(raw).trim() !== '--') {
+    return String(raw).trim();
+  }
+
+  return fallback;
+}
+window.getOfficialApprovedTopicTitle = getOfficialApprovedTopicTitle;
+
+/**
+ * Kiểm tra xem sinh viên có đề xuất đổi tên đề tài đang chờ duyệt (pending) hay không
+ */
+function getTopicPendingProposal(st) {
+  if (!st) return null;
+  const history = Array.isArray(st.topicTitleHistory) ? st.topicTitleHistory : [];
+  const approvedVersions = getApprovedTopicVersions(st);
+  const latestApprovedVer = approvedVersions.length > 0 ? approvedVersions[approvedVersions.length - 1].version : 0;
+
+  // Chỉ coi là đề xuất đổi tên khi ĐÃ CÓ ít nhất 1 phiên bản được phê duyệt trước đó
+  if (latestApprovedVer === 0) return null;
+
+  const currentVer = Number(st.topicTitleVersion || 1);
+  const currentStatus = st.topicApprovalStatus || st.approvalStatus;
+
+  if (currentStatus === 'pending' && currentVer > latestApprovedVer) {
+    const hist = history.find(h => Number(h.version) === currentVer) || {};
+    const tVal = hist.title || hist.topicTitle || st.topicTitle || '';
+    return {
+      version: currentVer,
+      title: tVal,
+      topicTitle: tVal,
+      topicDescription: hist.topicDescription || st.topicDescription || '',
+      submittedAt: hist.submittedAt || st.submittedAt || null
+    };
+  }
+
+  const pendingInHistory = history.find(h => h && h.status === 'pending' && Number(h.version) > latestApprovedVer);
+  if (pendingInHistory) {
+    const tVal = pendingInHistory.title || pendingInHistory.topicTitle || '';
+    return {
+      version: Number(pendingInHistory.version),
+      title: tVal,
+      topicTitle: tVal,
+      topicDescription: pendingInHistory.topicDescription || '',
+      submittedAt: pendingInHistory.submittedAt || null
+    };
+  }
+
+  return null;
+}
+window.getTopicPendingProposal = getTopicPendingProposal;
 
 function getRegistrationStudentIdentity() {
   const mssv = state.isPreviewMode ? state.previewMssv : (state.studentMssv || state.impersonation?.target?.mssv || state.myRegistration?.studentId || state.myRegistration?.mssv);
@@ -433,11 +529,20 @@ window.downloadOfficialTopicRegistrationPdf = async function(targetStudentId = n
     }
   }
 
+  const roundId = state.activeRoundId || state.activeRound?.id;
   if (targetStudentId && typeof targetStudentId === 'string') {
     if (!reg) {
       reg = (state.supervisorAssignedStudents || []).find(st => (st.studentId || st.id) === targetStudentId) ||
         (typeof findStudentInRound === 'function' ? findStudentInRound(targetStudentId) : null) ||
         (state.myRegistration && (state.myRegistration.studentId === targetStudentId || state.myRegistration.mssv === targetStudentId) ? state.myRegistration : null);
+    }
+    if (roundId && (!reg || !reg.topicTitleHistory || !reg.topicDescription)) {
+      try {
+        const snap = await getDoc(doc(db, 'graduationRounds', roundId, 'registrations', targetStudentId));
+        if (snap.exists()) {
+          reg = { ...(reg || {}), ...snap.data(), id: snap.id, studentId: targetStudentId };
+        }
+      } catch (e) {}
     }
     const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(targetStudentId) : null;
     const isFacReal = Boolean(studentObj && !studentObj.isMissing && !studentObj.notFoundInMaster);
