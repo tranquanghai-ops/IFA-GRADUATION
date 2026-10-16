@@ -4,3 +4,4 @@
 import './student-eligibility-modal.js';
 import './student-eligibility-admin.js';
 import './student-registrations-admin.js';
+import './student-review-submissions.js';

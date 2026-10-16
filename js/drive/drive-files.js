@@ -231,8 +231,15 @@ window.submitStudentFiles = async function(actId) {
     if (submitData.auditLogged === false) {
       showToast(submitData.auditWarning || 'Bài đã lưu nhưng nhật ký kiểm toán chưa ghi được.', 'warning');
     }
-    if (document.getElementById('student-timeline-event-dialog')) window.closeStudentTimelineEvent?.();
-    loadStudentRoundActivities(round.id);
+
+    // A3: Re-render the submission panel in-place so attempt counter, button, and "BÀI ĐÃ NỘP GẦN NHẤT" update immediately!
+    const panelEl = document.getElementById('sub-panel-' + act.id);
+    if (panelEl && typeof renderStudentSubmissionPanel === 'function') {
+      panelEl.outerHTML = renderStudentSubmissionPanel(act, round);
+    }
+    if (typeof loadStudentRoundActivities === 'function') {
+      loadStudentRoundActivities(round.id);
+    }
   } catch (err) {
     console.error('Submit error:', err);
     if (errBox) {
@@ -248,15 +255,15 @@ window.submitStudentFiles = async function(actId) {
         : null;
       if (updatedRules && updatedRules.remainingAttempts <= 0) {
         submitBtn.disabled = true;
-        submitBtn.className = 'px-4 py-2 bg-slate-300 text-slate-500 font-bold rounded-xl cursor-not-allowed';
+        submitBtn.className = 'w-full sm:w-auto px-4 py-2 bg-slate-200 text-slate-500 font-bold rounded-xl text-xs cursor-not-allowed border border-slate-300';
         submitBtn.textContent = '🚫 Đã hết lượt nộp';
       } else if (updatedRules && !updatedRules.canSubmit) {
         submitBtn.disabled = true;
-        submitBtn.className = 'px-4 py-2 bg-slate-300 text-slate-500 font-bold rounded-xl cursor-not-allowed';
+        submitBtn.className = 'w-full sm:w-auto px-4 py-2 bg-slate-200 text-slate-500 font-bold rounded-xl text-xs cursor-not-allowed border border-slate-300';
         submitBtn.textContent = updatedRules.isPastDeadline ? '⏰ Đã hết hạn nộp bài' : '⏳ Chưa mở nhận bài';
       } else if (updatedRules) {
         submitBtn.disabled = false;
-        submitBtn.className = 'px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer';
+        submitBtn.className = 'w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold rounded-xl shadow-xs text-xs transition-colors cursor-pointer';
         submitBtn.textContent = `📤 Nộp bài (Lần ${updatedRules.completedAttempts + 1}/${updatedRules.totalAllowedAttempts})`;
       } else {
         submitBtn.disabled = false;
@@ -355,7 +362,13 @@ window.retryStudentComplete = async function(actId) {
     if (submitData.auditLogged === false) {
       showToast(submitData.auditWarning || 'Bài đã lưu nhưng nhật ký kiểm toán chưa ghi được.', 'warning');
     }
-    loadStudentRoundActivities(round.id);
+    const panelEl = document.getElementById('sub-panel-' + act.id);
+    if (panelEl && typeof renderStudentSubmissionPanel === 'function') {
+      panelEl.outerHTML = renderStudentSubmissionPanel(act, round);
+    }
+    if (typeof loadStudentRoundActivities === 'function') {
+      loadStudentRoundActivities(round.id);
+    }
   } catch (err) {
     console.error('Retry complete error:', err);
     if (errBox) {

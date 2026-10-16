@@ -138,6 +138,9 @@ window.loadAdminEligibleStudents = async function(roundId) {
       drafts: new Map(draftSnap.docs.map(d => [d.id.toUpperCase(), d.data()]))
     };
     renderAdminEligibleStudentsTable();
+    if (typeof filterReviewSubmissionsTable === 'function' && document.getElementById('subtab-panel-review-rounds') && !document.getElementById('subtab-panel-review-rounds').classList.contains('hidden')) {
+      filterReviewSubmissionsTable();
+    }
   } catch (e) {
     console.error('Error loading eligible students:', e);
   }

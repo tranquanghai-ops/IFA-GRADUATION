@@ -1,0 +1,86 @@
+<!-- ============================================================================
+     MODAL: ADMIN INSPECT STUDENT SUBMISSION & HISTORY (v1.0.1)
+     ============================================================================ -->
+<div id="modal-admin-submission-inspect" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
+  <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-200 text-xs flex flex-col max-h-[90vh]">
+    <!-- MODAL HEADER -->
+    <div class="p-4 border-b border-slate-200 bg-slate-100 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">📄</span>
+        <div>
+          <h4 class="font-black text-sm text-slate-900 leading-tight">
+            Chi tiết bài nộp & Lịch sử các lần nộp
+          </h4>
+          <p class="text-[11px] text-slate-500 mt-0.5" id="inspect-sub-modal-subtitle">
+            Theo dõi và kiểm tra tệp tin nộp của sinh viên
+          </p>
+        </div>
+      </div>
+      <button type="button" onclick="closeAdminSubmissionInspectModal()" class="text-slate-500 hover:text-slate-800 text-lg font-bold p-1 leading-none cursor-pointer" aria-label="Đóng">✕</button>
+    </div>
+
+    <!-- STUDENT & MILESTONE BANNER -->
+    <div class="p-4 bg-slate-50 border-b border-slate-200 space-y-2">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <span class="font-mono font-bold text-slate-900 text-sm" id="inspect-sub-student-id">...</span>
+          <span class="font-bold text-slate-800 text-sm ml-1.5" id="inspect-sub-student-name">...</span>
+          <span class="text-[11px] text-slate-500 ml-1.5 font-mono" id="inspect-sub-student-class">...</span>
+        </div>
+        <div id="inspect-sub-attempts-badge">
+          <!-- Attempts badge -->
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+        <div>
+          <span class="text-slate-400 block font-semibold">Đề tài:</span>
+          <span class="font-bold text-slate-800 block truncate" id="inspect-sub-topic-title">...</span>
+        </div>
+        <div>
+          <span class="text-slate-400 block font-semibold">GVHD:</span>
+          <span class="font-bold text-slate-800 block truncate" id="inspect-sub-supervisor-name">...</span>
+        </div>
+      </div>
+      <div class="text-[11px] pt-1 border-t border-slate-200/80 flex items-center justify-between text-slate-600">
+        <span id="inspect-sub-activity-title">Mốc kế hoạch: ...</span>
+        <span id="inspect-sub-deadline">Hạn nộp: ...</span>
+      </div>
+    </div>
+
+    <!-- MODAL BODY: SCROLLABLE -->
+    <div class="p-4 flex-1 overflow-y-auto space-y-4">
+      <!-- SECTION 1: LATEST OFFICIAL SUBMISSION -->
+      <div class="space-y-2">
+        <h5 class="font-black text-xs uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+          <span>📌</span> <span>Bản nộp chính thức hiện tại</span>
+        </h5>
+        <div id="inspect-sub-current-card" class="p-3.5 bg-emerald-50/60 border border-emerald-300 rounded-xl space-y-2">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- SECTION 2: ATTEMPTS HISTORY -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <h5 class="font-black text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+            <span>📜</span> <span>Lịch sử các lượt nộp bài</span>
+          </h5>
+          <span class="text-[11px] text-slate-500 font-mono" id="inspect-sub-history-count">0 lượt nộp</span>
+        </div>
+        <div id="inspect-sub-history-list" class="space-y-2">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL FOOTER -->
+    <div class="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+      <div id="inspect-sub-admin-actions">
+        <!-- Shortcut to Override modal -->
+      </div>
+      <button type="button" onclick="closeAdminSubmissionInspectModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer">
+        Đóng
+      </button>
+    </div>
+  </div>
+</div>
