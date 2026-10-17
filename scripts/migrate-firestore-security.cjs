@@ -420,6 +420,30 @@ async function runInventoryAndMigration() {
           if (!writeRes.ok) {
             console.error(`Failed to migrate student ${stId}: HTTP ${writeRes.status}`);
           }
+
+          // Migrate independent phase document in subcollection reviews/{pKey}
+          const phaseDocUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${roundId}/publishedStudentResults/${stId}/reviews/${pKey}`;
+          const phasePayload = {
+            phase: Number(phaseNum),
+            activityId: pVal.activityId || `act_${pKey}`,
+            letterGrade: sRes.letterGrade || '--',
+            isPassed: Boolean(sRes.isPassed),
+            status: pVal.status || 'published',
+            publishedAt: pubAt,
+            publishedBy: pubBy,
+            publicationVersion: pubVersion,
+            updatedAt: new Date().toISOString()
+          };
+
+          const phaseWriteRes = await fetch(phaseDocUrl, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ fields: serializeFields(phasePayload) })
+          });
+
+          if (!phaseWriteRes.ok) {
+            console.error(`Failed to migrate phase doc for student ${stId} (${pKey}): HTTP ${phaseWriteRes.status}`);
+          }
         }
       }
     }

@@ -586,6 +586,20 @@ export async function confirmPublishProgressReview() {
               },
               updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : new Date().toISOString()
             }, { merge: true });
+
+            // Lưu document riêng cho từng đợt duyệt trong subcollection reviews/{phaseKey}
+            const phaseDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedStudentResults', stId, 'reviews', `duyet_${phase}`);
+            await rawSet(phaseDocRef, {
+              phase: Number(phase),
+              activityId: act ? act.id : `act_duyet_${phase}`,
+              letterGrade: sRes.letterGrade,
+              isPassed: sRes.isPassed,
+              status: 'published',
+              publishedAt: pubRecord.publishedAt,
+              publishedBy: pubRecord.publishedBy,
+              publicationVersion: pubVersion,
+              updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : new Date().toISOString()
+            });
           }
 
           // 3. Ghi nhật ký kiểm toán (Audit Log)
@@ -1044,6 +1058,19 @@ export async function confirmRevokeProgressReview() {
               status: rootStatus,
               isPublished: rootIsPub,
               revokedAt: revokeTimestamp
+            }).catch(() => {});
+
+            // Cập nhật document riêng của đợt này trong subcollection reviews/{phaseKey} thành revoked
+            const phaseDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedStudentResults', stId, 'reviews', pKey);
+            await rawSet(phaseDocRef, {
+              phase: Number(phase),
+              activityId: act ? act.id : `act_duyet_${phase}`,
+              status: 'revoked',
+              isPublished: false,
+              revokedAt: revokeTimestamp,
+              revokedBy: currentUserEmail,
+              revokeReason: reason,
+              updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : revokeTimestamp
             }).catch(() => {});
           }
 
@@ -1857,9 +1884,22 @@ export async function getStudentPublishedReviewResult(roundId, studentId, phase)
   // 1. Check in-memory state cache
   if (typeof state !== 'undefined') {
     state.cachedPublishedResults = state.cachedPublishedResults || {};
-    const cacheKey = `${roundId}_${sid}`;
-    if (state.cachedPublishedResults[cacheKey]) {
-      const cachedDoc = state.cachedPublishedResults[cacheKey];
+    // Check phase-specific cache first
+    const phaseCacheKey = `${roundId}_${sid}_${pKey}`;
+    if (state.cachedPublishedResults[phaseCacheKey] !== undefined) {
+      const cachedPhase = state.cachedPublishedResults[phaseCacheKey];
+      if (cachedPhase && (cachedPhase.status === 'revoked' || cachedPhase.isPublished === false)) {
+        return { status: 'revoked', isPublished: false };
+      }
+      if (cachedPhase && (cachedPhase.status === 'published' || cachedPhase.letterGrade)) {
+        return cachedPhase;
+      }
+      if (cachedPhase === null) return null;
+    }
+    // Check document-level cache
+    const docCacheKey = `${roundId}_${sid}`;
+    if (state.cachedPublishedResults[docCacheKey]) {
+      const cachedDoc = state.cachedPublishedResults[docCacheKey];
       if (cachedDoc.status !== 'revoked' && cachedDoc.reviews?.[pKey]?.status === 'published') {
         return cachedDoc.reviews[pKey];
       }
@@ -1869,34 +1909,68 @@ export async function getStudentPublishedReviewResult(roundId, studentId, phase)
     }
   }
 
-  // 2. Query Firestore subcollection publishedStudentResults
+  // 2. Query Firestore subcollection publishedStudentResults/{sid}/reviews/{phaseKey}
   try {
     const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
     const docFn = (typeof window !== 'undefined') ? (window.doc || (typeof doc !== 'undefined' ? doc : null)) : null;
     const getDocFn = (typeof window !== 'undefined') ? (window.getDoc || (typeof getDoc !== 'undefined' ? getDoc : null)) : null;
 
     if (dbObj && docFn && getDocFn) {
-      const stDocRef = docFn(dbObj, 'graduationRounds', roundId, 'publishedStudentResults', sid);
-      const snap = await getDocFn(stDocRef);
-      if (snap && snap.exists()) {
-        const data = snap.data();
-        if (typeof state !== 'undefined') {
-          state.cachedPublishedResults = state.cachedPublishedResults || {};
-          state.cachedPublishedResults[`${roundId}_${sid}`] = data;
+      // 2a. Try subcollection reviews/duyet_X first (document-level isolation)
+      try {
+        const phaseDocRef = docFn(dbObj, 'graduationRounds', roundId, 'publishedStudentResults', sid, 'reviews', pKey);
+        const phaseSnap = await getDocFn(phaseDocRef);
+        if (phaseSnap && phaseSnap.exists()) {
+          const phaseData = phaseSnap.data();
+          if (typeof state !== 'undefined') {
+            state.cachedPublishedResults = state.cachedPublishedResults || {};
+            state.cachedPublishedResults[`${roundId}_${sid}_${pKey}`] = phaseData;
+          }
+          if (phaseData.status === 'published' || (phaseData.isPublished !== false && phaseData.letterGrade)) {
+            return phaseData;
+          }
+          if (phaseData.status === 'revoked' || phaseData.isPublished === false) {
+            return { status: 'revoked', isPublished: false };
+          }
         }
-        if (data.status !== 'revoked' && data.reviews?.[pKey]?.status === 'published') {
-          return data.reviews[pKey];
-        }
-        if (data.status === 'revoked' || data.reviews?.[pKey]?.status === 'revoked') {
+      } catch (phaseErr) {
+        // Under Firestore Rules, reading a revoked or non-published review returns PERMISSION_DENIED.
+        // If permission is denied on this specific phase document, it is not published or revoked.
+        if (phaseErr && (phaseErr.code === 'permission-denied' || String(phaseErr).includes('permission-denied'))) {
+          if (typeof state !== 'undefined') {
+            state.cachedPublishedResults = state.cachedPublishedResults || {};
+            state.cachedPublishedResults[`${roundId}_${sid}_${pKey}`] = { status: 'revoked', isPublished: false };
+          }
           return { status: 'revoked', isPublished: false };
         }
       }
+
+      // 2b. Fallback to parent document publishedStudentResults/{sid}
+      try {
+        const stDocRef = docFn(dbObj, 'graduationRounds', roundId, 'publishedStudentResults', sid);
+        const snap = await getDocFn(stDocRef);
+        if (snap && snap.exists()) {
+          const data = snap.data();
+          if (typeof state !== 'undefined') {
+            state.cachedPublishedResults = state.cachedPublishedResults || {};
+            state.cachedPublishedResults[`${roundId}_${sid}`] = data;
+          }
+          if (data.status !== 'revoked' && data.reviews?.[pKey]?.status === 'published') {
+            return data.reviews[pKey];
+          }
+          if (data.status === 'revoked' || data.reviews?.[pKey]?.status === 'revoked') {
+            return { status: 'revoked', isPublished: false };
+          }
+        }
+      } catch (parentErr) {
+        // Handled silently
+      }
     }
   } catch (err) {
-    // Handled silently: Permission denied (e.g. revoked or unassigned)
+    // Handled silently
   }
 
-  // 3. Fallback to round publishedReviews if present (for test mocks / local admin preview)
+  // 3. Fallback to round publishedReviews if present (for test mocks / local admin preview / pre-migration production)
   const targetRound = (typeof state !== 'undefined' && ((state.rounds || []).find(r => r.id === roundId) || (state.activeRound?.id === roundId ? state.activeRound : null)));
   if (targetRound) {
     const pubRecord = targetRound.publishedReviews?.[pKey];

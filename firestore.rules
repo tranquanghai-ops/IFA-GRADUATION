@@ -508,10 +508,19 @@ service cloud.firestore {
       // ==========================================
       match /publishedStudentResults/{studentId} {
         allow get: if admin()
-          || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$') && isResultPublished(resource.data))
-          || (staff() && isAssignedSupervisor(studentId) && isResultPublished(resource.data));
+          || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$') && (!('reviews' in resource.data) || isResultPublished(resource.data)))
+          || (staff() && isAssignedSupervisor(studentId) && (!('reviews' in resource.data) || isResultPublished(resource.data)));
         allow list: if admin();
         allow create, update, delete: if admin();
+
+        // Subcollection theo từng đợt duyệt độc lập: reviews/{phaseKey}
+        match /reviews/{phaseKey} {
+          allow get: if admin()
+            || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$') && resource.data.status == 'published')
+            || (staff() && isAssignedSupervisor(studentId) && resource.data.status == 'published');
+          allow list: if admin();
+          allow create, update, delete: if admin();
+        }
       }
 
       // Snapshot công bố mốc của Quản trị viên phục vụ đối soát và bảng điểm

@@ -187,6 +187,33 @@ before(async () => {
         }
       }
     });
+
+    // 9. Subcollection reviews/{phaseKey} fixtures (Isolated per-phase documents)
+    await setDoc(doc(db, `graduationRounds/${roundId}/publishedStudentResults/${studentA}/reviews/duyet_1`), {
+      phase: 1,
+      activityId,
+      letterGrade: 'B',
+      isPassed: true,
+      status: 'published',
+      publishedAt: '2026-10-16T10:00:00.000Z',
+      publicationVersion: 1
+    });
+    await setDoc(doc(db, `graduationRounds/${roundId}/publishedStudentResults/${studentA}/reviews/duyet_2`), {
+      phase: 2,
+      activityId: 'act_duyet_2',
+      letterGrade: 'A',
+      isPassed: true,
+      status: 'published',
+      publishedAt: '2026-10-16T12:00:00.000Z',
+      publicationVersion: 1
+    });
+    await setDoc(doc(db, `graduationRounds/${roundId}/publishedStudentResults/${studentB}/reviews/duyet_1`), {
+      phase: 1,
+      activityId,
+      letterGrade: 'C',
+      isPassed: false,
+      status: 'draft'
+    });
   });
 });
 
@@ -422,4 +449,98 @@ test('12. Audit logs are immutable (append-only) and cannot be modified or delet
   // Student cannot read or delete audit log
   await assertFails(getDoc(doc(studentADb, `auditLogs/${logId}`)));
   await assertFails(deleteDoc(doc(studentADb, `auditLogs/${logId}`)));
+});
+
+// =========================================================================
+// TEST SUITE 6: INDEPENDENT MULTI-PHASE REVOCATION & SUBCOLLECTION ISOLATION
+// =========================================================================
+test('13. Multi-phase independent revocation: Revoking Phase 1 blocks reading Phase 1 via SDK, while Phase 2 remains readable', async () => {
+  const studentADb = env.authenticatedContext(studentAEmail, actor(studentAEmail)).firestore();
+  const assignedGvhdDb = env.authenticatedContext(supervisorAssigned, actor(supervisorAssigned)).firestore();
+  const adminDb = env.authenticatedContext(adminEmail, actor(adminEmail)).firestore();
+
+  const phase1Path = `graduationRounds/${roundId}/publishedStudentResults/${studentA}/reviews/duyet_1`;
+  const phase2Path = `graduationRounds/${roundId}/publishedStudentResults/${studentA}/reviews/duyet_2`;
+
+  // 1. Initial State: Both Phase 1 and Phase 2 are published and readable
+  const p1SnapInitial = await assertSucceeds(getDoc(doc(studentADb, phase1Path)));
+  assert.equal(p1SnapInitial.data().letterGrade, 'B');
+
+  const p2SnapInitial = await assertSucceeds(getDoc(doc(studentADb, phase2Path)));
+  assert.equal(p2SnapInitial.data().letterGrade, 'A');
+
+  // 2. Admin revokes ONLY Phase 1 (Duyệt 1)
+  await assertSucceeds(updateDoc(doc(adminDb, phase1Path), {
+    status: 'revoked',
+    isPublished: false,
+    revokedAt: new Date().toISOString(),
+    revokeReason: 'Thu hồi Duyệt 1 để phúc tra'
+  }));
+
+  // 3. Student A reading Phase 1 (duyet_1) MUST BE REJECTED by Firestore Rules
+  await assertFails(getDoc(doc(studentADb, phase1Path)));
+
+  // 4. Assigned GVHD reading Phase 1 MUST ALSO BE REJECTED
+  await assertFails(getDoc(doc(assignedGvhdDb, phase1Path)));
+
+  // 5. Phase 2 (duyet_2) is NOT lost and MUST REMAIN READABLE by Student A and GVHD!
+  const p2SnapPostRevoke = await assertSucceeds(getDoc(doc(studentADb, phase2Path)));
+  assert.equal(p2SnapPostRevoke.data().letterGrade, 'A');
+  assert.equal(p2SnapPostRevoke.data().status, 'published');
+
+  const gvP2Snap = await assertSucceeds(getDoc(doc(assignedGvhdDb, phase2Path)));
+  assert.equal(gvP2Snap.data().letterGrade, 'A');
+
+  // 6. Admin can still inspect revoked Phase 1 document for governance
+  const adminP1Snap = await assertSucceeds(getDoc(doc(adminDb, phase1Path)));
+  assert.equal(adminP1Snap.data().status, 'revoked');
+
+  // 7. Re-publication: Admin re-publishes Phase 1
+  await assertSucceeds(updateDoc(doc(adminDb, phase1Path), {
+    status: 'published',
+    isPublished: true,
+    publishedAt: new Date().toISOString(),
+    publicationVersion: 2
+  }));
+
+  // 8. Student A and GVHD can read Phase 1 again after re-publication
+  const p1SnapRePub = await assertSucceeds(getDoc(doc(studentADb, phase1Path)));
+  assert.equal(p1SnapRePub.data().letterGrade, 'B');
+  assert.equal(p1SnapRePub.data().status, 'published');
+});
+
+test('14. Subcollection reviews/{phaseKey} strictly enforces least-privilege RBAC', async () => {
+  const studentADb = env.authenticatedContext(studentAEmail, actor(studentAEmail)).firestore();
+  const studentBDb = env.authenticatedContext(studentBEmail, actor(studentBEmail)).firestore();
+  const studentOtherDb = env.authenticatedContext(studentOtherEmail, actor(studentOtherEmail)).firestore();
+  const assignedGvhdDb = env.authenticatedContext(supervisorAssigned, actor(supervisorAssigned)).firestore();
+  const unassignedGvhdDb = env.authenticatedContext(supervisorUnassigned, actor(supervisorUnassigned)).firestore();
+  const adminDb = env.authenticatedContext(adminEmail, actor(adminEmail)).firestore();
+
+  const studentAPhase2 = `graduationRounds/${roundId}/publishedStudentResults/${studentA}/reviews/duyet_2`;
+  const studentBPhase1 = `graduationRounds/${roundId}/publishedStudentResults/${studentB}/reviews/duyet_1`;
+
+  // 1. Student B CANNOT read Student A's review
+  await assertFails(getDoc(doc(studentBDb, studentAPhase2)));
+
+  // 2. Student outside round CANNOT read Student A's review
+  await assertFails(getDoc(doc(studentOtherDb, studentAPhase2)));
+
+  // 3. Unassigned teacher CANNOT read Student A's review
+  await assertFails(getDoc(doc(unassignedGvhdDb, studentAPhase2)));
+
+  // 4. Student B CANNOT read own review while in draft/unpublished status
+  await assertFails(getDoc(doc(studentBDb, studentBPhase1)));
+
+  // 5. Non-admin users CANNOT list the subcollection
+  await assertFails(getDocs(collection(studentADb, `graduationRounds/${roundId}/publishedStudentResults/${studentA}/reviews`)));
+  await assertFails(getDocs(collection(assignedGvhdDb, `graduationRounds/${roundId}/publishedStudentResults/${studentA}/reviews`)));
+
+  // 6. Admin CAN list subcollection
+  const adminColSnap = await assertSucceeds(getDocs(collection(adminDb, `graduationRounds/${roundId}/publishedStudentResults/${studentA}/reviews`)));
+  assert.equal(adminColSnap.docs.length >= 2, true);
+
+  // 7. Non-admin users CANNOT write, forge, or tamper with review docs
+  await assertFails(setDoc(doc(studentADb, studentAPhase2), { letterGrade: 'A+' }));
+  await assertFails(deleteDoc(doc(studentADb, studentAPhase2)));
 });
