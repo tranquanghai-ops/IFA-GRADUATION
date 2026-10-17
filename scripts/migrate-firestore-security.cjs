@@ -1,13 +1,13 @@
 /**
  * IFA-GRADUATION — FIRESTORE SECURITY MIGRATION & RECONCILIATION SCRIPT
- * 
+ *
  * Purpose:
  * 1. Read-only inventory and audit of sensitive grading fields across all graduationRounds.
  * 2. Full backup of pre-migration state to backups/firestore-security-backup-<timestamp>.json.
  * 3. Migration of legacy student results from root publishedReviews into Tier C subcollection publishedStudentResults/{studentId}.
  * 4. Verification of data checksums and idempotent safety.
  * 5. Rollback capability from JSON backup.
- * 
+ *
  * Safety Rules:
  * - DEFAULTS TO --dry-run (100% READ-ONLY).
  * - Requires explicit --apply to execute mutations.
@@ -23,12 +23,14 @@ const TARGET_ROUND_ID = 'FZRWniqMofaIvn7ogq0w'; // Main 2026 graduation round
 
 const args = process.argv.slice(2);
 const isApplyMode = args.includes('--apply');
-const isRollbackMode = args.some(a => a.startsWith('--rollback='));
-const isDryRun = !isApplyMode && !isRollbackMode;
+const isCleanupRootMode = args.includes('--cleanup-root');
+const rollbackArg = args.find(a => a.startsWith('--rollback='));
+const isRollbackMode = Boolean(rollbackArg);
+const isDryRun = !isApplyMode && !isRollbackMode && !isCleanupRootMode;
 
 console.log('='.repeat(80));
 console.log(' IFA-GRADUATION — FIRESTORE SECURITY AUDIT & MIGRATION SCRIPT');
-console.log(' Mode: ' + (isRollbackMode ? 'ROLLBACK' : (isApplyMode ? 'APPLY (ACTIVE PRODUCTION MUTATION)' : 'DRY-RUN (READ-ONLY INVENTORY)')));
+console.log(' Mode: ' + (isRollbackMode ? 'ROLLBACK' : (isCleanupRootMode ? 'CLEANUP-ROOT (ACTIVE PRODUCTION CLEANUP)' : (isApplyMode ? 'APPLY (ACTIVE PRODUCTION MUTATION)' : 'DRY-RUN (READ-ONLY INVENTORY)'))));
 console.log(' Project: ' + PROJECT_ID);
 console.log(' Target Round: ' + TARGET_ROUND_ID);
 console.log('='.repeat(80));
@@ -158,7 +160,7 @@ async function runInventoryAndMigration() {
     const hasCouncilScores = Boolean(r.data.councilScores && Object.keys(r.data.councilScores).length > 0);
     const hasProgressReviews = Boolean(r.data.progressReviews && Object.keys(r.data.progressReviews).length > 0);
     const publishedReviews = r.data.publishedReviews || {};
-    
+
     let publishedStudentCount = 0;
     const publishedPhases = [];
     for (const [pKey, pVal] of Object.entries(publishedReviews)) {
@@ -256,6 +258,109 @@ async function runInventoryAndMigration() {
   }
 
   // =========================================================================
+  // ROLLBACK MODE
+  // =========================================================================
+  if (isRollbackMode) {
+    const backupFile = rollbackArg.split('=')[1];
+    console.log(`\n[4/5] EXECUTING ROLLBACK FROM BACKUP: ${backupFile}...`);
+    if (!fs.existsSync(backupFile)) throw new Error(`Backup file not found: ${backupFile}`);
+    const backupData = JSON.parse(fs.readFileSync(backupFile, 'utf8'));
+    const rawRounds = backupData.rawRounds || (backupData.id ? [backupData] : []);
+    for (const r of rawRounds) {
+      const patchUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${r.id}`;
+      const patchRes = await fetch(patchUrl, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ fields: r.rawFields || serializeFields(r.data) })
+      });
+      if (!patchRes.ok) console.error(`Failed to restore round ${r.id}: HTTP ${patchRes.status}`);
+      else console.log(`Restored round ${r.id} successfully.`);
+    }
+    console.log('[5/5] Rollback finished successfully.');
+    return;
+  }
+
+  // =========================================================================
+  // CLEANUP-ROOT MODE: STRIP SENSITIVE LEAKS FROM ROOT DOCUMENT AFTER CUTOVER
+  // =========================================================================
+  if (isCleanupRootMode) {
+    console.log('\n[4/5] EXECUTING CONTROLLED ROOT DOCUMENT CLEANUP (--cleanup-root)...');
+    const targetRoundId = (args.find(a => a.startsWith('--round='))?.split('=')[1]) || TARGET_ROUND_ID;
+    const target = rounds.find(r => r.id === targetRoundId);
+    if (!target) throw new Error(`Target round ${targetRoundId} not found for cleanup.`);
+
+    // 1. Verify subcollection publishedStudentResults
+    const subColUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${target.id}/publishedStudentResults`;
+    const subColRes = await fetch(subColUrl, { headers });
+    const subColJson = subColRes.ok ? await subColRes.json() : {};
+    const migratedDocs = (subColJson.documents || []).length;
+    console.log(`Verified ${migratedDocs} published student documents in subcollection.`);
+
+    if (target.data.publishedReviews?.duyet_1?.studentResults) {
+      const requiredStudents = Object.keys(target.data.publishedReviews.duyet_1.studentResults).length;
+      if (migratedDocs < requiredStudents) {
+        throw new Error(`ABORT: Subcollection has ${migratedDocs} docs but root has ${requiredStudents} students. Run --apply first!`);
+      }
+    }
+
+    // 2. Pre-cleanup backup
+    const preCleanupBackupPath = path.join(backupDir, `pre-cleanup-backup-${target.id}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+    fs.writeFileSync(preCleanupBackupPath, JSON.stringify(target, null, 2), 'utf8');
+    console.log(`Pre-cleanup backup saved to: ${preCleanupBackupPath}`);
+
+    // 3. Build sanitized fields for root doc
+    const cleanFields = { ...target.rawFields };
+    // Remove councilScores
+    delete cleanFields.councilScores;
+    // Sanitize publishedReviews (keep metadata, remove studentResults map)
+    if (cleanFields.publishedReviews && cleanFields.publishedReviews.mapValue) {
+      const pubMap = cleanFields.publishedReviews.mapValue.fields || {};
+      const sanitizedPubMap = {};
+      for (const [k, v] of Object.entries(pubMap)) {
+        if (v.mapValue && v.mapValue.fields) {
+          const pFields = { ...v.mapValue.fields };
+          delete pFields.studentResults;
+          sanitizedPubMap[k] = { mapValue: { fields: pFields } };
+        } else {
+          sanitizedPubMap[k] = v;
+        }
+      }
+      cleanFields.publishedReviews = { mapValue: { fields: sanitizedPubMap } };
+    }
+    // Sanitize activities (remove finalDefenseScores from councils)
+    if (cleanFields.activities && cleanFields.activities.arrayValue) {
+      const acts = cleanFields.activities.arrayValue.values || [];
+      const sanitizedActs = acts.map(actVal => {
+        if (!actVal.mapValue || !actVal.mapValue.fields) return actVal;
+        const actFields = { ...actVal.mapValue.fields };
+        if (actFields.councils && actFields.councils.arrayValue) {
+          const councils = actFields.councils.arrayValue.values || [];
+          const sanitizedCouncils = councils.map(cVal => {
+            if (!cVal.mapValue || !cVal.mapValue.fields) return cVal;
+            const cFields = { ...cVal.mapValue.fields };
+            delete cFields.finalDefenseScores;
+            return { mapValue: { fields: cFields } };
+          });
+          actFields.councils = { arrayValue: { values: sanitizedCouncils } };
+        }
+        return { mapValue: { fields: actFields } };
+      });
+      cleanFields.activities = { arrayValue: { values: sanitizedActs } };
+    }
+
+    const patchUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${target.id}`;
+    const patchRes = await fetch(patchUrl, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ fields: cleanFields })
+    });
+    if (!patchRes.ok) throw new Error(`Failed to clean root doc: HTTP ${patchRes.status}`);
+
+    console.log(`[5/5] Root document ${target.id} cleaned successfully. Sensitive fields removed.`);
+    return;
+  }
+
+  // =========================================================================
   // APPLY MODE: ACTIVE PRODUCTION MIGRATION
   // =========================================================================
   console.log('\n[4/5] EXECUTING ACTIVE PRODUCTION MIGRATION (--apply)...');
@@ -274,6 +379,15 @@ async function runInventoryAndMigration() {
 
         console.log(`Migrating ${Object.keys(studentResults).length} students for Round ${roundId} ${pKey}...`);
 
+        // Save admin snapshot to publishedProgressReviews/{pKey}
+        const snapshotUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${roundId}/publishedProgressReviews/${pKey}`;
+        await fetch(snapshotUrl, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ fields: serializeFields(pVal) })
+        });
+
+        // Migrate individual student results
         for (const [stId, sRes] of Object.entries(studentResults)) {
           const docUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${roundId}/publishedStudentResults/${stId}`;
           const payload = {

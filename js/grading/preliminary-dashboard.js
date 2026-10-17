@@ -1000,6 +1000,7 @@ export async function confirmRevokeProgressReview() {
 
     const rawUpdate = (typeof window !== 'undefined') ? (window.updateDoc || window.rawUpdateDoc) : null;
     const rawSet = (typeof window !== 'undefined') ? (window.setDoc || window.rawSetDoc) : null;
+    const rawGet = (typeof window !== 'undefined') ? (window.getDoc || window.rawGetDoc) : null;
     const docFn = (typeof window !== 'undefined') ? window.doc : null;
     const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
 
@@ -1015,19 +1016,35 @@ export async function confirmRevokeProgressReview() {
           const subDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedProgressReviews', pKey);
           await rawSet(subDocRef, revokeRecord);
 
-          if (prevPub.studentResults) {
-            for (const stId of Object.keys(prevPub.studentResults)) {
-              const stDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedStudentResults', stId);
-              await rawUpdate(stDocRef, {
-                [`reviews.${pKey}.status`]: 'revoked',
-                [`reviews.${pKey}.isPublished`]: false,
-                [`reviews.${pKey}.revokedAt`]: revokeTimestamp,
-                [`reviews.${pKey}.revokeReason`]: reason,
-                status: 'revoked',
-                isPublished: false,
-                revokedAt: revokeTimestamp
-              }).catch(() => {});
-            }
+          let studentIdsToRevoke = prevPub.studentResults ? Object.keys(prevPub.studentResults) : [];
+          if (studentIdsToRevoke.length === 0 && rawGet) {
+            try {
+              const snap = await rawGet(subDocRef);
+              if (snap && snap.exists && snap.data()?.studentResults) {
+                studentIdsToRevoke = Object.keys(snap.data().studentResults);
+              }
+            } catch (e) {}
+          }
+          if (studentIdsToRevoke.length === 0 && Array.isArray(targetRound.students)) {
+            studentIdsToRevoke = targetRound.students.map(s => s.studentId || s.id).filter(Boolean);
+          }
+
+          // Kiểm tra xem còn đợt duyệt nào khác đang công bố không
+          const otherPhasesPublished = [1, 2, 3].some(p => p !== Number(phase) && targetRound.publishedReviews?.[`duyet_${p}`]?.status === 'published');
+          const rootStatus = otherPhasesPublished ? 'published' : 'revoked';
+          const rootIsPub = otherPhasesPublished;
+
+          for (const stId of studentIdsToRevoke) {
+            const stDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedStudentResults', stId);
+            await rawUpdate(stDocRef, {
+              [`reviews.${pKey}.status`]: 'revoked',
+              [`reviews.${pKey}.isPublished`]: false,
+              [`reviews.${pKey}.revokedAt`]: revokeTimestamp,
+              [`reviews.${pKey}.revokeReason`]: reason,
+              status: rootStatus,
+              isPublished: rootIsPub,
+              revokedAt: revokeTimestamp
+            }).catch(() => {});
           }
 
           if (typeof state !== 'undefined' && state.cachedPublishedResults) {

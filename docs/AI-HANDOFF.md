@@ -163,3 +163,33 @@ Khắc phục lỗ hổng rò rỉ điểm số và biên bản đánh giá nộ
 - Tuyệt đối KHÔNG deploy Cloud Functions lên Production.
 - Tuyệt đối KHÔNG chạy `--apply` trên dữ liệu thật của Production.
 - Tuyệt đối KHÔNG deploy Hosting có phiên bản phá vỡ tương thích dữ liệu hiện hành.
+
+---
+
+## 7. SIMPLIFIED SECURITY CUTOVER & STUDENT RESULT UI ENHANCEMENT
+*Thời điểm thực hiện: 2026-10-17*
+
+### 7.1. Chuẩn hóa & Nâng cấp Giao diện Điểm Sinh viên (Student Portal UI)
+1. **Gộp điểm trực tiếp vào thẻ Duyệt đồ án**:
+   - Vị trí: Nằm ngay bên trong thẻ mốc tương ứng (Tuần 4 - Duyệt đợt 1, Tuần 8 - Duyệt đợt 2, Tuần 12 - Duyệt đợt 3) thuộc phần *"Lộ trình Đồ án Tốt nghiệp & Tiến độ thực hiện"*.
+   - Loại bỏ hoàn toàn các thẻ đánh giá Hội đồng dư thừa bên ngoài.
+2. **Quy cách hiển thị chuẩn**:
+   - Nhãn mô tả: `Đánh giá Hội đồng` (`text-[10px] uppercase font-bold`).
+   - Trạng thái kết luận: `✓ Đạt yêu cầu` (xanh lá `emerald`) hoặc `✕ Không đạt yêu cầu` (đỏ `rose`) rõ ràng.
+   - Điểm chữ nổi bật: `B`, `B+`, `C+`... hiển thị với cỡ chữ lớn (`font-mono font-black text-xl sm:text-2xl`) trong khung điểm riêng biệt.
+   - Nội dung mô tả chuẩn xác: *"Đánh giá Hội đồng: Đạt yêu cầu – B"* (hoặc *"Không đạt yêu cầu – C+"*).
+   - Quy tắc ẩn an toàn: Khi mốc chưa tới, chưa công bố, hoặc đã bị thu hồi: ẩn hoàn toàn khối điểm (`reviewResultHtml = ''`), không chiếm diện tích và không để lộ thông tin đánh giá.
+3. **Đồng bộ Dialog chi tiết mốc (`rounds-timeline-preview.js`)**:
+   - Cập nhật dialog chi tiết khi sinh viên click vào mốc với bố cục Đánh giá Hội đồng tương thích, điểm chữ cỡ lớn và kết luận Đạt/Không đạt.
+
+### 7.2. Xử lý Thu hồi Độc lập Từng Đợt Duyệt (Multi-Phase Revoke)
+- Sửa đổi `confirmRevokeProgressReview` trong `preliminary-dashboard.js`:
+  - Khi thu hồi Duyệt 1, nếu Duyệt 2 vẫn đang ở trạng thái công bố, document cấp root `publishedStudentResults/{studentId}` giữ nguyên `status: 'published'` để sinh viên/GVHD tiếp tục xem được Duyệt 2 hợp lệ. Chỉ khi toàn bộ các đợt bị thu hồi mới chuyển root status thành `'revoked'`.
+  - Tự động nạp danh sách sinh viên cần thu hồi từ snapshot quản trị `publishedProgressReviews/duyet_${phase}` nếu trường `studentResults` trên root document đã được dọn dẹp.
+
+### 7.3. Bộ Công cụ Cutover Đơn giản & An toàn (`migrate-firestore-security.cjs`)
+Hoàn thiện script với 4 chế độ hoạt động:
+1. `--dry-run` (Mặc định): Kiểm kê toàn bộ dữ liệu, tự động xuất file backup JSON dạng snapshot, 0 write operations.
+2. `--apply`: Di chuyển kết quả từng sinh viên sang `publishedStudentResults/{studentId}` và lưu snapshot toàn đợt vào `publishedProgressReviews/{pKey}`.
+3. `--cleanup-root`: Kiểm tra đối soát 100% dữ liệu đã có trong subcollections trước khi xóa các trường rò rỉ (`councilScores`, `studentResults`, `finalDefenseScores`) khỏi root document. Tự động tạo bản backup `pre-cleanup-backup` trước khi sửa.
+4. `--rollback=<backup-file>`: Khôi phục tức thì toàn bộ cấu trúc gốc từ file JSON sao lưu.

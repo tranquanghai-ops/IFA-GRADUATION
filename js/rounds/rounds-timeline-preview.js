@@ -206,36 +206,40 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
           || pubInfo?.studentResults?.[String(mySid).toUpperCase()]
           || pubInfo?.studentResults?.[String(mySid).toLowerCase()])
         : null;
-      if (stRes) {
-        const passClass = stRes.isPassed ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300';
-        const passLabel = stRes.isPassed ? '✓ Đạt yêu cầu' : '✕ Không đạt yêu cầu';
+      if (stRes && stRes.letterGrade && stRes.status !== 'revoked') {
+        const isPassed = Boolean(stRes.isPassed);
+        const letter = escapeHtml(stRes.letterGrade || '--');
+        const passClass = isPassed ? 'text-emerald-700 bg-emerald-100 border-emerald-300' : 'text-rose-700 bg-rose-100 border-rose-300';
+        const passLabel = isPassed ? '✓ Đạt yêu cầu' : '✕ Không đạt yêu cầu';
+        const passBorder = isPassed ? 'border-emerald-300' : 'border-rose-300';
+        const passBg = isPassed ? 'bg-emerald-50/80' : 'bg-rose-50/80';
+        const letterBoxBg = isPassed ? 'bg-emerald-100 text-emerald-950 border-emerald-300' : 'bg-rose-100 text-rose-950 border-rose-300';
         const pubDateStr = pubInfo?.publishedAt ? new Date(pubInfo.publishedAt).toLocaleDateString('vi-VN') : '';
         progressReviewResultHtml = `
-          <div class="mb-4 p-4 bg-gradient-to-br from-purple-50 via-white to-slate-50 rounded-2xl border border-purple-200 shadow-2xs space-y-2.5">
+          <div class="mb-4 p-4 rounded-2xl border ${passBorder} ${passBg} shadow-2xs space-y-2.5">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-black uppercase text-purple-950 tracking-wider flex items-center gap-1.5">
+              <span class="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
                 <span>📢</span> KẾT QUẢ ĐÁNH GIÁ DUYỆT ĐỢT ${phase}
               </span>
               ${pubDateStr ? `<span class="text-[10px] text-slate-400 font-medium">Công bố: ${pubDateStr}</span>` : ''}
             </div>
+            <div class="text-xs font-bold text-slate-700">
+              Đánh giá Hội đồng: ${passLabel.replace(/^[✓✕]\s*/, '')} – ${letter}
+            </div>
             <div class="flex items-center justify-between gap-4 pt-1">
               <div>
-                <span class="text-[10px] uppercase font-bold text-slate-400 block">Điểm chữ chính thức</span>
-                <span class="text-2xl font-black font-mono text-purple-950">${escapeHtml(stRes.letterGrade || '--')}</span>
-              </div>
-              <div class="text-right">
                 <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Kết luận</span>
                 <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${passClass}">${passLabel}</span>
+              </div>
+              <div class="text-right">
+                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Điểm chữ chính thức</span>
+                <span class="text-2xl sm:text-3xl font-black font-mono px-3 py-0.5 rounded-xl border shadow-2xs inline-block ${letterBoxBg}">${letter}</span>
               </div>
             </div>
           </div>
         `;
-      } else if (mySid) {
-        progressReviewResultHtml = `
-          <div class="mb-4 p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-slate-500 font-medium text-xs flex items-center gap-2">
-            <span>ℹ️</span> <span>Kết quả mốc Duyệt đợt ${phase} đã được công bố, tuy nhiên mã số ${escapeHtml(mySid)} chưa có trong danh sách kết quả đợt này.</span>
-          </div>
-        `;
+      } else if (submissionRound.publishedReviews?.['duyet_' + phase]?.status === 'revoked') {
+        progressReviewResultHtml = '';
       }
     } else {
       progressReviewResultHtml = `

@@ -721,33 +721,39 @@ window.renderStudentTimelineWeeks = function() {
             }).catch(() => { window._hydratingStudentResult = false; });
           }
 
-          if (stRes) {
-            const passClass = stRes.isPassed ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300';
-            const passLabel = stRes.isPassed ? '✓ Đạt yêu cầu' : '✕ Không đạt yêu cầu';
+          if (stRes && stRes.letterGrade && stRes.status !== 'revoked') {
+            const isPassed = Boolean(stRes.isPassed);
+            const letter = escapeHtml(stRes.letterGrade || '--');
+            const passLabel = isPassed ? '✓ Đạt yêu cầu' : '✕ Không đạt yêu cầu';
+            const fullTitle = `Đánh giá Hội đồng: ${isPassed ? 'Đạt yêu cầu' : 'Không đạt yêu cầu'} – ${letter}`;
+
+            const containerTheme = isPassed
+              ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950'
+              : 'bg-rose-50/90 border-rose-300 text-rose-950';
+            const labelColor = isPassed ? 'text-emerald-800' : 'text-rose-800';
+            const statusColor = isPassed ? 'text-emerald-700' : 'text-rose-700';
+            const letterBox = isPassed
+              ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
+              : 'bg-rose-100 text-rose-950 border-rose-300';
+
             reviewResultHtml = `
-              <div class="mt-2 w-full p-2.5 rounded-xl bg-purple-50/90 border border-purple-200 text-left shadow-2xs">
-                <div class="text-[10px] font-black uppercase text-purple-900 tracking-wider flex items-center justify-between">
-                  <span class="flex items-center gap-1"><span>⚖️</span> HỘI ĐỒNG</span>
-                  <span class="font-mono font-black text-xs px-2 py-0.5 rounded bg-purple-200 text-purple-950">${escapeHtml(stRes.letterGrade || '--')}</span>
+              <div class="mt-2.5 w-full p-2.5 rounded-xl border ${containerTheme} text-left shadow-2xs transition-all" title="${escapeHtml(fullTitle)}">
+                <div class="text-[10px] font-bold uppercase tracking-wider ${labelColor} mb-1 flex items-center justify-between">
+                  <span>Đánh giá Hội đồng</span>
                 </div>
-                <div class="mt-1 flex items-center justify-between text-[11px] font-bold">
-                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] ${passClass}">${passLabel}</span>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-black ${statusColor} flex items-center gap-1">${passLabel}</span>
+                  <span class="font-mono font-black text-xl sm:text-2xl leading-none px-2.5 py-0.5 rounded-lg border shadow-2xs ${letterBox}">${letter}</span>
                 </div>
               </div>
             `;
           } else {
-            reviewResultHtml = `
-              <div class="mt-2 w-full p-1.5 rounded-lg bg-slate-100 text-slate-500 text-[10px] text-center border border-slate-200">
-                Đã công bố kết quả
-              </div>
-            `;
+            // Khi chưa công bố, chưa có kết quả, hoặc đã thu hồi: hoàn toàn ẩn kết quả, không chiếm diện tích
+            reviewResultHtml = '';
           }
-        } else if (card.status === 'completed') {
-          reviewResultHtml = `
-            <div class="mt-2 w-full p-1.5 rounded-lg bg-slate-50 text-slate-400 text-[10px] text-center border border-slate-200 italic">
-              Chưa công bố kết quả
-            </div>
-          `;
+        } else {
+          // Khi mốc chưa tới hoặc chưa công bố: không hiển thị
+          reviewResultHtml = '';
         }
       }
 
