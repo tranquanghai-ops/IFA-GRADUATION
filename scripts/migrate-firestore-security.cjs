@@ -402,8 +402,18 @@ async function runInventoryAndMigration() {
   // APPLY MODE: ACTIVE PRODUCTION MIGRATION
   // =========================================================================
   console.log('\n[4/5] EXECUTING ACTIVE PRODUCTION MIGRATION (--apply)...');
+  const targetRoundArg = (args.find(a => a.startsWith('--round='))?.split('=')[1]) || TARGET_ROUND_ID;
+  const roundsToMigrate = rounds.filter(r => r.id === targetRoundArg);
+  if (roundsToMigrate.length === 0) {
+    throw new Error(`Round ${targetRoundArg} not found for migration.`);
+  }
 
-  for (const r of rounds) {
+  let totalSnapshotsCreated = 0;
+  let totalParentDocsCreated = 0;
+  let totalPhaseDocsCreated = 0;
+  const writeErrors = [];
+
+  for (const r of roundsToMigrate) {
     const roundId = r.id;
     const publishedReviews = r.data.publishedReviews || {};
 
@@ -419,11 +429,16 @@ async function runInventoryAndMigration() {
 
         // Save admin snapshot to publishedProgressReviews/{pKey}
         const snapshotUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${roundId}/publishedProgressReviews/${pKey}`;
-        await fetch(snapshotUrl, {
+        const snapRes = await fetch(snapshotUrl, {
           method: 'PATCH',
           headers,
           body: JSON.stringify({ fields: serializeFields(pVal) })
         });
+        if (!snapRes.ok) {
+          writeErrors.push(`Failed to save admin snapshot ${pKey}: HTTP ${snapRes.status}`);
+        } else {
+          totalSnapshotsCreated++;
+        }
 
         // Migrate individual student results
         for (const [stId, sRes] of Object.entries(studentResults)) {
@@ -456,7 +471,9 @@ async function runInventoryAndMigration() {
           });
 
           if (!writeRes.ok) {
-            console.error(`Failed to migrate student ${stId}: HTTP ${writeRes.status}`);
+            writeErrors.push(`Failed to write parent doc for student ${stId}: HTTP ${writeRes.status}`);
+          } else {
+            totalParentDocsCreated++;
           }
 
           // Migrate independent phase document in subcollection reviews/{pKey}
@@ -480,14 +497,27 @@ async function runInventoryAndMigration() {
           });
 
           if (!phaseWriteRes.ok) {
-            console.error(`Failed to migrate phase doc for student ${stId} (${pKey}): HTTP ${phaseWriteRes.status}`);
+            writeErrors.push(`Failed to write phase doc for student ${stId} (${pKey}): HTTP ${phaseWriteRes.status}`);
+          } else {
+            totalPhaseDocsCreated++;
           }
         }
       }
     }
   }
 
-  console.log('\n[5/5] Migration completed successfully.');
+  if (writeErrors.length > 0) {
+    console.error('\n[ERRORS DETECTED DURING MIGRATION]:');
+    writeErrors.forEach(e => console.error('  - ' + e));
+    throw new Error(`Migration completed with ${writeErrors.length} write error(s).`);
+  }
+
+  console.log(`\n[5/5] Migration Step 1 completed successfully.`);
+  console.log(`Summary:`);
+  console.log(`  - Admin snapshots created: ${totalSnapshotsCreated}`);
+  console.log(`  - Parent student documents written: ${totalParentDocsCreated}`);
+  console.log(`  - Subcollection phase documents written: ${totalPhaseDocsCreated}`);
+  console.log(`  - Total write errors: 0`);
 }
 
 runInventoryAndMigration().catch(err => {
