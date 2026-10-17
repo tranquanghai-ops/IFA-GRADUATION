@@ -15,15 +15,28 @@ function read(rel) {
 
 test('1. Syntax Check: All JS modules parse and compile without syntax errors', () => {
   const { execSync } = require('child_process');
+  function getJsFiles(dir) {
+    let results = [];
+    const list = fs.readdirSync(dir);
+    for (const file of list) {
+      const fullPath = path.join(dir, file);
+      const stat = fs.statSync(fullPath);
+      if (stat && stat.isDirectory()) {
+        results = results.concat(getJsFiles(fullPath));
+      } else if (file.endsWith('.js') || file.endsWith('.mjs')) {
+        results.push(fullPath);
+      }
+    }
+    return results;
+  }
   const targetFiles = [
-    path.join(__dirname, '..', 'js', 'core.js'),
-    path.join(__dirname, '..', 'js', 'auth.js'),
-    path.join(__dirname, '..', 'js', 'grading', 'final-scores-export.js')
+    path.join(__dirname, '..', 'app.js'),
+    ...getJsFiles(path.join(__dirname, '..', 'js'))
   ];
   for (const f of targetFiles) {
     assert.doesNotThrow(() => {
       execSync(`node --check "${f}"`, { stdio: 'pipe' });
-    });
+    }, `Syntax check failed for ${f}`);
   }
 });
 

@@ -1871,7 +1871,7 @@ window.reopenSupervisorScore = async function(studentId) {
   openAdminStudentScoreDetail(studentId);
   renderAdminScoresTable();
   showToast('Đã mở lại Điểm GVHD thành công.', 'info');
-// --- 8. ADMIN PRELIMINARY CONFIG & SUPERVISOR CONFIG ---
+};
 
 // ==========================================
 // TẦNG C HELPER: ĐỌC KẾT QUẢ CÔNG BỐ AN TOÀN CHO SINH VIÊN VÀ GVHD

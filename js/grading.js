@@ -4,7 +4,7 @@
  */
 import './grading/councils.js?v=2.7.4';
 import './grading/rubrics.js';
-import './grading/preliminary-scores.js';
+import './grading/preliminary-scores.js?v=1.0.1.3';
 import './grading/defense-scores.js';
 import './grading/final-scores.js';
 import './grading/assessment-portal.js';
