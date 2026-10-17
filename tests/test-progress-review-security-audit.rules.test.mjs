@@ -243,18 +243,14 @@ test('Audit Question 5: Can a council member tamper with finalized councilScores
     score: 9.5
   }));
 
-  // BUT: In reviewDecisions (subcollection), check if member can update:
+  // In reviewDecisions (subcollection):
   const decisionPath = `graduationRounds/${roundId}/reviewDecisions/${activityId}_${councilId}_${student1}_${memberEmail}`;
-  // L154: allow update: if admin() || (staff() && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy))
-  // NOTICE: reviewDecisions lacks finalized status check!
-  const memberCanTamperReviewDecision = await assertSucceeds(updateDoc(doc(memberDb, decisionPath), {
+  // VERIFY FIX: When council is finalized, member update MUST be blocked!
+  await assertFails(updateDoc(doc(memberDb, decisionPath), {
     value: 'A',
     selectedLetterCode: 'A',
     numericValue: 9.5
-  })).then(() => true).catch(() => false);
-
-  assert.equal(memberCanTamperReviewDecision, true,
-    'SECURITY FINDING: reviewDecisions lacks council finalized check, allowing member to alter score after council finalized!');
+  }));
 });
 
 test('Audit Question 6, 7, 8: Post-publication access and RBAC', async () => {

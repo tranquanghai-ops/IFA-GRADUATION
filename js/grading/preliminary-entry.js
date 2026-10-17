@@ -559,18 +559,9 @@ window.saveScoreEntry = async function(isCompleted) {
 
 async function persistScoreItem(roundId, dotPath, record, decisionKey) {
   try {
-    // 1. Subcollection reviewDecisions (authorized under current rules)
+    // 1. Subcollection reviewDecisions (durable and private grading storage)
     const decRef = doc(db, 'graduationRounds', roundId, 'reviewDecisions', decisionKey);
     await setDoc(decRef, record, { merge: true }).catch(() => {});
-
-    // 2. Round doc atomic dot notation if admin
-    if (state.isAdmin) {
-      const roundRef = doc(db, 'graduationRounds', roundId);
-      await updateDoc(roundRef, {
-        [dotPath]: record,
-        updatedAt: serverTimestamp()
-      }).catch(() => {});
-    }
   } catch (err) {
     console.warn('Persist score item notice:', err);
   }

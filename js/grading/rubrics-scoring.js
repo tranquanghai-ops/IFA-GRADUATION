@@ -141,7 +141,7 @@ function renderScoringSection() {
     inputHtml = `
       <div class="space-y-2">
         <label class="font-bold text-slate-800 text-xs block mb-1">Mức điểm / Đánh giá (*):</label>
-        
+
         <!-- A-, A, A+ (3 COLUMNS) -->
         ${finalAOpts.length > 0 ? `
           <div class="grid grid-cols-3 gap-2">
@@ -510,15 +510,8 @@ window.saveCurrentScore = async function(isCompleted) {
     return;
   }
 
-  if (state.isAdmin) {
-    try {
-      const roundRef = doc(db, 'graduationRounds', roundId);
-      await updateDoc(roundRef, new window.FieldPath('councilScores', scoreKey), scoreRecord, 'updatedAt', serverTimestamp());
-    } catch (err) {
-      console.warn('Council score cache notice:', err);
-    }
-  }
-
+  // Migration note: legacy cache used new window.FieldPath('councilScores', scoreKey);
+  // Authoritative storage is now isolated in subcollection reviewDecisions to prevent public round data leaks.
   state.councilScores[scoreKey] = scoreRecord;
   delete state.councilLocalDrafts[sid];
 
@@ -564,14 +557,6 @@ window.reopenCurrentScore = async function() {
     console.error('Reopen council score failed:', err);
     showToast('Không mở lại được phiếu điểm. Vui lòng thử lại.', 'error');
     return;
-  }
-  if (state.isAdmin) {
-    try {
-      const roundRef = doc(db, 'graduationRounds', roundId);
-      await updateDoc(roundRef, new window.FieldPath('councilScores', scoreKey), draftScore, 'updatedAt', serverTimestamp());
-    } catch (err) {
-      console.warn('Council score cache notice:', err);
-    }
   }
   state.councilScores[scoreKey] = draftScore;
 
@@ -624,7 +609,7 @@ window.batchFinalizeAllCouncilScores = async function() {
       state.councilLocalDrafts[curSid] = state.councilLocalDrafts[curSid] || {};
       state.councilLocalDrafts[curSid].value = valInput.value;
       if (commInput) state.councilLocalDrafts[curSid].comment = commInput.value;
-      
+
       if (mode === 'defense_rubric') {
         const rubricInputs = document.querySelectorAll('input[data-crit-key]');
         const components = {};
@@ -734,21 +719,10 @@ window.batchFinalizeAllCouncilScores = async function() {
       state.councilScores = state.councilScores || {};
       state.councilScores[item.scoreKey] = scoreRecord;
       if (state.councilLocalDrafts) delete state.councilLocalDrafts[item.sid];
-      if (state.isAdmin) batchUpdates.push(item.scoreKey, scoreRecord);
       successCount++;
     } catch (err) {
       console.warn('Council batch score failed:', err);
     }
-  }
-
-  if (state.isAdmin && batchUpdates.length > 0) {
-    try {
-      const fieldUpdates = [];
-      for (let i = 0; i < batchUpdates.length; i += 2) {
-        fieldUpdates.push(new window.FieldPath('councilScores', batchUpdates[i]), batchUpdates[i + 1]);
-      }
-      await updateDoc(roundRef, ...fieldUpdates, 'updatedAt', serverTimestamp());
-    } catch (err) { console.warn('Council batch cache notice:', err); }
   }
 
   renderCouncilStudentList();

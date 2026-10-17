@@ -109,3 +109,57 @@
 - [x] Đã bảo toàn tuyệt đối dữ liệu sinh viên thật, điểm thật trên Production (chưa chạy `--apply` khi chưa được duyệt).
 - [x] Đã bảo toàn Firestore Rules và Cloud Functions (không tự deploy lên Production).
 - [ ] Sẵn sàng triển khai Firebase Hosting (`ifa-graduation`) cho phần frontend an toàn đã qua kiểm thử.
+
+---
+
+## 6. PHASE SECURITY HARDENING: KHẮC PHỤC RÒ RỈ ĐIỂM FIRESTORE & 3-TIER ARCHITECTURE
+*Thời điểm thực hiện: 2026-10-17*
+
+### 6.1. Mục tiêu & Kiến trúc 3 tầng (3-Tier Data Architecture)
+Khắc phục lỗ hổng rò rỉ điểm số và biên bản đánh giá nội bộ của từng ủy viên hội đồng trên document gốc `graduationRounds/{roundId}`:
+1. **Tier A (Public Round Metadata)**:
+   - Collection: `graduationRounds/{roundId}`.
+   - Nội dung: Chỉ lưu metadata đợt, mốc thời gian, trạng thái công bố (`duyet_1: { published: true, publishedAt, ... }`).
+   - Loại bỏ hoàn toàn `councilScores` (điểm của từng ủy viên) và `studentResults` (kết quả chi tiết của toàn bộ sinh viên).
+   - Quyền: Đọc cho mọi người dùng đã đăng nhập; Ghi chỉ dành cho Admin/Owner.
+2. **Tier B (Private Internal Deliberation & Scoring Storage)**:
+   - Collection: `graduationRounds/{roundId}/reviewDecisions/{decisionKey}`.
+   - Nội dung: Phiếu chấm chi tiết của từng ủy viên, nhận xét, căn cứ hội đồng.
+   - Quyền: Sinh viên và người ngoài KHÔNG thể đọc/ghi; Chỉ ủy viên thuộc hội đồng mới đọc được phiếu của hội đồng mình; Khóa ghi khi hội đồng đã `finalized` hoặc `ended`.
+3. **Tier C (Published Student Results with Least-Privilege RBAC)**:
+   - Collection: `publishedStudentResults/{studentId}` (hoặc subcollection theo round).
+   - Snapshot quản trị: `publishedProgressReviews/{phaseKey}` (chỉ Admin/Owner đọc/ghi).
+   - Quyền `publishedStudentResults/{studentId}`:
+     - `allow get`: Admin/Owner, hoặc chính sinh viên đó (`email` khớp `studentId` và `status != 'revoked'`), hoặc GVHD được phân công chính thức (`officialAssignments` / `supervisorAssignments` và `status != 'revoked'`).
+     - `allow list`: Chỉ Admin/Owner (chặn sinh viên/GVHD query vét toàn bộ kết quả của khoa).
+     - `allow write`: Chỉ Admin/Owner.
+
+### 6.2. Các file đã triển khai & cập nhật
+1. `firestore.rules`:
+   - Bổ sung helper `isAssignedSupervisor(stId)` đối chiếu `officialAssignments` và `supervisorAssignments`.
+   - Bổ sung helper `isResultPublished(data)` kiểm tra trạng thái công bố và chặn đọc khi `status == 'revoked'`.
+   - Hardening rule cho `/publishedStudentResults/{studentId}`, `/publishedProgressReviews/{phaseKey}`, và `/reviewDecisions/{decisionId}`.
+2. `js/grading/preliminary-dashboard.js`:
+   - `confirmPublishProgressReview`: Tách bạch rõ rệt: ghi root metadata sạch không chứa điểm từng người; ghi snapshot quản trị; ghi kết quả riêng lẻ từng sinh viên vào `publishedStudentResults/{stId}` với `{ merge: true }` (bảo toàn Duyệt 1 khi công bố Duyệt 2).
+   - `confirmRevokeProgressReview`: Đưa `status: 'revoked'`, `isPublished: false` vào `publishedStudentResults/{stId}`, cắt ngay quyền đọc cấp Firestore Rules; xóa `studentResults` khỏi root doc.
+   - `confirmAdjustCouncilScore`: Ghi quyết định điều chỉnh vào `reviewDecisions`, ghi audit log bất biến, không đẩy điểm vào root doc.
+   - `window.getStudentPublishedReviewResult`: Đọc từ `publishedStudentResults/{studentId}` kèm bộ nhớ đệm cache và fallback an toàn.
+3. `js/grading/rubrics-scoring.js` & `js/grading/preliminary-entry.js`: Loại bỏ các thao tác ghi trùng lặp `councilScores` và `progressReviews` lên root doc `roundRef`.
+4. `js/grading/councils-editor.js`: Hàm `persistActivityCouncilChanges` tự động làm sạch `activities` (loại bỏ `finalDefenseScores`) trước khi lưu root doc.
+5. `js/students/student-journey.js`, `js/rounds/rounds-timeline-preview.js`, `js/supervisors/supervisor-portal-students.js`: Đồng bộ đọc kết quả duyệt qua `getStudentPublishedReviewResult`.
+6. `scripts/migrate-firestore-security.cjs` *(Mới)*: Script di chuyển dữ liệu bảo mật (mặc định `--dry-run`, có backup JSON tự động, hỗ trợ `--apply` và `--rollback`).
+7. `tests/test-firestore-security-hardening.rules.test.mjs` *(Mới)*: Bộ test 12 ca kiểm thử Firestore Rules với 10 danh tính người dùng.
+8. `tests/test-post-migration-business.cjs` *(Mới)*: 7 ca kiểm thử toàn diện quy trình nghiệp vụ sau di chuyển.
+9. `docs/FIRESTORE-SECURITY-MIGRATION.md` *(Mới)*: Tài liệu phân tích lỗ hổng, kiến trúc 3 tầng, ma trận RBAC và kế hoạch rollback.
+
+### 6.3. Kết quả kiểm thử tự động
+- **`npm test`**: **188 / 188 unit tests PASS (100%)**.
+- **`npm run test:rules`**: **42 / 42 rules tests PASS trên Firestore Emulator (100%)** (gồm 12 tests hardening mới + 30 tests kế thừa).
+- **`node tests/test-post-migration-business.cjs`**: **7 / 7 business tests PASS (100%)**.
+- **`scripts/migrate-firestore-security.cjs --dry-run`**: Thực thi thành công, tạo bản sao lưu tại `backups/firestore-security-backup-2026-10-17T01-58-14-470Z.json`, 0 write operations thực tế.
+
+### 6.4. Cam kết bảo đảm an toàn
+- Tuyệt đối KHÔNG deploy Firestore Rules lên Production khi chưa có phê duyệt.
+- Tuyệt đối KHÔNG deploy Cloud Functions lên Production.
+- Tuyệt đối KHÔNG chạy `--apply` trên dữ liệu thật của Production.
+- Tuyệt đối KHÔNG deploy Hosting có phiên bản phá vỡ tương thích dữ liệu hiện hành.

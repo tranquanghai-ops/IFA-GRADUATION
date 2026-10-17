@@ -632,6 +632,11 @@ window.openSupervisorStudentDetailModal = async function(studentId, focusSection
       await window.ensureStudentSubmissionsLoaded(round.id, studentId);
     } catch (e) {}
   }
+  if (round?.id && typeof window.getStudentPublishedReviewResult === 'function') {
+    try {
+      await Promise.all([1, 2, 3].map(p => window.getStudentPublishedReviewResult(round.id, studentId, p)));
+    } catch (e) {}
+  }
 
   const st = (state.supervisorAssignedStudents || []).find(s => (s.studentId || s.id) === studentId) ||
     findStudentInRound(studentId);
@@ -705,7 +710,7 @@ window.openSupervisorStudentDetailModal = async function(studentId, focusSection
       const now = new Date();
       milestonesEl.innerHTML = activities.map((act, idx) => {
         const rules = (typeof getEffectiveSubmissionRules === 'function') ? getEffectiveSubmissionRules(studentId, act, round) : null;
-        
+
         // Decouple submission status
         let stBadge = '';
         if (act.submissionEnabled) {
@@ -738,7 +743,10 @@ window.openSupervisorStudentDetailModal = async function(studentId, focusSection
 
           if (isPub) {
             const pubInfo = round?.publishedReviews?.['duyet_' + phase];
-            const stRes = pubInfo?.studentResults?.[studentId] || pubInfo?.studentResults?.[String(studentId).toUpperCase()];
+            const cachedDoc = (typeof state !== 'undefined' && state.cachedPublishedResults?.[`${round.id}_${studentId}`]);
+            const stRes = (cachedDoc && cachedDoc.reviews?.['duyet_' + phase]?.status === 'published' ? cachedDoc.reviews['duyet_' + phase] : null)
+              || pubInfo?.studentResults?.[studentId]
+              || pubInfo?.studentResults?.[String(studentId).toUpperCase()];
             if (stRes) {
               const passClass = stRes.isPassed ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300';
               const passLabel = stRes.isPassed ? '✓ Đạt' : '✕ Không đạt';

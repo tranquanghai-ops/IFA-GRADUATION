@@ -509,18 +509,37 @@ export async function confirmPublishProgressReview() {
       throw new Error('Không có sinh viên nào có điểm chốt hợp lệ để công bố.');
     }
 
+    const prevVersion = targetRound.publishedReviews?.['duyet_' + phase]?.publicationVersion || 0;
+    const pubVersion = prevVersion + 1;
+
+    // Full snapshot for Admin subcollection and in-memory state
     const pubRecord = {
       status: 'published',
+      isPublished: true,
       publishedAt: new Date().toISOString(),
       publishedBy: state.user?.email || 'admin',
       activityId: act ? act.id : `act_duyet_${phase}`,
       phase: Number(phase),
       roundId: targetRound.id,
       eligibleCount: eligibleCount,
+      publicationVersion: pubVersion,
       studentResults: studentResults
     };
 
-    // Update in-memory round
+    // Public metadata for Tier A root doc (STRICTLY NO studentResults map!)
+    const roundDocPubMetadata = {
+      status: 'published',
+      isPublished: true,
+      publishedAt: pubRecord.publishedAt,
+      publishedBy: pubRecord.publishedBy,
+      activityId: pubRecord.activityId,
+      phase: Number(phase),
+      roundId: targetRound.id,
+      eligibleCount: eligibleCount,
+      publicationVersion: pubVersion
+    };
+
+    // Update in-memory round (keeps admin views reactive)
     targetRound.publishedReviews = targetRound.publishedReviews || {};
     targetRound.publishedReviews['duyet_' + phase] = pubRecord;
 
@@ -533,14 +552,14 @@ export async function confirmPublishProgressReview() {
     if (dbObj && rawUpdate && docFn) {
       const roundRef = docFn(dbObj, 'graduationRounds', targetRound.id);
       await rawUpdate(roundRef, {
-        [`publishedReviews.duyet_${phase}`]: pubRecord,
+        [`publishedReviews.duyet_${phase}`]: roundDocPubMetadata,
         updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : new Date().toISOString()
       });
 
       // Safe Subcollection writes (Phase B: Lớp B độc lập & Audit Log)
       try {
         if (rawSet) {
-          // 1. Snapshot tổng hợp mốc duyệt
+          // 1. Snapshot tổng hợp mốc duyệt cho Admin
           const subDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedProgressReviews', `duyet_${phase}`);
           await rawSet(subDocRef, pubRecord);
 
@@ -550,15 +569,19 @@ export async function confirmPublishProgressReview() {
             await rawSet(stDocRef, {
               studentId: stId,
               studentName: sRes.studentName || stId,
+              roundId: targetRound.id,
+              status: 'published',
+              isPublished: true,
               reviews: {
                 [`duyet_${phase}`]: {
                   phase: Number(phase),
                   activityId: act ? act.id : `act_duyet_${phase}`,
                   letterGrade: sRes.letterGrade,
                   isPassed: sRes.isPassed,
-                  status: sRes.status,
+                  status: 'published',
                   publishedAt: pubRecord.publishedAt,
-                  publishedBy: pubRecord.publishedBy
+                  publishedBy: pubRecord.publishedBy,
+                  publicationVersion: pubVersion
                 }
               },
               updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : new Date().toISOString()
@@ -582,7 +605,7 @@ export async function confirmPublishProgressReview() {
           });
         }
       } catch (subErr) {
-        console.warn('[PublishedProgressReviews] Subcollection write pending rules approval:', subErr.message);
+        console.warn('[PublishedProgressReviews] Subcollection write notice:', subErr.message);
       }
     }
 
@@ -961,6 +984,17 @@ export async function confirmRevokeProgressReview() {
       revokeReason: reason
     };
 
+    const roundDocRevokeMetadata = {
+      status: 'revoked',
+      isPublished: false,
+      revokedAt: revokeTimestamp,
+      revokedBy: currentUserEmail,
+      revokeReason: reason,
+      activityId: act ? act.id : `act_duyet_${phase}`,
+      phase: Number(phase),
+      roundId: targetRound.id
+    };
+
     targetRound.publishedReviews = targetRound.publishedReviews || {};
     targetRound.publishedReviews[pKey] = revokeRecord;
 
@@ -972,7 +1006,7 @@ export async function confirmRevokeProgressReview() {
     if (dbObj && rawUpdate && docFn) {
       const roundRef = docFn(dbObj, 'graduationRounds', targetRound.id);
       await rawUpdate(roundRef, {
-        [`publishedReviews.${pKey}`]: revokeRecord,
+        [`publishedReviews.${pKey}`]: roundDocRevokeMetadata,
         updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : revokeTimestamp
       });
 
@@ -988,9 +1022,16 @@ export async function confirmRevokeProgressReview() {
                 [`reviews.${pKey}.status`]: 'revoked',
                 [`reviews.${pKey}.isPublished`]: false,
                 [`reviews.${pKey}.revokedAt`]: revokeTimestamp,
-                [`reviews.${pKey}.revokeReason`]: reason
+                [`reviews.${pKey}.revokeReason`]: reason,
+                status: 'revoked',
+                isPublished: false,
+                revokedAt: revokeTimestamp
               }).catch(() => {});
             }
+          }
+
+          if (typeof state !== 'undefined' && state.cachedPublishedResults) {
+            delete state.cachedPublishedResults;
           }
 
           const auditRef = docFn(dbObj, 'auditLogs', `audit_revoke_${targetRound.id}_${pKey}_${Date.now()}`);
@@ -1237,15 +1278,40 @@ export async function confirmAdjustCouncilScore() {
     const docFn = (typeof window !== 'undefined') ? window.doc : null;
     const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
 
-    if (dbObj && rawUpdate && docFn) {
-      const roundRef = docFn(dbObj, 'graduationRounds', ctx.targetRound.id);
-      await rawUpdate(roundRef, {
-        [`activities`]: ctx.targetRound.activities,
-        [`councilScores.${ctx.act?.id}_${ctx.council.id}_${ctx.studentId}`]: scorePayload,
-        updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : adjustTimestamp
-      });
+    if (dbObj && docFn) {
+      // 1. Persist to private grading subcollection reviewDecisions
+      try {
+        if (rawSet) {
+          const decisionKey = `${ctx.act?.id}_${ctx.council.id}_${ctx.studentId}_official`;
+          const decRef = docFn(dbObj, 'graduationRounds', ctx.targetRound.id, 'reviewDecisions', decisionKey);
+          await rawSet(decRef, {
+            ...scorePayload,
+            activityId: ctx.act?.id,
+            councilId: ctx.council.id,
+            studentId: ctx.studentId,
+            scorerId: 'official_adjusted',
+            scorerEmail: currentUserEmail,
+            decidedBy: currentUserEmail,
+            mode: 'letter',
+            value: letter,
+            selectedLetterCode: letter,
+            numericValue: newScore,
+            status: 'completed'
+          }, { merge: true });
+        }
+      } catch (decErr) {
+        console.warn('[AdjustScore] Review decision subcollection notice:', decErr.message);
+      }
 
-      // Write immutable audit log
+      // 2. Touch root round document updatedAt ONLY without leaking score fields
+      if (rawUpdate) {
+        const roundRef = docFn(dbObj, 'graduationRounds', ctx.targetRound.id);
+        await rawUpdate(roundRef, {
+          updatedAt: (typeof window.serverTimestamp === 'function') ? window.serverTimestamp() : adjustTimestamp
+        }).catch(() => {});
+      }
+
+      // 3. Write immutable audit log
       try {
         if (rawSet) {
           const auditRef = docFn(dbObj, 'auditLogs', `audit_adjust_${ctx.targetRound.id}_${ctx.studentId}_${Date.now()}`);
@@ -1761,6 +1827,73 @@ window.reopenSupervisorScore = async function(studentId) {
   openAdminStudentScoreDetail(studentId);
   renderAdminScoresTable();
   showToast('Đã mở lại Điểm GVHD thành công.', 'info');
-};
-
 // --- 8. ADMIN PRELIMINARY CONFIG & SUPERVISOR CONFIG ---
+
+// ==========================================
+// TẦNG C HELPER: ĐỌC KẾT QUẢ CÔNG BỐ AN TOÀN CHO SINH VIÊN VÀ GVHD
+// ==========================================
+export async function getStudentPublishedReviewResult(roundId, studentId, phase) {
+  if (!roundId || !studentId || !phase) return null;
+  const pKey = 'duyet_' + phase;
+  const sid = String(studentId).trim();
+
+  // 1. Check in-memory state cache
+  if (typeof state !== 'undefined') {
+    state.cachedPublishedResults = state.cachedPublishedResults || {};
+    const cacheKey = `${roundId}_${sid}`;
+    if (state.cachedPublishedResults[cacheKey]) {
+      const cachedDoc = state.cachedPublishedResults[cacheKey];
+      if (cachedDoc.status !== 'revoked' && cachedDoc.reviews?.[pKey]?.status === 'published') {
+        return cachedDoc.reviews[pKey];
+      }
+      if (cachedDoc.status === 'revoked' || cachedDoc.reviews?.[pKey]?.status === 'revoked') {
+        return { status: 'revoked', isPublished: false };
+      }
+    }
+  }
+
+  // 2. Query Firestore subcollection publishedStudentResults
+  try {
+    const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
+    const docFn = (typeof window !== 'undefined') ? (window.doc || (typeof doc !== 'undefined' ? doc : null)) : null;
+    const getDocFn = (typeof window !== 'undefined') ? (window.getDoc || (typeof getDoc !== 'undefined' ? getDoc : null)) : null;
+
+    if (dbObj && docFn && getDocFn) {
+      const stDocRef = docFn(dbObj, 'graduationRounds', roundId, 'publishedStudentResults', sid);
+      const snap = await getDocFn(stDocRef);
+      if (snap && snap.exists()) {
+        const data = snap.data();
+        if (typeof state !== 'undefined') {
+          state.cachedPublishedResults = state.cachedPublishedResults || {};
+          state.cachedPublishedResults[`${roundId}_${sid}`] = data;
+        }
+        if (data.status !== 'revoked' && data.reviews?.[pKey]?.status === 'published') {
+          return data.reviews[pKey];
+        }
+        if (data.status === 'revoked' || data.reviews?.[pKey]?.status === 'revoked') {
+          return { status: 'revoked', isPublished: false };
+        }
+      }
+    }
+  } catch (err) {
+    // Handled silently: Permission denied (e.g. revoked or unassigned)
+  }
+
+  // 3. Fallback to round publishedReviews if present (for test mocks / local admin preview)
+  const targetRound = (typeof state !== 'undefined' && ((state.rounds || []).find(r => r.id === roundId) || (state.activeRound?.id === roundId ? state.activeRound : null)));
+  if (targetRound) {
+    const pubRecord = targetRound.publishedReviews?.[pKey];
+    if (pubRecord && (pubRecord.status === 'published' || pubRecord.isPublished === true) && pubRecord.studentResults) {
+      const stRes = pubRecord.studentResults[sid]
+        || pubRecord.studentResults[sid.toUpperCase()]
+        || pubRecord.studentResults[sid.toLowerCase()];
+      if (stRes) return stRes;
+    }
+  }
+
+  return null;
+}
+
+if (typeof window !== 'undefined') {
+  window.getStudentPublishedReviewResult = getStudentPublishedReviewResult;
+}

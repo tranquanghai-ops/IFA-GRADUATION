@@ -703,7 +703,24 @@ window.renderStudentTimelineWeeks = function() {
           || (state.user?.email && /^\d{7,10}@/.test(state.user.email) ? state.user.email.split('@')[0] : null);
 
         if (isPub) {
-          const stRes = mySid ? (pubInfo?.studentResults?.[mySid] || pubInfo?.studentResults?.[String(mySid).toUpperCase()] || pubInfo?.studentResults?.[String(mySid).toLowerCase()]) : null;
+          const cachedDoc = (typeof state !== 'undefined' && state.cachedPublishedResults?.[`${round.id}_${mySid}`]);
+          const stRes = mySid
+            ? ((cachedDoc && cachedDoc.reviews?.['duyet_' + phase]?.status === 'published' ? cachedDoc.reviews['duyet_' + phase] : null)
+              || pubInfo?.studentResults?.[mySid]
+              || pubInfo?.studentResults?.[String(mySid).toUpperCase()]
+              || pubInfo?.studentResults?.[String(mySid).toLowerCase()])
+            : null;
+
+          if (!stRes && mySid && round?.id && typeof window.getStudentPublishedReviewResult === 'function' && !window._hydratingStudentResult) {
+            window._hydratingStudentResult = true;
+            window.getStudentPublishedReviewResult(round.id, mySid, phase).then(res => {
+              window._hydratingStudentResult = false;
+              if (res && res.letterGrade) {
+                renderStudentTimelineWeeks(round, activities, weeks);
+              }
+            }).catch(() => { window._hydratingStudentResult = false; });
+          }
+
           if (stRes) {
             const passClass = stRes.isPassed ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300';
             const passLabel = stRes.isPassed ? '✓ Đạt yêu cầu' : '✕ Không đạt yêu cầu';

@@ -199,8 +199,12 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
       const pubInfo = (typeof window.getProgressReviewPublicationInfo === 'function')
         ? window.getProgressReviewPublicationInfo(phase, submissionRound)
         : submissionRound.publishedReviews?.['duyet_' + phase];
+      const cachedDoc = (typeof state !== 'undefined' && state.cachedPublishedResults?.[`${submissionRound.id}_${mySid}`]);
       const stRes = mySid
-        ? (pubInfo?.studentResults?.[mySid] || pubInfo?.studentResults?.[String(mySid).toUpperCase()] || pubInfo?.studentResults?.[String(mySid).toLowerCase()])
+        ? ((cachedDoc && cachedDoc.reviews?.['duyet_' + phase]?.status === 'published' ? cachedDoc.reviews['duyet_' + phase] : null)
+          || pubInfo?.studentResults?.[mySid]
+          || pubInfo?.studentResults?.[String(mySid).toUpperCase()]
+          || pubInfo?.studentResults?.[String(mySid).toLowerCase()])
         : null;
       if (stRes) {
         const passClass = stRes.isPassed ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300';

@@ -827,7 +827,7 @@ window.copyCouncilLink = async function(activitySlug, councilSlug, councilId = n
   for (const r of (state.rounds || [])) {
     if (r.deleted) continue;
     for (const a of (r.activities || [])) {
-      const c = (a.councils || []).find(x => 
+      const c = (a.councils || []).find(x =>
         (councilId && x.id === councilId) ||
         (councilSlug && (x.slug === councilSlug || x.id === councilSlug || x.shortCode === councilSlug)) ||
         (activitySlug && (a.slug === activitySlug || a.id === activitySlug) && (x.slug === councilSlug || x.id === councilSlug))
@@ -868,13 +868,19 @@ async function persistActivityCouncilChanges(targetRound) {
   const roundId = targetRound.id;
   try {
     const roundRef = doc(db, 'graduationRounds', roundId);
+    // Sanitize activities to prevent leaking internal member/defense scores to public round doc
+    const sanitizedActivities = (targetRound.activities || []).map(act => ({
+      ...act,
+      councils: Array.isArray(act.councils) ? act.councils.map(c => {
+        const cleanCouncil = { ...c };
+        delete cleanCouncil.finalDefenseScores;
+        return cleanCouncil;
+      }) : []
+    }));
     const payload = {
-      activities: targetRound.activities,
+      activities: sanitizedActivities,
       updatedAt: serverTimestamp()
     };
-    if (targetRound.progressReviews) {
-      payload.progressReviews = targetRound.progressReviews;
-    }
     await updateDoc(roundRef, payload);
     // Keep authorization indexes aligned with every council/member/student edit.
     // The live presentation rules consult these small documents, not the large

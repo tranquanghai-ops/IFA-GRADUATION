@@ -44,7 +44,7 @@ service cloud.firestore {
     // ==========================================
     // IFA GRADUATION MASTER CATALOGS
     // ==========================================
-    
+
     // Kho GVHD Master
     match /supervisorMaster/{supervisorId} {
       allow read: if signedIn();
@@ -144,14 +144,24 @@ service cloud.firestore {
 
       // Quyết định xét duyệt của GVHD từng vòng
       match /reviewDecisions/{decisionId} {
-        allow read: if admin() || staff()
+        allow read: if admin()
+          || (staff() && (
+              (resource.data.keys().hasAll(['scorerEmail']) && resource.data.scorerEmail == email())
+              || (resource.data.keys().hasAll(['supervisorEmail']) && resource.data.supervisorEmail == email())
+              || (resource.data.keys().hasAll(['decidedBy']) && resource.data.decidedBy == email())
+              || (resource.data.keys().hasAll(['activityId', 'councilId'])
+                  && isCouncilMember(resource.data.activityId, resource.data.councilId, email()))
+          ))
           || (signedIn() && resource.data.keys().hasAll(['scorerEmail']) && resource.data.scorerEmail == email());
         allow create: if admin() || (staff() && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy))
           || (signedIn() && !staff()
             && validGuestCouncilDecision(request.resource.data, decisionId)
             && isCouncilMember(request.resource.data.activityId, request.resource.data.councilId, email())
             && isStudentInCouncil(request.resource.data.activityId, request.resource.data.councilId, request.resource.data.studentId));
-        allow update: if admin() || (staff() && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy))
+        allow update: if admin() || (staff()
+            && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy)
+            && (!resource.data.keys().hasAll(['activityId', 'councilId'])
+                || getCouncilStatus(resource.data.activityId, resource.data.councilId) in ['preparing', 'active', 'open', 'unknown']))
           || (signedIn() && !staff()
             && resource.data.scorerEmail == email()
             && validGuestCouncilDecision(request.resource.data, decisionId)
@@ -159,13 +169,15 @@ service cloud.firestore {
             && request.resource.data.councilId == resource.data.councilId
             && request.resource.data.studentId == resource.data.studentId
             && isCouncilMember(resource.data.activityId, resource.data.councilId, email())
-            && isStudentInCouncil(resource.data.activityId, resource.data.councilId, resource.data.studentId));
+            && isStudentInCouncil(resource.data.activityId, resource.data.councilId, resource.data.studentId)
+            && (!resource.data.keys().hasAll(['activityId', 'councilId'])
+                || getCouncilStatus(resource.data.activityId, resource.data.councilId) in ['preparing', 'active', 'open', 'unknown']));
         allow delete: if admin();
       }
 
       // Đăng ký nguyện vọng của sinh viên
       match /registrations/{studentId} {
-        allow get: if admin() 
+        allow get: if admin()
           || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$'))
           || staff()
           || (signedIn()
@@ -213,9 +225,9 @@ service cloud.firestore {
             )
             && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized']
                 || !get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status']))
-            && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['openAt']) 
+            && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['openAt'])
                 || request.time >= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.openAt)
-            && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt']) 
+            && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt'])
                 || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt));
 
         allow update: if (admin())
@@ -274,7 +286,7 @@ service cloud.firestore {
                 && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.supervisorAssignmentMode == 'direct_assignment'))
             && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized']
                 || !get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status']))
-            && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt']) 
+            && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt'])
                 || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt));
 
         allow delete: if admin();
@@ -337,6 +349,30 @@ service cloud.firestore {
       function isActivitySubmissionEnabled(actId) {
         return exists(activityAccessDoc(actId))
           && get(activityAccessDoc(actId)).data.submissionEnabled == true;
+      }
+      function isAssignedSupervisor(stId) {
+        return (
+          exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(stId))
+          && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(stId)).data.assignmentStatus == 'published'
+          && (email() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(stId)).data.supervisorEmails
+            || email().lower() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(stId)).data.supervisorEmails)
+        ) || (
+          exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisorAssignments/$(stId))
+          && (email() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisorAssignments/$(stId)).data.supervisorEmails
+            || email().lower() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisorAssignments/$(stId)).data.supervisorEmails)
+        );
+      }
+      function isResultPublished(data) {
+        return (
+          (data.status == 'published' || (data.keys().hasAll(['isPublished']) && data.isPublished == true))
+          && data.status != 'revoked'
+        ) || (
+          data.keys().hasAll(['reviews']) && (
+            (data.reviews.keys().hasAll(['duyet_1']) && data.reviews.duyet_1.status == 'published')
+            || (data.reviews.keys().hasAll(['duyet_2']) && data.reviews.duyet_2.status == 'published')
+            || (data.reviews.keys().hasAll(['duyet_3']) && data.reviews.duyet_3.status == 'published')
+          )
+        );
       }
 
       // --- AUTHORIZATION INDEX SUBCOLLECTIONS ---
@@ -465,6 +501,22 @@ service cloud.firestore {
               && (!('score' in request.resource.data) || (request.resource.data.score is number && request.resource.data.score >= 0 && request.resource.data.score <= 10)));
 
         allow delete: if false;
+      }
+
+      // ==========================================
+      // KẾT QUẢ CÔNG BỐ CHO TỪNG SINH VIÊN (TẦNG C - LEAST PRIVILEGE)
+      // ==========================================
+      match /publishedStudentResults/{studentId} {
+        allow get: if admin()
+          || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$') && isResultPublished(resource.data))
+          || (staff() && isAssignedSupervisor(studentId) && isResultPublished(resource.data));
+        allow list: if admin();
+        allow create, update, delete: if admin();
+      }
+
+      // Snapshot công bố mốc của Quản trị viên phục vụ đối soát và bảng điểm
+      match /publishedProgressReviews/{phaseKey} {
+        allow get, list, write: if admin();
       }
 
       // Quản lý Nộp bài độc lập (submissions)
