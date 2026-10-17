@@ -132,6 +132,7 @@ async function runInventoryAndMigration() {
   const rounds = (roundsJson.documents || []).map(doc => ({
     id: doc.name.split('/').pop(),
     path: doc.name,
+    updateTime: doc.updateTime,
     rawFields: doc.fields,
     data: deserializeFields(doc.fields)
   }));
@@ -341,13 +342,30 @@ async function runInventoryAndMigration() {
 
     console.log(`Deep reconciliation verified: ${totalVerifiedStudents} student result(s) matched 100% of data values.`);
 
-    // 2. Pre-cleanup backup
+    // 2. Pre-cleanup backup with read-back verification and optimistic locking
+    const freshUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${target.id}`;
+    const freshRes = await fetch(freshUrl, { headers });
+    if (!freshRes.ok) throw new Error(`Failed to re-fetch target round: HTTP ${freshRes.status}`);
+    const freshDoc = await freshRes.json();
+    const freshUpdateTime = freshDoc.updateTime;
+
     const preCleanupBackupPath = path.join(backupDir, `pre-cleanup-backup-${target.id}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
-    fs.writeFileSync(preCleanupBackupPath, JSON.stringify(target, null, 2), 'utf8');
+    fs.writeFileSync(preCleanupBackupPath, JSON.stringify({
+      roundId: target.id,
+      updateTime: freshUpdateTime,
+      rawDoc: freshDoc,
+      data: deserializeFields(freshDoc.fields)
+    }, null, 2), 'utf8');
     console.log(`Pre-cleanup backup saved to: ${preCleanupBackupPath}`);
 
-    // 3. Build sanitized fields for root doc
-    const cleanFields = { ...target.rawFields };
+    // Verify backup can be read back immediately
+    const verifyBackup = JSON.parse(fs.readFileSync(preCleanupBackupPath, 'utf8'));
+    if (!verifyBackup.rawDoc || !verifyBackup.data) {
+      throw new Error(`ABORT CLEANUP: Backup verification failed for ${preCleanupBackupPath}`);
+    }
+
+    // 3. Build sanitized fields for root doc from freshDoc.fields
+    const cleanFields = { ...freshDoc.fields };
     // Remove councilScores
     delete cleanFields.councilScores;
     // Sanitize publishedReviews (keep metadata, remove studentResults map)
@@ -386,13 +404,19 @@ async function runInventoryAndMigration() {
       cleanFields.activities = { arrayValue: { values: sanitizedActs } };
     }
 
-    const patchUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${target.id}`;
+    // Optimistic concurrency control via currentDocument.updateTime
+    const patchUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${target.id}?currentDocument.updateTime=${encodeURIComponent(freshUpdateTime)}`;
     const patchRes = await fetch(patchUrl, {
       method: 'PATCH',
       headers,
       body: JSON.stringify({ fields: cleanFields })
     });
-    if (!patchRes.ok) throw new Error(`Failed to clean root doc: HTTP ${patchRes.status}`);
+    if (!patchRes.ok) {
+      if (patchRes.status === 412 || patchRes.status === 409) {
+        throw new Error(`ABORT CLEANUP: Concurrent update detected! Document was modified by another client (HTTP ${patchRes.status}).`);
+      }
+      throw new Error(`Failed to clean root doc: HTTP ${patchRes.status}`);
+    }
 
     console.log(`[5/5] Root document ${target.id} cleaned successfully. Sensitive fields removed.`);
     return;
