@@ -679,8 +679,8 @@ window.loadSupervisorPortalData = async function(roundId) {
       const sid = st.studentId || st.id;
       return sid ? window.ensureStudentSubmissionsLoaded(round.id, sid) : Promise.resolve();
     })).then(() => {
-      if (typeof window.renderSupervisorStudentsTable === 'function') {
-        window.renderSupervisorStudentsTable();
+      if (typeof window.renderSupervisorAssignedStudents === 'function') {
+        window.renderSupervisorAssignedStudents();
       }
     }).catch(() => {});
   }

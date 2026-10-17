@@ -8,13 +8,13 @@ export function formatActivityDateTime(ts) {
   if (!ts) return '';
   const date = ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
   if (isNaN(date.getTime())) return '';
-  return date.toLocaleString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  });
+  const pad = n => String(n).padStart(2, '0');
+  const d = pad(date.getDate());
+  const m = pad(date.getMonth() + 1);
+  const y = date.getFullYear();
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  return `${d}/${m}/${y} ${hh}:${mm}`;
 }
 
 // Relative time format in Vietnamese
@@ -198,27 +198,41 @@ export function getUserActivityInfo(identifier) {
     data = map.get(studentEmail);
   }
 
-  if (!data || (!data.lastLoginAt && !data.lastActiveAt)) {
+  if (!data || (!data.lastLoginAt && !data.lastActiveAt && !data.lastActionAt)) {
     return {
       hasLoggedIn: false,
       statusText: 'Chưa từng đăng nhập',
       timeAgo: 'Chưa từng đăng nhập',
       formattedDate: '--',
+      lastLoginAt: null,
+      lastLoginFormattedDate: '--',
+      lastLoginTimeAgo: 'Chưa từng đăng nhập',
+      lastActiveAt: null,
+      lastActionAt: null,
+      lastActionFormattedDate: '--',
+      lastActionTimeAgo: '',
       lastAction: '',
       lastActionDetails: '',
       raw: null
     };
   }
 
-  const activeTs = data.lastActiveAt || data.lastLoginAt;
+  const loginTs = data.lastLoginAt;
+  const actionTs = data.lastActionAt || data.lastActiveAt;
+  const effectiveActionTs = actionTs || loginTs;
   return {
-    hasLoggedIn: true,
+    hasLoggedIn: Boolean(data.lastLoginAt || data.lastActiveAt),
     statusText: 'Đã đăng nhập',
     lastLoginAt: data.lastLoginAt,
+    lastLoginFormattedDate: loginTs ? formatActivityDateTime(loginTs) : '--',
+    lastLoginTimeAgo: loginTs ? formatActivityTimeAgo(loginTs) : 'Chưa từng đăng nhập',
     lastActiveAt: data.lastActiveAt,
-    timeAgo: formatActivityTimeAgo(activeTs),
-    formattedDate: formatActivityDateTime(activeTs),
-    lastAction: data.lastAction || 'Đăng nhập hệ thống',
+    lastActionAt: actionTs,
+    lastActionFormattedDate: effectiveActionTs ? formatActivityDateTime(effectiveActionTs) : '--',
+    lastActionTimeAgo: effectiveActionTs ? formatActivityTimeAgo(effectiveActionTs) : '',
+    timeAgo: formatActivityTimeAgo(effectiveActionTs),
+    formattedDate: formatActivityDateTime(effectiveActionTs),
+    lastAction: data.lastAction || (loginTs ? 'Đăng nhập hệ thống' : ''),
     lastActionDetails: data.lastActionDetails || '',
     displayName: data.displayName || '',
     role: data.role || '',
@@ -487,14 +501,14 @@ export function filterRoundAccessMonitoringTable() {
     }
 
     const info = a.actInfo;
-    const loginHtml = info.hasLoggedIn
+    const loginHtml = (info.hasLoggedIn && info.lastLoginAt)
       ? `
         <div>
           <span class="inline-flex items-center gap-1 font-bold text-emerald-800 text-xs">
             <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-            <span>${info.timeAgo}</span>
+            <span>${info.lastLoginTimeAgo || info.timeAgo}</span>
           </span>
-          <span class="text-[10px] text-slate-400 block font-mono mt-0.5">${info.formattedDate}</span>
+          <span class="text-[10px] text-slate-400 block font-mono mt-0.5">${info.lastLoginFormattedDate || info.formattedDate}</span>
         </div>
       `
       : `
@@ -504,21 +518,22 @@ export function filterRoundAccessMonitoringTable() {
         </span>
       `;
 
-    const actionHtml = info.hasLoggedIn && info.lastAction
+    const actionHtml = (info.hasLoggedIn && info.lastAction)
       ? `
         <div>
           <span class="font-bold text-slate-800 text-xs">${escapeHtml(info.lastAction)}</span>
           ${info.lastActionDetails ? `<span class="text-[10px] text-slate-500 block truncate max-w-[220px]">${escapeHtml(info.lastActionDetails)}</span>` : ''}
+          <span class="text-[10px] text-slate-400 block font-mono mt-0.5">${info.lastActionFormattedDate || info.formattedDate}</span>
         </div>
       `
       : `<span class="text-slate-400 italic text-xs">--</span>`;
 
     return `
-      <tr class="hover:bg-slate-50 transition-colors">
+      <tr class="hover:bg-slate-50 transition-colors cursor-pointer group" onclick="openStudentActivityHistoryModal('${a.id || a.email}', '${a.roleType}')" title="Bấm để xem 10 thao tác gần nhất">
         <td class="p-3 text-center font-bold text-slate-400 font-mono text-[11px]">${idx + 1}</td>
         <td class="p-3 whitespace-nowrap">${roleBadge}</td>
         <td class="p-3">
-          <span class="font-bold text-slate-900 block text-xs">${escapeHtml(a.name)}</span>
+          <span class="font-bold text-slate-900 group-hover:text-blue-600 transition-colors block text-xs">${escapeHtml(a.name)}</span>
           <span class="text-[11px] text-slate-500 block">${escapeHtml(a.subInfo)}</span>
         </td>
         <td class="p-3 font-mono text-[11px] text-slate-600">${escapeHtml(a.email || '--')}</td>
@@ -579,21 +594,17 @@ window.exportRoundAccessMonitoringCSV = exportRoundAccessMonitoringCSV;
  * - Topic registration & proposal updates
  * - Review and grading notices
  */
-export async function openStudentActivityHistoryModal(studentId) {
+export async function openStudentActivityHistoryModal(studentId, optRoleType) {
   if (!studentId) return;
-  const sid = String(studentId).trim().toUpperCase();
+  const rawId = String(studentId).trim();
+  const isEmail = rawId.includes('@');
+  const sid = isEmail ? (rawId.endsWith('@student.tdtu.edu.vn') ? rawId.split('@')[0].toUpperCase() : '') : rawId.toUpperCase();
 
   const modal = document.getElementById('modal-student-activity-history');
   if (!modal) return;
 
-  const master = (typeof window.getFacultyStudentByMssv === 'function') ? window.getFacultyStudentByMssv(sid) : null;
-  const eligibleItem = (state.eligibleStudents || []).find(s => String(s.studentId || s.mssv || s.id).trim().toUpperCase() === sid);
-  const fullName = master?.fullName || master?.name || eligibleItem?.name || eligibleItem?.fullName || sid;
-  const className = master?.className || eligibleItem?.className || eligibleItem?.studentClass || '--';
-  const major = master?.major || eligibleItem?.major || 'Thiết kế Nội thất';
-  const email = master?.email || eligibleItem?.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`;
-
   const subtitleEl = document.getElementById('student-activity-history-subtitle');
+  const titleEl = document.getElementById('student-activity-history-title');
   const nameEl = document.getElementById('student-activity-info-name');
   const mssvEl = document.getElementById('student-activity-info-mssv');
   const classMajorEl = document.getElementById('student-activity-info-class-major');
@@ -601,20 +612,52 @@ export async function openStudentActivityHistoryModal(studentId) {
   const timelineEl = document.getElementById('student-activity-history-timeline');
   const countBadgeEl = document.getElementById('student-activity-history-count-badge');
 
-  if (subtitleEl) subtitleEl.textContent = `MSSV: ${sid} • Lớp: ${className}`;
+  let fullName = '';
+  let idDisplay = '';
+  let subInfoDisplay = '';
+  let roleLabel = 'Sinh viên';
+  let email = '';
+
+  const isStudent = Boolean(sid && (!optRoleType || optRoleType === 'student'));
+
+  if (isStudent) {
+    roleLabel = 'Sinh viên';
+    const master = (typeof window.getFacultyStudentByMssv === 'function') ? window.getFacultyStudentByMssv(sid) : null;
+    const eligibleItem = (state.eligibleStudents || []).find(s => String(s.studentId || s.mssv || s.id).trim().toUpperCase() === sid);
+    fullName = master?.fullName || master?.name || eligibleItem?.name || eligibleItem?.fullName || sid;
+    const className = master?.className || eligibleItem?.className || eligibleItem?.studentClass || '--';
+    const major = master?.major || eligibleItem?.major || 'Thiết kế Nội thất';
+    email = master?.email || eligibleItem?.email || `${sid.toLowerCase()}@student.tdtu.edu.vn`;
+    idDisplay = `MSSV: ${sid}`;
+    subInfoDisplay = `Lớp: ${className} • Ngành: ${major}`;
+    if (subtitleEl) subtitleEl.textContent = `${idDisplay} • Lớp: ${className}`;
+  } else {
+    // Supervisor, Council member, or Staff/Admin
+    const emailLower = rawId.toLowerCase();
+    email = emailLower;
+    const supMaster = (state.supervisorsMaster || []).find(s => s.id === rawId || (s.email && s.email.toLowerCase() === emailLower));
+    fullName = supMaster?.name || rawId;
+    const dept = supMaster?.department || 'Khoa MTCN';
+    roleLabel = optRoleType === 'supervisor' ? 'Giảng viên hướng dẫn' : (optRoleType === 'council' ? 'Thành viên Hội đồng' : 'Giảng viên / Quản trị viên');
+    idDisplay = emailLower;
+    subInfoDisplay = `Vai trò: ${roleLabel} • Đơn vị: ${dept}`;
+    if (subtitleEl) subtitleEl.textContent = `${emailLower} • ${roleLabel}`;
+  }
+
+  if (titleEl) titleEl.textContent = `Lịch sử thao tác ${isStudent ? 'sinh viên' : roleLabel.toLowerCase()}`;
   if (nameEl) nameEl.textContent = fullName;
-  if (mssvEl) mssvEl.textContent = sid;
-  if (classMajorEl) classMajorEl.textContent = `Lớp: ${className} • Ngành: ${major}`;
+  if (mssvEl) mssvEl.textContent = idDisplay;
+  if (classMajorEl) classMajorEl.textContent = subInfoDisplay;
 
   if (loginPillEl) {
-    loginPillEl.innerHTML = renderUserActivityBadge(sid, { compact: true });
+    loginPillEl.innerHTML = renderUserActivityBadge(isStudent ? sid : email, { compact: true });
   }
 
   if (timelineEl) {
     timelineEl.innerHTML = `
       <div class="p-8 text-center text-slate-400 font-medium text-xs flex flex-col items-center justify-center gap-2">
         <span class="animate-spin text-lg">⏳</span>
-        <span>Đang tổng hợp lịch sử hoạt động thực tế...</span>
+        <span>Đang tổng hợp lịch sử thao tác thực tế...</span>
       </div>
     `;
   }
@@ -625,7 +668,7 @@ export async function openStudentActivityHistoryModal(studentId) {
     const events = [];
 
     // 1. User login & active session from userActivities
-    const actInfo = getUserActivityInfo(sid) || getUserActivityInfo(email);
+    const actInfo = getUserActivityInfo(isStudent ? sid : email) || getUserActivityInfo(email);
     if (actInfo.hasLoggedIn && actInfo.raw) {
       const raw = actInfo.raw;
       if (raw.lastLoginAt) {
@@ -650,62 +693,83 @@ export async function openStudentActivityHistoryModal(studentId) {
       }
     }
 
-    // 2. Registrations & Topic Proposals
-    const targetRoundId = state.selectedRoundId || state.activeRound?.id;
-    if (targetRoundId) {
-      const reg = state.eligibleStudentDetails?.registrations?.get(sid);
-      if (reg) {
-        if (reg.registeredAt || reg.createdAt) {
-          events.push({
-            type: 'topic_registration',
-            title: 'Đăng ký đề tài tốt nghiệp',
-            details: `Đề tài: "${reg.topicTitle || 'Chưa đặt tên'}"${reg.acceptedSupervisorName ? ' • GVHD: ' + reg.acceptedSupervisorName : ''}`,
-            timestamp: reg.registeredAt || reg.createdAt,
-            icon: '📝',
-            badgeClass: 'bg-blue-50 text-blue-700 border-blue-200'
-          });
-        }
-        if (Array.isArray(reg.topicTitleHistory)) {
-          reg.topicTitleHistory.forEach(v => {
-            const vStatus = v.status === 'approved' ? '✓ Đã duyệt' : (v.status === 'rejected' ? '✕ Yêu cầu sửa' : '⏳ Chờ duyệt');
+    if (isStudent) {
+      // 2. Registrations & Topic Proposals
+      const targetRoundId = state.selectedRoundId || state.activeRound?.id;
+      if (targetRoundId) {
+        const reg = state.eligibleStudentDetails?.registrations?.get(sid);
+        if (reg) {
+          if (reg.registeredAt || reg.createdAt) {
             events.push({
-              type: 'topic_proposal',
-              title: `Đề xuất đổi tên đề tài (Lần ${v.version || 1})`,
-              details: `"${v.topicTitle}" • Trạng thái: ${vStatus}${v.reviewNote ? ' (Ghi chú: ' + v.reviewNote + ')' : ''}`,
-              timestamp: v.proposedAt || v.submittedAt || v.createdAt || reg.updatedAt,
-              icon: '💡',
-              badgeClass: v.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+              type: 'topic_registration',
+              title: 'Đăng ký đề tài tốt nghiệp',
+              details: `Đề tài: "${reg.topicTitle || 'Chưa đặt tên'}"${reg.acceptedSupervisorName ? ' • GVHD: ' + reg.acceptedSupervisorName : ''}`,
+              timestamp: reg.registeredAt || reg.createdAt,
+              icon: '📝',
+              badgeClass: 'bg-blue-50 text-blue-700 border-blue-200'
             });
-          });
+          }
+          if (Array.isArray(reg.topicTitleHistory)) {
+            reg.topicTitleHistory.forEach(v => {
+              const vStatus = v.status === 'approved' ? '✓ Đã duyệt' : (v.status === 'rejected' ? '✕ Yêu cầu sửa' : '⏳ Chờ duyệt');
+              events.push({
+                type: 'topic_proposal',
+                title: `Đề xuất đổi tên đề tài (Lần ${v.version || 1})`,
+                details: `"${v.topicTitle}" • Trạng thái: ${vStatus}${v.reviewNote ? ' (Ghi chú: ' + v.reviewNote + ')' : ''}`,
+                timestamp: v.proposedAt || v.submittedAt || v.createdAt || reg.updatedAt,
+                icon: '💡',
+                badgeClass: v.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+              });
+            });
+          }
         }
       }
-    }
 
-    // 3. Submissions & Drive Files
-    const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
-    const getDocsFn = (typeof window !== 'undefined') ? (window.getDocs || (typeof getDocs !== 'undefined' ? getDocs : null)) : null;
-    const queryFn = (typeof window !== 'undefined') ? (window.query || (typeof query !== 'undefined' ? query : null)) : null;
-    const colFn = (typeof window !== 'undefined') ? (window.collection || (typeof collection !== 'undefined' ? collection : null)) : null;
-    const whereFn = (typeof window !== 'undefined') ? (window.where || (typeof where !== 'undefined' ? where : null)) : null;
+      // 3. Submissions & Drive Files
+      const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
+      const getDocsFn = (typeof window !== 'undefined') ? (window.getDocs || (typeof getDocs !== 'undefined' ? getDocs : null)) : null;
+      const queryFn = (typeof window !== 'undefined') ? (window.query || (typeof query !== 'undefined' ? query : null)) : null;
+      const colFn = (typeof window !== 'undefined') ? (window.collection || (typeof collection !== 'undefined' ? collection : null)) : null;
+      const whereFn = (typeof window !== 'undefined') ? (window.where || (typeof where !== 'undefined' ? where : null)) : null;
 
-    if (dbObj && getDocsFn && queryFn && colFn && whereFn) {
-      try {
-        const driveSnap = await getDocsFn(queryFn(colFn(dbObj, 'driveFiles'), whereFn('studentId', '==', sid)));
-        driveSnap.docs.forEach(d => {
-          const df = d.data();
-          const fName = df.fileName || df.name || 'Tài liệu nộp bài';
-          const sizeMb = df.fileSize ? ` (${(df.fileSize / (1024 * 1024)).toFixed(2)} MB)` : '';
-          events.push({
-            type: 'submission',
-            title: `Nộp bài mốc: ${df.activityTitle || df.activityId || 'Duyệt đồ án'}`,
-            details: `File: "${fName}"${sizeMb}${df.attemptNumber ? ' • Lần nộp ' + df.attemptNumber : ''}`,
-            timestamp: df.createdAt || df.uploadedAt,
-            icon: '📤',
-            badgeClass: 'bg-purple-50 text-purple-700 border-purple-200'
+      if (dbObj && getDocsFn && queryFn && colFn && whereFn) {
+        try {
+          const driveSnap = await getDocsFn(queryFn(colFn(dbObj, 'driveFiles'), whereFn('studentId', '==', sid)));
+          driveSnap.docs.forEach(d => {
+            const df = d.data();
+            const fName = df.fileName || df.name || 'Tài liệu nộp bài';
+            const sizeMb = df.fileSize ? ` (${(df.fileSize / (1024 * 1024)).toFixed(2)} MB)` : '';
+            events.push({
+              type: 'submission',
+              title: `Nộp bài mốc: ${df.activityTitle || df.activityId || 'Duyệt đồ án'}`,
+              details: `File: "${fName}"${sizeMb}${df.attemptNumber ? ' • Lần nộp ' + df.attemptNumber : ''}`,
+              timestamp: df.createdAt || df.uploadedAt,
+              icon: '📤',
+              badgeClass: 'bg-purple-50 text-purple-700 border-purple-200'
+            });
           });
-        });
-      } catch (err) {
-        console.warn('[UserTracker] Notice fetching driveFiles for history:', err.message);
+        } catch (err) {
+          console.warn('[UserTracker] Notice fetching driveFiles for history:', err.message);
+        }
+      }
+    } else {
+      // Supervisor or Council member: check for recorded evaluation / grading / assignment logs
+      const rounds = state.rounds || (state.activeRound ? [state.activeRound] : []);
+      for (const r of rounds) {
+        if (Array.isArray(r.auditLogs)) {
+          r.auditLogs.forEach(al => {
+            if (al.actorEmail === email || al.email === email || al.actorId === rawId || al.userId === email) {
+              events.push({
+                type: 'audit_log',
+                title: al.action || 'Thao tác nghiệp vụ',
+                details: al.details || al.note || `Đợt: ${r.title || r.id}`,
+                timestamp: al.timestamp || al.createdAt || al.time,
+                icon: '⚡',
+                badgeClass: 'bg-blue-50 text-blue-700 border-blue-200'
+              });
+            }
+          });
+        }
       }
     }
 
@@ -732,7 +796,7 @@ export async function openStudentActivityHistoryModal(studentId) {
     const top10 = deduped.slice(0, 10);
 
     if (countBadgeEl) {
-      countBadgeEl.textContent = `${top10.length} hoạt động gần nhất`;
+      countBadgeEl.textContent = `${top10.length} thao tác gần nhất`;
     }
 
     if (!timelineEl) return;
@@ -740,7 +804,7 @@ export async function openStudentActivityHistoryModal(studentId) {
     if (top10.length === 0) {
       timelineEl.innerHTML = `
         <div class="p-8 text-center text-slate-400 font-medium text-xs">
-          Chưa ghi nhận hoạt động nào của sinh viên này trong hệ thống.
+          Chưa có lịch sử thao tác
         </div>
       `;
       return;
@@ -788,4 +852,5 @@ export function closeStudentActivityHistoryModal() {
 }
 
 window.openStudentActivityHistoryModal = openStudentActivityHistoryModal;
+window.openUserActivityHistoryModal = openStudentActivityHistoryModal;
 window.closeStudentActivityHistoryModal = closeStudentActivityHistoryModal;

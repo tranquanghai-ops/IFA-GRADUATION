@@ -703,26 +703,36 @@ window.renderStudentTimelineWeeks = function() {
           || (state.user?.email && /^\d{7,10}@/.test(state.user.email) ? state.user.email.split('@')[0] : null);
 
         if (isPub) {
+          const phaseCacheKey = `${round.id}_${mySid}_duyet_${phase}`;
+          const cachedPhase = (typeof state !== 'undefined' && state.cachedPublishedResults?.[phaseCacheKey]);
           const cachedDoc = (typeof state !== 'undefined' && state.cachedPublishedResults?.[`${round.id}_${mySid}`]);
           const stRes = mySid
-            ? ((cachedDoc && cachedDoc.reviews?.['duyet_' + phase]?.status === 'published' ? cachedDoc.reviews['duyet_' + phase] : null)
+            ? ((cachedPhase && (cachedPhase.status === 'published' || (cachedPhase.isPublished !== false && cachedPhase.letterGrade)) && cachedPhase.status !== 'revoked') ? cachedPhase : null)
+              || (cachedDoc && cachedDoc.status !== 'revoked' && cachedDoc.reviews?.['duyet_' + phase]?.status === 'published' ? cachedDoc.reviews['duyet_' + phase] : null)
               || pubInfo?.studentResults?.[mySid]
               || pubInfo?.studentResults?.[String(mySid).toUpperCase()]
-              || pubInfo?.studentResults?.[String(mySid).toLowerCase()])
+              || pubInfo?.studentResults?.[String(mySid).toLowerCase()]
             : null;
 
-          if (!stRes && mySid && round?.id && typeof window.getStudentPublishedReviewResult === 'function' && !window._hydratingStudentResult) {
-            window._hydratingStudentResult = true;
-            window.getStudentPublishedReviewResult(round.id, mySid, phase).then(res => {
-              window._hydratingStudentResult = false;
-              if (res && res.letterGrade) {
-                renderStudentTimelineWeeks(round, activities, weeks);
-              }
-            }).catch(() => { window._hydratingStudentResult = false; });
+          if (!stRes && mySid && round?.id && typeof window.getStudentPublishedReviewResult === 'function') {
+            if (!window._activeHydratingPhases) window._activeHydratingPhases = new Set();
+            if (!window._activeHydratingPhases.has(phaseCacheKey)) {
+              window._activeHydratingPhases.add(phaseCacheKey);
+              window.getStudentPublishedReviewResult(round.id, mySid, phase).then(res => {
+                window._activeHydratingPhases.delete(phaseCacheKey);
+                if (res && res.letterGrade && res.status !== 'revoked') {
+                  renderStudentTimelineWeeks();
+                }
+              }).catch(() => {
+                window._activeHydratingPhases.delete(phaseCacheKey);
+              });
+            }
           }
 
           if (stRes && stRes.letterGrade && stRes.status !== 'revoked') {
-            const isPassed = Boolean(stRes.isPassed);
+            const isPassed = typeof stRes.isPassed === 'boolean'
+              ? stRes.isPassed
+              : ['A', 'A-', 'B+', 'B', 'B-'].includes(stRes.letterGrade);
             const letter = escapeHtml(stRes.letterGrade || '--');
             const passLabel = isPassed ? '✓ Đạt yêu cầu' : '✕ Không đạt yêu cầu';
             const fullTitle = `Đánh giá Hội đồng: ${isPassed ? 'Đạt yêu cầu' : 'Không đạt yêu cầu'} – ${letter}`;

@@ -1925,6 +1925,9 @@ export async function getStudentPublishedReviewResult(roundId, studentId, phase)
           if (typeof state !== 'undefined') {
             state.cachedPublishedResults = state.cachedPublishedResults || {};
             state.cachedPublishedResults[`${roundId}_${sid}_${pKey}`] = phaseData;
+            state.cachedPublishedResults[`${roundId}_${sid}`] = state.cachedPublishedResults[`${roundId}_${sid}`] || { reviews: {} };
+            state.cachedPublishedResults[`${roundId}_${sid}`].reviews = state.cachedPublishedResults[`${roundId}_${sid}`].reviews || {};
+            state.cachedPublishedResults[`${roundId}_${sid}`].reviews[pKey] = phaseData;
           }
           if (phaseData.status === 'published' || (phaseData.isPublished !== false && phaseData.letterGrade)) {
             return phaseData;
@@ -1940,6 +1943,9 @@ export async function getStudentPublishedReviewResult(roundId, studentId, phase)
           if (typeof state !== 'undefined') {
             state.cachedPublishedResults = state.cachedPublishedResults || {};
             state.cachedPublishedResults[`${roundId}_${sid}_${pKey}`] = { status: 'revoked', isPublished: false };
+            if (state.cachedPublishedResults[`${roundId}_${sid}`]?.reviews) {
+              state.cachedPublishedResults[`${roundId}_${sid}`].reviews[pKey] = { status: 'revoked', isPublished: false };
+            }
           }
           return { status: 'revoked', isPublished: false };
         }

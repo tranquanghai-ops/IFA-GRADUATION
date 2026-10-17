@@ -123,7 +123,11 @@ function renderAdminRegistrationsTable(list) {
         <td class="p-3.5 text-slate-600">${escapeHtml(getSupName(3))}</td>
         <td class="p-3.5 text-center">${elBadge}</td>
         <td class="p-3.5 whitespace-nowrap">${reviewBadge}</td>
-        <td class="p-3.5 whitespace-nowrap">${activityBadge}</td>
+        <td class="p-3.5 whitespace-nowrap">
+          <button type="button" onclick="openStudentActivityHistoryModal('${r.studentId}')" class="text-left group hover:opacity-80 transition-all cursor-pointer p-0 bg-transparent border-0 inline-block" title="Bấm để xem lịch sử 10 thao tác gần nhất">
+            ${activityBadge}
+          </button>
+        </td>
         <td class="p-3.5 text-[11px] text-slate-400 whitespace-nowrap">${subDate ? subDate.toLocaleString('vi-VN') : '--'}</td>
       </tr>
     `;

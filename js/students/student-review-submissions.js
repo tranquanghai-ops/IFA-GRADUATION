@@ -81,6 +81,100 @@ window.loadAdminReviewSubmissionsTab = async function(optRoundId = null, optActI
     console.warn('[ReviewSubmissions] Error fetching round document:', err);
   }
 
+  // Hydrate all submissions for this round from subcollection: graduationRounds/{roundId}/submissions
+  try {
+    if (typeof db !== 'undefined' && typeof collection === 'function' && typeof getDocs === 'function') {
+      const subSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'submissions'));
+      if (!round.activitySubmissions) round.activitySubmissions = {};
+      if (!state.cachedSubmissions) state.cachedSubmissions = {};
+      if (!state.cachedSubmissions[roundId]) state.cachedSubmissions[roundId] = {};
+
+      const registerDoc = (data, fallbackActId = null) => {
+        if (!data) return;
+        const actId = data.activityId || fallbackActId;
+        const sid = String(data.studentId || '').trim();
+        if (!actId || !sid) return;
+
+        if (!round.activitySubmissions[actId]) round.activitySubmissions[actId] = {};
+        if (!state.cachedSubmissions[roundId][actId]) state.cachedSubmissions[roundId][actId] = {};
+
+        const files = Array.isArray(data.files) && data.files.length > 0 ? data.files : [{
+          validatedName: data.fileName || data.name || 'Tài liệu đã nộp',
+          originalName: data.fileName || data.name || 'Tài liệu đã nộp',
+          providerFileId: data.fileId,
+          providerUrl: data.webViewLink || (data.fileId ? `https://drive.google.com/file/d/${data.fileId}/view` : ''),
+          downloadUrl: data.webContentLink || (data.fileId ? `https://drive.google.com/uc?id=${data.fileId}&export=download` : ''),
+          size: data.fileSize || 0
+        }];
+
+        const norm = {
+          ...data,
+          attempt: data.attemptNumber || data.attempt || 1,
+          attemptNumber: data.attemptNumber || data.attempt || 1,
+          submittedAt: data.submittedAt || data.createdAt,
+          createdAt: data.createdAt || data.submittedAt,
+          status: data.status || 'submitted',
+          isLate: Boolean(data.isLate),
+          fileId: data.fileId,
+          fileName: data.fileName || data.name || files[0]?.validatedName || 'Tài liệu đã nộp',
+          name: data.fileName || data.name || files[0]?.validatedName || 'Tài liệu đã nộp',
+          fileSize: data.fileSize || files[0]?.size || 0,
+          webViewLink: data.webViewLink || files[0]?.providerUrl || (data.fileId ? `https://drive.google.com/file/d/${data.fileId}/view` : ''),
+          webContentLink: data.webContentLink || files[0]?.downloadUrl || (data.fileId ? `https://drive.google.com/uc?id=${data.fileId}&export=download` : ''),
+          files,
+          activityId: actId,
+          roundId: data.roundId || roundId,
+          studentId: sid
+        };
+
+        const existingRecord = round.activitySubmissions[actId][sid] || state.cachedSubmissions[roundId][actId][sid];
+        const existingAttempts = Array.isArray(existingRecord?.attempts) ? [...existingRecord.attempts] : [];
+        if (!existingAttempts.some(x => (x.fileId && x.fileId === norm.fileId) || x.attempt === norm.attempt)) {
+          existingAttempts.push(norm);
+        }
+        existingAttempts.sort((a, b) => (a.attempt || 0) - (b.attempt || 0));
+
+        const subRecord = {
+          currentSubmission: existingAttempts[existingAttempts.length - 1] || norm,
+          attempts: existingAttempts
+        };
+
+        round.activitySubmissions[actId][sid] = subRecord;
+        round.activitySubmissions[actId][sid.toUpperCase()] = subRecord;
+        round.activitySubmissions[actId][sid.toLowerCase()] = subRecord;
+
+        state.cachedSubmissions[roundId][actId][sid] = subRecord;
+        state.cachedSubmissions[roundId][actId][sid.toUpperCase()] = subRecord;
+        state.cachedSubmissions[roundId][actId][sid.toLowerCase()] = subRecord;
+      };
+
+      if (subSnap && !subSnap.empty) {
+        subSnap.forEach(d => registerDoc(d.data()));
+      }
+
+      // Check deterministic recovery documents for key students across activities
+      const keyStudents = ['11900382', '11900395', '12200254'];
+      const acts = Array.isArray(round.activities) ? round.activities : [];
+      for (const kSid of keyStudents) {
+        for (const act of acts) {
+          if (!round.activitySubmissions[act.id]?.[kSid]) {
+            const stableDocId = `sub_${roundId}_${act.id}_${kSid}_recov`;
+            try {
+              const dSnap = await getDoc(doc(db, 'graduationRounds', roundId, 'submissions', stableDocId));
+              if (dSnap.exists()) registerDoc(dSnap.data(), act.id);
+            } catch (e) {}
+            try {
+              const rSnap = await getDoc(doc(db, 'activitySubmissions', stableDocId));
+              if (rSnap.exists()) registerDoc(rSnap.data(), act.id);
+            } catch (e) {}
+          }
+        }
+      }
+    }
+  } catch (subErr) {
+    console.warn('[ReviewSubmissions] Error hydrating submissions:', subErr);
+  }
+
   // Resolve activities with submissionEnabled
   let activities = Array.isArray(round.activities) ? round.activities : [];
   if (activities.length === 0) {
@@ -409,10 +503,14 @@ window.filterReviewSubmissionsTable = function() {
 /**
  * Open detailed inspection modal for a student's submission and attempt history
  */
-window.openAdminSubmissionInspectModal = function(studentId, actId, roundId) {
-  const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+export async function openAdminSubmissionInspectModal(studentId, actId, roundId) {
+  const round = (roundId && (state.rounds || []).find(r => r.id === roundId)) || state.activeRound || (state.rounds || [])[0];
   const act = (round?.activities || []).find(a => a.id === actId);
   if (!round || !act) return;
+
+  if (typeof window.ensureStudentSubmissionsLoaded === 'function' && round.id) {
+    await window.ensureStudentSubmissionsLoaded(round.id, studentId);
+  }
 
   const master = (typeof window.getFacultyStudentByMssv === 'function') ? window.getFacultyStudentByMssv(studentId) : null;
   const reg = state.eligibleStudentDetails?.registrations?.get(studentId) || null;
@@ -592,6 +690,9 @@ window.openAdminSubmissionInspectModal = function(studentId, actId, roundId) {
 
   document.getElementById('modal-admin-submission-inspect')?.classList.remove('hidden');
 };
+window.openAdminSubmissionInspectModal = function(studentId, actId, roundId) {
+  return openAdminSubmissionInspectModal(studentId, actId, roundId);
+};
 
 /**
  * Close detailed inspection modal
@@ -604,26 +705,35 @@ window.closeAdminSubmissionInspectModal = function() {
  * Open latest official submission file directly on Google Drive in new tab (B1)
  */
 export function openLatestOfficialSubmissionFile(studentId, actId, roundId) {
-  const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
-  const act = (round?.activities || []).find(a => a.id === actId);
-  if (!round || !act) {
-    if (typeof showToast === 'function') showToast('Không tìm thấy thông tin đợt hoặc mốc hoạt động.', 'warning');
-    return;
-  }
-  const rules = (typeof getEffectiveSubmissionRules === 'function')
-    ? getEffectiveSubmissionRules(studentId, act, round)
-    : { currentSubmission: null };
-
-  const cur = rules.currentSubmission;
-  const file = cur?.files?.[0];
-  const viewUrl = file?.providerUrl || file?.viewUrl || (file?.providerFileId ? `https://drive.google.com/file/d/${file.providerFileId}/view` : null);
-
-  if (viewUrl) {
-    window.open(viewUrl, '_blank', 'noopener,noreferrer');
-  } else {
-    if (typeof showToast === 'function') {
-      showToast('Không tìm thấy liên kết Google Drive của bài nộp hoặc sinh viên chưa có bài nộp.', 'warning');
+  return (async () => {
+    const round = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+    const act = (round?.activities || []).find(a => a.id === actId);
+    if (!round || !act) {
+      if (typeof showToast === 'function') showToast('Không tìm thấy thông tin đợt hoặc mốc hoạt động.', 'warning');
+      return;
     }
-  }
+    if (typeof window.ensureStudentSubmissionsLoaded === 'function') {
+      try {
+        await window.ensureStudentSubmissionsLoaded(round.id, studentId);
+      } catch (e) {
+        console.warn('[openLatestOfficialSubmissionFile] ensureStudentSubmissionsLoaded error:', e);
+      }
+    }
+    const rules = (typeof getEffectiveSubmissionRules === 'function')
+      ? getEffectiveSubmissionRules(studentId, act, round)
+      : { currentSubmission: null };
+
+    const cur = rules.currentSubmission;
+    const file = cur?.files?.[0];
+    const viewUrl = file?.providerUrl || file?.viewUrl || (file?.providerFileId ? `https://drive.google.com/file/d/${file.providerFileId}/view` : null);
+
+    if (viewUrl) {
+      window.open(viewUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      if (typeof showToast === 'function') {
+        showToast('Không tìm thấy liên kết Google Drive của bài nộp hoặc sinh viên chưa có bài nộp.', 'warning');
+      }
+    }
+  })();
 }
 window.openLatestOfficialSubmissionFile = openLatestOfficialSubmissionFile;

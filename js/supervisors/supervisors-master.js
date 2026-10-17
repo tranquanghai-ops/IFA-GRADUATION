@@ -784,7 +784,11 @@ function renderAdminRoundSupervisorsTable(roundId, list) {
             <span class="text-xs font-semibold">${s.activeInRound !== false ? 'Hoạt động' : 'Tạm ẩn'}</span>
           </label>
         </td>
-        <td class="p-3.5 whitespace-nowrap">${activityBadge}</td>
+        <td class="p-3.5 whitespace-nowrap">
+          <button type="button" onclick="openStudentActivityHistoryModal('${supEmail}', 'supervisor')" class="text-left group hover:opacity-80 transition-all cursor-pointer p-0 bg-transparent border-0 inline-block" title="Bấm để xem lịch sử 10 thao tác gần nhất">
+            ${activityBadge}
+          </button>
+        </td>
         <td class="p-3.5 text-right space-x-2">
           <button onclick="saveRoundSupervisorRow('${roundId}', '${s.id}')" class="text-emerald-600 font-bold hover:underline">Lưu</button>
           <button onclick="removeRoundSupervisor('${roundId}', '${s.id}')" class="text-rose-600 font-bold hover:underline">Bỏ khỏi đợt</button>

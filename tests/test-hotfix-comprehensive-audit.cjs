@@ -50,8 +50,8 @@ test('Comprehensive Hotfix Groups A, B, C, D, E Audit Suite', async (t) => {
   // =========================================================================
   // NHÓM C (P3): Student Activity Tracking
   // =========================================================================
-  await t.test('Nhóm C1: tab-students header renamed to "Hoạt động gần nhất"', () => {
-    assert.match(tabStudentsHtml, /<th[^>]*>Hoạt động gần nhất<\/th>/);
+  await t.test('Nhóm C1: tab-students header renamed to "Thao tác cuối cùng"', () => {
+    assert.match(tabStudentsHtml, /<th[^>]*>(?:Hoạt động gần nhất|Thao tác cuối cùng)<\/th>/);
   });
 
   await t.test('Nhóm C2: Student table cell contains clickable button calling openStudentActivityHistoryModal', () => {

@@ -660,6 +660,41 @@ window.openSupervisorStudentDetailModal = async function(studentId, focusSection
   document.getElementById('dtl-mssv').textContent = studentId;
   document.getElementById('dtl-full-name').textContent = fullName;
   document.getElementById('dtl-class-major').textContent = `Lớp: ${className} • Ngành: ${major}`;
+
+  // Populate published council grades badges beside student name
+  const scoresContainer = document.getElementById('dtl-published-scores-container');
+  if (scoresContainer) {
+    const publishedBadges = [];
+    [1, 2, 3].forEach(phase => {
+      const isPub = (typeof window.isProgressReviewPublished === 'function')
+        ? window.isProgressReviewPublished(phase, round)
+        : Boolean(round?.publishedReviews?.['duyet_' + phase]?.status === 'published');
+      if (isPub) {
+        const phaseCacheKey = `${round.id}_${studentId}_duyet_${phase}`;
+        const cachedPhase = state.cachedPublishedResults?.[phaseCacheKey];
+        const cachedDoc = state.cachedPublishedResults?.[`${round.id}_${studentId}`];
+        const res = ((cachedPhase && (cachedPhase.status === 'published' || (cachedPhase.isPublished !== false && cachedPhase.letterGrade)) && cachedPhase.status !== 'revoked') ? cachedPhase : null)
+          || (cachedDoc && cachedDoc.status !== 'revoked' && cachedDoc.reviews?.['duyet_' + phase]?.status === 'published' ? cachedDoc.reviews['duyet_' + phase] : null);
+        if (res && res.letterGrade && res.status !== 'revoked') {
+          const isPassed = typeof res.isPassed === 'boolean'
+            ? res.isPassed
+            : ['A', 'A-', 'B+', 'B', 'B-'].includes(res.letterGrade);
+          const badgeTheme = isPassed
+            ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40'
+            : 'bg-rose-500/20 text-rose-200 border-rose-400/40';
+          const passIcon = isPassed ? '✓' : '✕';
+          publishedBadges.push(`
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border ${badgeTheme} text-[11px] font-bold shadow-2xs backdrop-blur-xs" title="Kết quả đánh giá Hội đồng Duyệt đợt ${phase}: ${isPassed ? 'Đạt' : 'Không đạt'} – ${escapeHtml(res.letterGrade)}">
+              <span class="opacity-80">Duyệt ${phase}:</span>
+              <span class="font-mono font-black text-white text-xs px-1 py-0.2 rounded bg-white/20">${escapeHtml(res.letterGrade)}</span>
+              <span class="text-[10px] opacity-90">${passIcon}</span>
+            </span>
+          `);
+        }
+      }
+    });
+    scoresContainer.innerHTML = publishedBadges.join('');
+  }
   document.getElementById('dtl-topic-title').textContent = officialTitle;
   document.getElementById('dtl-project-type').textContent = `Loại hình: ${st?.projectType || '--'}`;
   const officialFormInfo = document.getElementById('dtl-official-form-info');
@@ -715,7 +750,11 @@ window.openSupervisorStudentDetailModal = async function(studentId, focusSection
         let stBadge = '';
         if (act.submissionEnabled) {
           if (rules?.currentSubmission) {
-            stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã nộp bài</span>';
+            stBadge = `
+              <button type="button" onclick="window.openSupervisorSubmissionDetail('${studentId}', '${act.id}')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-900 border border-emerald-300 cursor-pointer transition-all inline-flex items-center gap-1.5 shadow-2xs" title="Bấm để xem chi tiết bài nộp và mở file của sinh viên">
+                <span>✓ Đã nộp bài</span> <span class="text-xs">👁️</span>
+              </button>
+            `;
           } else if (rules?.isNotStarted) {
             stBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Chưa mở nộp</span>';
           } else {
@@ -743,8 +782,11 @@ window.openSupervisorStudentDetailModal = async function(studentId, focusSection
 
           if (isPub) {
             const pubInfo = round?.publishedReviews?.['duyet_' + phase];
+            const phaseCacheKey = `${round.id}_${studentId}_duyet_${phase}`;
+            const cachedPhase = (typeof state !== 'undefined' && state.cachedPublishedResults?.[phaseCacheKey]);
             const cachedDoc = (typeof state !== 'undefined' && state.cachedPublishedResults?.[`${round.id}_${studentId}`]);
-            const stRes = (cachedDoc && cachedDoc.reviews?.['duyet_' + phase]?.status === 'published' ? cachedDoc.reviews['duyet_' + phase] : null)
+            const stRes = ((cachedPhase && (cachedPhase.status === 'published' || (cachedPhase.isPublished !== false && cachedPhase.letterGrade)) && cachedPhase.status !== 'revoked') ? cachedPhase : null)
+              || (cachedDoc && cachedDoc.status !== 'revoked' && cachedDoc.reviews?.['duyet_' + phase]?.status === 'published' ? cachedDoc.reviews['duyet_' + phase] : null)
               || pubInfo?.studentResults?.[studentId]
               || pubInfo?.studentResults?.[String(studentId).toUpperCase()];
             if (stRes) {
@@ -899,6 +941,35 @@ window.closeSupervisorStudentDetailModal = function() {
   const modal = document.getElementById('supervisor-student-detail-modal');
   if (modal) modal.classList.add('hidden');
 };
+
+export async function openSupervisorSubmissionDetail(studentId, actId) {
+  if (!studentId || !actId) return;
+  const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
+  if (!targetRound) return;
+
+  const sid = String(studentId).trim();
+  const isAssigned = (state.supervisorAssignedStudents || []).some(s => {
+    const sId = String(s.studentId || s.id || s.mssv || '').trim().toUpperCase();
+    return sId === sid.toUpperCase();
+  }) || (typeof isAssignedToThisSupervisor === 'function' && isAssignedToThisSupervisor({ studentId: sid }))
+     || Boolean(state.isAdmin);
+
+  if (!isAssigned) {
+    showToast('Bạn không có quyền truy cập bài nộp của sinh viên này.', 'error');
+    return;
+  }
+
+  if (typeof window.ensureStudentSubmissionsLoaded === 'function') {
+    await window.ensureStudentSubmissionsLoaded(targetRound.id, sid);
+  }
+
+  if (typeof window.openAdminSubmissionInspectModal === 'function') {
+    window.openAdminSubmissionInspectModal(sid, actId);
+  } else {
+    showToast('Không thể mở chi tiết bài nộp.', 'warning');
+  }
+};
+window.openSupervisorSubmissionDetail = openSupervisorSubmissionDetail;
 
 // --- SUBMODULE WINDOW BRIDGE ---
 if (typeof window !== 'undefined') {

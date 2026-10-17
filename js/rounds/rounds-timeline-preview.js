@@ -199,15 +199,57 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
       const pubInfo = (typeof window.getProgressReviewPublicationInfo === 'function')
         ? window.getProgressReviewPublicationInfo(phase, submissionRound)
         : submissionRound.publishedReviews?.['duyet_' + phase];
+      const phaseCacheKey = `${submissionRound.id}_${mySid}_duyet_${phase}`;
+      const cachedPhase = (typeof state !== 'undefined' && state.cachedPublishedResults?.[phaseCacheKey]);
       const cachedDoc = (typeof state !== 'undefined' && state.cachedPublishedResults?.[`${submissionRound.id}_${mySid}`]);
       const stRes = mySid
-        ? ((cachedDoc && cachedDoc.reviews?.['duyet_' + phase]?.status === 'published' ? cachedDoc.reviews['duyet_' + phase] : null)
+        ? ((cachedPhase && (cachedPhase.status === 'published' || (cachedPhase.isPublished !== false && cachedPhase.letterGrade)) && cachedPhase.status !== 'revoked') ? cachedPhase : null)
+          || (cachedDoc && cachedDoc.status !== 'revoked' && cachedDoc.reviews?.['duyet_' + phase]?.status === 'published' ? cachedDoc.reviews['duyet_' + phase] : null)
           || pubInfo?.studentResults?.[mySid]
           || pubInfo?.studentResults?.[String(mySid).toUpperCase()]
-          || pubInfo?.studentResults?.[String(mySid).toLowerCase()])
+          || pubInfo?.studentResults?.[String(mySid).toLowerCase()]
         : null;
+
+      if (!stRes && mySid && submissionRound?.id && typeof window.getStudentPublishedReviewResult === 'function') {
+        window.getStudentPublishedReviewResult(submissionRound.id, mySid, phase).then(res => {
+          if (res && res.letterGrade && res.status !== 'revoked') {
+            const container = document.getElementById('student-timeline-dialog-review-slot');
+            if (container) {
+              const isP = typeof res.isPassed === 'boolean' ? res.isPassed : ['A', 'A-', 'B+', 'B', 'B-'].includes(res.letterGrade);
+              const pCls = isP ? 'text-emerald-700 bg-emerald-100 border-emerald-300' : 'text-rose-700 bg-rose-100 border-rose-300';
+              const pLbl = isP ? '✓ Đạt yêu cầu' : '✕ Không đạt yêu cầu';
+              const lBox = isP ? 'bg-emerald-100 text-emerald-950 border-emerald-300' : 'bg-rose-100 text-rose-950 border-rose-300';
+              container.innerHTML = `
+                <div class="mb-4 p-4 rounded-2xl border ${isP ? 'border-emerald-300 bg-emerald-50/80' : 'border-rose-300 bg-rose-50/80'} shadow-2xs space-y-2.5">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
+                      <span>📢</span> KẾT QUẢ ĐÁNH GIÁ DUYỆT ĐỢT ${phase}
+                    </span>
+                  </div>
+                  <div class="text-xs font-bold text-slate-700">
+                    Đánh giá Hội đồng: ${pLbl.replace(/^[✓✕]\s*/, '')} – ${escapeHtml(res.letterGrade)}
+                  </div>
+                  <div class="flex items-center justify-between gap-4 pt-1">
+                    <div>
+                      <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Kết luận</span>
+                      <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${pCls}">${pLbl}</span>
+                    </div>
+                    <div class="text-right">
+                      <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Điểm chữ chính thức</span>
+                      <span class="text-2xl sm:text-3xl font-black font-mono px-3 py-0.5 rounded-xl border shadow-2xs inline-block ${lBox}">${escapeHtml(res.letterGrade)}</span>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }
+          }
+        }).catch(() => {});
+      }
+
       if (stRes && stRes.letterGrade && stRes.status !== 'revoked') {
-        const isPassed = Boolean(stRes.isPassed);
+        const isPassed = typeof stRes.isPassed === 'boolean'
+          ? stRes.isPassed
+          : ['A', 'A-', 'B+', 'B', 'B-'].includes(stRes.letterGrade);
         const letter = escapeHtml(stRes.letterGrade || '--');
         const passClass = isPassed ? 'text-emerald-700 bg-emerald-100 border-emerald-300' : 'text-rose-700 bg-rose-100 border-rose-300';
         const passLabel = isPassed ? '✓ Đạt yêu cầu' : '✕ Không đạt yêu cầu';
@@ -216,30 +258,34 @@ window.openStudentTimelineEvent = function(weekNumber, eventIndex, roundId = nul
         const letterBoxBg = isPassed ? 'bg-emerald-100 text-emerald-950 border-emerald-300' : 'bg-rose-100 text-rose-950 border-rose-300';
         const pubDateStr = pubInfo?.publishedAt ? new Date(pubInfo.publishedAt).toLocaleDateString('vi-VN') : '';
         progressReviewResultHtml = `
-          <div class="mb-4 p-4 rounded-2xl border ${passBorder} ${passBg} shadow-2xs space-y-2.5">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
-                <span>📢</span> KẾT QUẢ ĐÁNH GIÁ DUYỆT ĐỢT ${phase}
-              </span>
-              ${pubDateStr ? `<span class="text-[10px] text-slate-400 font-medium">Công bố: ${pubDateStr}</span>` : ''}
-            </div>
-            <div class="text-xs font-bold text-slate-700">
-              Đánh giá Hội đồng: ${passLabel.replace(/^[✓✕]\s*/, '')} – ${letter}
-            </div>
-            <div class="flex items-center justify-between gap-4 pt-1">
-              <div>
-                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Kết luận</span>
-                <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${passClass}">${passLabel}</span>
+          <div id="student-timeline-dialog-review-slot">
+            <div class="mb-4 p-4 rounded-2xl border ${passBorder} ${passBg} shadow-2xs space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-1.5">
+                  <span>📢</span> KẾT QUẢ ĐÁNH GIÁ DUYỆT ĐỢT ${phase}
+                </span>
+                ${pubDateStr ? `<span class="text-[10px] text-slate-400 font-medium">Công bố: ${pubDateStr}</span>` : ''}
               </div>
-              <div class="text-right">
-                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Điểm chữ chính thức</span>
-                <span class="text-2xl sm:text-3xl font-black font-mono px-3 py-0.5 rounded-xl border shadow-2xs inline-block ${letterBoxBg}">${letter}</span>
+              <div class="text-xs font-bold text-slate-700">
+                Đánh giá Hội đồng: ${passLabel.replace(/^[✓✕]\s*/, '')} – ${letter}
+              </div>
+              <div class="flex items-center justify-between gap-4 pt-1">
+                <div>
+                  <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Kết luận</span>
+                  <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${passClass}">${passLabel}</span>
+                </div>
+                <div class="text-right">
+                  <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Điểm chữ chính thức</span>
+                  <span class="text-2xl sm:text-3xl font-black font-mono px-3 py-0.5 rounded-xl border shadow-2xs inline-block ${letterBoxBg}">${letter}</span>
+                </div>
               </div>
             </div>
           </div>
         `;
       } else if (submissionRound.publishedReviews?.['duyet_' + phase]?.status === 'revoked') {
-        progressReviewResultHtml = '';
+        progressReviewResultHtml = '<div id="student-timeline-dialog-review-slot"></div>';
+      } else {
+        progressReviewResultHtml = '<div id="student-timeline-dialog-review-slot"></div>';
       }
     } else {
       progressReviewResultHtml = `
