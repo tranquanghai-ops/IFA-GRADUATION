@@ -289,19 +289,57 @@ async function runInventoryAndMigration() {
     const target = rounds.find(r => r.id === targetRoundId);
     if (!target) throw new Error(`Target round ${targetRoundId} not found for cleanup.`);
 
-    // 1. Verify subcollection publishedStudentResults
-    const subColUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${target.id}/publishedStudentResults`;
-    const subColRes = await fetch(subColUrl, { headers });
-    const subColJson = subColRes.ok ? await subColRes.json() : {};
-    const migratedDocs = (subColJson.documents || []).length;
-    console.log(`Verified ${migratedDocs} published student documents in subcollection.`);
+    // 1. Deep data-level verification before cleanup: Check each student, phase, and grading values
+    console.log('Performing deep data reconciliation across all students and phases...');
+    const publishedReviews = target.data.publishedReviews || {};
+    let totalVerifiedStudents = 0;
 
-    if (target.data.publishedReviews?.duyet_1?.studentResults) {
-      const requiredStudents = Object.keys(target.data.publishedReviews.duyet_1.studentResults).length;
-      if (migratedDocs < requiredStudents) {
-        throw new Error(`ABORT: Subcollection has ${migratedDocs} docs but root has ${requiredStudents} students. Run --apply first!`);
+    for (const [pKey, pVal] of Object.entries(publishedReviews)) {
+      if (!pVal || !pVal.studentResults) continue;
+      const studentResults = pVal.studentResults;
+      console.log(`Checking Phase ${pKey} (${Object.keys(studentResults).length} students)...`);
+
+      // 1a. Verify admin snapshot exists in publishedProgressReviews/{pKey}
+      const snapUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${target.id}/publishedProgressReviews/${pKey}`;
+      const snapRes = await fetch(snapUrl, { headers });
+      if (!snapRes.ok) {
+        throw new Error(`ABORT CLEANUP: Admin snapshot publishedProgressReviews/${pKey} is missing! HTTP ${snapRes.status}`);
+      }
+
+      // 1b. Verify each individual student's migrated record value-by-value
+      for (const [stId, expectedRes] of Object.entries(studentResults)) {
+        // Check subcollection reviews/{pKey} document
+        const phaseDocUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/graduationRounds/${target.id}/publishedStudentResults/${stId}/reviews/${pKey}`;
+        const phaseRes = await fetch(phaseDocUrl, { headers });
+        if (!phaseRes.ok) {
+          throw new Error(`ABORT CLEANUP: Student ${stId} missing phase document in subcollection reviews/${pKey}! HTTP ${phaseRes.status}`);
+        }
+        const phaseJson = await phaseRes.json();
+        const phaseData = deserializeFields(phaseJson.fields);
+
+        // Verify letterGrade
+        const expGrade = expectedRes.letterGrade || '--';
+        if (phaseData.letterGrade !== expGrade) {
+          throw new Error(`ABORT CLEANUP: Student ${stId} phase ${pKey} letterGrade mismatch! Expected: ${expGrade}, Got: ${phaseData.letterGrade}`);
+        }
+
+        // Verify isPassed
+        const expPassed = Boolean(expectedRes.isPassed);
+        if (Boolean(phaseData.isPassed) !== expPassed) {
+          throw new Error(`ABORT CLEANUP: Student ${stId} phase ${pKey} isPassed mismatch! Expected: ${expPassed}, Got: ${phaseData.isPassed}`);
+        }
+
+        // Verify status
+        const expStatus = pVal.status || 'published';
+        if (phaseData.status !== expStatus) {
+          throw new Error(`ABORT CLEANUP: Student ${stId} phase ${pKey} status mismatch! Expected: ${expStatus}, Got: ${phaseData.status}`);
+        }
+
+        totalVerifiedStudents++;
       }
     }
+
+    console.log(`Deep reconciliation verified: ${totalVerifiedStudents} student result(s) matched 100% of data values.`);
 
     // 2. Pre-cleanup backup
     const preCleanupBackupPath = path.join(backupDir, `pre-cleanup-backup-${target.id}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
