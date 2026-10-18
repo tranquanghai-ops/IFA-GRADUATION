@@ -807,10 +807,12 @@ window.saveScoreCalibration = async function() {
 
   // Persist to Firestore
   try {
+    const decRef = doc(db, 'graduationRounds', roundId, 'reviewDecisions', scoreKey);
+    await setDoc(decRef, updatedScore, { merge: true }).catch(() => {});
+
     const roundRef = doc(db, 'graduationRounds', roundId);
     if (state.isAdmin) {
       await updateDoc(roundRef, {
-        [`councilScores.${scoreKey}`]: updatedScore,
         activities: targetRound.activities,
         updatedAt: serverTimestamp()
       });

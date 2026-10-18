@@ -218,91 +218,134 @@ export function getProgressReviewData(studentId, phase, targetRound) {
     return { status: 'pending', score: null, letterGrade: null, letterLabel: '', displayScore: '--', referenceScore: null, isPassed: false, isFinalized: false, source: 'none' };
   }
   const sid = String(studentId).trim();
+  const pKey = 'duyet_' + phase;
+  const roundId = targetRound.id || (typeof state !== 'undefined' ? state.selectedRoundId : null);
 
   // Sync state.councilScores with targetRound.councilScores if available
   if (targetRound.councilScores && typeof state !== 'undefined') {
     state.councilScores = { ...(targetRound.councilScores || {}), ...(state.councilScores || {}) };
   }
 
-  // 1. Check if there is an activity for this phase
+  // 1. Check Authoritative Published / Snapshot Results (Tier B snapshot & Tier C student results)
+  const snapshotRes = targetRound.publishedProgressReviews?.[pKey]?.studentResults?.[sid]
+    || targetRound.publishedProgressReviews?.[pKey]?.studentResults?.[sid.toUpperCase()]
+    || targetRound.publishedProgressReviews?.[pKey]?.studentResults?.[sid.toLowerCase()]
+    || (typeof state !== 'undefined' && state.publishedProgressReviews?.[`${roundId}_${pKey}`]?.studentResults?.[sid])
+    || targetRound.publishedReviews?.[pKey]?.studentResults?.[sid]
+    || targetRound.publishedReviews?.[pKey]?.studentResults?.[sid.toUpperCase()]
+    || targetRound.publishedReviews?.[pKey]?.studentResults?.[sid.toLowerCase()]
+    || (typeof state !== 'undefined' && state.cachedPublishedResults?.[`${roundId}_${sid}_${pKey}`])
+    || (typeof state !== 'undefined' && state.cachedPublishedResults?.[`${roundId}_${sid}`]?.reviews?.[pKey]);
+
+  if (snapshotRes && (snapshotRes.letterGrade || (snapshotRes.score !== null && snapshotRes.score !== undefined) || snapshotRes.value)) {
+    const letter = snapshotRes.letterGrade || (typeof snapshotRes.value === 'string' && /[A-DF]/i.test(snapshotRes.value) ? snapshotRes.value : null);
+    const numScore = (snapshotRes.score !== undefined && snapshotRes.score !== null) ? Number(snapshotRes.score) : ((snapshotRes.numericValue !== undefined && snapshotRes.numericValue !== null) ? Number(snapshotRes.numericValue) : null);
+    const isPassed = (snapshotRes.isPassed !== undefined) ? Boolean(snapshotRes.isPassed) : isProgressReviewPassed(letter, numScore);
+    const status = snapshotRes.status || (isPassed ? 'passed' : 'failed');
+
+    return {
+      status: status === 'revoked' ? 'revoked' : (isPassed ? 'passed' : (status === 'revision' ? 'revision' : 'failed')),
+      score: numScore,
+      letterGrade: letter,
+      letterLabel: snapshotRes.letterLabel || '',
+      displayScore: letter || (numScore !== null ? numScore.toFixed(1) : '--'),
+      referenceScore: (snapshotRes.referenceScore !== undefined && snapshotRes.referenceScore !== null) ? String(snapshotRes.referenceScore) : (numScore !== null ? numScore.toFixed(2) : null),
+      isPassed,
+      isFinalized: true,
+      finalizedAt: snapshotRes.finalizedAt || null,
+      source: 'publishedProgressReviews'
+    };
+  }
+
+  // 2. Check if there is an activity for this phase
   const act = findProgressReviewActivity(targetRound, phase);
+  let council = null;
   if (act && act.councilEnabled && Array.isArray(act.councils) && act.councils.length > 0) {
     // Find council assigned to this student
     const asgns = act.councilStudentAssignments || [];
     const studentAsgn = asgns.find(a => String(a.studentId).trim() === sid);
-    const council = studentAsgn ? act.councils.find(c => c.id === studentAsgn.councilId) : act.councils[0];
+    council = studentAsgn ? act.councils.find(c => c.id === studentAsgn.councilId) : act.councils[0];
+  }
 
-    if (council) {
-      const cStat = council.status || 'preparing';
-      const isCouncilFinished = (cStat === 'finalized' || cStat === 'ended' || cStat === 'completed');
+  // 2A. Check official adjusted decision in reviewDecisions (subcollection storage)
+  if (council && typeof state !== 'undefined' && state.councilScores) {
+    const officialKey = `${act?.id}_${council.id}_${sid}_official`;
+    const officialAdjustedKey = `${act?.id}_${council.id}_${sid}_official_adjusted`;
+    const officialDecision = state.councilScores[officialKey] || state.councilScores[officialAdjustedKey];
+    if (officialDecision && (officialDecision.value || officialDecision.numericValue !== undefined || officialDecision.letterGrade)) {
+      const letter = officialDecision.letterGrade || officialDecision.selectedLetterCode || (typeof officialDecision.value === 'string' && /[A-DF]/i.test(officialDecision.value) ? officialDecision.value : null);
+      const numScore = officialDecision.numericValue !== undefined && officialDecision.numericValue !== null ? Number(officialDecision.numericValue) : (typeof officialDecision.value === 'number' ? Number(officialDecision.value) : null);
+      const isPassed = isProgressReviewPassed(letter, numScore);
+      return {
+        status: isPassed ? 'passed' : 'failed',
+        score: numScore,
+        letterGrade: letter,
+        letterLabel: officialDecision.letterLabel || '',
+        displayScore: letter || (numScore !== null ? numScore.toFixed(1) : '--'),
+        referenceScore: numScore !== null ? numScore.toFixed(2) : null,
+        isPassed,
+        isFinalized: true,
+        councilStatus: council.status || 'finalized',
+        councilName: council.name || '',
+        source: 'reviewDecisions_official'
+      };
+    }
+  }
 
-      // 1A. If council has cached finalDefenseScores for this student
-      if (council.finalDefenseScores?.[sid]) {
-        const cached = council.finalDefenseScores[sid];
-        const letter = cached.letterGrade || (act.scoringConfig?.mode === 'letter' && cached.formattedScore !== '--' ? cached.formattedScore : null);
-        const numScore = cached.score !== undefined && cached.score !== null ? Number(cached.score) : null;
+  // 2B. If council has cached finalDefenseScores for this student
+  if (council && council.finalDefenseScores?.[sid]) {
+    const cached = council.finalDefenseScores[sid];
+    const letter = cached.letterGrade || (act.scoringConfig?.mode === 'letter' && cached.formattedScore !== '--' ? cached.formattedScore : null);
+    const numScore = cached.score !== undefined && cached.score !== null ? Number(cached.score) : null;
+    const isPassed = isProgressReviewPassed(letter, numScore);
+    return {
+      status: isPassed ? 'passed' : 'failed',
+      score: numScore,
+      letterGrade: letter,
+      letterLabel: cached.letterLabel || '',
+      displayScore: letter || (numScore !== null ? numScore.toFixed(1) : '--'),
+      referenceScore: numScore !== null ? numScore.toFixed(2) : null,
+      isPassed,
+      isFinalized: true,
+      councilStatus: council.status || 'preparing',
+      councilName: council.name || '',
+      source: 'council_finalDefenseScores'
+    };
+  }
+
+  // 2C. If council is ended or finalized, compute official score from completed member scores
+  if (council) {
+    const cStat = council.status || 'preparing';
+    const isCouncilFinished = (cStat === 'finalized' || cStat === 'ended' || cStat === 'completed');
+    if (isCouncilFinished) {
+      const resolveOfficial = (typeof window !== 'undefined' && typeof window.getOfficialDefenseScore === 'function')
+        ? window.getOfficialDefenseScore
+        : (typeof getOfficialDefenseScore === 'function' ? getOfficialDefenseScore : null);
+
+      const official = resolveOfficial ? resolveOfficial(sid, council, act, targetRound) : null;
+
+      if (official && (official.score !== null || official.letterGrade !== null)) {
+        const letter = official.letterGrade || (act.scoringConfig?.mode === 'letter' && official.formattedScore !== '--' ? official.formattedScore : null);
+        const numScore = official.score !== null ? Number(official.score) : null;
         const isPassed = isProgressReviewPassed(letter, numScore);
         return {
           status: isPassed ? 'passed' : 'failed',
           score: numScore,
           letterGrade: letter,
-          letterLabel: cached.letterLabel || '',
+          letterLabel: official.letterLabel || '',
           displayScore: letter || (numScore !== null ? numScore.toFixed(1) : '--'),
           referenceScore: numScore !== null ? numScore.toFixed(2) : null,
           isPassed,
           isFinalized: true,
           councilStatus: cStat,
           councilName: council.name || '',
-          source: 'council_finalDefenseScores'
+          source: 'council_calculated'
         };
       }
-
-      // 1B. If council is ended or finalized, compute official score from completed member scores
-      if (isCouncilFinished) {
-        const resolveOfficial = (typeof window !== 'undefined' && typeof window.getOfficialDefenseScore === 'function')
-          ? window.getOfficialDefenseScore
-          : (typeof getOfficialDefenseScore === 'function' ? getOfficialDefenseScore : null);
-
-        const official = resolveOfficial ? resolveOfficial(sid, council, act, targetRound) : null;
-
-        if (official && (official.score !== null || official.letterGrade !== null)) {
-          const letter = official.letterGrade || (act.scoringConfig?.mode === 'letter' && official.formattedScore !== '--' ? official.formattedScore : null);
-          const numScore = official.score !== null ? Number(official.score) : null;
-          const isPassed = isProgressReviewPassed(letter, numScore);
-          return {
-            status: isPassed ? 'passed' : 'failed',
-            score: numScore,
-            letterGrade: letter,
-            letterLabel: official.letterLabel || '',
-            displayScore: letter || (numScore !== null ? numScore.toFixed(1) : '--'),
-            referenceScore: numScore !== null ? numScore.toFixed(2) : null,
-            isPassed,
-            isFinalized: true,
-            councilStatus: cStat,
-            councilName: council.name || '',
-            source: 'council_calculated'
-          };
-        }
-      }
-
-      // Council is not finished (preparing / active) or student has not been scored yet
-      return {
-        status: 'pending',
-        score: null,
-        letterGrade: null,
-        letterLabel: '',
-        displayScore: '--',
-        referenceScore: null,
-        isPassed: false,
-        isFinalized: false,
-        councilStatus: cStat,
-        councilName: council.name || '',
-        source: 'council_pending'
-      };
     }
   }
 
-  // 2. Fallback to targetRound.progressReviews
+  // 3. Fallback to targetRound.progressReviews
   const legacy = targetRound.progressReviews?.['duyet_' + phase]?.[sid];
   if (legacy) {
     const rawScore = legacy.score !== undefined && legacy.score !== null ? Number(legacy.score) : null;
@@ -319,6 +362,23 @@ export function getProgressReviewData(studentId, phase, targetRound) {
       isPassed,
       isFinalized: status === 'passed' || status === 'failed' || status === 'completed',
       source: 'progressReviews'
+    };
+  }
+
+  if (council) {
+    const cStat = council.status || 'preparing';
+    return {
+      status: 'pending',
+      score: null,
+      letterGrade: null,
+      letterLabel: '',
+      displayScore: '--',
+      referenceScore: null,
+      isPassed: false,
+      isFinalized: false,
+      councilStatus: cStat,
+      councilName: council.name || '',
+      source: 'council_pending'
     };
   }
 
@@ -989,8 +1049,32 @@ export async function confirmRevokeProgressReview() {
     const currentUserEmail = (typeof state !== 'undefined' && state.user?.email) || 'admin';
     const revokeTimestamp = new Date().toISOString();
 
+    const rawUpdate = (typeof window !== 'undefined') ? (window.updateDoc || window.rawUpdateDoc) : null;
+    const rawSet = (typeof window !== 'undefined') ? (window.setDoc || window.rawSetDoc) : null;
+    const rawGet = (typeof window !== 'undefined') ? (window.getDoc || window.rawGetDoc) : null;
+    const docFn = (typeof window !== 'undefined') ? window.doc : null;
+    const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
+
+    // 1. Resolve existing snapshot BEFORE overwriting to preserve studentResults
+    let existingSnapshot = targetRound.publishedProgressReviews?.[pKey]
+      || (typeof state !== 'undefined' && state.publishedProgressReviews?.[`${targetRound.id}_${pKey}`])
+      || null;
+
+    if (!existingSnapshot && rawGet && dbObj && docFn) {
+      try {
+        const subDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedProgressReviews', pKey);
+        const snap = await rawGet(subDocRef);
+        if (snap && snap.exists && (typeof snap.exists === 'function' ? snap.exists() : true)) {
+          existingSnapshot = typeof snap.data === 'function' ? snap.data() : snap.data;
+        }
+      } catch (e) {}
+    }
+
+    const existingStudentResults = existingSnapshot?.studentResults || prevPub.studentResults || {};
+
     const revokeRecord = {
-      ...prevPub,
+      ...(existingSnapshot || prevPub),
+      studentResults: existingStudentResults,
       status: 'revoked',
       isPublished: false,
       revokedAt: revokeTimestamp,
@@ -1010,13 +1094,13 @@ export async function confirmRevokeProgressReview() {
     };
 
     targetRound.publishedReviews = targetRound.publishedReviews || {};
-    targetRound.publishedReviews[pKey] = revokeRecord;
-
-    const rawUpdate = (typeof window !== 'undefined') ? (window.updateDoc || window.rawUpdateDoc) : null;
-    const rawSet = (typeof window !== 'undefined') ? (window.setDoc || window.rawSetDoc) : null;
-    const rawGet = (typeof window !== 'undefined') ? (window.getDoc || window.rawGetDoc) : null;
-    const docFn = (typeof window !== 'undefined') ? window.doc : null;
-    const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
+    targetRound.publishedReviews[pKey] = roundDocRevokeMetadata;
+    targetRound.publishedProgressReviews = targetRound.publishedProgressReviews || {};
+    targetRound.publishedProgressReviews[pKey] = revokeRecord;
+    if (typeof state !== 'undefined') {
+      state.publishedProgressReviews = state.publishedProgressReviews || {};
+      state.publishedProgressReviews[`${targetRound.id}_${pKey}`] = revokeRecord;
+    }
 
     if (dbObj && rawUpdate && docFn) {
       const roundRef = docFn(dbObj, 'graduationRounds', targetRound.id);
@@ -1030,17 +1114,10 @@ export async function confirmRevokeProgressReview() {
           const subDocRef = docFn(dbObj, 'graduationRounds', targetRound.id, 'publishedProgressReviews', pKey);
           await rawSet(subDocRef, revokeRecord);
 
-          let studentIdsToRevoke = prevPub.studentResults ? Object.keys(prevPub.studentResults) : [];
-          if (studentIdsToRevoke.length === 0 && rawGet) {
-            try {
-              const snap = await rawGet(subDocRef);
-              if (snap && snap.exists && snap.data()?.studentResults) {
-                studentIdsToRevoke = Object.keys(snap.data().studentResults);
-              }
-            } catch (e) {}
-          }
-          if (studentIdsToRevoke.length === 0 && Array.isArray(targetRound.students)) {
-            studentIdsToRevoke = targetRound.students.map(s => s.studentId || s.id).filter(Boolean);
+          let studentIdsToRevoke = Object.keys(existingStudentResults);
+          if (studentIdsToRevoke.length === 0) {
+            const scoringStudents = getScoringRoundStudents(targetRound);
+            studentIdsToRevoke = scoringStudents.map(s => s.studentId || s.mssv || s.id).filter(Boolean);
           }
 
           // Kiểm tra xem còn đợt duyệt nào khác đang công bố không
@@ -1402,6 +1479,120 @@ export async function confirmAdjustCouncilScore() {
   }
 }
 
+export async function ensureAdminProgressReviewLoaded(roundId, phase) {
+  if (!roundId || !phase) return null;
+  const pKey = 'duyet_' + phase;
+  const loadKey = `${roundId}_${pKey}`;
+
+  const targetRound = (typeof state !== 'undefined' && ((state.rounds || []).find(r => r.id === roundId) || (state.activeRound?.id === roundId ? state.activeRound : null)));
+
+  const dbObj = (typeof window !== 'undefined') ? (window.db || (typeof db !== 'undefined' ? db : null)) : null;
+  const docFn = (typeof window !== 'undefined') ? (window.doc || (typeof doc !== 'undefined' ? doc : null)) : null;
+  const getDocFn = (typeof window !== 'undefined') ? (window.getDoc || (typeof getDoc !== 'undefined' ? getDoc : null)) : null;
+  const colFn = (typeof window !== 'undefined') ? (window.collection || (typeof collection !== 'undefined' ? collection : null)) : null;
+  const getDocsFn = (typeof window !== 'undefined') ? (window.getDocs || (typeof getDocs !== 'undefined' ? getDocs : null)) : null;
+
+  if (!dbObj || !docFn || !getDocFn) return null;
+
+  // 1. Try fetching admin snapshot from subcollection: graduationRounds/{roundId}/publishedProgressReviews/{phaseKey}
+  let snapshotData = null;
+  try {
+    const snapRef = docFn(dbObj, 'graduationRounds', roundId, 'publishedProgressReviews', pKey);
+    const snap = await getDocFn(snapRef);
+    if (snap && snap.exists && (typeof snap.exists === 'function' ? snap.exists() : true)) {
+      snapshotData = typeof snap.data === 'function' ? snap.data() : snap.data;
+    }
+  } catch (snapErr) {
+    console.warn(`[ensureAdminProgressReviewLoaded] Snapshot fetch notice for ${loadKey}:`, snapErr.message);
+  }
+
+  // 2. Fallback: If snapshot is not found but publishedStudentResults exists, query publishedStudentResults
+  if (!snapshotData && colFn && getDocsFn) {
+    try {
+      const stResultsCol = colFn(dbObj, 'graduationRounds', roundId, 'publishedStudentResults');
+      const stSnap = await getDocsFn(stResultsCol);
+      if (stSnap && !stSnap.empty) {
+        const studentResults = {};
+        stSnap.docs.forEach(d => {
+          const dData = d.data();
+          const rPhase = dData.reviews?.[pKey];
+          if (rPhase) {
+            studentResults[dData.studentId || d.id] = {
+              studentId: dData.studentId || d.id,
+              studentName: dData.studentName || d.id,
+              letterGrade: rPhase.letterGrade,
+              isPassed: rPhase.isPassed,
+              status: rPhase.status,
+              finalizedAt: rPhase.finalizedAt || dData.updatedAt
+            };
+          }
+        });
+        if (Object.keys(studentResults).length > 0) {
+          snapshotData = {
+            roundId,
+            phase: Number(phase),
+            status: targetRound?.publishedReviews?.[pKey]?.status || 'published',
+            studentResults
+          };
+        }
+      }
+    } catch (stErr) {
+      console.warn(`[ensureAdminProgressReviewLoaded] publishedStudentResults fetch notice:`, stErr.message);
+    }
+  }
+
+  // 3. Also load reviewDecisions into state.councilScores so individual member breakdown is available
+  if (colFn && getDocsFn) {
+    try {
+      const decCol = colFn(dbObj, 'graduationRounds', roundId, 'reviewDecisions');
+      const decSnap = await getDocsFn(decCol);
+      if (decSnap && !decSnap.empty) {
+        state.councilScores = state.councilScores || {};
+        decSnap.docs.forEach(docSnap => {
+          const dec = docSnap.data();
+          if (dec) {
+            if (dec.scoreKey) state.councilScores[dec.scoreKey] = dec;
+            if (dec.scorerId && dec.studentId && dec.councilId) {
+              const k = `${dec.activityId || `act_${pKey}`}_${dec.councilId}_${dec.studentId}_${dec.scorerId}`;
+              state.councilScores[k] = dec;
+            }
+            if (dec.scorerEmail && dec.studentId && dec.councilId) {
+              const kEmail = `${dec.activityId || `act_${pKey}`}_${dec.councilId}_${dec.studentId}_${String(dec.scorerEmail).toLowerCase().trim()}`;
+              state.councilScores[kEmail] = dec;
+            }
+          }
+        });
+      }
+    } catch (decErr) {
+      console.warn(`[ensureAdminProgressReviewLoaded] reviewDecisions fetch notice:`, decErr.message);
+    }
+  }
+
+  // 4. Store snapshot in round and global state caches
+  if (snapshotData) {
+    if (targetRound) {
+      targetRound.publishedProgressReviews = targetRound.publishedProgressReviews || {};
+      targetRound.publishedProgressReviews[pKey] = snapshotData;
+    }
+    if (typeof state !== 'undefined') {
+      state.publishedProgressReviews = state.publishedProgressReviews || {};
+      state.publishedProgressReviews[loadKey] = snapshotData;
+
+      if (snapshotData.studentResults) {
+        state.cachedPublishedResults = state.cachedPublishedResults || {};
+        Object.entries(snapshotData.studentResults).forEach(([sid, sRes]) => {
+          state.cachedPublishedResults[`${roundId}_${sid}_${pKey}`] = sRes;
+          state.cachedPublishedResults[`${roundId}_${sid}`] = state.cachedPublishedResults[`${roundId}_${sid}`] || { reviews: {} };
+          state.cachedPublishedResults[`${roundId}_${sid}`].reviews = state.cachedPublishedResults[`${roundId}_${sid}`].reviews || {};
+          state.cachedPublishedResults[`${roundId}_${sid}`].reviews[pKey] = sRes;
+        });
+      }
+    }
+  }
+
+  return snapshotData;
+}
+
 if (typeof window !== 'undefined') {
   window.isProgressReviewPassed = isProgressReviewPassed;
   window.isProgressReviewPublished = isProgressReviewPublished;
@@ -1415,6 +1606,7 @@ if (typeof window !== 'undefined') {
   window.closeCouncilScoreDetailModal = closeCouncilScoreDetailModal;
   window.findProgressReviewActivity = findProgressReviewActivity;
   window.getProgressReviewData = getProgressReviewData;
+  window.ensureAdminProgressReviewLoaded = ensureAdminProgressReviewLoaded;
 
   // Revoke & Adjust bindings (Nhóm E)
   window.openRevokeProgressReviewModal = openRevokeProgressReviewModal;
@@ -1435,8 +1627,48 @@ window.renderAdminProgressReviewTable = function(phase) {
   const tbody = document.getElementById('admin-duyet-' + phase + '-tbody');
   if (!tbody) return;
 
-  const targetRound = (state.rounds || []).find(r => r.id === state.selectedRoundId) || state.activeRound;
+  const targetRound = (typeof state !== 'undefined' && (state.rounds || []).find(r => r.id === state.selectedRoundId)) || state?.activeRound;
   if (!targetRound) return;
+
+  const pKey = 'duyet_' + phase;
+  const loadKey = `${targetRound.id}_${pKey}`;
+
+  // Check if progress review data needs to be hydrated from Firestore
+  const hasSnapshot = Boolean(targetRound.publishedProgressReviews?.[pKey] || state?.publishedProgressReviews?.[loadKey]);
+  const isPubOrRevoked = targetRound.publishedReviews?.[pKey]?.status === 'published' || targetRound.publishedReviews?.[pKey]?.status === 'revoked';
+
+  if (!hasSnapshot && isPubOrRevoked && !state?._loadingProgressReviews?.[loadKey] && typeof ensureAdminProgressReviewLoaded === 'function') {
+    state._loadingProgressReviews = state._loadingProgressReviews || {};
+    state._loadingProgressReviews[loadKey] = true;
+
+    // Show loading spinner
+    tbody.innerHTML = `<tr>
+      <td colspan="7" class="p-8 text-center text-slate-500">
+        <div class="inline-flex items-center gap-2">
+          <span class="animate-spin text-lg">⏳</span>
+          <span class="text-xs font-semibold">Đang tải kết quả đánh giá Duyệt đợt ${phase}...</span>
+        </div>
+      </td>
+    </tr>`;
+
+    ensureAdminProgressReviewLoaded(targetRound.id, phase).then(() => {
+      delete state._loadingProgressReviews[loadKey];
+      window.renderAdminProgressReviewTable(phase);
+    }).catch(fetchErr => {
+      delete state._loadingProgressReviews[loadKey];
+      console.error(`[AdminProgressReview] Failed to load progress review data for ${loadKey}:`, fetchErr);
+      tbody.innerHTML = `<tr>
+        <td colspan="7" class="p-8 text-center text-rose-600 bg-rose-50/50 rounded-xl font-medium">
+          <div class="flex flex-col items-center gap-1.5">
+            <span class="text-xl">⚠️</span>
+            <span class="text-xs font-bold">Không thể tải dữ liệu Duyệt đợt ${phase}: ${String(fetchErr.message || fetchErr)}</span>
+            <button type="button" onclick="renderAdminProgressReviewTable(${phase})" class="mt-2 px-3 py-1 bg-white border border-rose-300 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer">Thử lại</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+    return;
+  }
 
   const allStudents = getScoringRoundStudents(targetRound);
 
@@ -1610,6 +1842,13 @@ window.loadAdminScoringDashboard = async function(targetRoundId, targetTab = 'du
 
   const activeNavBtn = document.querySelector('.ascore-nav-btn.bg-slate-900');
   const curSubTab = targetTab || (activeNavBtn ? activeNavBtn.id.replace('ascore-tab-btn-', '') : 'duyet-1');
+
+  // Preload progress review data for the active phase if applicable
+  const phaseMatch = curSubTab.match(/^duyet-(\d+)$/);
+  if (phaseMatch && state.selectedRoundId && typeof ensureAdminProgressReviewLoaded === 'function') {
+    await ensureAdminProgressReviewLoaded(state.selectedRoundId, parseInt(phaseMatch[1], 10)).catch(() => {});
+  }
+
   switchAdminScoringSubTab(curSubTab);
 };
 
@@ -1622,6 +1861,10 @@ window.onAdminScoringRoundChange = async function(roundId) {
     }
   }
   const curSubTab = document.querySelector('.ascore-nav-btn.bg-slate-900')?.id?.replace('ascore-tab-btn-', '') || 'duyet-1';
+  const phaseMatch = curSubTab.match(/^duyet-(\d+)$/);
+  if (phaseMatch && roundId && typeof ensureAdminProgressReviewLoaded === 'function') {
+    await ensureAdminProgressReviewLoaded(roundId, parseInt(phaseMatch[1], 10)).catch(() => {});
+  }
   switchAdminScoringSubTab(curSubTab);
 };
 

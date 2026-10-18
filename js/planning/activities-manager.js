@@ -1193,8 +1193,7 @@ export function normalizeActivity(a, roundId, idx = 0) {
       ...c,
       status: c.status || 'preparing',
       auditLogs: Array.isArray(c.auditLogs) ? c.auditLogs : [],
-      guestInclusion: c.guestInclusion || {},
-      finalDefenseScores: c.finalDefenseScores || {}
+      guestInclusion: c.guestInclusion || {}
     })) : [],
     councilStudentAssignments: Array.isArray(a.councilStudentAssignments) ? a.councilStudentAssignments : [],
     scoringConfig,
