@@ -312,13 +312,14 @@ window.refreshCopiedSchedulePreview = function() {
     };
 
     if (shifted.activities.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Đợt nguồn chưa có mốc hoạt động nào.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-400">Đợt nguồn chưa có mốc hoạt động nào.</td></tr>';
     } else {
       tbody.innerHTML = shifted.activities.map(act => {
         const typeMeta = typeLabels[act.activityType] || typeLabels.other;
         const openStr = act.submissionConfig?.openAt ? window.formatVietnamDateTime(act.submissionConfig.openAt) : '--';
         const deadlineStr = act.submissionConfig?.deadlineAt ? window.formatVietnamDateTime(act.submissionConfig.deadlineAt) : '--';
-        const councilStr = act.startAt ? `${window.formatVietnamDateTime(act.startAt)}${act.endAt ? ' – ' + (window.formatVietnamDateTime(act.endAt).split(' ')[0] || '') : ''}` : '--';
+        const councilStartStr = act.startAt ? window.formatVietnamDateTime(act.startAt) : '--';
+        const councilEndStr = act.endAt ? (window.formatVietnamDateTime(act.endAt).split(' ')[0] || '--') : '--';
 
         return `
           <tr class="hover:bg-indigo-50/40 transition-colors">
@@ -327,11 +328,15 @@ window.refreshCopiedSchedulePreview = function() {
             </td>
             <td class="p-2.5 font-bold text-slate-900">
               ${escapeHtml(act.title)}
+              <div class="mt-0.5">
+                <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold border ${typeMeta.color}">
+                  ${typeMeta.label}
+                </span>
+              </div>
             </td>
             <td class="p-2.5 whitespace-nowrap">
-              <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold border ${typeMeta.color}">
-                ${typeMeta.label}
-              </span>
+              <span class="font-bold text-slate-800">${escapeHtml(act.weekdayName || '--')}</span>
+              <span class="block text-[10px] text-slate-500 font-mono">${escapeHtml(act.dateDisplay || '--')}</span>
             </td>
             <td class="p-2.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
               ${openStr}
@@ -340,7 +345,10 @@ window.refreshCopiedSchedulePreview = function() {
               ${deadlineStr}
             </td>
             <td class="p-2.5 font-mono text-[11px] font-bold text-slate-800 whitespace-nowrap">
-              ${councilStr}
+              ${councilStartStr}
+            </td>
+            <td class="p-2.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+              ${councilEndStr}
             </td>
           </tr>
         `;

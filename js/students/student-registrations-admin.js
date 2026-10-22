@@ -61,11 +61,11 @@ window.filterAdminRegistrationsTable = function() {
 
   // Filter by eligibility & self-declaration
   if (statusFilter === 'decl_eligible') {
-    filtered = filtered.filter(r => r.eligibilityDeclaration?.status === 'eligible');
+    filtered = filtered.filter(r => (r.adminReview?.status === 'eligible') || (!r.adminReview && r.eligibilityDeclaration?.status === 'eligible'));
   } else if (statusFilter === 'decl_ineligible') {
-    filtered = filtered.filter(r => r.eligibilityDeclaration?.status === 'ineligible');
+    filtered = filtered.filter(r => (r.adminReview?.status === 'ineligible' || r.adminReview?.status === 'pending_documents') || (!r.adminReview && r.eligibilityDeclaration?.status === 'ineligible'));
   } else if (statusFilter === 'decl_undeclared') {
-    filtered = filtered.filter(r => !r.eligibilityDeclaration?.status || r.eligibilityDeclaration?.status === 'undeclared');
+    filtered = filtered.filter(r => !r.adminReview && (!r.eligibilityDeclaration?.status || r.eligibilityDeclaration?.status === 'undeclared'));
   } else if (statusFilter === 'eligible') {
     filtered = filtered.filter(r => r.eligibilityStatus === 'eligible' || (!r.eligibilityStatus && r.status === 'submitted'));
   } else if (statusFilter === 'pending') {
@@ -97,27 +97,54 @@ function renderAdminRegistrationsTable(list) {
 
     // Self-declaration & Admin verification status
     const decl = r.eligibilityDeclaration || {};
-    let selfDeclBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-300">Chưa khai báo</span>';
-    if (decl.status === 'eligible') {
-      selfDeclBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">✓ Đủ điều kiện</span>';
-    } else if (decl.status === 'ineligible') {
-      const reasonCount = Array.isArray(decl.reasons) ? decl.reasons.length : 0;
-      selfDeclBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs" title="${reasonCount} lý do chưa đủ ĐK">⚠️ Chưa đủ ĐK (${reasonCount})</span>`;
+    const adminRev = r.adminReview || null;
+
+    let elBadge = '';
+    if (adminRev && adminRev.status) {
+      if (adminRev.status === 'eligible') {
+        elBadge = `
+          <button type="button" onclick="openAdminReviewEligibilityModal('${r.studentId}')" class="flex flex-col items-center gap-0.5 hover:opacity-80 transition-opacity p-1 rounded hover:bg-slate-100 cursor-pointer text-center mx-auto" title="Khoa đã duyệt: Đủ điều kiện">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-400 shadow-2xs">✓ Đủ ĐK (Khoa)</span>
+          </button>
+        `;
+      } else if (adminRev.status === 'ineligible') {
+        const rc = Array.isArray(adminRev.reasons) ? adminRev.reasons.length : 0;
+        elBadge = `
+          <button type="button" onclick="openAdminReviewEligibilityModal('${r.studentId}')" class="flex flex-col items-center gap-0.5 hover:opacity-80 transition-opacity p-1 rounded hover:bg-slate-100 cursor-pointer text-center mx-auto" title="Khoa kết luận: Chưa đủ điều kiện (${rc} lý do)">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-400 shadow-2xs">⚠️ Chưa đủ ĐK (Khoa)</span>
+          </button>
+        `;
+      } else if (adminRev.status === 'pending_documents') {
+        elBadge = `
+          <button type="button" onclick="openAdminReviewEligibilityModal('${r.studentId}')" class="flex flex-col items-center gap-0.5 hover:opacity-80 transition-opacity p-1 rounded hover:bg-slate-100 cursor-pointer text-center mx-auto" title="Khoa yêu cầu: Cần bổ sung hồ sơ">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-400 shadow-2xs">⏳ Cần bổ sung (Khoa)</span>
+          </button>
+        `;
+      }
+    } else if (decl && decl.status) {
+      if (decl.status === 'eligible') {
+        elBadge = `
+          <button type="button" onclick="openAdminReviewEligibilityModal('${r.studentId}')" class="flex flex-col items-center gap-0.5 hover:opacity-80 transition-opacity p-1 rounded hover:bg-slate-100 cursor-pointer text-center mx-auto" title="Sinh viên tự khai: Đã đủ điều kiện (Chờ Khoa đối soát)">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">✓ Đủ ĐK (SV khai)</span>
+          </button>
+        `;
+      } else if (decl.status === 'ineligible') {
+        const rc = Array.isArray(decl.reasons) ? decl.reasons.length : 0;
+        elBadge = `
+          <button type="button" onclick="openAdminReviewEligibilityModal('${r.studentId}')" class="flex flex-col items-center gap-0.5 hover:opacity-80 transition-opacity p-1 rounded hover:bg-slate-100 cursor-pointer text-center mx-auto" title="Sinh viên tự khai: Chưa đủ điều kiện (${rc} lý do)">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-300 shadow-2xs">⚠️ Chưa đủ ĐK (SV khai)</span>
+          </button>
+        `;
+      }
     }
 
-    let adminDecisionBadge = '';
-    if (decl.adminDecision === 'confirmed_eligible') {
-      adminDecisionBadge = '<span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-black bg-blue-100 text-blue-900 border border-blue-300 ml-1">Khoa: Đạt</span>';
-    } else if (decl.adminDecision === 'confirmed_ineligible') {
-      adminDecisionBadge = '<span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-black bg-rose-100 text-rose-900 border border-rose-300 ml-1">Khoa: Chưa đạt</span>';
+    if (!elBadge) {
+      elBadge = `
+        <button type="button" onclick="openAdminReviewEligibilityModal('${r.studentId}')" class="flex flex-col items-center gap-0.5 hover:opacity-80 transition-opacity p-1 rounded hover:bg-slate-100 cursor-pointer text-center mx-auto" title="Sinh viên chưa thực hiện khai báo">
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-300">Chưa khai báo</span>
+        </button>
+      `;
     }
-
-    let elBadge = `
-      <button type="button" onclick="openAdminReviewEligibilityModal('${r.studentId}')" class="flex flex-col items-center gap-0.5 hover:opacity-80 transition-opacity p-1 rounded hover:bg-slate-100 cursor-pointer text-center mx-auto" title="Bấm để xem chi tiết tự khai và xác nhận của Khoa">
-        ${selfDeclBadge}
-        ${adminDecisionBadge}
-      </button>
-    `;
 
     let reviewBadge = '<span class="text-slate-400 font-medium text-xs">Chưa nộp</span>';
     if (isReg) {
@@ -380,6 +407,123 @@ if (typeof window !== 'undefined') {
 
 
 // ── Admin Eligibility Review & Correction Submodule ─────────────────────────
+window.onAdminReviewDecisionChanged = function(decision) {
+  const detailsWrap = document.getElementById('admin-edit-details-wrap');
+  if (!detailsWrap) return;
+  // If confirmed_eligible, Admin can still view/tweak details or collapse it if desired.
+  // We keep it visible so Admin has full control to check or clear reasons.
+};
+
+window.onAdminIneligibleReasonToggled = function() {
+  const checked = Array.from(document.querySelectorAll('input[name="admin-ineligible-reason"]:checked')).map(cb => cb.value);
+  const coursesWrap = document.getElementById('admin-missing-courses-wrap');
+  const engWrap = document.getElementById('admin-english-notes-wrap');
+  const otherWrap = document.getElementById('admin-other-reason-wrap');
+
+  if (coursesWrap) {
+    const showCourses = checked.includes('failing_courses') ||
+      checked.includes('missing_credits_1_3') ||
+      checked.includes('missing_credits_4_6') ||
+      checked.includes('missing_credits_7_10');
+    coursesWrap.classList.toggle('hidden', !showCourses);
+    if (showCourses && checked.includes('failing_courses')) {
+      const tbody = document.getElementById('admin-missing-courses-tbody');
+      if (tbody && tbody.children.length === 0) {
+        window.addAdminMissingCourseRow();
+      }
+    }
+  }
+
+  if (engWrap) {
+    const showEng = checked.some(r => r === 'no_english_cert' || r === 'english_waiting_result' || r === 'english_waiting_verification' || r.startsWith('english_'));
+    engWrap.classList.toggle('hidden', !showEng);
+  }
+
+  if (otherWrap) {
+    otherWrap.classList.toggle('hidden', !checked.includes('other'));
+  }
+};
+
+window.addAdminMissingCourseRow = function(code = '', name = '', credits = '') {
+  const tbody = document.getElementById('admin-missing-courses-tbody');
+  if (!tbody) return;
+  const tr = document.createElement('tr');
+  tr.className = 'hover:bg-slate-50 transition-colors';
+  tr.innerHTML = `
+    <td class="p-1.5">
+      <input type="text" maxlength="30" placeholder="Mã HP (nếu có)" value="${escapeHtml(code)}" class="admin-missing-course-code w-full p-1.5 border border-slate-300 rounded text-xs bg-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500">
+    </td>
+    <td class="p-1.5">
+      <input type="text" maxlength="120" placeholder="Tên học phần *" value="${escapeHtml(name)}" class="admin-missing-course-name w-full p-1.5 border border-slate-300 rounded text-xs bg-white font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500" required>
+    </td>
+    <td class="p-1.5">
+      <input type="number" min="1" max="15" placeholder="Số TC" value="${escapeHtml(credits)}" class="admin-missing-course-credits w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+    </td>
+    <td class="p-1.5 text-center">
+      <button type="button" onclick="window.removeAdminMissingCourseRow(this)" class="text-rose-500 hover:text-rose-700 font-bold p-1 text-sm cursor-pointer" title="Xóa môn này">✕</button>
+    </td>
+  `;
+  tbody.appendChild(tr);
+};
+
+window.removeAdminMissingCourseRow = function(btn) {
+  const tr = btn?.closest('tr');
+  if (tr) tr.remove();
+};
+
+window.copyStudentDeclarationToAdminForm = function() {
+  const studentId = document.getElementById('admin-modal-el-student-id')?.value;
+  const list = state.currentAdminRegistrations || [];
+  const r = list.find(item => item.studentId === studentId);
+  const decl = r?.eligibilityDeclaration || {};
+
+  if (!decl || !decl.status || decl.status === 'undeclared') {
+    showToast('Sinh viên này chưa có bản tự khai để sao chép.', 'info');
+    return;
+  }
+
+  // Set decision radio
+  const targetDecision = decl.status === 'eligible' ? 'confirmed_eligible' : 'confirmed_ineligible';
+  const radio = document.querySelector(`input[name="admin-review-decision"][value="${targetDecision}"]`);
+  if (radio) {
+    radio.checked = true;
+    window.onAdminReviewDecisionChanged(targetDecision);
+  }
+
+  // Set reasons
+  const reasons = Array.isArray(decl.reasons) ? decl.reasons : [];
+  const mapped = reasons.map(k => {
+    if (k === 'english_not_taken') return 'no_english_cert';
+    if (k === 'english_pending_result') return 'english_waiting_result';
+    if (k === 'english_pending_verification') return 'english_waiting_verification';
+    return k;
+  });
+  document.querySelectorAll('input[name="admin-ineligible-reason"]').forEach(cb => {
+    cb.checked = mapped.includes(cb.value);
+  });
+
+  // Set courses
+  const tbody = document.getElementById('admin-missing-courses-tbody');
+  if (tbody) {
+    tbody.innerHTML = '';
+    if (Array.isArray(decl.missingCourses) && decl.missingCourses.length > 0) {
+      decl.missingCourses.forEach(c => {
+        window.addAdminMissingCourseRow(c.courseCode || '', c.courseName || '', c.credits || '');
+      });
+    }
+  }
+
+  // Set English & other
+  const engInput = document.getElementById('admin-modal-el-english-input');
+  if (engInput) engInput.value = decl.englishCertificateStatus || '';
+
+  const otherInput = document.getElementById('admin-modal-el-other-input');
+  if (otherInput) otherInput.value = decl.otherReason || '';
+
+  window.onAdminIneligibleReasonToggled();
+  showToast('✓ Đã sao chép nội dung từ bản tự khai của sinh viên.', 'success');
+};
+
 window.openAdminReviewEligibilityModal = function(studentId) {
   const list = state.currentAdminRegistrations || [];
   const r = list.find(item => item.studentId === studentId);
@@ -389,107 +533,177 @@ window.openAdminReviewEligibilityModal = function(studentId) {
   }
 
   const decl = r.eligibilityDeclaration || {};
+  const adminRev = r.adminReview || null;
+
   document.getElementById('admin-modal-el-student-id').value = r.studentId;
   document.getElementById('admin-modal-el-mssv').textContent = r.studentId;
   document.getElementById('admin-modal-el-name').textContent = r.studentName || '--';
   document.getElementById('admin-modal-el-topic').textContent = r.topicTitle || '(Chưa đăng ký đề tài)';
 
-  // Declaration badge
+  // 1. Render Section 1: Student Self-Declaration (Read-Only)
+  const studentEmptyEl = document.getElementById('admin-modal-el-student-empty');
+  const studentContentEl = document.getElementById('admin-modal-el-student-content');
   const badgeEl = document.getElementById('admin-modal-el-decl-badge');
-  if (badgeEl) {
-    if (!decl.status || decl.status === 'undeclared') {
-      badgeEl.innerHTML = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-300">Chưa khai báo</span>';
-    } else if (decl.status === 'eligible') {
-      badgeEl.innerHTML = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã đủ điều kiện</span>';
-    } else if (decl.status === 'ineligible') {
-      badgeEl.innerHTML = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">⚠️ Chưa đủ điều kiện</span>';
-    }
-  }
 
-  // Timestamps
+  const reasonNames = {
+    wrong_registration: 'Đăng ký nhầm DATN/DATH.',
+    no_english_cert: 'Chưa thi hoặc chưa có chứng chỉ tiếng Anh đủ điều kiện.',
+    english_waiting_result: 'Đã thi tiếng Anh và đang chờ kết quả.',
+    english_waiting_verification: 'Đã có chứng chỉ tiếng Anh nhưng đang chờ xác minh.',
+    missing_credits_1_3: 'Thiếu 1–3 tín chỉ.',
+    missing_credits_4_6: 'Thiếu 4–6 tín chỉ.',
+    missing_credits_7_10: 'Thiếu 7–10 tín chỉ.',
+    failing_courses: 'Còn nợ học phần/môn học chưa đạt.',
+    other: 'Lý do khác.',
+    // Legacy mapping
+    english_not_taken: 'Chưa thi hoặc chưa có chứng chỉ tiếng Anh đủ điều kiện.',
+    english_pending_result: 'Đã thi tiếng Anh và đang chờ kết quả.',
+    english_pending_verification: 'Đã có chứng chỉ tiếng Anh nhưng đang chờ xác minh.'
+  };
+
   const formatTime = (ts) => {
     if (!ts) return '--';
     const d = new Date(ts.toDate ? ts.toDate() : ts);
     return isNaN(d.getTime()) ? '--' : d.toLocaleString('vi-VN');
   };
 
-  document.getElementById('admin-modal-el-decl-time').textContent = formatTime(decl.studentDeclaredAt);
-  document.getElementById('admin-modal-el-decl-updated').textContent = formatTime(decl.studentUpdatedAt);
-
-  // Reasons list
-  const reasonsWrap = document.getElementById('admin-modal-el-reasons-wrap');
-  const reasonsList = document.getElementById('admin-modal-el-reasons-list');
-  const reasonNames = {
-    wrong_registration: 'Đăng ký nhầm DATN/DATH / sai đối tượng môn học',
-    english_not_taken: 'Chưa thi / chưa có chứng chỉ Tiếng Anh đạt yêu cầu',
-    english_pending_result: 'Đã thi Tiếng Anh và đang chờ kết quả',
-    english_pending_verification: 'Đã nộp chứng chỉ Tiếng Anh nhưng trường chưa hậu kiểm/cập nhật',
-    missing_credits_1_3: 'Thiếu từ 1 đến 3 tín chỉ',
-    missing_credits_4_6: 'Thiếu từ 4 đến 6 tín chỉ',
-    missing_credits_7_10: 'Thiếu từ 7 đến 10 tín chỉ',
-    failing_courses: 'Còn nợ học phần / môn học chưa đạt',
-    other: 'Lý do khác'
-  };
-
-  if (decl.status === 'ineligible' && Array.isArray(decl.reasons) && decl.reasons.length > 0) {
-    reasonsList.innerHTML = decl.reasons.map(key => `<li><b>${escapeHtml(reasonNames[key] || key)}</b></li>`).join('');
-    reasonsWrap.classList.remove('hidden');
+  if (!decl.status || decl.status === 'undeclared') {
+    if (studentEmptyEl) studentEmptyEl.classList.remove('hidden');
+    if (studentContentEl) studentContentEl.classList.add('hidden');
+    if (badgeEl) badgeEl.innerHTML = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-300">Chưa khai báo</span>';
   } else {
-    reasonsWrap.classList.add('hidden');
+    if (studentEmptyEl) studentEmptyEl.classList.add('hidden');
+    if (studentContentEl) studentContentEl.classList.remove('hidden');
+    if (badgeEl) {
+      if (decl.status === 'eligible') {
+        badgeEl.innerHTML = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã đủ điều kiện</span>';
+      } else {
+        badgeEl.innerHTML = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">⚠️ Chưa đủ điều kiện</span>';
+      }
+    }
+
+    document.getElementById('admin-modal-el-decl-time').textContent = formatTime(decl.studentDeclaredAt);
+    document.getElementById('admin-modal-el-decl-updated').textContent = formatTime(decl.studentUpdatedAt);
+
+    // Reasons list
+    const reasonsWrap = document.getElementById('admin-modal-el-reasons-wrap');
+    const reasonsList = document.getElementById('admin-modal-el-reasons-list');
+    if (decl.status === 'ineligible' && Array.isArray(decl.reasons) && decl.reasons.length > 0) {
+      reasonsList.innerHTML = decl.reasons.map(key => `<li><b>${escapeHtml(reasonNames[key] || key)}</b></li>`).join('');
+      reasonsWrap.classList.remove('hidden');
+    } else {
+      reasonsWrap.classList.add('hidden');
+    }
+
+    // Missing courses
+    const coursesWrap = document.getElementById('admin-modal-el-courses-wrap');
+    const coursesTbody = document.getElementById('admin-modal-el-courses-tbody');
+    if (Array.isArray(decl.missingCourses) && decl.missingCourses.length > 0) {
+      coursesTbody.innerHTML = decl.missingCourses.map(c => `
+        <tr>
+          <td class="p-2 font-mono font-bold text-slate-700">${escapeHtml(c.courseCode || '--')}</td>
+          <td class="p-2 font-bold text-slate-900">${escapeHtml(c.courseName || '--')}</td>
+          <td class="p-2 text-slate-700 font-semibold">${c.credits !== null && c.credits !== undefined ? c.credits : '--'}</td>
+        </tr>
+      `).join('');
+      coursesWrap.classList.remove('hidden');
+    } else {
+      coursesWrap.classList.add('hidden');
+    }
+
+    // English notes
+    const engWrap = document.getElementById('admin-modal-el-english-wrap');
+    const engNote = document.getElementById('admin-modal-el-english-note');
+    if (decl.englishCertificateStatus) {
+      engNote.textContent = decl.englishCertificateStatus;
+      engWrap.classList.remove('hidden');
+    } else {
+      engWrap.classList.add('hidden');
+    }
+
+    // Other reason
+    const otherWrap = document.getElementById('admin-modal-el-other-wrap');
+    const otherNote = document.getElementById('admin-modal-el-other-note');
+    if (decl.otherReason) {
+      otherNote.textContent = decl.otherReason;
+      otherWrap.classList.remove('hidden');
+    } else {
+      otherWrap.classList.add('hidden');
+    }
   }
 
-  // Missing courses
-  const coursesWrap = document.getElementById('admin-modal-el-courses-wrap');
-  const coursesTbody = document.getElementById('admin-modal-el-courses-tbody');
-  if (Array.isArray(decl.missingCourses) && decl.missingCourses.length > 0) {
-    coursesTbody.innerHTML = decl.missingCourses.map(c => `
-      <tr>
-        <td class="p-2 font-mono font-bold text-slate-700">${escapeHtml(c.courseCode || '--')}</td>
-        <td class="p-2 font-bold text-slate-900">${escapeHtml(c.courseName || '--')}</td>
-        <td class="p-2 text-slate-700 font-semibold">${c.credits !== null && c.credits !== undefined ? c.credits : '--'}</td>
-      </tr>
-    `).join('');
-    coursesWrap.classList.remove('hidden');
+  // 2. Render Section 2: Admin Review & Edit Form
+  const adminTbody = document.getElementById('admin-missing-courses-tbody');
+  if (adminTbody) adminTbody.innerHTML = '';
+
+  if (adminRev) {
+    // Populate from previous Admin Review
+    const decisionVal = adminRev.decision || (adminRev.status === 'eligible' ? 'confirmed_eligible' : (adminRev.status === 'ineligible' ? 'confirmed_ineligible' : 'pending_documents'));
+    const radio = document.querySelector(`input[name="admin-review-decision"][value="${decisionVal}"]`);
+    if (radio) radio.checked = true;
+
+    const reasons = Array.isArray(adminRev.reasons) ? adminRev.reasons : [];
+    const mapped = reasons.map(k => {
+      if (k === 'english_not_taken') return 'no_english_cert';
+      if (k === 'english_pending_result') return 'english_waiting_result';
+      if (k === 'english_pending_verification') return 'english_waiting_verification';
+      return k;
+    });
+    document.querySelectorAll('input[name="admin-ineligible-reason"]').forEach(cb => {
+      cb.checked = mapped.includes(cb.value);
+    });
+
+    if (Array.isArray(adminRev.missingCourses) && adminRev.missingCourses.length > 0) {
+      adminRev.missingCourses.forEach(c => {
+        window.addAdminMissingCourseRow(c.courseCode || '', c.courseName || '', c.credits || '');
+      });
+    }
+
+    document.getElementById('admin-modal-el-english-input').value = adminRev.englishCertificateStatus || '';
+    document.getElementById('admin-modal-el-other-input').value = adminRev.otherReason || '';
+    document.getElementById('admin-modal-el-notes').value = adminRev.adminNote || '';
+
+    // Audit info
+    const auditWrap = document.getElementById('admin-modal-el-audit-wrap');
+    if (adminRev.reviewedBy) {
+      document.getElementById('admin-modal-el-audit-by').textContent = adminRev.reviewedBy;
+      document.getElementById('admin-modal-el-audit-at').textContent = formatTime(adminRev.reviewedAt);
+      auditWrap.classList.remove('hidden');
+    } else {
+      auditWrap.classList.add('hidden');
+    }
   } else {
-    coursesWrap.classList.add('hidden');
+    // Initial draft: copy from student if available, else default to confirmed_eligible
+    const initialDecision = decl.status === 'ineligible' ? 'confirmed_ineligible' : 'confirmed_eligible';
+    const radio = document.querySelector(`input[name="admin-review-decision"][value="${initialDecision}"]`);
+    if (radio) radio.checked = true;
+
+    const reasons = Array.isArray(decl.reasons) ? decl.reasons : [];
+    const mapped = reasons.map(k => {
+      if (k === 'english_not_taken') return 'no_english_cert';
+      if (k === 'english_pending_result') return 'english_waiting_result';
+      if (k === 'english_pending_verification') return 'english_waiting_verification';
+      return k;
+    });
+    document.querySelectorAll('input[name="admin-ineligible-reason"]').forEach(cb => {
+      cb.checked = mapped.includes(cb.value);
+    });
+
+    if (Array.isArray(decl.missingCourses) && decl.missingCourses.length > 0) {
+      decl.missingCourses.forEach(c => {
+        window.addAdminMissingCourseRow(c.courseCode || '', c.courseName || '', c.credits || '');
+      });
+    }
+
+    document.getElementById('admin-modal-el-english-input').value = decl.englishCertificateStatus || '';
+    document.getElementById('admin-modal-el-other-input').value = decl.otherReason || '';
+    document.getElementById('admin-modal-el-notes').value = '';
+
+    const auditWrap = document.getElementById('admin-modal-el-audit-wrap');
+    if (auditWrap) auditWrap.classList.add('hidden');
   }
 
-  // English notes
-  const engWrap = document.getElementById('admin-modal-el-english-wrap');
-  const engNote = document.getElementById('admin-modal-el-english-note');
-  if (decl.englishCertificateStatus) {
-    engNote.textContent = decl.englishCertificateStatus;
-    engWrap.classList.remove('hidden');
-  } else {
-    engWrap.classList.add('hidden');
-  }
-
-  // Other reason
-  const otherWrap = document.getElementById('admin-modal-el-other-wrap');
-  const otherNote = document.getElementById('admin-modal-el-other-note');
-  if (decl.otherReason) {
-    otherNote.textContent = decl.otherReason;
-    otherWrap.classList.remove('hidden');
-  } else {
-    otherWrap.classList.add('hidden');
-  }
-
-  // Admin decision & notes
-  const decision = decl.adminDecision || 'keep_student';
-  const radio = document.querySelector(`input[name="admin-review-decision"][value="${decision}"]`);
-  if (radio) radio.checked = true;
-  document.getElementById('admin-modal-el-notes').value = decl.adminNotes || '';
-
-  // Audit info
-  const auditWrap = document.getElementById('admin-modal-el-audit-wrap');
-  if (decl.adminReviewedBy) {
-    document.getElementById('admin-modal-el-audit-by').textContent = decl.adminReviewedBy;
-    document.getElementById('admin-modal-el-audit-at').textContent = formatTime(decl.adminReviewedAt);
-    auditWrap.classList.remove('hidden');
-  } else {
-    auditWrap.classList.add('hidden');
-  }
-
+  window.onAdminIneligibleReasonToggled();
   document.getElementById('modal-admin-review-eligibility').classList.remove('hidden');
 };
 
@@ -500,7 +714,7 @@ window.closeAdminReviewEligibilityModal = function() {
 window.saveAdminEligibilityReview = async function() {
   const studentId = document.getElementById('admin-modal-el-student-id')?.value;
   const roundId = document.getElementById('admin-round-reg-select')?.value || state.selectedRoundId;
-  const decision = document.querySelector('input[name="admin-review-decision"]:checked')?.value || 'keep_student';
+  const decision = document.querySelector('input[name="admin-review-decision"]:checked')?.value || 'confirmed_eligible';
   const notes = document.getElementById('admin-modal-el-notes')?.value?.trim() || '';
 
   if (!studentId || !roundId) {
@@ -517,24 +731,62 @@ window.saveAdminEligibilityReview = async function() {
   try {
     const list = state.currentAdminRegistrations || [];
     const r = list.find(item => item.studentId === studentId);
-    const prevDecl = (r && r.eligibilityDeclaration) ? { ...r.eligibilityDeclaration } : {};
 
-    const updatedDecl = {
-      ...prevDecl,
-      adminDecision: decision,
-      adminNotes: notes,
-      adminReviewedBy: state.user?.email || 'admin',
-      adminReviewedAt: new Date().toISOString()
+    // Collect Admin form inputs
+    const checkedBoxes = Array.from(document.querySelectorAll('input[name="admin-ineligible-reason"]:checked'));
+    const adminReasons = checkedBoxes.map(cb => cb.value);
+
+    const rows = Array.from(document.querySelectorAll('#admin-missing-courses-tbody tr'));
+    const adminMissingCourses = rows.map(tr => {
+      const code = tr.querySelector('.admin-missing-course-code')?.value?.trim() || '';
+      const name = tr.querySelector('.admin-missing-course-name')?.value?.trim() || '';
+      const credits = tr.querySelector('.admin-missing-course-credits')?.value?.trim() || '';
+      return { courseCode: code, courseName: name, credits: credits ? Number(credits) : null };
+    }).filter(c => c.courseName);
+
+    const adminEnglish = document.getElementById('admin-modal-el-english-input')?.value?.trim() || '';
+    const adminOther = document.getElementById('admin-modal-el-other-input')?.value?.trim() || '';
+
+    // Map decision to status
+    let status = 'eligible';
+    if (decision === 'confirmed_ineligible') status = 'ineligible';
+    else if (decision === 'pending_documents') status = 'pending_documents';
+
+    const prevAdmin = r?.adminReview || {};
+    const newAdminReview = {
+      status: status,
+      decision: decision,
+      reasons: adminReasons,
+      missingCourses: adminMissingCourses,
+      englishCertificateStatus: adminEnglish,
+      otherReason: adminOther,
+      adminNote: notes,
+      reviewedBy: state.user?.email || 'admin',
+      reviewedAt: new Date().toISOString(),
+      history: [
+        ...(Array.isArray(prevAdmin.history) ? prevAdmin.history : []),
+        {
+          status: status,
+          decision: decision,
+          reasons: adminReasons,
+          missingCourses: adminMissingCourses,
+          englishCertificateStatus: adminEnglish,
+          otherReason: adminOther,
+          adminNote: notes,
+          reviewedBy: state.user?.email || 'admin',
+          reviewedAt: new Date().toISOString()
+        }
+      ]
     };
 
     const regRef = doc(db, 'graduationRounds', roundId, 'registrations', studentId);
     await updateDoc(regRef, {
-      eligibilityDeclaration: updatedDecl,
+      adminReview: newAdminReview,
       updatedAt: serverTimestamp()
     });
 
     if (r) {
-      r.eligibilityDeclaration = updatedDecl;
+      r.adminReview = newAdminReview;
     }
 
     // Refresh table
@@ -543,14 +795,14 @@ window.saveAdminEligibilityReview = async function() {
     }
 
     closeAdminReviewEligibilityModal();
-    showToast(`✓ Đã lưu quyết định thẩm định điều kiện cho sinh viên ${studentId} thành công.`, 'success');
+    showToast(`✓ Đã lưu quyết định thẩm định & điều chỉnh điều kiện cho sinh viên ${studentId} thành công.`, 'success');
   } catch (err) {
     console.error('Lỗi lưu thẩm định điều kiện:', err);
     showToast('Lỗi lưu thẩm định: ' + (err?.message || err), 'error');
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<span>💾 Lưu Xác nhận Thẩm định</span>';
+      btn.innerHTML = '<span>💾 Lưu Thẩm định & Điều chỉnh</span>';
     }
   }
 };

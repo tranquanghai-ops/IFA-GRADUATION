@@ -144,6 +144,12 @@ function slugify(text) {
     .slice(0, 50);
 }
 
+export function getWeekdayNameVN(dayOfWeek) {
+  // 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+  const map = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
+  return map[dayOfWeek] || '--';
+}
+
 /**
  * Core function: Recalculates shifted schedule from a source round to a new start date.
  *
@@ -251,15 +257,27 @@ export function calculateShiftedRoundSchedule(sourceRound, newStartDateStr, opti
     shifted.driveFolderName = null;
     shifted.driveFolderUrl = null;
 
-    // Calculate Week Index for preview
-    const actDateMs = parseDateToVietnamComponents(shifted.startAt || shifted.endAt || shifted.submissionConfig?.deadlineAt)?.utcMidnightMs;
+    // Calculate Week Index and Weekday for preview
+    const actParts = parseDateToVietnamComponents(shifted.startAt || shifted.endAt || shifted.submissionConfig?.deadlineAt);
     let computedWeek = 1;
-    if (actDateMs) {
-      computedWeek = Math.floor((actDateMs - newMonday.utcMidnightMs) / (7 * 86400000)) + 1;
+    if (actParts?.utcMidnightMs) {
+      computedWeek = Math.floor((actParts.utcMidnightMs - newMonday.utcMidnightMs) / (7 * 86400000)) + 1;
     }
     shifted.computedWeek = computedWeek;
+    shifted.weekdayName = actParts ? getWeekdayNameVN(actParts.dayOfWeek) : '--';
+    shifted.dateDisplay = actParts ? `${pad(actParts.date)}/${pad(actParts.month)}/${actParts.year}` : '--';
 
     // Validation checks for this shifted activity
+    if (!shifted.startAt && !shifted.submissionConfig?.deadlineAt) {
+      validationWarnings.push(`Mốc "${shifted.title}": Chưa có mốc thời gian cụ thể.`);
+    }
+    if (computedWeek > durationWeeks) {
+      validationWarnings.push(`Mốc "${shifted.title}" rơi vào Tuần ${computedWeek}, vượt quá tổng số tuần của đợt (${durationWeeks} tuần).`);
+    }
+    if (computedWeek < 1) {
+      validationWarnings.push(`Mốc "${shifted.title}" (Tuần ${computedWeek}) diễn ra trước ngày bắt đầu đợt.`);
+    }
+
     if (shifted.startAt && shifted.endAt) {
       const sMs = new Date(shifted.startAt).getTime();
       const eMs = new Date(shifted.endAt).getTime();

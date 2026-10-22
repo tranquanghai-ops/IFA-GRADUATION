@@ -228,7 +228,8 @@ service cloud.firestore {
             && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['openAt'])
                 || request.time >= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.openAt)
             && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt'])
-                || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt));
+                || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt)
+            && !request.resource.data.keys().hasAll(['adminReview']));
 
         allow update: if (admin())
           || (signedIn()
@@ -287,7 +288,9 @@ service cloud.firestore {
             && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized']
                 || !get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status']))
             && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt'])
-                || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt));
+                || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt)
+            && (!request.resource.data.keys().hasAll(['adminReview'])
+                || (resource.data.keys().hasAll(['adminReview']) && request.resource.data.adminReview == resource.data.adminReview)));
 
         allow delete: if admin();
       }

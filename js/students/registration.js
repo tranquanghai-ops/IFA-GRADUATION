@@ -584,11 +584,14 @@ window.onIneligibleReasonToggled = function() {
   const englishWrap = document.getElementById('student-english-notes-wrap');
   const otherWrap = document.getElementById('student-other-reason-wrap');
 
-  // Failing courses table
+  // Failing courses or missing credits table
   if (coursesWrap) {
-    const showCourses = checked.includes('failing_courses');
+    const showCourses = checked.includes('failing_courses') ||
+      checked.includes('missing_credits_1_3') ||
+      checked.includes('missing_credits_4_6') ||
+      checked.includes('missing_credits_7_10');
     coursesWrap.classList.toggle('hidden', !showCourses);
-    if (showCourses) {
+    if (showCourses && checked.includes('failing_courses')) {
       const tbody = document.getElementById('student-missing-courses-tbody');
       if (tbody && tbody.children.length === 0) {
         window.addStudentMissingCourseRow();
@@ -598,7 +601,12 @@ window.onIneligibleReasonToggled = function() {
 
   // English notes
   if (englishWrap) {
-    const showEnglish = checked.some(r => r.startsWith('english_'));
+    const showEnglish = checked.some(r =>
+      r === 'no_english_cert' ||
+      r === 'english_waiting_result' ||
+      r === 'english_waiting_verification' ||
+      r.startsWith('english_')
+    );
     englishWrap.classList.toggle('hidden', !showEnglish);
   }
 
@@ -668,8 +676,14 @@ window.populateEligibilityDeclarationForm = function(decl) {
     window.onStudentEligibilityChoiceChanged('ineligible');
 
     const reasons = Array.isArray(decl.reasons) ? decl.reasons : [];
+    const mappedReasons = reasons.map(r => {
+      if (r === 'english_not_taken') return 'no_english_cert';
+      if (r === 'english_pending_result') return 'english_waiting_result';
+      if (r === 'english_pending_verification') return 'english_waiting_verification';
+      return r;
+    });
     document.querySelectorAll('input[name="ineligible-reason"]').forEach(cb => {
-      cb.checked = reasons.includes(cb.value);
+      cb.checked = mappedReasons.includes(cb.value);
     });
 
     if (Array.isArray(decl.missingCourses) && decl.missingCourses.length > 0) {
@@ -738,7 +752,12 @@ window.collectStudentEligibilityDeclaration = function() {
   }
 
   let missingCourses = [];
-  if (selectedReasons.includes('failing_courses')) {
+  const hasCourseReason = selectedReasons.includes('failing_courses') ||
+    selectedReasons.includes('missing_credits_1_3') ||
+    selectedReasons.includes('missing_credits_4_6') ||
+    selectedReasons.includes('missing_credits_7_10');
+
+  if (hasCourseReason) {
     const rows = Array.from(document.querySelectorAll('#student-missing-courses-tbody tr'));
     missingCourses = rows.map(r => {
       const code = r.querySelector('.missing-course-code')?.value?.trim() || '';
@@ -747,8 +766,8 @@ window.collectStudentEligibilityDeclaration = function() {
       return { courseCode: code, courseName: name, credits: credits ? Number(credits) : null };
     }).filter(c => c.courseName);
 
-    if (missingCourses.length === 0) {
-      const msg = 'Bạn đã chọn lý do "Còn nợ học phần/môn học". Vui lòng nhập ít nhất một Tên học phần còn nợ.';
+    if (selectedReasons.includes('failing_courses') && missingCourses.length === 0) {
+      const msg = 'Bạn đã chọn lý do "Còn nợ học phần/môn học chưa đạt". Vui lòng nhập ít nhất một Tên học phần còn nợ.';
       if (errorEl) {
         errorEl.textContent = msg;
         errorEl.classList.remove('hidden');
@@ -758,7 +777,7 @@ window.collectStudentEligibilityDeclaration = function() {
   }
 
   let englishNotes = '';
-  if (selectedReasons.some(r => r.startsWith('english_'))) {
+  if (selectedReasons.some(r => r === 'no_english_cert' || r === 'english_waiting_result' || r === 'english_waiting_verification' || r.startsWith('english_'))) {
     englishNotes = document.getElementById('student-english-notes')?.value?.trim() || '';
   }
 

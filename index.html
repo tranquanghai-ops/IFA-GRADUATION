@@ -661,39 +661,39 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
                             <input type="checkbox" name="ineligible-reason" value="wrong_registration" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Đăng ký nhầm DATN/DATH / sai đối tượng môn học</span>
+                            <span class="text-slate-800">Đăng ký nhầm DATN/DATH.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                            <input type="checkbox" name="ineligible-reason" value="english_not_taken" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Chưa thi / chưa có chứng chỉ Tiếng Anh đạt yêu cầu</span>
+                            <input type="checkbox" name="ineligible-reason" value="no_english_cert" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                            <span class="text-slate-800">Chưa thi hoặc chưa có chứng chỉ tiếng Anh đủ điều kiện.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                            <input type="checkbox" name="ineligible-reason" value="english_pending_result" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Đã thi Tiếng Anh và đang chờ kết quả</span>
+                            <input type="checkbox" name="ineligible-reason" value="english_waiting_result" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                            <span class="text-slate-800">Đã thi tiếng Anh và đang chờ kết quả.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                            <input type="checkbox" name="ineligible-reason" value="english_pending_verification" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Đã nộp chứng chỉ Tiếng Anh nhưng trường chưa hậu kiểm/cập nhật</span>
+                            <input type="checkbox" name="ineligible-reason" value="english_waiting_verification" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                            <span class="text-slate-800">Đã có chứng chỉ tiếng Anh nhưng đang chờ xác minh.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
                             <input type="checkbox" name="ineligible-reason" value="missing_credits_1_3" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Thiếu từ 1 đến 3 tín chỉ</span>
+                            <span class="text-slate-800">Thiếu 1–3 tín chỉ.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
                             <input type="checkbox" name="ineligible-reason" value="missing_credits_4_6" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Thiếu từ 4 đến 6 tín chỉ</span>
+                            <span class="text-slate-800">Thiếu 4–6 tín chỉ.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
                             <input type="checkbox" name="ineligible-reason" value="missing_credits_7_10" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Thiếu từ 7 đến 10 tín chỉ</span>
+                            <span class="text-slate-800">Thiếu 7–10 tín chỉ.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
                             <input type="checkbox" name="ineligible-reason" value="failing_courses" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800 font-semibold text-rose-700">Còn nợ học phần / môn học chưa đạt</span>
+                            <span class="text-slate-800 font-semibold text-rose-700">Còn nợ học phần/môn học chưa đạt.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer sm:col-span-2">
                             <input type="checkbox" name="ineligible-reason" value="other" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Lý do khác</span>
+                            <span class="text-slate-800">Lý do khác.</span>
                           </label>
                         </div>
                       </div>
@@ -721,7 +721,7 @@
                             </tbody>
                           </table>
                         </div>
-                        <p class="text-[10px] text-rose-700 italic">💡 Tên học phần là bắt buộc cho mỗi môn nợ được khai. Mã môn và số tín chỉ là tùy chọn.</p>
+                        <p class="text-[10px] text-rose-700 italic">💡 Tên học phần là bắt buộc cho mỗi môn nợ được khai. Mã môn và số tín chỉ là tùy chọn. Nếu bạn chọn thiếu tín chỉ và đã xác định được môn cần học, có thể khai báo tại đây.</p>
                       </div>
 
                       <!-- GHI CHÚ CHỨNG CHỈ TIẾNG ANH (Hiện khi chọn các lý do Tiếng Anh) -->
@@ -3860,11 +3860,12 @@
                     <thead class="bg-indigo-100/70 text-indigo-900 font-bold border-b border-indigo-200 sticky top-0 z-10 text-[11px] uppercase tracking-wide">
                       <tr>
                         <th class="p-2.5 w-24 text-center">Tuần</th>
-                        <th class="p-2.5 min-w-[160px]">Tên mốc / Hoạt động</th>
-                        <th class="p-2.5 w-28">Loại mốc</th>
-                        <th class="p-2.5 min-w-[140px]">Mở nhận bài</th>
-                        <th class="p-2.5 min-w-[140px]">Hạn chót nộp</th>
-                        <th class="p-2.5 min-w-[150px]">Phiên Hội đồng</th>
+                        <th class="p-2.5 min-w-[150px]">Tên mốc & Loại</th>
+                        <th class="p-2.5 min-w-[120px]">Thứ & Ngày</th>
+                        <th class="p-2.5 min-w-[130px]">Mở nhận bài</th>
+                        <th class="p-2.5 min-w-[130px]">Hạn chót nộp</th>
+                        <th class="p-2.5 min-w-[130px]">Hội đồng bắt đầu</th>
+                        <th class="p-2.5 min-w-[110px]">Giờ kết thúc</th>
                       </tr>
                     </thead>
                     <tbody id="round-copy-preview-tbody" class="divide-y divide-slate-100">
@@ -6948,14 +6949,14 @@
   </div>
 </div>
 
-<!-- === MODAL: ADMIN THẨM ĐỊNH ĐIỀU KIỆN LÀM DATN/DATH === -->
+<!-- === MODAL: ADMIN THẨM ĐỊNH & ĐIỀU CHỈNH ĐIỀU KIỆN LÀM DATN/DATH === -->
 <div id="modal-admin-review-eligibility" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4">
-  <div class="modal-size-management bg-white rounded-2xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
+  <div class="modal-size-management bg-white rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
     <!-- MODAL HEADER -->
     <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 shrink-0">
       <div>
         <h3 class="font-bold text-base text-tdtu-blue flex items-center gap-2">
-          <span>🎓</span> <span>Thẩm định Điều kiện Làm ĐATN / ĐATH</span>
+          <span>🎓</span> <span>Thẩm định & Điều chỉnh Điều kiện Làm ĐATN / ĐATH</span>
         </h3>
         <p class="text-[11px] text-slate-500 mt-0.5">
           Sinh viên: <b id="admin-modal-el-name" class="text-slate-800">--</b> · MSSV: <span id="admin-modal-el-mssv" class="font-mono font-bold text-blue-700">--</span> · Đề tài: <span id="admin-modal-el-topic" class="italic text-slate-600">--</span>
@@ -6965,105 +6966,205 @@
     </div>
 
     <!-- MODAL BODY -->
-    <div class="p-6 space-y-5 text-xs overflow-y-auto flex-1 min-h-0">
+    <div class="p-6 space-y-6 text-xs overflow-y-auto flex-1 min-h-0">
       <input type="hidden" id="admin-modal-el-student-id">
 
-      <!-- SECTION 1: BẢN TỰ KHAI CỦA SINH VIÊN -->
+      <!-- SECTION 1: BẢN TỰ KHAI CỦA SINH VIÊN (NGUYÊN GỐC - CHỈ ĐỌC) -->
       <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-        <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+        <div class="flex items-center justify-between border-b border-slate-200 pb-2.5">
           <span class="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
-            <span>📝</span> <span>1. Bản tự khai ban đầu của Sinh viên</span>
+            <span>📝</span> <span>1. Bản tự khai ban đầu của Sinh viên (Nguyên gốc)</span>
           </span>
           <span id="admin-modal-el-decl-badge">
             <!-- Badge: Đủ ĐK / Chưa đủ ĐK / Chưa khai báo -->
           </span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-600">
-          <div>
-            <span class="text-[11px] text-slate-400 block">Thời gian tự khai:</span>
-            <span id="admin-modal-el-decl-time" class="font-semibold text-slate-800">--</span>
+        <div id="admin-modal-el-student-empty" class="hidden p-3 bg-white rounded-lg border border-slate-200 text-center text-slate-400">
+          Sinh viên chưa thực hiện khai báo điều kiện làm ĐATN/DATH.
+        </div>
+
+        <div id="admin-modal-el-student-content" class="space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-600">
+            <div>
+              <span class="text-[11px] text-slate-400 block">Thời gian tự khai:</span>
+              <span id="admin-modal-el-decl-time" class="font-semibold text-slate-800">--</span>
+            </div>
+            <div>
+              <span class="text-[11px] text-slate-400 block">Cập nhật lần cuối:</span>
+              <span id="admin-modal-el-decl-updated" class="font-semibold text-slate-800">--</span>
+            </div>
           </div>
-          <div>
-            <span class="text-[11px] text-slate-400 block">Cập nhật lần cuối:</span>
-            <span id="admin-modal-el-decl-updated" class="font-semibold text-slate-800">--</span>
+
+          <!-- REASONS LIST -->
+          <div id="admin-modal-el-reasons-wrap" class="hidden space-y-1.5 pt-2 border-t border-slate-200">
+            <span class="font-bold text-slate-700 block">Các lý do tự khai chưa đủ điều kiện:</span>
+            <ul id="admin-modal-el-reasons-list" class="space-y-1 text-slate-800 list-disc list-inside bg-white p-3 rounded-lg border border-slate-200">
+              <!-- Rendered list of reasons -->
+            </ul>
           </div>
-        </div>
 
-        <!-- REASONS LIST -->
-        <div id="admin-modal-el-reasons-wrap" class="hidden space-y-1.5 pt-2 border-t border-slate-200">
-          <span class="font-bold text-slate-700 block">Các lý do tự khai chưa đủ điều kiện:</span>
-          <ul id="admin-modal-el-reasons-list" class="space-y-1 text-slate-800 list-disc list-inside bg-white p-3 rounded-lg border border-slate-200">
-            <!-- Rendered list of reasons -->
-          </ul>
-        </div>
-
-        <!-- MISSING COURSES TABLE -->
-        <div id="admin-modal-el-courses-wrap" class="hidden space-y-1.5 pt-2 border-t border-slate-200">
-          <span class="font-bold text-rose-800 block">Danh sách học phần còn nợ (Sinh viên khai):</span>
-          <div class="border border-rose-200 rounded-lg overflow-hidden bg-white">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead class="bg-rose-50 text-rose-900 font-bold border-b border-rose-200 text-[11px]">
-                <tr>
-                  <th class="p-2 w-32">Mã học phần</th>
-                  <th class="p-2 min-w-[150px]">Tên học phần</th>
-                  <th class="p-2 w-24">Số tín chỉ</th>
-                </tr>
-              </thead>
-              <tbody id="admin-modal-el-courses-tbody" class="divide-y divide-rose-100">
-                <!-- Rows -->
-              </tbody>
-            </table>
+          <!-- MISSING COURSES TABLE -->
+          <div id="admin-modal-el-courses-wrap" class="hidden space-y-1.5 pt-2 border-t border-slate-200">
+            <span class="font-bold text-rose-800 block">Danh sách học phần còn nợ (Sinh viên khai):</span>
+            <div class="border border-rose-200 rounded-lg overflow-hidden bg-white">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-rose-50 text-rose-900 font-bold border-b border-rose-200 text-[11px]">
+                  <tr>
+                    <th class="p-2 w-32">Mã học phần</th>
+                    <th class="p-2 min-w-[150px]">Tên học phần</th>
+                    <th class="p-2 w-24">Số tín chỉ</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-modal-el-courses-tbody" class="divide-y divide-rose-100">
+                  <!-- Rows -->
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
 
-        <!-- ENGLISH NOTES -->
-        <div id="admin-modal-el-english-wrap" class="hidden space-y-1 pt-2 border-t border-slate-200">
-          <span class="font-bold text-slate-700 block">Ghi chú chứng chỉ Tiếng Anh:</span>
-          <div id="admin-modal-el-english-note" class="p-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium">--</div>
-        </div>
+          <!-- ENGLISH NOTES -->
+          <div id="admin-modal-el-english-wrap" class="hidden space-y-1 pt-2 border-t border-slate-200">
+            <span class="font-bold text-slate-700 block">Ghi chú chứng chỉ Tiếng Anh:</span>
+            <div id="admin-modal-el-english-note" class="p-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium">--</div>
+          </div>
 
-        <!-- OTHER REASON -->
-        <div id="admin-modal-el-other-wrap" class="hidden space-y-1 pt-2 border-t border-slate-200">
-          <span class="font-bold text-slate-700 block">Mô tả lý do khác:</span>
-          <div id="admin-modal-el-other-note" class="p-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium leading-relaxed">--</div>
+          <!-- OTHER REASON -->
+          <div id="admin-modal-el-other-wrap" class="hidden space-y-1 pt-2 border-t border-slate-200">
+            <span class="font-bold text-slate-700 block">Mô tả lý do khác:</span>
+            <div id="admin-modal-el-other-note" class="p-2.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium leading-relaxed">--</div>
+          </div>
         </div>
       </div>
 
-      <!-- SECTION 2: QUẢN TRỊ VIÊN KHOA XÁC NHẬN & ĐIỀU CHỈNH -->
-      <div class="p-4 bg-blue-50/70 border border-blue-200 rounded-xl space-y-3.5">
-        <div class="border-b border-blue-200 pb-2">
-          <span class="font-bold text-blue-950 text-xs uppercase tracking-wider flex items-center gap-1.5">
-            <span>⚖️</span> <span>2. Quyết định Thẩm định & Xác nhận của Khoa</span>
-          </span>
-          <p class="text-[11px] text-blue-800 mt-0.5">
-            Quản trị viên có thể xác nhận cho phép hoặc chưa cho phép sinh viên tiếp tục làm ĐATN/ĐATH. Bản tự khai ban đầu của sinh viên được bảo toàn nguyên vẹn.
-          </p>
+      <!-- SECTION 2: BẢN QUẢN TRỊ VIÊN THẨM ĐỊNH & ĐIỀU CHỈNH (ADMIN OVERRIDE & EDIT) -->
+      <div class="p-4 bg-blue-50/70 border border-blue-200 rounded-xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-200 pb-2.5">
+          <div>
+            <span class="font-bold text-blue-950 text-xs uppercase tracking-wider flex items-center gap-1.5">
+              <span>⚖️</span> <span>2. Thẩm định & Điều chỉnh của Quản trị viên Khoa</span>
+            </span>
+            <p class="text-[11px] text-blue-800 mt-0.5">
+              Admin có quyền điều chỉnh trạng thái, sửa lý do, thêm/bớt môn nợ theo học bạ chính thức. Bản tự khai ban đầu của sinh viên được lưu vết độc lập.
+            </p>
+          </div>
+          <button type="button" onclick="copyStudentDeclarationToAdminForm()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-2xs transition-colors shrink-0 flex items-center gap-1.5">
+            <span>📋</span> <span>Sao chép từ bản tự khai của SV</span>
+          </button>
         </div>
 
+        <!-- QUYẾT ĐỊNH THẨM ĐỊNH (RADIO GROUP) -->
         <div>
-          <label class="font-bold text-slate-800 block mb-1.5">Quyết định thẩm định của Quản trị viên *</label>
+          <label class="font-bold text-slate-800 block mb-1.5">Quyết định thẩm định của Quản trị viên <span class="text-rose-500">*</span></label>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <label class="flex items-center gap-2 p-2.5 bg-white border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-50/50">
-              <input type="radio" name="admin-review-decision" value="keep_student" checked class="text-blue-600">
-              <span class="font-semibold text-slate-800">Theo SV tự khai</span>
+            <label class="flex items-center gap-2 p-2.5 bg-white border border-emerald-300 rounded-lg cursor-pointer hover:bg-emerald-50/50 shadow-2xs">
+              <input type="radio" name="admin-review-decision" value="confirmed_eligible" onchange="onAdminReviewDecisionChanged('confirmed_eligible')" class="text-emerald-600">
+              <span class="font-bold text-emerald-800">✓ Đã đủ điều kiện</span>
             </label>
-            <label class="flex items-center gap-2 p-2.5 bg-white border border-emerald-300 rounded-lg cursor-pointer hover:bg-emerald-50/50">
-              <input type="radio" name="admin-review-decision" value="confirmed_eligible" class="text-emerald-600">
-              <span class="font-bold text-emerald-800">✓ Đủ điều kiện</span>
-            </label>
-            <label class="flex items-center gap-2 p-2.5 bg-white border border-rose-300 rounded-lg cursor-pointer hover:bg-rose-50/50">
-              <input type="radio" name="admin-review-decision" value="confirmed_ineligible" class="text-rose-600">
+            <label class="flex items-center gap-2 p-2.5 bg-white border border-rose-300 rounded-lg cursor-pointer hover:bg-rose-50/50 shadow-2xs">
+              <input type="radio" name="admin-review-decision" value="confirmed_ineligible" onchange="onAdminReviewDecisionChanged('confirmed_ineligible')" class="text-rose-600">
               <span class="font-bold text-rose-800">⚠️ Chưa đủ điều kiện</span>
             </label>
+            <label class="flex items-center gap-2 p-2.5 bg-white border border-amber-300 rounded-lg cursor-pointer hover:bg-amber-50/50 shadow-2xs">
+              <input type="radio" name="admin-review-decision" value="pending_documents" onchange="onAdminReviewDecisionChanged('pending_documents')" class="text-amber-600">
+              <span class="font-bold text-amber-800">⏳ Cần bổ sung hồ sơ</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- FORM CHI TIẾT ĐIỀU CHỈNH CỦA ADMIN -->
+        <div id="admin-edit-details-wrap" class="space-y-3.5 pt-3 border-t border-blue-200">
+          <div>
+            <span class="font-bold text-slate-800 text-xs block mb-1">
+              Các lý do chưa đủ điều kiện (Admin xác nhận hoặc điều chỉnh):
+            </span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" name="admin-ineligible-reason" value="wrong_registration" onchange="onAdminIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                <span class="text-slate-800">Đăng ký nhầm DATN/DATH.</span>
+              </label>
+              <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" name="admin-ineligible-reason" value="no_english_cert" onchange="onAdminIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                <span class="text-slate-800">Chưa thi hoặc chưa có chứng chỉ tiếng Anh đủ điều kiện.</span>
+              </label>
+              <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" name="admin-ineligible-reason" value="english_waiting_result" onchange="onAdminIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                <span class="text-slate-800">Đã thi tiếng Anh và đang chờ kết quả.</span>
+              </label>
+              <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" name="admin-ineligible-reason" value="english_waiting_verification" onchange="onAdminIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                <span class="text-slate-800">Đã có chứng chỉ tiếng Anh nhưng đang chờ xác minh.</span>
+              </label>
+              <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" name="admin-ineligible-reason" value="missing_credits_1_3" onchange="onAdminIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                <span class="text-slate-800">Thiếu 1–3 tín chỉ.</span>
+              </label>
+              <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" name="admin-ineligible-reason" value="missing_credits_4_6" onchange="onAdminIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                <span class="text-slate-800">Thiếu 4–6 tín chỉ.</span>
+              </label>
+              <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" name="admin-ineligible-reason" value="missing_credits_7_10" onchange="onAdminIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                <span class="text-slate-800">Thiếu 7–10 tín chỉ.</span>
+              </label>
+              <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" name="admin-ineligible-reason" value="failing_courses" onchange="onAdminIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                <span class="text-slate-800 font-semibold text-rose-700">Còn nợ học phần/môn học chưa đạt.</span>
+              </label>
+              <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer sm:col-span-2">
+                <input type="checkbox" name="admin-ineligible-reason" value="other" onchange="onAdminIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                <span class="text-slate-800">Lý do khác.</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- BẢNG MÔN NỢ CỦA ADMIN (CHO PHÉP THÊM / SỬA / XÓA) -->
+          <div id="admin-missing-courses-wrap" class="p-3 bg-white border border-blue-200 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-800 text-xs block">Danh sách môn còn nợ (Admin hiệu chỉnh theo học bạ)</span>
+              <button type="button" onclick="addAdminMissingCourseRow()" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-[11px] shadow-2xs transition-colors">
+                ＋ Thêm học phần
+              </button>
+            </div>
+            <div class="border border-slate-200 rounded-lg overflow-hidden bg-white">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="bg-slate-100 text-slate-800 font-bold border-b border-slate-200 text-[11px]">
+                  <tr>
+                    <th class="p-2 w-32">Mã môn</th>
+                    <th class="p-2 min-w-[150px]">Tên học phần *</th>
+                    <th class="p-2 w-24">Số tín chỉ</th>
+                    <th class="p-2 w-14 text-center">Xóa</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-missing-courses-tbody" class="divide-y divide-slate-100">
+                  <!-- Rows inserted dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- GHI CHÚ CHỨNG CHỈ TIẾNG ANH (ADMIN SỬA) -->
+          <div id="admin-english-notes-wrap" class="space-y-1">
+            <label for="admin-modal-el-english-input" class="block font-bold text-slate-700 text-xs">
+              Tình trạng chứng chỉ Tiếng Anh (Admin cập nhật sau hậu kiểm)
+            </label>
+            <input type="text" id="admin-modal-el-english-input" maxlength="250" placeholder="Ví dụ: Đã đối soát nộp TOEIC 500 ngày 10/10, hoặc Chưa có chứng chỉ..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+
+          <!-- MÔ TẢ LÝ DO KHÁC (ADMIN SỬA) -->
+          <div id="admin-other-reason-wrap" class="space-y-1">
+            <label for="admin-modal-el-other-input" class="block font-bold text-slate-700 text-xs">
+              Mô tả chi tiết lý do khác (Admin ghi nhận)
+            </label>
+            <textarea id="admin-modal-el-other-input" rows="2" maxlength="500" placeholder="Nội dung lý do khác..." class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
           </div>
         </div>
 
         <div>
           <label for="admin-modal-el-notes" class="font-bold text-slate-800 block mb-1">
-            Ghi chú thẩm định của Khoa
+            Ghi chú quản trị & Căn cứ của Khoa
           </label>
-          <textarea id="admin-modal-el-notes" rows="3" maxlength="1000" placeholder="Nhập căn cứ, ghi chú hoặc hướng dẫn bổ sung cho sinh viên..." class="w-full p-2.5 border border-blue-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+          <textarea id="admin-modal-el-notes" rows="3" maxlength="1000" placeholder="Nhập căn cứ thẩm định, số công văn, hoặc ghi chú nội bộ của Khoa..." class="w-full p-2.5 border border-blue-300 rounded-xl text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
         </div>
 
         <!-- AUDIT TRAIL FOOTNOTE -->
@@ -7082,7 +7183,7 @@
           Hủy
         </button>
         <button type="button" id="btn-save-admin-review-el" onclick="saveAdminEligibilityReview()" class="px-5 py-2 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-xl font-bold shadow-md transition-colors cursor-pointer flex items-center gap-1.5">
-          <span>💾 Lưu Xác nhận Thẩm định</span>
+          <span>💾 Lưu Thẩm định & Điều chỉnh</span>
         </button>
       </div>
     </div>

@@ -411,39 +411,39 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
                             <input type="checkbox" name="ineligible-reason" value="wrong_registration" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Đăng ký nhầm DATN/DATH / sai đối tượng môn học</span>
+                            <span class="text-slate-800">Đăng ký nhầm DATN/DATH.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                            <input type="checkbox" name="ineligible-reason" value="english_not_taken" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Chưa thi / chưa có chứng chỉ Tiếng Anh đạt yêu cầu</span>
+                            <input type="checkbox" name="ineligible-reason" value="no_english_cert" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                            <span class="text-slate-800">Chưa thi hoặc chưa có chứng chỉ tiếng Anh đủ điều kiện.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                            <input type="checkbox" name="ineligible-reason" value="english_pending_result" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Đã thi Tiếng Anh và đang chờ kết quả</span>
+                            <input type="checkbox" name="ineligible-reason" value="english_waiting_result" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                            <span class="text-slate-800">Đã thi tiếng Anh và đang chờ kết quả.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                            <input type="checkbox" name="ineligible-reason" value="english_pending_verification" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Đã nộp chứng chỉ Tiếng Anh nhưng trường chưa hậu kiểm/cập nhật</span>
+                            <input type="checkbox" name="ineligible-reason" value="english_waiting_verification" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
+                            <span class="text-slate-800">Đã có chứng chỉ tiếng Anh nhưng đang chờ xác minh.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
                             <input type="checkbox" name="ineligible-reason" value="missing_credits_1_3" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Thiếu từ 1 đến 3 tín chỉ</span>
+                            <span class="text-slate-800">Thiếu 1–3 tín chỉ.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
                             <input type="checkbox" name="ineligible-reason" value="missing_credits_4_6" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Thiếu từ 4 đến 6 tín chỉ</span>
+                            <span class="text-slate-800">Thiếu 4–6 tín chỉ.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
                             <input type="checkbox" name="ineligible-reason" value="missing_credits_7_10" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Thiếu từ 7 đến 10 tín chỉ</span>
+                            <span class="text-slate-800">Thiếu 7–10 tín chỉ.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer">
                             <input type="checkbox" name="ineligible-reason" value="failing_courses" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800 font-semibold text-rose-700">Còn nợ học phần / môn học chưa đạt</span>
+                            <span class="text-slate-800 font-semibold text-rose-700">Còn nợ học phần/môn học chưa đạt.</span>
                           </label>
                           <label class="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 cursor-pointer sm:col-span-2">
                             <input type="checkbox" name="ineligible-reason" value="other" onchange="onIneligibleReasonToggled()" class="mt-0.5 rounded text-blue-600">
-                            <span class="text-slate-800">Lý do khác</span>
+                            <span class="text-slate-800">Lý do khác.</span>
                           </label>
                         </div>
                       </div>
@@ -471,7 +471,7 @@
                             </tbody>
                           </table>
                         </div>
-                        <p class="text-[10px] text-rose-700 italic">💡 Tên học phần là bắt buộc cho mỗi môn nợ được khai. Mã môn và số tín chỉ là tùy chọn.</p>
+                        <p class="text-[10px] text-rose-700 italic">💡 Tên học phần là bắt buộc cho mỗi môn nợ được khai. Mã môn và số tín chỉ là tùy chọn. Nếu bạn chọn thiếu tín chỉ và đã xác định được môn cần học, có thể khai báo tại đây.</p>
                       </div>
 
                       <!-- GHI CHÚ CHỨNG CHỈ TIẾNG ANH (Hiện khi chọn các lý do Tiếng Anh) -->
