@@ -116,7 +116,7 @@ test('5. Simulation Suite: Fake Timers for 60-Second Watchdog and Bootstrap Flow
     let overlayClasses = new Set();
     let spinnerClasses = new Set();
     let msgInnerHtml = '';
-    let msgTextContent = 'Đang tải IFA+ Graduation...';
+    let msgTextContent = 'Đang tải dữ liệu...';
 
     const dom = {
       'app-loading-overlay': {
@@ -177,13 +177,13 @@ test('5. Simulation Suite: Fake Timers for 60-Second Watchdog and Bootstrap Flow
           const spinner = dom['app-loading-spinner'];
           if (spinner) spinner.classList.remove('hidden');
           const msgEl = dom['app-loading-msg'];
-          if (msgEl) msgEl.textContent = 'Đang tải IFA+ Graduation...';
+          if (msgEl) msgEl.textContent = 'Đang tải dữ liệu...';
         }, 300);
       }
     }
 
     // Core showLoading as defined in js/core.js
-    function showLoading(text = 'Đang tải IFA+ Graduation...') {
+    function showLoading(text = 'Đang tải dữ liệu...') {
       const overlay = dom['app-loading-overlay'];
       const msgEl = dom['app-loading-msg'];
       const spinner = dom['app-loading-spinner'];
@@ -271,7 +271,7 @@ test('5. Simulation Suite: Fake Timers for 60-Second Watchdog and Bootstrap Flow
     fake.advance(300);
     assert.equal(env.overlayClasses.has('hidden'), true, 'Overlay auto-dismisses on late completion');
     assert.equal(env.spinnerClasses.has('hidden'), false, 'Spinner is reset');
-    assert.equal(env.dom['app-loading-msg'].textContent, 'Đang tải IFA+ Graduation...');
+    assert.equal(env.dom['app-loading-msg'].textContent, 'Đang tải dữ liệu...');
   });
 
   await t.test('5.5. Immediate Real Error Handling (does not wait for 60s)', () => {

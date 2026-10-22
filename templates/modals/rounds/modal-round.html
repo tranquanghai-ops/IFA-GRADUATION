@@ -39,6 +39,41 @@
           <!-- SECTION A: THÔNG TIN ĐỢT -->
           <!-- ============================================================ -->
           <div id="round-modal-panel-info" class="space-y-4">
+
+            <!-- PHƯƠNG THỨC TẠO ĐỢT (Chỉ hiển thị khi Tạo mới, ẩn khi Chỉnh sửa đợt đã có) -->
+            <div id="round-creation-mode-wrap" class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <span class="font-bold text-slate-800 text-xs block uppercase tracking-wider">Phương thức tạo đợt tốt nghiệp</span>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label id="label-mode-scratch" class="flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all bg-white border-blue-500 ring-2 ring-blue-500/20 shadow-2xs">
+                  <input type="radio" name="round-creation-mode" value="scratch" checked onchange="onRoundCreationModeChanged('scratch')" class="mt-0.5 text-blue-600">
+                  <div>
+                    <span class="font-bold text-slate-900 text-xs block">✨ Tạo mới từ đầu</span>
+                    <span class="text-[11px] text-slate-500 block leading-relaxed mt-0.5">Nhập mới thông tin đợt và cấu hình lịch trình 12 tuần mặc định.</span>
+                  </div>
+                </label>
+                <label id="label-mode-copy" class="flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all border-slate-200 bg-slate-50/50 hover:bg-white">
+                  <input type="radio" name="round-creation-mode" value="copy" onchange="onRoundCreationModeChanged('copy')" class="mt-0.5 text-blue-600">
+                  <div>
+                    <span class="font-bold text-slate-900 text-xs block">📋 Sao chép cấu hình từ đợt đã có</span>
+                    <span class="text-[11px] text-slate-500 block leading-relaxed mt-0.5">Tái sử dụng mẫu kế hoạch, mẫu mốc duyệt và tự động tính lại toàn bộ lịch theo ngày bắt đầu mới.</span>
+                  </div>
+                </label>
+              </div>
+
+              <!-- KHU VỰC CHỌN ĐỢT NGUỒN (Hiện khi chọn Sao chép) -->
+              <div id="round-copy-source-section" class="hidden pt-3 border-t border-slate-200 space-y-2.5">
+                <div>
+                  <label for="round-copy-source-select" class="font-bold text-slate-700 block mb-1">Chọn đợt nguồn để sao chép *</label>
+                  <select id="round-copy-source-select" onchange="onSourceRoundSelected(this.value)" class="w-full p-2.5 border border-blue-300 rounded-xl text-xs bg-white font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <option value="">-- Chọn một đợt tốt nghiệp nguồn --</option>
+                  </select>
+                </div>
+                <div id="round-copy-source-summary" class="hidden p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-xs space-y-1.5 text-blue-950">
+                  <!-- Rendered dynamically -->
+                </div>
+              </div>
+            </div>
+
             <div>
               <label class="font-bold text-slate-700 block mb-1">Tên đợt tốt nghiệp *</label>
               <input type="text" id="round-form-title" required placeholder="Ví dụ: Đồ án Tốt nghiệp - Đợt 1 (2026-2027)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
@@ -135,6 +170,52 @@
             </div>
 
             <!-- Admin Weekly Content Editor -->
+
+            <!-- BẢN XEM TRƯỚC LỊCH TRÌNH & CÁC MỐC KẾ HOẠCH TỰ ĐỘNG TÍNH TOÁN -->
+            <div id="round-copy-schedule-preview-wrap" class="hidden p-4 bg-indigo-50/80 border border-indigo-200 rounded-xl space-y-3">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-200 pb-2.5">
+                <div>
+                  <span class="font-bold text-indigo-950 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🗓️</span> <span>Bản xem trước lịch trình và các mốc đánh giá (Tự động tính toán)</span>
+                  </span>
+                  <p class="text-[11px] text-indigo-800 mt-0.5 leading-relaxed">
+                    Lịch đã được dịch sang đợt mới dựa theo Thứ Hai của tuần bắt đầu; bảo toàn đúng vị trí tuần (Tuần 4, 8, 12), thứ trong tuần và khoảng thời gian nộp bài.
+                  </p>
+                </div>
+                <div id="round-copy-preview-meta-badge" class="shrink-0 text-right">
+                  <!-- Meta badges -->
+                </div>
+              </div>
+
+              <!-- Alerts / Warnings Container -->
+              <div id="round-copy-preview-alerts" class="hidden space-y-1.5 text-xs font-semibold"></div>
+
+              <!-- Milestones Preview Table -->
+              <div class="border border-indigo-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                <div class="max-h-72 overflow-y-auto overflow-x-auto">
+                  <table class="w-full text-left text-xs border-collapse">
+                    <thead class="bg-indigo-100/70 text-indigo-900 font-bold border-b border-indigo-200 sticky top-0 z-10 text-[11px] uppercase tracking-wide">
+                      <tr>
+                        <th class="p-2.5 w-24 text-center">Tuần</th>
+                        <th class="p-2.5 min-w-[160px]">Tên mốc / Hoạt động</th>
+                        <th class="p-2.5 w-28">Loại mốc</th>
+                        <th class="p-2.5 min-w-[140px]">Mở nhận bài</th>
+                        <th class="p-2.5 min-w-[140px]">Hạn chót nộp</th>
+                        <th class="p-2.5 min-w-[150px]">Phiên Hội đồng</th>
+                      </tr>
+                    </thead>
+                    <tbody id="round-copy-preview-tbody" class="divide-y divide-slate-100">
+                      <!-- Populated dynamically -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="p-2.5 bg-white border border-indigo-200 rounded-lg text-[11px] text-indigo-900 flex items-start gap-2">
+                <span class="text-sm shrink-0">🔒</span>
+                <span><strong>Bảo vệ dữ liệu tuyệt đối:</strong> Chỉ sao chép cấu hình mẫu (loại mốc, tiêu chí, định dạng bài nộp, cấu trúc thư mục Drive). Danh sách SV, đề tài, phân công GVHD, điểm số, bài nộp và Folder ID thực tế của đợt cũ hoàn toàn không bị sao chép.</span>
+              </div>
+            </div>
             <div id="round-weekly-content-editor-wrap" class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="font-bold text-slate-800 text-xs uppercase tracking-wider">📝 Nội dung từng tuần</span>

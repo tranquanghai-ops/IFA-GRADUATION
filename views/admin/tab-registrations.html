@@ -20,9 +20,12 @@
               <label for="admin-reg-filter-status" class="text-xs font-bold text-slate-700">Điều kiện:</label>
               <select id="admin-reg-filter-status" onchange="filterAdminRegistrationsTable()" class="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none">
                 <option value="all">Tất cả điều kiện</option>
-                <option value="eligible">Đủ điều kiện</option>
-                <option value="pending">Chờ xét (Pre-eligibility)</option>
-                <option value="not_eligible">Không đủ điều kiện</option>
+                <option value="decl_eligible">✓ SV tự khai: Đủ điều kiện</option>
+                <option value="decl_ineligible">⚠️ SV tự khai: Chưa đủ điều kiện</option>
+                <option value="decl_undeclared">⏳ SV: Chưa khai báo</option>
+                <option value="eligible">DS Khoa: Đủ điều kiện</option>
+                <option value="pending">DS Khoa: Chờ xét</option>
+                <option value="not_eligible">DS Khoa: Không đủ điều kiện</option>
               </select>
             </div>
           </div>
@@ -94,5 +97,5 @@
         </div>
       </div>
 
-        
+
       <!-- ADMIN TAB: SCORING DASHBOARD (v1.9.0-beta.1) -->

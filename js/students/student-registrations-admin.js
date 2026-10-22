@@ -59,8 +59,14 @@ window.filterAdminRegistrationsTable = function() {
     filtered = filtered.filter(r => !r.isRegistered);
   }
 
-  // Filter by eligibility
-  if (statusFilter === 'eligible') {
+  // Filter by eligibility & self-declaration
+  if (statusFilter === 'decl_eligible') {
+    filtered = filtered.filter(r => r.eligibilityDeclaration?.status === 'eligible');
+  } else if (statusFilter === 'decl_ineligible') {
+    filtered = filtered.filter(r => r.eligibilityDeclaration?.status === 'ineligible');
+  } else if (statusFilter === 'decl_undeclared') {
+    filtered = filtered.filter(r => !r.eligibilityDeclaration?.status || r.eligibilityDeclaration?.status === 'undeclared');
+  } else if (statusFilter === 'eligible') {
     filtered = filtered.filter(r => r.eligibilityStatus === 'eligible' || (!r.eligibilityStatus && r.status === 'submitted'));
   } else if (statusFilter === 'pending') {
     filtered = filtered.filter(r => r.eligibilityStatus === 'pending');
@@ -89,12 +95,29 @@ function renderAdminRegistrationsTable(list) {
       ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">✓ Đã đăng ký</span>'
       : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">⏳ Chưa đăng ký</span>';
 
-    let elBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">Đủ ĐK</span>';
-    if (r.eligibilityStatus === 'pending') {
-      elBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300" title="Chờ nạp danh sách đủ điều kiện chính thức">Chờ xét</span>';
-    } else if (r.eligibilityStatus === 'not_eligible') {
-      elBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300" title="Không có trong danh sách đủ điều kiện">Không đủ ĐK</span>';
+    // Self-declaration & Admin verification status
+    const decl = r.eligibilityDeclaration || {};
+    let selfDeclBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-300">Chưa khai báo</span>';
+    if (decl.status === 'eligible') {
+      selfDeclBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">✓ Đủ điều kiện</span>';
+    } else if (decl.status === 'ineligible') {
+      const reasonCount = Array.isArray(decl.reasons) ? decl.reasons.length : 0;
+      selfDeclBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs" title="${reasonCount} lý do chưa đủ ĐK">⚠️ Chưa đủ ĐK (${reasonCount})</span>`;
     }
+
+    let adminDecisionBadge = '';
+    if (decl.adminDecision === 'confirmed_eligible') {
+      adminDecisionBadge = '<span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-black bg-blue-100 text-blue-900 border border-blue-300 ml-1">Khoa: Đạt</span>';
+    } else if (decl.adminDecision === 'confirmed_ineligible') {
+      adminDecisionBadge = '<span class="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-black bg-rose-100 text-rose-900 border border-rose-300 ml-1">Khoa: Chưa đạt</span>';
+    }
+
+    let elBadge = `
+      <button type="button" onclick="openAdminReviewEligibilityModal('${r.studentId}')" class="flex flex-col items-center gap-0.5 hover:opacity-80 transition-opacity p-1 rounded hover:bg-slate-100 cursor-pointer text-center mx-auto" title="Bấm để xem chi tiết tự khai và xác nhận của Khoa">
+        ${selfDeclBadge}
+        ${adminDecisionBadge}
+      </button>
+    `;
 
     let reviewBadge = '<span class="text-slate-400 font-medium text-xs">Chưa nộp</span>';
     if (isReg) {
@@ -354,3 +377,180 @@ if (typeof window !== 'undefined') {
   if (typeof getSupName !== 'undefined') window.getSupName = getSupName;
   if (typeof getSup !== 'undefined') window.getSup = getSup;
 }
+
+
+// ── Admin Eligibility Review & Correction Submodule ─────────────────────────
+window.openAdminReviewEligibilityModal = function(studentId) {
+  const list = state.currentAdminRegistrations || [];
+  const r = list.find(item => item.studentId === studentId);
+  if (!r) {
+    showToast('Không tìm thấy thông tin đăng ký của sinh viên ' + studentId, 'error');
+    return;
+  }
+
+  const decl = r.eligibilityDeclaration || {};
+  document.getElementById('admin-modal-el-student-id').value = r.studentId;
+  document.getElementById('admin-modal-el-mssv').textContent = r.studentId;
+  document.getElementById('admin-modal-el-name').textContent = r.studentName || '--';
+  document.getElementById('admin-modal-el-topic').textContent = r.topicTitle || '(Chưa đăng ký đề tài)';
+
+  // Declaration badge
+  const badgeEl = document.getElementById('admin-modal-el-decl-badge');
+  if (badgeEl) {
+    if (!decl.status || decl.status === 'undeclared') {
+      badgeEl.innerHTML = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-300">Chưa khai báo</span>';
+    } else if (decl.status === 'eligible') {
+      badgeEl.innerHTML = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✓ Đã đủ điều kiện</span>';
+    } else if (decl.status === 'ineligible') {
+      badgeEl.innerHTML = '<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">⚠️ Chưa đủ điều kiện</span>';
+    }
+  }
+
+  // Timestamps
+  const formatTime = (ts) => {
+    if (!ts) return '--';
+    const d = new Date(ts.toDate ? ts.toDate() : ts);
+    return isNaN(d.getTime()) ? '--' : d.toLocaleString('vi-VN');
+  };
+
+  document.getElementById('admin-modal-el-decl-time').textContent = formatTime(decl.studentDeclaredAt);
+  document.getElementById('admin-modal-el-decl-updated').textContent = formatTime(decl.studentUpdatedAt);
+
+  // Reasons list
+  const reasonsWrap = document.getElementById('admin-modal-el-reasons-wrap');
+  const reasonsList = document.getElementById('admin-modal-el-reasons-list');
+  const reasonNames = {
+    wrong_registration: 'Đăng ký nhầm DATN/DATH / sai đối tượng môn học',
+    english_not_taken: 'Chưa thi / chưa có chứng chỉ Tiếng Anh đạt yêu cầu',
+    english_pending_result: 'Đã thi Tiếng Anh và đang chờ kết quả',
+    english_pending_verification: 'Đã nộp chứng chỉ Tiếng Anh nhưng trường chưa hậu kiểm/cập nhật',
+    missing_credits_1_3: 'Thiếu từ 1 đến 3 tín chỉ',
+    missing_credits_4_6: 'Thiếu từ 4 đến 6 tín chỉ',
+    missing_credits_7_10: 'Thiếu từ 7 đến 10 tín chỉ',
+    failing_courses: 'Còn nợ học phần / môn học chưa đạt',
+    other: 'Lý do khác'
+  };
+
+  if (decl.status === 'ineligible' && Array.isArray(decl.reasons) && decl.reasons.length > 0) {
+    reasonsList.innerHTML = decl.reasons.map(key => `<li><b>${escapeHtml(reasonNames[key] || key)}</b></li>`).join('');
+    reasonsWrap.classList.remove('hidden');
+  } else {
+    reasonsWrap.classList.add('hidden');
+  }
+
+  // Missing courses
+  const coursesWrap = document.getElementById('admin-modal-el-courses-wrap');
+  const coursesTbody = document.getElementById('admin-modal-el-courses-tbody');
+  if (Array.isArray(decl.missingCourses) && decl.missingCourses.length > 0) {
+    coursesTbody.innerHTML = decl.missingCourses.map(c => `
+      <tr>
+        <td class="p-2 font-mono font-bold text-slate-700">${escapeHtml(c.courseCode || '--')}</td>
+        <td class="p-2 font-bold text-slate-900">${escapeHtml(c.courseName || '--')}</td>
+        <td class="p-2 text-slate-700 font-semibold">${c.credits !== null && c.credits !== undefined ? c.credits : '--'}</td>
+      </tr>
+    `).join('');
+    coursesWrap.classList.remove('hidden');
+  } else {
+    coursesWrap.classList.add('hidden');
+  }
+
+  // English notes
+  const engWrap = document.getElementById('admin-modal-el-english-wrap');
+  const engNote = document.getElementById('admin-modal-el-english-note');
+  if (decl.englishCertificateStatus) {
+    engNote.textContent = decl.englishCertificateStatus;
+    engWrap.classList.remove('hidden');
+  } else {
+    engWrap.classList.add('hidden');
+  }
+
+  // Other reason
+  const otherWrap = document.getElementById('admin-modal-el-other-wrap');
+  const otherNote = document.getElementById('admin-modal-el-other-note');
+  if (decl.otherReason) {
+    otherNote.textContent = decl.otherReason;
+    otherWrap.classList.remove('hidden');
+  } else {
+    otherWrap.classList.add('hidden');
+  }
+
+  // Admin decision & notes
+  const decision = decl.adminDecision || 'keep_student';
+  const radio = document.querySelector(`input[name="admin-review-decision"][value="${decision}"]`);
+  if (radio) radio.checked = true;
+  document.getElementById('admin-modal-el-notes').value = decl.adminNotes || '';
+
+  // Audit info
+  const auditWrap = document.getElementById('admin-modal-el-audit-wrap');
+  if (decl.adminReviewedBy) {
+    document.getElementById('admin-modal-el-audit-by').textContent = decl.adminReviewedBy;
+    document.getElementById('admin-modal-el-audit-at').textContent = formatTime(decl.adminReviewedAt);
+    auditWrap.classList.remove('hidden');
+  } else {
+    auditWrap.classList.add('hidden');
+  }
+
+  document.getElementById('modal-admin-review-eligibility').classList.remove('hidden');
+};
+
+window.closeAdminReviewEligibilityModal = function() {
+  document.getElementById('modal-admin-review-eligibility')?.classList.add('hidden');
+};
+
+window.saveAdminEligibilityReview = async function() {
+  const studentId = document.getElementById('admin-modal-el-student-id')?.value;
+  const roundId = document.getElementById('admin-round-reg-select')?.value || state.selectedRoundId;
+  const decision = document.querySelector('input[name="admin-review-decision"]:checked')?.value || 'keep_student';
+  const notes = document.getElementById('admin-modal-el-notes')?.value?.trim() || '';
+
+  if (!studentId || !roundId) {
+    showToast('Lỗi xác định đợt hoặc sinh viên.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-save-admin-review-el');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ Đang lưu...</span>';
+  }
+
+  try {
+    const list = state.currentAdminRegistrations || [];
+    const r = list.find(item => item.studentId === studentId);
+    const prevDecl = (r && r.eligibilityDeclaration) ? { ...r.eligibilityDeclaration } : {};
+
+    const updatedDecl = {
+      ...prevDecl,
+      adminDecision: decision,
+      adminNotes: notes,
+      adminReviewedBy: state.user?.email || 'admin',
+      adminReviewedAt: new Date().toISOString()
+    };
+
+    const regRef = doc(db, 'graduationRounds', roundId, 'registrations', studentId);
+    await updateDoc(regRef, {
+      eligibilityDeclaration: updatedDecl,
+      updatedAt: serverTimestamp()
+    });
+
+    if (r) {
+      r.eligibilityDeclaration = updatedDecl;
+    }
+
+    // Refresh table
+    if (typeof filterAdminRegistrationsTable === 'function') {
+      filterAdminRegistrationsTable();
+    }
+
+    closeAdminReviewEligibilityModal();
+    showToast(`✓ Đã lưu quyết định thẩm định điều kiện cho sinh viên ${studentId} thành công.`, 'success');
+  } catch (err) {
+    console.error('Lỗi lưu thẩm định điều kiện:', err);
+    showToast('Lỗi lưu thẩm định: ' + (err?.message || err), 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>💾 Lưu Xác nhận Thẩm định</span>';
+    }
+  }
+};

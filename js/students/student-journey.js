@@ -49,6 +49,7 @@ window.startStudentRegistration = function() {
   if (topicInput) topicInput.value = '';
   setSelectedProjectTypes([]);
   populateRegistrationStudentForm();
+  window.populateEligibilityDeclarationForm?.(null);
   goToStep(1);
 };
 
@@ -285,6 +286,7 @@ window.onRoundStartDateChanged = function(val) {
     }
   }
   window.refreshRoundWeekDayPickers?.();
+  window.refreshCopiedSchedulePreview?.();
 };
 
 window.prevTimelineWeek = function() {

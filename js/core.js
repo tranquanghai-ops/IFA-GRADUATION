@@ -5,36 +5,36 @@
 
 
 import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js';
-import { 
-  getStorage, 
-  ref as storageRef, 
+import {
+  getStorage,
+  ref as storageRef,
   getBytes as storageGetBytes,
   uploadBytes,
   getDownloadURL,
   deleteObject
 } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-storage.js';
-import { 
-  getAuth, 
-  onAuthStateChanged, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signOut 
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut
 } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
-import { 
-  getFirestore, 
+import {
+  getFirestore,
   FieldPath,
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
+  collection,
+  doc,
+  getDoc,
+  getDocs,
   addDoc as rawAddDoc,
-  setDoc as rawSetDoc, 
-  updateDoc as rawUpdateDoc, 
-  deleteDoc as rawDeleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  serverTimestamp, 
+  setDoc as rawSetDoc,
+  updateDoc as rawUpdateDoc,
+  deleteDoc as rawDeleteDoc,
+  query,
+  where,
+  orderBy,
+  serverTimestamp,
   writeBatch as rawWriteBatch,
   runTransaction as rawRunTransaction,
   onSnapshot
@@ -209,8 +209,8 @@ export function showConfirm(title, message, { confirmText = 'Xác nhận', cance
     if (titleEl) titleEl.textContent = title || 'Xác nhận';
     if (msgEl) msgEl.textContent = message || '';
     if (iconEl) {
-      iconEl.className = danger 
-        ? 'w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 text-xl font-bold' 
+      iconEl.className = danger
+        ? 'w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 text-xl font-bold'
         : 'w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 text-xl font-bold';
       iconEl.textContent = danger ? '⚠️' : '❓';
     }
@@ -538,7 +538,7 @@ export const state = {
   isStudent: false,
   studentMssv: '',
   isEligible: false,
-  
+
   // Impersonation / Act-As Test Mode State (v2.6.0-beta.1)
   realUser: null,
   realIsAdmin: false,
@@ -550,7 +550,7 @@ export const state = {
   impersonateFilterRound: 'all',
   impersonateFilterRole: 'all',
   impersonateSearchQuery: '',
-  
+
   // Active Data
   rounds: [],
   roundsLoaded: false,
@@ -566,16 +566,16 @@ export const state = {
   myRegistration: null,
   myOfficialAssignment: null,
   studentSelfProfile: null,
-  
+
   // Registration Flow State
   currentStep: 1,
   wizardRank: 1,
   selectedPreferences: [], // [{ rank: 1, supervisorId, supervisorName, photoUrl, department }]
-  
+
   // Preview Mode
   isPreviewMode: false,
   previewMssv: '',
-  
+
   // Excel Staging
   assignmentImportPreview: [],
   excelStaging: [],
@@ -606,7 +606,7 @@ let app, auth, db, storage;
 let countdownInterval = null;
 
 // --- LOADING OVERLAY HELPERS ---
-export function showLoading(msg = 'Đang tải IFA+ Graduation...') {
+export function showLoading(msg = 'Đang tải dữ liệu...') {
   const overlay = document.getElementById('app-loading-overlay');
   const msgEl = document.getElementById('app-loading-msg');
   const spinner = document.getElementById('app-loading-spinner');
@@ -630,7 +630,7 @@ export function hideLoading() {
       const spinner = document.getElementById('app-loading-spinner');
       if (spinner) spinner.classList.remove('hidden');
       const msgEl = document.getElementById('app-loading-msg');
-      if (msgEl) msgEl.textContent = 'Đang tải IFA+ Graduation...';
+      if (msgEl) msgEl.textContent = 'Đang tải dữ liệu...';
     }, 300);
   }
 }

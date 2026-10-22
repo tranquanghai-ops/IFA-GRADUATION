@@ -101,11 +101,268 @@ const ensureFacultyDatasetLoaded = (f) => (typeof window !== 'undefined' && type
 /**
  * IFA+ Graduation — Round Create & Edit Modal Form Management Module
  */
+
+// ── Round Creation Mode & Schedule Copier Handlers ──────────────────────────
+window.onRoundCreationModeChanged = function(mode) {
+  state.roundCreationMode = mode;
+  const labelScratch = document.getElementById('label-mode-scratch');
+  const labelCopy = document.getElementById('label-mode-copy');
+  const copySection = document.getElementById('round-copy-source-section');
+  const previewWrap = document.getElementById('round-copy-schedule-preview-wrap');
+
+  if (mode === 'copy') {
+    if (labelCopy) {
+      labelCopy.className = 'flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all bg-white border-blue-500 ring-2 ring-blue-500/20 shadow-2xs';
+    }
+    if (labelScratch) {
+      labelScratch.className = 'flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all border-slate-200 bg-slate-50/50 hover:bg-white';
+    }
+    if (copySection) copySection.classList.remove('hidden');
+
+    // Populate source rounds select
+    const sel = document.getElementById('round-copy-source-select');
+    if (sel) {
+      const rounds = (state.rounds || []).filter(r => !r.isDeleted && !r.deleted);
+      sel.innerHTML = '<option value="">-- Chọn một đợt tốt nghiệp nguồn --</option>' + rounds.map(r => {
+        const actCount = (r.activities || []).length;
+        const dur = r.durationWeeks || 12;
+        return `<option value="${r.id}">${escapeHtml(r.title || r.roundName)} (${escapeHtml(r.academicYear || '--')}) · ${dur} tuần · ${actCount} mốc</option>`;
+      }).join('');
+    }
+
+    if (sel && sel.value) {
+      window.onSourceRoundSelected(sel.value);
+    }
+  } else {
+    if (labelScratch) {
+      labelScratch.className = 'flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all bg-white border-blue-500 ring-2 ring-blue-500/20 shadow-2xs';
+    }
+    if (labelCopy) {
+      labelCopy.className = 'flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all border-slate-200 bg-slate-50/50 hover:bg-white';
+    }
+    if (copySection) copySection.classList.add('hidden');
+    if (previewWrap) previewWrap.classList.add('hidden');
+    state.copiedRoundSchedule = null;
+  }
+};
+
+window.onSourceRoundSelected = async function(sourceRoundId) {
+  const summaryEl = document.getElementById('round-copy-source-summary');
+  const previewWrap = document.getElementById('round-copy-schedule-preview-wrap');
+
+  if (!sourceRoundId) {
+    if (summaryEl) summaryEl.classList.add('hidden');
+    if (previewWrap) previewWrap.classList.add('hidden');
+    state.copiedRoundSchedule = null;
+    return;
+  }
+
+  const sourceRound = (state.rounds || []).find(r => r.id === sourceRoundId);
+  if (!sourceRound) return;
+
+  // Ensure activities loaded
+  let activities = Array.isArray(sourceRound.activities) ? sourceRound.activities : [];
+  if (activities.length === 0) {
+    try {
+      const snap = await getDocs(collection(db, 'graduationRounds', sourceRoundId, 'activities'));
+      if (snap && !snap.empty) {
+        activities = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        sourceRound.activities = activities;
+      }
+    } catch (e) {
+      console.warn('Lỗi đọc activities đợt nguồn:', e);
+    }
+  }
+
+  // Populate summary info
+  if (summaryEl) {
+    summaryEl.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <span class="font-bold text-xs text-blue-900 block">📌 Đợt nguồn: ${escapeHtml(sourceRound.title)}</span>
+          <p class="text-[11px] text-blue-800 mt-0.5">
+            Năm học: <b>${escapeHtml(sourceRound.academicYear || '--')}</b> · Kế hoạch: <b>${sourceRound.durationWeeks || 12} tuần</b> · Số mốc kế hoạch: <b>${activities.length} mốc</b> · Cấu trúc Drive mẫu: <b>${(sourceRound.driveSubfolderNames || []).length} thư mục con</b>.
+          </p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 shrink-0">Đã nạp mẫu</span>
+      </div>
+    `;
+    summaryEl.classList.remove('hidden');
+  }
+
+  // Suggest form values based on source round
+  const titleInput = document.getElementById('round-form-title');
+  if (titleInput && (!titleInput.value || titleInput.value.includes('(Bản sao)'))) {
+    titleInput.value = `${sourceRound.title || ''} (Bản sao)`;
+  }
+  const yearInput = document.getElementById('round-form-year');
+  if (yearInput && !yearInput.value) {
+    yearInput.value = sourceRound.academicYear || '';
+  }
+  const nameInput = document.getElementById('round-form-name');
+  if (nameInput) {
+    const baseSlug = (sourceRound.slug || sourceRound.shortCode || sourceRound.roundName || 'dot').replace(/[^a-zA-Z0-9_-]/g, '');
+    nameInput.value = `${baseSlug}-sao-chep`.replace(/--+/g, '-').slice(0, 40);
+  }
+
+  const durationInput = document.getElementById('round-form-duration-weeks');
+  if (durationInput) {
+    durationInput.value = String(sourceRound.durationWeeks || 12);
+  }
+
+  const prefCountInput = document.getElementById('round-form-pref-count');
+  if (prefCountInput && sourceRound.preferenceCount) {
+    prefCountInput.value = String(sourceRound.preferenceCount);
+  }
+
+  const modeInput = document.getElementById('round-form-selection-mode');
+  if (modeInput && sourceRound.selectionMode) {
+    modeInput.value = sourceRound.selectionMode;
+  }
+
+  const assignmentMode = sourceRound.supervisorAssignmentMode || 'student_preference';
+  const supModeRadio = document.querySelector(`input[name="supervisor-assignment-mode"][value="${assignmentMode}"]`);
+  if (supModeRadio) supModeRadio.checked = true;
+
+  if (document.getElementById('round-form-allow-edit')) {
+    document.getElementById('round-form-allow-edit').checked = sourceRound.allowStudentEdit !== false;
+  }
+  if (document.getElementById('round-form-allow-topic-edit')) {
+    document.getElementById('round-form-allow-topic-edit').checked = sourceRound.allowTopicEdit !== false;
+  }
+  if (document.getElementById('round-form-allow-pref-edit')) {
+    document.getElementById('round-form-allow-pref-edit').checked = sourceRound.allowPreferenceEdit !== false;
+  }
+  if (document.getElementById('round-form-show-email-after-publish')) {
+    document.getElementById('round-form-show-email-after-publish').checked = sourceRound.showEmailAfterPublish !== false;
+  }
+  if (document.getElementById('round-form-show-phone-after-publish')) {
+    document.getElementById('round-form-show-phone-after-publish').checked = sourceRound.showPhoneAfterPublish !== false;
+  }
+
+  // Copy drive subfolders template
+  const subfoldersInput = document.getElementById('round-drive-subfolder-names');
+  if (subfoldersInput && Array.isArray(sourceRound.driveSubfolderNames) && sourceRound.driveSubfolderNames.length > 0) {
+    subfoldersInput.value = sourceRound.driveSubfolderNames.join('\n');
+    updateRoundDriveFolderPreview();
+  }
+
+  // Calculate and refresh preview
+  window.refreshCopiedSchedulePreview();
+};
+
+window.refreshCopiedSchedulePreview = function() {
+  if (state.roundCreationMode !== 'copy') return;
+  const sourceRoundId = document.getElementById('round-copy-source-select')?.value;
+  if (!sourceRoundId) return;
+
+  const sourceRound = (state.rounds || []).find(r => r.id === sourceRoundId);
+  if (!sourceRound) return;
+
+  const startDateInput = document.getElementById('round-form-start-date');
+  const startDateStr = startDateInput?.value?.trim();
+  if (!startDateStr) return;
+
+  try {
+    const copierFn = window.calculateShiftedRoundSchedule;
+    if (typeof copierFn !== 'function') {
+      console.warn('calculateShiftedRoundSchedule chưa sẵn sàng');
+      return;
+    }
+    const shifted = copierFn(sourceRound, startDateStr);
+    state.copiedRoundSchedule = shifted;
+
+    const previewWrap = document.getElementById('round-copy-schedule-preview-wrap');
+    const badgeWrap = document.getElementById('round-copy-preview-meta-badge');
+    const alertsWrap = document.getElementById('round-copy-preview-alerts');
+    const tbody = document.getElementById('round-copy-preview-tbody');
+
+    if (!previewWrap || !tbody) return;
+
+    if (badgeWrap) {
+      badgeWrap.innerHTML = `
+        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-indigo-600 text-white shadow-2xs">
+          ${shifted.activities.length} mốc kế hoạch · ${shifted.durationWeeks} tuần
+        </span>
+      `;
+    }
+
+    if (alertsWrap) {
+      const hasErrors = shifted.validationErrors.length > 0;
+      const hasWarnings = shifted.validationWarnings.length > 0;
+      if (hasErrors || hasWarnings) {
+        alertsWrap.innerHTML = [
+          ...shifted.validationErrors.map(e => `<div class="p-2.5 bg-rose-50 border border-rose-300 text-rose-800 rounded-lg">❌ ${escapeHtml(e)}</div>`),
+          ...shifted.validationWarnings.map(w => `<div class="p-2.5 bg-amber-50 border border-amber-300 text-amber-800 rounded-lg">⚠️ ${escapeHtml(w)}</div>`)
+        ].join('');
+        alertsWrap.classList.remove('hidden');
+      } else {
+        alertsWrap.innerHTML = '';
+        alertsWrap.classList.add('hidden');
+      }
+    }
+
+    const typeLabels = {
+      review: { label: 'Duyệt HĐ', color: 'bg-amber-100 text-amber-900 border-amber-200' },
+      submission: { label: 'Nộp bài', color: 'bg-emerald-100 text-emerald-900 border-emerald-200' },
+      announcement: { label: 'Thông báo', color: 'bg-blue-100 text-blue-900 border-blue-200' },
+      preliminary: { label: 'Sơ khảo', color: 'bg-purple-100 text-purple-900 border-purple-200' },
+      defense: { label: 'Bảo vệ', color: 'bg-rose-100 text-rose-900 border-rose-200' },
+      other: { label: 'Mốc khác', color: 'bg-slate-100 text-slate-800 border-slate-200' }
+    };
+
+    if (shifted.activities.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Đợt nguồn chưa có mốc hoạt động nào.</td></tr>';
+    } else {
+      tbody.innerHTML = shifted.activities.map(act => {
+        const typeMeta = typeLabels[act.activityType] || typeLabels.other;
+        const openStr = act.submissionConfig?.openAt ? window.formatVietnamDateTime(act.submissionConfig.openAt) : '--';
+        const deadlineStr = act.submissionConfig?.deadlineAt ? window.formatVietnamDateTime(act.submissionConfig.deadlineAt) : '--';
+        const councilStr = act.startAt ? `${window.formatVietnamDateTime(act.startAt)}${act.endAt ? ' – ' + (window.formatVietnamDateTime(act.endAt).split(' ')[0] || '') : ''}` : '--';
+
+        return `
+          <tr class="hover:bg-indigo-50/40 transition-colors">
+            <td class="p-2.5 text-center font-bold text-indigo-900 whitespace-nowrap bg-indigo-50/30">
+              Tuần ${act.computedWeek || '--'}
+            </td>
+            <td class="p-2.5 font-bold text-slate-900">
+              ${escapeHtml(act.title)}
+            </td>
+            <td class="p-2.5 whitespace-nowrap">
+              <span class="inline-flex px-2 py-0.5 rounded text-[10px] font-bold border ${typeMeta.color}">
+                ${typeMeta.label}
+              </span>
+            </td>
+            <td class="p-2.5 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+              ${openStr}
+            </td>
+            <td class="p-2.5 font-mono text-[11px] font-bold text-rose-700 whitespace-nowrap">
+              ${deadlineStr}
+            </td>
+            <td class="p-2.5 font-mono text-[11px] font-bold text-slate-800 whitespace-nowrap">
+              ${councilStr}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    previewWrap.classList.remove('hidden');
+  } catch (err) {
+    console.error('Lỗi tính toán lịch xem trước:', err);
+  }
+};
+
 window.openCreateRoundModal = async function() {
   try {
     document.getElementById('form-round').reset();
     document.getElementById('round-form-id').value = '';
     document.getElementById('modal-round-title').textContent = 'Tạo Đợt Đồ án Tốt nghiệp Mới';
+    const modeWrap = document.getElementById('round-creation-mode-wrap');
+    if (modeWrap) modeWrap.classList.remove('hidden');
+    const scratchRadio = document.querySelector('input[name="round-creation-mode"][value="scratch"]');
+    if (scratchRadio) scratchRadio.checked = true;
+    window.onRoundCreationModeChanged?.('scratch');
     const defaultAssignmentMode = document.querySelector('input[name="supervisor-assignment-mode"][value="student_preference"]');
     if (defaultAssignmentMode) defaultAssignmentMode.checked = true;
 
@@ -195,6 +452,13 @@ window.editRoundModal = async function(roundId, initialTab = 'info') {
     }
 
   document.getElementById('round-form-id').value = r.id;
+  document.getElementById('modal-round-title').textContent = 'Chỉnh sửa Đợt Đồ án Tốt nghiệp';
+  const editModeWrap = document.getElementById('round-creation-mode-wrap');
+  if (editModeWrap) editModeWrap.classList.add('hidden');
+  const editPreviewWrap = document.getElementById('round-copy-schedule-preview-wrap');
+  if (editPreviewWrap) editPreviewWrap.classList.add('hidden');
+  state.roundCreationMode = 'edit';
+  state.copiedRoundSchedule = null;
   document.getElementById('round-form-title').value = r.title || '';
   document.getElementById('round-form-year').value = r.academicYear || '';
   document.getElementById('round-form-name').value = r.slug || r.shortCode || r.roundName || '';
@@ -539,6 +803,19 @@ window.saveRound = async function(e) {
     };
   });
 
+
+  if (!id && state.roundCreationMode === 'copy') {
+    if (!state.copiedRoundSchedule || !state.copiedRoundSchedule.sourceRoundId) {
+      showToast('Vui lòng chọn đợt tốt nghiệp nguồn để sao chép cấu hình.', 'warning');
+      switchRoundModalTab('info');
+      return;
+    }
+    if (state.copiedRoundSchedule.validationErrors?.length > 0) {
+      showToast('Lịch đợt nguồn có lỗi thời gian: ' + state.copiedRoundSchedule.validationErrors[0], 'error');
+      switchRoundModalTab('info');
+      return;
+    }
+  }
   if (!title || !academicYear || !roundName || (!openImmediately && !openDateStr) || !closeDateStr) {
     showToast('Vui lòng nhập đầy đủ các trường bắt buộc (*)', 'warning');
     switchRoundModalTab('info');
@@ -658,6 +935,16 @@ window.saveRound = async function(e) {
     deleted: false,
     updatedAt: serverTimestamp()
   };
+
+
+  if (!id && state.roundCreationMode === 'copy' && state.copiedRoundSchedule) {
+    payload.copiedFromRoundId = state.copiedRoundSchedule.sourceRoundId;
+    payload.copiedFromRoundTitle = state.copiedRoundSchedule.sourceRoundTitle;
+    payload.activities = state.copiedRoundSchedule.activities;
+    if (Array.isArray(state.copiedRoundSchedule.timelineWeeksConfig) && state.copiedRoundSchedule.timelineWeeksConfig.length > 0) {
+      payload.timelineWeeksConfig = state.copiedRoundSchedule.timelineWeeksConfig;
+    }
+  }
 
   let driveProvisionWarning = '';
   try {

@@ -27,7 +27,7 @@ const validateOfficialFormFields = (f) => (typeof window !== 'undefined' && wind
  */
 async function checkStudentEligibilityAndRegistration(roundId) {
   const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
-  
+
   state.isEligible = false;
   state.myRegistration = null;
   state.myOfficialAssignment = null;
@@ -158,7 +158,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
         if (alreadyRegCard) alreadyRegCard.classList.remove('hidden');
         renderStudentExistingRegistration(state.myRegistration);
         if (officialResultCard) officialResultCard.classList.add('hidden');
-        
+
         const reviewTag = document.getElementById('review-round-tag');
         if (reviewTag) reviewTag.textContent = 'ĐANG XỬ LÝ';
         if (reviewInProgressCard) reviewInProgressCard.classList.remove('hidden');
@@ -549,7 +549,254 @@ window.goToStep = function(step) {
   }
 };
 
+
+// ── Student Eligibility Declaration Handlers ────────────────────────────────
+window.onStudentEligibilityChoiceChanged = function(choice) {
+  const labelEligible = document.getElementById('label-student-decl-eligible');
+  const labelIneligible = document.getElementById('label-student-decl-ineligible');
+  const detailsWrap = document.getElementById('student-ineligible-details-wrap');
+  const errEl = document.getElementById('student-decl-error');
+  if (errEl) errEl.classList.add('hidden');
+
+  if (choice === 'eligible') {
+    if (labelEligible) {
+      labelEligible.className = 'flex items-start gap-3 p-3 bg-emerald-50/50 border-2 border-emerald-500 rounded-xl cursor-pointer shadow-2xs transition-all';
+    }
+    if (labelIneligible) {
+      labelIneligible.className = 'flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-rose-400 hover:bg-rose-50/10 transition-all';
+    }
+    if (detailsWrap) detailsWrap.classList.add('hidden');
+  } else if (choice === 'ineligible') {
+    if (labelIneligible) {
+      labelIneligible.className = 'flex items-start gap-3 p-3 bg-rose-50/50 border-2 border-rose-500 rounded-xl cursor-pointer shadow-2xs transition-all';
+    }
+    if (labelEligible) {
+      labelEligible.className = 'flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/10 transition-all';
+    }
+    if (detailsWrap) detailsWrap.classList.remove('hidden');
+    window.onIneligibleReasonToggled();
+  }
+};
+
+window.onIneligibleReasonToggled = function() {
+  const checked = Array.from(document.querySelectorAll('input[name="ineligible-reason"]:checked')).map(cb => cb.value);
+  const coursesWrap = document.getElementById('student-missing-courses-wrap');
+  const englishWrap = document.getElementById('student-english-notes-wrap');
+  const otherWrap = document.getElementById('student-other-reason-wrap');
+
+  // Failing courses table
+  if (coursesWrap) {
+    const showCourses = checked.includes('failing_courses');
+    coursesWrap.classList.toggle('hidden', !showCourses);
+    if (showCourses) {
+      const tbody = document.getElementById('student-missing-courses-tbody');
+      if (tbody && tbody.children.length === 0) {
+        window.addStudentMissingCourseRow();
+      }
+    }
+  }
+
+  // English notes
+  if (englishWrap) {
+    const showEnglish = checked.some(r => r.startsWith('english_'));
+    englishWrap.classList.toggle('hidden', !showEnglish);
+  }
+
+  // Other reason
+  if (otherWrap) {
+    const showOther = checked.includes('other');
+    otherWrap.classList.toggle('hidden', !showOther);
+  }
+};
+
+window.addStudentMissingCourseRow = function(code = '', name = '', credits = '') {
+  const tbody = document.getElementById('student-missing-courses-tbody');
+  if (!tbody) return;
+  const tr = document.createElement('tr');
+  tr.className = 'hover:bg-rose-50/30 transition-colors';
+  tr.innerHTML = `
+    <td class="p-1.5">
+      <input type="text" maxlength="30" placeholder="Mã HP (nếu biết)" value="${escapeHtml(code)}" class="missing-course-code w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-rose-500 font-mono">
+    </td>
+    <td class="p-1.5">
+      <input type="text" maxlength="120" placeholder="Tên học phần còn nợ *" value="${escapeHtml(name)}" class="missing-course-name w-full p-1.5 border border-rose-300 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-rose-500 font-semibold text-slate-800" required>
+    </td>
+    <td class="p-1.5">
+      <input type="number" min="1" max="15" placeholder="Số TC" value="${escapeHtml(credits)}" class="missing-course-credits w-full p-1.5 border border-slate-300 rounded text-xs bg-white focus:outline-none focus:ring-1 focus:ring-rose-500">
+    </td>
+    <td class="p-1.5 text-center">
+      <button type="button" onclick="window.removeStudentMissingCourseRow(this)" class="text-rose-500 hover:text-rose-700 font-bold p-1 text-sm cursor-pointer" title="Xóa môn này">✕</button>
+    </td>
+  `;
+  tbody.appendChild(tr);
+};
+
+window.removeStudentMissingCourseRow = function(btn) {
+  const tr = btn?.closest('tr');
+  if (tr) tr.remove();
+};
+
+window.populateEligibilityDeclarationForm = function(decl) {
+  const radioEligible = document.querySelector('input[name="student-eligibility-status"][value="eligible"]');
+  const radioIneligible = document.querySelector('input[name="student-eligibility-status"][value="ineligible"]');
+  const labelEligible = document.getElementById('label-student-decl-eligible');
+  const labelIneligible = document.getElementById('label-student-decl-ineligible');
+  const detailsWrap = document.getElementById('student-ineligible-details-wrap');
+  const coursesTbody = document.getElementById('student-missing-courses-tbody');
+  const englishNotesInput = document.getElementById('student-english-notes');
+  const otherReasonInput = document.getElementById('student-other-reason-text');
+
+  if (coursesTbody) coursesTbody.innerHTML = '';
+  if (englishNotesInput) englishNotesInput.value = '';
+  if (otherReasonInput) otherReasonInput.value = '';
+  document.querySelectorAll('input[name="ineligible-reason"]').forEach(cb => cb.checked = false);
+
+  if (!decl || !decl.status || decl.status === 'undeclared') {
+    if (radioEligible) radioEligible.checked = false;
+    if (radioIneligible) radioIneligible.checked = false;
+    if (labelEligible) labelEligible.className = 'flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/20 transition-all';
+    if (labelIneligible) labelIneligible.className = 'flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-rose-500 hover:bg-rose-50/20 transition-all';
+    if (detailsWrap) detailsWrap.classList.add('hidden');
+    return;
+  }
+
+  if (decl.status === 'eligible') {
+    if (radioEligible) radioEligible.checked = true;
+    window.onStudentEligibilityChoiceChanged('eligible');
+  } else if (decl.status === 'ineligible') {
+    if (radioIneligible) radioIneligible.checked = true;
+    window.onStudentEligibilityChoiceChanged('ineligible');
+
+    const reasons = Array.isArray(decl.reasons) ? decl.reasons : [];
+    document.querySelectorAll('input[name="ineligible-reason"]').forEach(cb => {
+      cb.checked = reasons.includes(cb.value);
+    });
+
+    if (Array.isArray(decl.missingCourses) && decl.missingCourses.length > 0) {
+      decl.missingCourses.forEach(c => {
+        window.addStudentMissingCourseRow(c.courseCode || '', c.courseName || '', c.credits || '');
+      });
+    }
+
+    if (englishNotesInput && decl.englishCertificateStatus) {
+      englishNotesInput.value = decl.englishCertificateStatus;
+    }
+
+    if (otherReasonInput && decl.otherReason) {
+      otherReasonInput.value = decl.otherReason;
+    }
+
+    window.onIneligibleReasonToggled();
+  }
+};
+
+window.collectStudentEligibilityDeclaration = function() {
+  const selectedStatus = document.querySelector('input[name="student-eligibility-status"]:checked')?.value;
+  const errorEl = document.getElementById('student-decl-error');
+
+  if (errorEl) {
+    errorEl.classList.add('hidden');
+    errorEl.textContent = '';
+  }
+
+  if (!selectedStatus) {
+    const msg = 'Vui lòng chọn tình trạng đủ điều kiện làm DATN/DATH ("Đã đủ điều kiện" hoặc "Chưa đủ điều kiện").';
+    if (errorEl) {
+      errorEl.textContent = msg;
+      errorEl.classList.remove('hidden');
+    }
+    return { valid: false, error: msg };
+  }
+
+  const existing = state.myRegistration?.eligibilityDeclaration || {};
+
+  if (selectedStatus === 'eligible') {
+    return {
+      valid: true,
+      declaration: {
+        status: 'eligible',
+        reasons: [],
+        missingCourses: [],
+        englishCertificateStatus: '',
+        otherReason: '',
+        studentDeclaredAt: existing.studentDeclaredAt || new Date().toISOString(),
+        studentUpdatedAt: new Date().toISOString()
+      }
+    };
+  }
+
+  const checkedBoxes = Array.from(document.querySelectorAll('input[name="ineligible-reason"]:checked'));
+  const selectedReasons = checkedBoxes.map(cb => cb.value);
+
+  if (selectedReasons.length === 0) {
+    const msg = 'Vui lòng chọn ít nhất một lý do bạn chưa đủ điều kiện làm DATN/DATH.';
+    if (errorEl) {
+      errorEl.textContent = msg;
+      errorEl.classList.remove('hidden');
+    }
+    return { valid: false, error: msg };
+  }
+
+  let missingCourses = [];
+  if (selectedReasons.includes('failing_courses')) {
+    const rows = Array.from(document.querySelectorAll('#student-missing-courses-tbody tr'));
+    missingCourses = rows.map(r => {
+      const code = r.querySelector('.missing-course-code')?.value?.trim() || '';
+      const name = r.querySelector('.missing-course-name')?.value?.trim() || '';
+      const credits = r.querySelector('.missing-course-credits')?.value?.trim() || '';
+      return { courseCode: code, courseName: name, credits: credits ? Number(credits) : null };
+    }).filter(c => c.courseName);
+
+    if (missingCourses.length === 0) {
+      const msg = 'Bạn đã chọn lý do "Còn nợ học phần/môn học". Vui lòng nhập ít nhất một Tên học phần còn nợ.';
+      if (errorEl) {
+        errorEl.textContent = msg;
+        errorEl.classList.remove('hidden');
+      }
+      return { valid: false, error: msg };
+    }
+  }
+
+  let englishNotes = '';
+  if (selectedReasons.some(r => r.startsWith('english_'))) {
+    englishNotes = document.getElementById('student-english-notes')?.value?.trim() || '';
+  }
+
+  let otherReason = '';
+  if (selectedReasons.includes('other')) {
+    otherReason = document.getElementById('student-other-reason-text')?.value?.trim() || '';
+    if (!otherReason) {
+      const msg = 'Bạn đã chọn "Lý do khác". Vui lòng nhập mô tả chi tiết lý do bạn chưa đủ điều kiện.';
+      if (errorEl) {
+        errorEl.textContent = msg;
+        errorEl.classList.remove('hidden');
+      }
+      return { valid: false, error: msg };
+    }
+  }
+
+  return {
+    valid: true,
+    declaration: {
+      status: 'ineligible',
+      reasons: selectedReasons,
+      missingCourses,
+      englishCertificateStatus: englishNotes,
+      otherReason,
+      studentDeclaredAt: existing.studentDeclaredAt || new Date().toISOString(),
+      studentUpdatedAt: new Date().toISOString()
+    }
+  };
+};
+
 window.validateAndGoToStep2 = function() {
+  const declResult = window.collectStudentEligibilityDeclaration?.();
+  if (declResult && !declResult.valid) {
+    showToast(declResult.error, 'warning');
+    document.getElementById('student-eligibility-declaration-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
   const topicInput = document.getElementById('input-topic-title');
   const errorEl = document.getElementById('topic-title-error');
   const topic = (topicInput?.value || '').trim();
@@ -652,8 +899,8 @@ function renderConfirmationPanel() {
   listEl.innerHTML = orderedPreferences.map(p => {
     const sup = (state.roundSupervisors || []).find(s => s.id === p.supervisorId) ||
                 (state.supervisorsMaster || []).find(s => s.id === p.supervisorId);
-    const avatarSrc = (sup?.showPhoto !== false && sup?.photoUrl && sup.photoUrl.trim()) 
-      ? sup.photoUrl 
+    const avatarSrc = (sup?.showPhoto !== false && sup?.photoUrl && sup.photoUrl.trim())
+      ? sup.photoUrl
       : getSupervisorAvatarSvgDataUri(p.supervisorName);
     const escapedName = escapeHtml(p.supervisorName || '');
 
@@ -777,6 +1024,7 @@ window.submitRegistration = async function() {
       // student back to the waiting state on first registration.
       reviewStatus: directAssignment && primaryPublishedSupervisor ? 'manually_assigned' : (directAssignment ? 'direct_assignment_pending' : 'waiting'),
       eligibilityStatus: eligibilityStatus,
+      eligibilityDeclaration: declResult?.declaration || null,
       ...(primaryPublishedSupervisor ? {
         officialSupervisors: publishedSupervisors,
         acceptedSupervisorId: primaryPublishedSupervisor.supervisorId || '',
@@ -805,7 +1053,7 @@ window.submitRegistration = async function() {
       updatedBy: actor?.email || studentEmail
     }, { merge: true });
     await setDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), payload, { merge: true });
-    
+
     if (typeof window.trackUserActivity === 'function') {
       window.trackUserActivity('Đăng ký đề tài', { context: payload.topicTitle });
     }

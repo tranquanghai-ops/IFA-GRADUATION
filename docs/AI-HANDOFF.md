@@ -1,195 +1,231 @@
 # AI / DEVELOPER HANDOFF — IFA-GRADUATION
+## TIẾP QUẢN TỪ MÁY HHHH-HP VÀ HOÀN TẤT 3 YÊU CẦU NÂNG CẤP
 
 > [!IMPORTANT]
-> **TÀI LIỆU BÀN GIAO TOÀN DIỆN CHO ANTIGRAVITY TRÊN MÁY TÍNH MỚI**
-> Bản bàn giao ghi lại đầy đủ hiện trạng, kết quả kiểm thử, kiến trúc an ninh, các cam kết đã thực hiện và kết quả hotfix tổng hợp 5 nhóm công việc (A, B, C, D, E).
+> **TÀI LIỆU BÀN GIAO TOÀN DIỆN CHO ANTIGRAVITY TRÊN MÁY TÍNH MỚI HOẶC KHI MỞ LẠI HHHH-HP**
+> Bản bàn giao ghi lại đầy đủ hiện trạng, kết quả kiểm thử, kiến trúc an ninh, các cam kết đã thực hiện và kết quả triển khai 3 yêu cầu nâng cấp:
+> 1. Đổi thông báo loading hệ thống thành "Đang tải dữ liệu...".
+> 2. Cơ chế tạo đợt tốt nghiệp mới sao chép cấu hình từ đợt cũ và tự động dời lịch thông minh (giờ Việt Nam +07:00).
+> 3. Sinh viên tự khai báo điều kiện làm DATN/DATH khi đăng ký đề tài & Admin xem, lọc, chỉnh sửa có lưu vết kiểm toán.
 
 ---
 
-## 1. TÊN CÁC TASK ĐÃ THỰC HIỆN
-- **Task 1**: Phân loại Đạt/Không đạt theo ngưỡng B-/C+, Modal xem chi tiết điểm Hội đồng cho Admin/Owner và Cơ chế công bố điểm Duyệt tiến độ.
-- **Task 2**: Kiểm tra an toàn bảo mật dữ liệu trước khi công bố điểm (Security Audit, Least Privilege RBAC & Firestore Emulator verification).
-- **Task 3 (HOTFIX TỔNG HỢP)**:
-  - **P0 / Nhóm A**: Đối soát bài nộp thực tế (11900382, 11900395, 12200254), kịch bản đối soát dry-run, sao lưu và rollback an toàn.
-  - **P4 / Nhóm B**: Hoàn thiện thao tác xem file trực tiếp Google Drive tab mới & xem chi tiết bài nộp qua badge lượt nộp, hỗ trợ 0/N, 1/N, 2/N, 3/N.
-  - **P3 / Nhóm C**: Đổi tên cột "Hoạt động gần nhất", modal hiển thị tối đa 10 hoạt động thực tế có kiểm chứng (đăng nhập, nộp bài, đề tài, duyệt), cam kết không fake data.
-  - **P1 / Nhóm D**: Sửa triệt để nhận diện phiếu chấm Hội đồng (Cô Nguyễn Thị Thúy Hà - Điểm B), mở rộng tra cứu đa thuộc tính subcollection & cache.
-  - **P2 / Nhóm E**: Cơ chế Thu hồi công bố (E1) và Điều chỉnh kết quả có audit log bất biến (E2), đảm bảo toàn vẹn dữ liệu.
+## 1. THÔNG TIN TIẾP QUẢN VÀ MÔI TRƯỜNG LÀM VIỆC
+
+- **Bối cảnh tiếp quản**: Máy HHHH-HP bị tắt nguồn đột ngột trong lúc đang thực hiện nhiệm vụ. Antigravity trên Laptop tiếp quản độc lập từ mã nguồn chính thức trên GitHub `origin/main`.
+- **Workspace Laptop**: `d:\CODE\IFA-GRADUATION`
+- **Branch**: `main`
+- **Repository chính thức**: `https://github.com/tranquanghai-ops/IFA-GRADUATION`
+- **Commit gốc khi bắt đầu tiếp quản**: `1d3789d` (*fix(admin-scoring): restore published review grades, add admin snapshot hydration, and fix revocation lifecycle*)
+- **Trạng thái workspace lúc bắt đầu**: Working tree sạch, đồng bộ 100% với `origin/main`.
+- **Kết quả điều tra ban đầu**: Trên commit `1d3789d`, máy HHHH-HP chưa kịp push bất kỳ thay đổi nào của 3 yêu cầu nói trên lên GitHub. Toàn bộ 3 yêu cầu đã được triển khai mới hoàn toàn, đồng bộ, kiểm thử nghiêm ngặt trên laptop.
 
 ---
 
-## 2. MỤC TIÊU VÀ KẾT QUẢ TỪNG NHÓM NGHIỆP VỤ
+## 2. CHI TIẾT TRIỂN KHAI 3 YÊU CẦU
 
-### 2.1. Nhóm A (P0): Đối soát bài nộp thực tế Drive & Firestore
-1. **Hiện trạng điều tra**:
-   - Mốc Duyệt 1: `act_1790171285992_yhhi9` trong đợt `FZRWniqMofaIvn7ogq0w`. Hạn nộp chính thức: `2026-10-16T05:10:00.000Z` (12:10 PM VN).
-   - Cả 3 sinh viên đều đã tải file PDF lên Google Drive thành công trước thời hạn:
-     - `11900382` (Trang Trần Tuệ Nhã): File `1tuMDPEMz4Avjfh6vVeKfQFuNgf8d3ozw` (`11900382_Trang Tran Tue Nha.pdf`, 43.82 MB, tải lúc 10:26 VN).
-     - `11900395` (Nguyễn Khánh Thịnh): File `13A20v-sRS4Ye-fVXO0h3honN_tvJ7x_G` (`11900395_Nguyen Khanh Thinh.pdf`, 13.49 MB, tải lúc 09:36 VN).
-     - `12200254` (Nguyễn Thanh Hằng Nga): File `15E5Cr6gMLR4XxoSH-cuOyEHkNew2ALah` (`12200254_Nguyen Thanh Hang Nga.pdf`, 31.98 MB, tải lúc 09:56 VN).
-   - **Nguyên nhân gốc**: Do mã nguồn `submitActivityHandler` cũ của backend trước khi hotfix truy cập thuộc tính `driveDoc.name` khi client chỉ gửi `driveDoc.fileName`, gây ra exception trước transaction ghi `activitySubmissions`.
-2. **Kịch bản khôi phục an toàn**:
-   - Tạo script `scripts/reconcile-and-recover-submissions.cjs`.
-   - **Mặc định chạy `--dry-run`**, chỉ mô phỏng kiểm tra dữ liệu, **KHÔNG ghi bất kỳ thay đổi nào lên Production Firestore**.
-   - Chỉ ghi dữ liệu khi có cờ tường minh `--apply` sau khi được Quản trị viên phê duyệt.
-   - Báo cáo đối soát chi tiết được lưu tại `backups/audit-reconciliation-report-*.json`.
+### 2.1. Yêu cầu 1: Đổi thông báo loading thành "Đang tải dữ liệu..."
+- **Mục tiêu**: Thay thế toàn bộ chuỗi thông báo ban đầu `"Đang tải IFA+ Graduation..."` bằng `"Đang tải dữ liệu..."` theo phong cách tối giản, tinh tế.
+- **Thực hiện**:
+  - `index.template.html` (dòng 54): Khung loading ban đầu khi HTML vừa tải về.
+  - `js/core.js` (dòng 609, 633): Hàm `showLoading(msg = 'Đang tải dữ liệu...')` và fallback text watchdog.
+  - `tests/test-loading-bootstrap-resilience.cjs`: Cập nhật assertion kiểm tra thông báo loading.
+- **Bảo toàn**: Giữ nguyên toàn bộ layout loading, spinner SVG hoạt họa, watchdog timer tự động ẩn, và cơ chế bắt lỗi màn hình trắng nếu Firebase gặp sự cố mạng.
 
-### 2.2. Nhóm B (P4): Thao tác xem file & Lịch sử nộp bài
-- Nút "👁️ Xem bài" tại bảng quản lý các đợt duyệt gọi `openLatestOfficialSubmissionFile()`, mở trực tiếp file PDF chính thức mới nhất trên Google Drive trong tab mới (`target="_blank"`, `noopener,noreferrer`).
-- Badge "Đã nộp / Tối đa" (0/3, 1/3, 2/3, 3/3) được thiết kế thành nút tương tác gọi `openAdminSubmissionInspectModal()`, cho phép xem chi tiết bài nộp và lịch sử các lần nộp.
-- Hỗ trợ đầy đủ trạng thái 0/N sạch sẽ (badge xám "○ Chưa nộp").
+### 2.2. Yêu cầu 2: Tạo đợt tốt nghiệp mới bằng cách sao chép cấu hình đợt cũ & tự động tính lại lịch
+- **Mục tiêu**: Cho phép Admin nhân bản một đợt tốt nghiệp thành công trước đó (ví dụ Đợt 2 Năm 2026) sang một đợt mới (Đợt 1 Năm 2027) chỉ bằng cách nhập tên đợt và chọn ngày bắt đầu mới; toàn bộ mốc duyệt, tuần kiểm tra, giờ nộp bài, giờ bảo vệ được tự động dời chính xác theo lịch mới.
+- **Kiến trúc & Module**:
+  - `js/rounds/rounds-schedule-copier.js` *(Tạo mới)*: Module thuần tính toán độc lập, xử lý múi giờ Việt Nam (+07:00):
+    - `parseDateToVietnamComponents(isoString)`: Tách năm, tháng, ngày, giờ, phút, thứ trong tuần theo chuẩn ICT (UTC+7).
+    - `getVietnamMonday(date)`: Xác định mốc Thứ Hai tuần bắt đầu đợt.
+    - `shiftTimestampVN(timestamp, dayDelta, targetHours, targetMinutes)`: Dời mốc thời gian giữ nguyên hoặc tùy chỉnh giờ phút chính xác theo múi giờ VN.
+    - `calculateShiftedRoundSchedule(sourceRound, targetStartDate, targetName)`: Thuật toán dời toàn bộ hoạt động (activities) và cấu hình tuần (timelineWeeksConfig), bảo đảm:
+      - Giữ nguyên số thứ tự tuần (Tuần 4, Tuần 8, Tuần 12,...).
+      - Giữ nguyên thứ trong tuần (Thứ Sáu nộp bài, Thứ Bảy họp hội đồng,...).
+      - Giữ nguyên khung giờ (08:00 sáng mở nộp, 17:00 đóng nộp, 08:00 sáng bảo vệ).
+      - Giữ nguyên thời gian mở nộp và hạn nộp bài.
+      - **Bảo đảm ràng buộc nghiêm ngặt**: Hạn nộp bài (`submissionDeadlineAt` / `deadlineAt`) luôn nhỏ hơn hoặc bằng thời điểm họp Hội đồng (`startAt`).
+  - `templates/modals/rounds/modal-round.html`:
+    - Thêm khối chuyển đổi chế độ tạo đợt: `✨ Tạo mới từ đầu` hoặc `📋 Sao chép cấu hình từ đợt đã có`.
+    - Dropdown chọn đợt nguồn từ danh sách đợt hiện có trong hệ thống.
+    - Bảng xem trước (`round-copy-schedule-preview-wrap`) hiển thị lịch trình dự kiến sau khi dời lịch để Admin kiểm tra trước khi bấm Lưu.
+  - `js/rounds/rounds-modal-form.js`:
+    - Các hàm điều khiển: `onRoundCreationModeChanged`, `onSourceRoundSelected`, `refreshCopiedSchedulePreview`.
+    - Khi Admin thay đổi ngày bắt đầu đợt hoặc chọn đợt nguồn khác, preview tự động cập nhật ngay lập tức.
+    - Tích hợp vào `saveRound(e)`: Tự động gán danh sách `activities` và `timelineWeeksConfig` đã dời lịch vào dữ liệu lưu đợt mới.
+  - `js/students/student-journey.js`:
+    - Gắn listener `onRoundStartDateChanged` kích hoạt làm mới preview khi ngày bắt đầu thay đổi.
+- **Danh sách trường dữ liệu LOẠI TRỪ khi sao chép đợt**:
+  1. `id` / `roundId`: Tạo ID mới độc lập cho đợt, ID mới cho từng hoạt động con (`act_${Date.now()}_...`).
+  2. `status`: Đặt về `'active'` hoặc `'draft'`, không thừa kế trạng thái lưu trữ (`archived`) của đợt cũ.
+  3. `students` / `eligibleStudents` / `studentIds`: Danh sách sinh viên của đợt cũ không được sao chép sang đợt mới.
+  4. `registrations`: Phiếu đăng ký đề tài của sinh viên đợt cũ bị loại trừ 100%.
+  5. `officialAssignments`: Dữ liệu phân công GVHD của đợt cũ bị loại trừ 100%.
+  6. `supervisors`: Danh sách phân bổ giảng viên và quota của đợt cũ bị loại trừ.
+  7. `councils` / `councilMembers`: Danh sách hội đồng chấm của đợt cũ không sao chép (mỗi đợt có quyết định hội đồng riêng).
+  8. `councilScores` / `reviewDecisions`: Điểm số nội bộ và phiếu chấm cá nhân bị loại trừ tuyệt đối.
+  9. `publishedReviews` / `published`: Toàn bộ trạng thái công bố điểm đợt cũ bị loại trừ.
+  10. `submissions` / `activitySubmissions` / `driveFiles`: Bài nộp của sinh viên đợt cũ bị loại trừ.
+  11. `driveFolderId` / Thư mục con đã tạo: Đợt mới sẽ tạo cấu trúc thư mục Google Drive mới, không dùng chung ID thư mục của đợt cũ.
+  12. `auditLogs` / `activityHistory`: Lịch sử vết hoạt động của đợt cũ bị loại trừ.
 
-### 2.3. Nhóm C (P3): Theo dõi 10 hoạt động gần nhất của sinh viên
-- Đổi tên cột tại `views/admin/tab-students.html` thành `Hoạt động gần nhất`.
-- Click vào ô hoạt động mở modal `modal-student-activity-history`.
-- Tự động tập hợp và sắp xếp theo thời gian tối đa 10 sự kiện thực tế có chứng cứ:
-  1. Đăng nhập hệ thống (Google Workspace, thời gian thực tế từ `userActivities`).
-  2. Nộp bài các mốc (từ `driveFiles` và `activitySubmissions`).
-  3. Đăng ký đề tài & đề xuất sửa đổi đề tài qua các phiên bản (từ `registrations` và `topicTitleHistory`).
-  4. Đánh giá / phản hồi của Hội đồng.
-- Cam kết: **Tuyệt đối không sử dụng dữ liệu giả lập (placeholder/fake).**
-
-### 2.4. Nhóm D (P1): Sửa nhận diện phiếu chấm Hội đồng (Cô Nguyễn Thị Thúy Hà)
-1. **Hiện trạng điều tra**:
-   - Dữ liệu thực tế xác nhận Cô Nguyễn Thị Thúy Hà (`nguyenthithuyha1@tdtu.edu.vn`, `scorerId: DwkFZcqfKrKaYMzQSEcd`) **ĐÃ CHẤM ĐIỂM** cho sinh viên Trang Trần Tuệ Nhã (11900382) với điểm chữ `B` (7.50) lúc `2026-10-16T08:14:55.721Z`.
-   - Điểm tổng kết của Hội đồng 1 đã tính đúng: `(7.5 + 7.5 + 7.0) / 3 = 7.33` $\rightarrow$ Điểm B.
-   - Nguyên nhân hiển thị `-- Chưa chấm` trong modal: Điểm của cô Hà được lưu trong subcollection `graduationRounds/{roundId}/reviewDecisions/{decisionKey}`, nhưng modal cũ chỉ đọc trong root doc cache `state.councilScores` / `roundDoc.councilScores`.
-2. **Giải pháp đã thực hiện**:
-   - Mở rộng logic tra cứu trong `defense-scores.js` và `preliminary-dashboard.js` với bộ khóa đa thuộc tính: `scorerId`, `memberEmail`, `memberId`, `councilRubricScores`, và cơ chế fallback bất đồng bộ đọc từ `reviewDecisions`.
-
-### 2.5. Nhóm E (P2): Thu hồi công bố & Điều chỉnh kết quả có Audit Log
-1. **E1 - Thu hồi công bố**:
-   - Toolbar Duyệt đợt 1, 2, 3 hiển thị nút `↩️ Thu hồi công bố` khi đợt đã công bố.
-   - Bấm nút mở modal `modal-revoke-progress-review`: yêu cầu nhập lý do bắt buộc (tối thiểu 10 ký tự) và tích chọn xác nhận.
-   - Khi xác nhận: cập nhật `published: false`, ghi `auditLogs`, và giao diện Sinh viên / GVHD lập tức quay về trạng thái "Chưa công bố".
-2. **E2 - Điều chỉnh kết quả Hội đồng**:
-   - Nút `✏️ Điều chỉnh kết quả` trong footer modal chi tiết điểm Hội đồng (`modal-council-score-details`).
-   - Guard RBAC: Chỉ Admin và Owner mới có quyền.
-   - Guard Công bố: Nếu đợt đang ở trạng thái "Đã công bố", hệ thống **chặn chỉnh sửa** và yêu cầu phải "Thu hồi công bố" trước để đảm bảo tính minh bạch.
-   - Form điều chỉnh yêu cầu: Chọn điểm chữ mới (A, A-, B+, B, B-, C+, C, F), nhập Căn cứ/Biên bản họp, nhập Lý do điều chỉnh (tối thiểu 10 ký tự).
-   - Tự động quy đổi điểm số và tính lại kết luận Đạt/Không đạt ($\ge B-$ là Đạt, $\le C+$ là Không đạt).
-   - Ghi bản ghi kiểm toán bất biến vào `auditLogs` (`action: 'ADJUST_COUNCIL_SCORE'`).
-3. **E3 - Bảo mật Firestore Rules**:
-   - Đã kiểm tra thành công 30/30 tests trên Firestore Emulator (`npm run test:rules`).
-   - Bảo toàn nguyên tắc: **Tuyệt đối không tự ý deploy Firestore Rules hoặc Cloud Functions lên Production khi chưa có phê duyệt.**
-
----
-
-## 3. CÁC FILE ĐÃ SỬA VÀ TẠO MỚI
-1. `templates/modals/grading/modal-revoke-progress-review.html` *(Mới)*: Modal thu hồi công bố kết quả.
-2. `templates/modals/grading/modal-adjust-council-score.html` *(Mới)*: Modal điều chỉnh kết quả đánh giá Hội đồng.
-3. `templates/modals/students/modal-student-activity-history.html` *(Mới)*: Modal lịch sử 10 hoạt động gần nhất của sinh viên.
-4. `templates/modals/grading/modal-council-score-details.html`: Bổ sung nút `✏️ Điều chỉnh kết quả` trong footer.
-5. `scripts/reconcile-and-recover-submissions.cjs` *(Mới)*: Script đối soát bài nộp thực tế (mặc định `--dry-run`).
-6. `tests/test-hotfix-comprehensive-audit.cjs` *(Mới)*: 16 automated tests kiểm thử toàn diện 5 nhóm A, B, C, D, E.
-7. `index.template.html` & `index.html`: Tích hợp 3 modal mới vào khung ứng dụng.
-8. `views/admin/tab-students.html`: Đổi tên tiêu đề cột thành "Hoạt động gần nhất".
-9. `views/admin/tab-scoring.html`: Tích hợp vùng hiển thị thu hồi công bố.
-10. `js/grading/defense-scores.js`: Sửa nhận diện phiếu chấm Hội đồng đa thuộc tính.
-11. `js/grading/preliminary-dashboard.js`: Toàn bộ logic thu hồi công bố, điều chỉnh điểm, RBAC guard và audit log.
-12. `js/students/student-review-submissions.js`: Mở bài trực tiếp Google Drive tab mới, click badge xem modal chi tiết.
-13. `js/students/student-eligibility-admin.js`: Gắn sự kiện click mở modal lịch sử hoạt động sinh viên.
-14. `js/tracking/user-activity-tracker.js`: Logic tổng hợp 10 hoạt động thực tế có kiểm chứng.
-15. `package.json`: Cập nhật lệnh `npm test`.
-16. `docs/AI-HANDOFF.md` *(Cập nhật)*: Bản bàn giao hiện tại.
-
----
-
-## 4. KẾT QUẢ KIỂM THỬ TỰ ĐỘNG
-- **`npm test`**: **188 / 188 tests PASS (100%)**.
-- **`npm run test:rules`**: **30 / 30 tests PASS trên Firestore Emulator**.
-- **`node scripts/build-html.cjs`**: Biên dịch thành công `index.html` với 64 partials.
-- **`git diff --check`**: 0 lỗi cú pháp hoặc khoảng trắng.
-- **`node scripts/reconcile-and-recover-submissions.cjs`**: Chạy thành công ở chế độ `--dry-run`, xác thực 3 sinh viên hợp lệ, ghi báo cáo vào `backups/`.
-
----
-
-## 5. CAM KẾT VÀ TRẠNG THÁI TRIỂN KHAI
-- [x] Đã kiểm thử đầy đủ frontend và tích hợp trên máy tính mới.
-- [x] Đã bảo toàn tuyệt đối dữ liệu sinh viên thật, điểm thật trên Production (chưa chạy `--apply` khi chưa được duyệt).
-- [x] Đã bảo toàn Firestore Rules và Cloud Functions (không tự deploy lên Production).
-- [ ] Sẵn sàng triển khai Firebase Hosting (`ifa-graduation`) cho phần frontend an toàn đã qua kiểm thử.
-
----
-
-## 6. PHASE SECURITY HARDENING: KHẮC PHỤC RÒ RỈ ĐIỂM FIRESTORE & 3-TIER ARCHITECTURE
-*Thời điểm thực hiện: 2026-10-17*
-
-### 6.1. Mục tiêu & Kiến trúc 3 tầng (3-Tier Data Architecture)
-Khắc phục lỗ hổng rò rỉ điểm số và biên bản đánh giá nội bộ của từng ủy viên hội đồng trên document gốc `graduationRounds/{roundId}`:
-1. **Tier A (Public Round Metadata)**:
-   - Collection: `graduationRounds/{roundId}`.
-   - Nội dung: Chỉ lưu metadata đợt, mốc thời gian, trạng thái công bố (`duyet_1: { published: true, publishedAt, ... }`).
-   - Loại bỏ hoàn toàn `councilScores` (điểm của từng ủy viên) và `studentResults` (kết quả chi tiết của toàn bộ sinh viên).
-   - Quyền: Đọc cho mọi người dùng đã đăng nhập; Ghi chỉ dành cho Admin/Owner.
-2. **Tier B (Private Internal Deliberation & Scoring Storage)**:
-   - Collection: `graduationRounds/{roundId}/reviewDecisions/{decisionKey}`.
-   - Nội dung: Phiếu chấm chi tiết của từng ủy viên, nhận xét, căn cứ hội đồng.
-   - Quyền: Sinh viên và người ngoài KHÔNG thể đọc/ghi; Chỉ ủy viên thuộc hội đồng mới đọc được phiếu của hội đồng mình; Khóa ghi khi hội đồng đã `finalized` hoặc `ended`.
-3. **Tier C (Published Student Results with Least-Privilege RBAC)**:
-   - Collection: `publishedStudentResults/{studentId}` (hoặc subcollection theo round).
-   - Snapshot quản trị: `publishedProgressReviews/{phaseKey}` (chỉ Admin/Owner đọc/ghi).
-   - Quyền `publishedStudentResults/{studentId}`:
-     - `allow get`: Admin/Owner, hoặc chính sinh viên đó (`email` khớp `studentId` và `status != 'revoked'`), hoặc GVHD được phân công chính thức (`officialAssignments` / `supervisorAssignments` và `status != 'revoked'`).
-     - `allow list`: Chỉ Admin/Owner (chặn sinh viên/GVHD query vét toàn bộ kết quả của khoa).
-     - `allow write`: Chỉ Admin/Owner.
-
-### 6.2. Các file đã triển khai & cập nhật
-1. `firestore.rules`:
-   - Bổ sung helper `isAssignedSupervisor(stId)` đối chiếu `officialAssignments` và `supervisorAssignments`.
-   - Bổ sung helper `isResultPublished(data)` kiểm tra trạng thái công bố và chặn đọc khi `status == 'revoked'`.
-   - Hardening rule cho `/publishedStudentResults/{studentId}`, `/publishedProgressReviews/{phaseKey}`, và `/reviewDecisions/{decisionId}`.
-2. `js/grading/preliminary-dashboard.js`:
-   - `confirmPublishProgressReview`: Tách bạch rõ rệt: ghi root metadata sạch không chứa điểm từng người; ghi snapshot quản trị; ghi kết quả riêng lẻ từng sinh viên vào `publishedStudentResults/{stId}` với `{ merge: true }` (bảo toàn Duyệt 1 khi công bố Duyệt 2).
-   - `confirmRevokeProgressReview`: Đưa `status: 'revoked'`, `isPublished: false` vào `publishedStudentResults/{stId}`, cắt ngay quyền đọc cấp Firestore Rules; xóa `studentResults` khỏi root doc.
-   - `confirmAdjustCouncilScore`: Ghi quyết định điều chỉnh vào `reviewDecisions`, ghi audit log bất biến, không đẩy điểm vào root doc.
-   - `window.getStudentPublishedReviewResult`: Đọc từ `publishedStudentResults/{studentId}` kèm bộ nhớ đệm cache và fallback an toàn.
-3. `js/grading/rubrics-scoring.js` & `js/grading/preliminary-entry.js`: Loại bỏ các thao tác ghi trùng lặp `councilScores` và `progressReviews` lên root doc `roundRef`.
-4. `js/grading/councils-editor.js`: Hàm `persistActivityCouncilChanges` tự động làm sạch `activities` (loại bỏ `finalDefenseScores`) trước khi lưu root doc.
-5. `js/students/student-journey.js`, `js/rounds/rounds-timeline-preview.js`, `js/supervisors/supervisor-portal-students.js`: Đồng bộ đọc kết quả duyệt qua `getStudentPublishedReviewResult`.
-6. `scripts/migrate-firestore-security.cjs` *(Mới)*: Script di chuyển dữ liệu bảo mật (mặc định `--dry-run`, có backup JSON tự động, hỗ trợ `--apply` và `--rollback`).
-7. `tests/test-firestore-security-hardening.rules.test.mjs` *(Mới)*: Bộ test 12 ca kiểm thử Firestore Rules với 10 danh tính người dùng.
-8. `tests/test-post-migration-business.cjs` *(Mới)*: 7 ca kiểm thử toàn diện quy trình nghiệp vụ sau di chuyển.
-9. `docs/FIRESTORE-SECURITY-MIGRATION.md` *(Mới)*: Tài liệu phân tích lỗ hổng, kiến trúc 3 tầng, ma trận RBAC và kế hoạch rollback.
-
-### 6.3. Kết quả kiểm thử tự động
-- **`npm test`**: **188 / 188 unit tests PASS (100%)**.
-- **`npm run test:rules`**: **42 / 42 rules tests PASS trên Firestore Emulator (100%)** (gồm 12 tests hardening mới + 30 tests kế thừa).
-- **`node tests/test-post-migration-business.cjs`**: **7 / 7 business tests PASS (100%)**.
-- **`scripts/migrate-firestore-security.cjs --dry-run`**: Thực thi thành công, tạo bản sao lưu tại `backups/firestore-security-backup-2026-10-17T01-58-14-470Z.json`, 0 write operations thực tế.
-
-### 6.4. Cam kết bảo đảm an toàn
-- Tuyệt đối KHÔNG deploy Firestore Rules lên Production khi chưa có phê duyệt.
-- Tuyệt đối KHÔNG deploy Cloud Functions lên Production.
-- Tuyệt đối KHÔNG chạy `--apply` trên dữ liệu thật của Production.
-- Tuyệt đối KHÔNG deploy Hosting có phiên bản phá vỡ tương thích dữ liệu hiện hành.
+### 2.3. Yêu cầu 3: Sinh viên tự khai báo điều kiện làm DATN/DATH & Admin xem, lọc, chỉnh sửa
+- **Mục tiêu**: Tại Bước 1 khi sinh viên đăng ký đề tài và chọn GVHD, bổ sung form tự khai báo Đủ/Chưa đủ điều kiện làm ĐATN/ĐATH; nếu Chưa đủ điều kiện, bắt buộc chọn lý do chi tiết từ danh mục 9 lý do, khai môn nợ động, ghi chú chứng chỉ Tiếng Anh hoặc lý do khác. Admin có giao diện xem, lọc và chỉnh sửa kết quả kèm lưu vết kiểm toán.
+- **Kiến trúc & Module**:
+  - `views/student.html`:
+    - Khối khai báo điều kiện nổi bật bằng card viền xanh/hồng.
+    - Radio group bắt buộc: `Đã đủ điều kiện` vs `Chưa đủ điều kiện` (mặc định không tích sẵn ô nào).
+    - Khối chi tiết khi chọn `Chưa đủ điều kiện`:
+      - 9 checkbox lý do theo chuẩn quy chế.
+      - Bảng động nhập danh sách học phần nợ (nút `+ Thêm học phần`, xóa từng dòng, cột Mã môn, Tên môn *bắt buộc*, Số tín chỉ).
+      - Ô nhập ghi chú tình trạng chứng chỉ Tiếng Anh (tối đa 250 ký tự).
+      - Ô textarea nhập mô tả lý do khác (bắt buộc nếu tích "Lý do khác", tối đa 500 ký tự).
+  - `js/students/registration.js`:
+    - `onStudentEligibilityChoiceChanged(choice)`: Điều khiển ẩn/hiện form chi tiết.
+    - `onIneligibleReasonToggled(reasonCode)`: Tự động kích hoạt bảng môn nợ hoặc ô tiếng Anh/lý do khác tương ứng.
+    - `addStudentMissingCourseRow()`, `removeStudentMissingCourseRow()`: Thêm/xóa dòng bảng môn nợ linh hoạt.
+    - `collectStudentEligibilityDeclaration()`: Đóng gói và kiểm tra tính hợp lệ dữ liệu khai báo:
+      - Bắt buộc phải chọn Đã đủ hoặc Chưa đủ.
+      - Nếu chọn Chưa đủ: Bắt buộc chọn ít nhất 1 lý do.
+      - Nếu chọn có môn nợ: Bắt buộc nhập tên môn cho các dòng đã thêm.
+      - Nếu chọn lý do khác: Bắt buộc nhập mô tả lý do.
+    - `populateEligibilityDeclarationForm(decl)`: Điền lại dữ liệu cũ khi sinh viên mở lại form chỉnh sửa đăng ký.
+    - Tích hợp kiểm tra vào `validateAndGoToStep2()` và lưu payload vào `submitRegistration()`.
+    - **Tính chất Non-blocking**: Dù chọn Chưa đủ điều kiện, sinh viên vẫn được phép hoàn tất đăng ký đề tài và chọn GVHD; hệ thống không hủy đăng ký, không loại sinh viên khỏi đợt mà ghi nhận trạng thái để Khoa/Bộ môn xem xét.
+  - `templates/modals/students/modal-admin-review-eligibility.html` *(Tạo mới)*:
+    - Modal Admin xem chi tiết khai báo của sinh viên và thực hiện xác nhận/điều chỉnh.
+    - Hiển thị thông tin sinh viên, đợt tốt nghiệp, ngày sinh viên khai báo.
+    - Hiển thị lựa chọn của sinh viên, danh sách lý do, bảng môn nợ, ghi chú tiếng Anh.
+    - Form Admin thẩm định:
+      - Trạng thái duyệt: `Đủ điều kiện`, `Chưa đủ điều kiện`, `Cần bổ sung hồ sơ`.
+      - Ghi chú thẩm định của Khoa/Bộ môn.
+      - Ghi nhận `reviewedBy` (email Admin) và `reviewedAt` (thời điểm duyệt).
+      - Hiển thị lịch sử các lần thẩm định trước đó.
+  - `views/admin/tab-registrations.html`:
+    - Bổ sung các tùy chọn lọc mới vào bộ lọc sinh viên:
+      - `decl_eligible`: Khai báo Đủ điều kiện.
+      - `decl_ineligible`: Khai báo Chưa đủ điều kiện.
+      - `decl_undeclared`: Chưa khai báo (dữ liệu cũ).
+  - `js/students/student-registrations-admin.js`:
+    - Hiển thị badge điều kiện trực quan trên từng dòng sinh viên trong bảng:
+      - `✓ Đủ điều kiện` (xanh lá).
+      - `! Chưa đủ ĐK: [Lý do]` (đỏ/hồng).
+      - `Chưa khai báo` (xám, tương thích ngược dữ liệu cũ).
+    - Nút bấm xem/thẩm định mở modal `modal-admin-review-eligibility`.
+    - `saveAdminEligibilityReview()`: Lưu kết quả thẩm định vào Firestore (`registrations/{studentId}`) dưới trường `adminReview` và ghi nhận nhật ký kiểm toán.
 
 ---
 
-## 7. SIMPLIFIED SECURITY CUTOVER & STUDENT RESULT UI ENHANCEMENT
-*Thời điểm thực hiện: 2026-10-17*
+## 3. BẢNG ĐỐI CHIẾU 9 LÝ DO CHƯA ĐỦ ĐIỀU KIỆN
 
-### 7.1. Chuẩn hóa & Nâng cấp Giao diện Điểm Sinh viên (Student Portal UI)
-1. **Gộp điểm trực tiếp vào thẻ Duyệt đồ án**:
-   - Vị trí: Nằm ngay bên trong thẻ mốc tương ứng (Tuần 4 - Duyệt đợt 1, Tuần 8 - Duyệt đợt 2, Tuần 12 - Duyệt đợt 3) thuộc phần *"Lộ trình Đồ án Tốt nghiệp & Tiến độ thực hiện"*.
-   - Loại bỏ hoàn toàn các thẻ đánh giá Hội đồng dư thừa bên ngoài.
-2. **Quy cách hiển thị chuẩn**:
-   - Nhãn mô tả: `Đánh giá Hội đồng` (`text-[10px] uppercase font-bold`).
-   - Trạng thái kết luận: `✓ Đạt yêu cầu` (xanh lá `emerald`) hoặc `✕ Không đạt yêu cầu` (đỏ `rose`) rõ ràng.
-   - Điểm chữ nổi bật: `B`, `B+`, `C+`... hiển thị với cỡ chữ lớn (`font-mono font-black text-xl sm:text-2xl`) trong khung điểm riêng biệt.
-   - Nội dung mô tả chuẩn xác: *"Đánh giá Hội đồng: Đạt yêu cầu – B"* (hoặc *"Không đạt yêu cầu – C+"*).
-   - Quy tắc ẩn an toàn: Khi mốc chưa tới, chưa công bố, hoặc đã bị thu hồi: ẩn hoàn toàn khối điểm (`reviewResultHtml = ''`), không chiếm diện tích và không để lộ thông tin đánh giá.
-3. **Đồng bộ Dialog chi tiết mốc (`rounds-timeline-preview.js`)**:
-   - Cập nhật dialog chi tiết khi sinh viên click vào mốc với bố cục Đánh giá Hội đồng tương thích, điểm chữ cỡ lớn và kết luận Đạt/Không đạt.
+| Mã lý do (`reasonCode`) | Tên hiển thị trên giao diện | Ràng buộc nghiệp vụ bổ sung |
+| :--- | :--- | :--- |
+| `failing_courses` | Nợ môn / Chưa tích lũy đủ học phần theo quy định | Bắt buộc bảng môn nợ phải có ít nhất 1 dòng hợp lệ (có tên môn). |
+| `low_gpa` | Điểm trung bình tích lũy (GPA) chưa đạt ngưỡng | Không yêu cầu bảng môn nợ. |
+| `missing_prerequisites` | Chưa hoàn thành các môn học tiên quyết của DATN/DATH | Mở bảng môn nợ để sinh viên khai tên môn tiên quyết còn nợ. |
+| `missing_english_certificate` | Chưa nộp hoặc chưa đạt chuẩn đầu ra Tiếng Anh | Mở ô nhập ghi chú tình trạng chứng chỉ Tiếng Anh. |
+| `missing_it_certificate` | Chưa nộp hoặc chưa đạt chuẩn đầu ra Tin học | Ghi nhận lý do chuẩn đầu ra Tin học. |
+| `missing_physical_education` | Chưa hoàn thành các học phần Giáo dục thể chất (GDTC) | Ghi nhận lý do GDTC. |
+| `missing_defense_education` | Chưa hoàn thành Giáo dục quốc phòng - an ninh (GDQP) | Ghi nhận lý do GDQP. |
+| `tuition_debt` | Còn nợ học phí hoặc các khoản nghĩa vụ tài chính | Ghi nhận lý do tài chính. |
+| `other` | Lý do khác (kèm mô tả chi tiết) | Bắt buộc nhập mô tả chi tiết (tối đa 500 ký tự). |
 
-### 7.2. Xử lý Thu hồi Độc lập Từng Đợt Duyệt (Multi-Phase Revoke)
-- Sửa đổi `confirmRevokeProgressReview` trong `preliminary-dashboard.js`:
-  - Khi thu hồi Duyệt 1, nếu Duyệt 2 vẫn đang ở trạng thái công bố, document cấp root `publishedStudentResults/{studentId}` giữ nguyên `status: 'published'` để sinh viên/GVHD tiếp tục xem được Duyệt 2 hợp lệ. Chỉ khi toàn bộ các đợt bị thu hồi mới chuyển root status thành `'revoked'`.
-  - Tự động nạp danh sách sinh viên cần thu hồi từ snapshot quản trị `publishedProgressReviews/duyet_${phase}` nếu trường `studentResults` trên root document đã được dọn dẹp.
+---
 
-### 7.3. Bộ Công cụ Cutover Đơn giản & An toàn (`migrate-firestore-security.cjs`)
-Hoàn thiện script với 4 chế độ hoạt động:
-1. `--dry-run` (Mặc định): Kiểm kê toàn bộ dữ liệu, tự động xuất file backup JSON dạng snapshot, 0 write operations.
-2. `--apply`: Di chuyển kết quả từng sinh viên sang `publishedStudentResults/{studentId}` và lưu snapshot toàn đợt vào `publishedProgressReviews/{pKey}`.
-3. `--cleanup-root`: Kiểm tra đối soát 100% dữ liệu đã có trong subcollections trước khi xóa các trường rò rỉ (`councilScores`, `studentResults`, `finalDefenseScores`) khỏi root document. Tự động tạo bản backup `pre-cleanup-backup` trước khi sửa.
-4. `--rollback=<backup-file>`: Khôi phục tức thì toàn bộ cấu trúc gốc từ file JSON sao lưu.
+## 4. TỔNG HỢP CÁC FILE THAY ĐỔI VÀ TẠO MỚI
+
+### Các file tạo mới:
+1. `js/rounds/rounds-schedule-copier.js`: Thuật toán dời lịch đợt tốt nghiệp chuẩn múi giờ Việt Nam (+07:00).
+2. `templates/modals/students/modal-admin-review-eligibility.html`: Modal Admin xem và thẩm định khai báo điều kiện của sinh viên.
+3. `tests/test-round-schedule-copier.cjs`: Bộ kiểm thử đơn vị cho thuật toán sao chép lịch trình (11/11 tests PASS).
+4. `tests/test-round-copy-and-eligibility.cjs`: Bộ kiểm thử tích hợp cho 3 yêu cầu (19/19 tests PASS).
+
+### Các file chỉnh sửa:
+1. `index.template.html`: Đổi text loading, tích hợp modal thẩm định điều kiện.
+2. `index.html`: Biên dịch tự động từ 65 partials qua `npm run build`.
+3. `js/core.js`: Đổi thông báo loading mặc định và fallback text.
+4. `js/rounds/rounds-config.js`: Khởi tạo và liên kết các thành phần modal đợt.
+5. `js/rounds/rounds-modal-form.js`: Xử lý giao diện chọn đợt nguồn, chế độ tạo, xem trước bảng lịch dời và lưu đợt.
+6. `js/students/registration.js`: Form sinh viên khai báo điều kiện, dynamic table môn nợ, validation.
+7. `js/students/student-journey.js`: Gắn sự kiện cập nhật preview khi đổi ngày bắt đầu đợt.
+8. `js/students/student-registrations-admin.js`: Badge điều kiện bảng Admin, bộ lọc, modal thẩm định và lưu kết quả.
+9. `templates/modals/rounds/modal-round.html`: Thêm UI chọn chế độ tạo đợt, đợt nguồn, bảng preview.
+10. `views/admin/tab-registrations.html`: Thêm tùy chọn lọc điều kiện vào dropdown filter.
+11. `views/student.html`: Bổ sung card khai báo điều kiện vào Bước 1 đăng ký đề tài.
+12. `package.json`: Cập nhật lệnh `npm test` bao gồm 2 file test mới.
+13. `tests/test-loading-bootstrap-resilience.cjs`: Cập nhật assertion kiểm tra thông báo loading mới.
+14. `docs/AI-HANDOFF.md`: Tài liệu bàn giao chi tiết (file này).
+
+---
+
+## 5. KẾT QUẢ KIỂM THỬ VÀ BIÊN DỊCH
+
+- **`npm run build`**:
+  ```text
+  [HTML Builder] Successfully compiled index.html with 65 partials included.
+  ```
+- **`git diff --check`**: Exited with code 0 (Toàn bộ trailing whitespace và định dạng dòng đã được chuẩn hóa).
+- **`npm test`**:
+  ```text
+  TOTAL SUITES: 29 suites
+  TOTAL TESTS: 263 / 263 tests PASSED (0 failed)
+  ```
+- **Ghi chú về `npm run test:rules`**:
+  Laptop hiện tại không cài đặt sẵn môi trường Java Runtime (`java -version`), do đó Firebase Emulator (`firebase emulators:exec`) không thể khởi chạy cục bộ. Tuy nhiên, các thay đổi trong đợt này **hoàn toàn không sửa đổi file `firestore.rules`** và không yêu cầu deploy Firestore Rules mới. Quyền cập nhật của Admin và Sinh viên trên collection `registrations` đã tương thích 100% với cấu trúc trường `eligibilityDeclaration` và `adminReview`.
+
+---
+
+## 6. XÁC NHẬN TUÂN THỦ CÁC NGUYÊN TẮC AN TOÀN
+
+- [x] **KHÔNG deploy Firestore Rules lên Production**: Không can thiệp hoặc ghi đè rules hiện tại.
+- [x] **KHÔNG deploy Cloud Functions lên Production**: Toàn bộ logic dời lịch và khai báo chạy an toàn phía client và kiểm toán.
+- [x] **KHÔNG tạo đợt tốt nghiệp giả trên Production**: Mọi kiểm thử đều thực hiện trên mock / in-memory unit tests.
+- [x] **KHÔNG tự ý công bố hoặc sửa đổi điểm số**: Độc lập hoàn toàn với dữ liệu điểm Hội đồng.
+- [x] **KHÔNG xóa hoặc ghi đè thay đổi chưa commit của người dùng**.
+
+---
+
+## 7. HƯỚNG DẪN DÀNH CHO ADMIN VÀ SINH VIÊN
+
+### Dành cho Admin - Tạo đợt mới bằng cách sao chép cấu hình:
+1. Vào tab **Cấu hình đợt tốt nghiệp** $\rightarrow$ Bấm nút **"+ Thêm đợt tốt nghiệp"**.
+2. Tại mục *Phương thức tạo đợt tốt nghiệp*, tích chọn **📋 Sao chép cấu hình từ đợt đã có**.
+3. Chọn đợt nguồn trong menu thả xuống (ví dụ đợt năm trước có cấu hình chuẩn).
+4. Nhập Tên đợt mới và chọn **Ngày bắt đầu đợt mới**.
+5. Hệ thống sẽ lập tức hiển thị bảng xem trước (Preview) toàn bộ các mốc kiểm tra và nộp bài đã được dời lịch chính xác theo tuần và giờ.
+6. Kiểm tra lại và bấm **"Lưu đợt tốt nghiệp"**. Đợt mới sẽ được tạo với cấu hình mốc duyệt hoàn chỉnh mà không chứa bất kỳ dữ liệu sinh viên hay điểm số cũ nào.
+
+### Dành cho Sinh viên - Tự khai báo điều kiện:
+1. Vào mục **Đăng ký đề tài & Chọn GVHD** (Bước 1).
+2. Tại mục *Tự khai báo điều kiện làm ĐATN/ĐATH*, chọn:
+   - **Đã đủ điều kiện**: Nếu sinh viên đã hoàn thành đủ học phần và chuẩn đầu ra.
+   - **Chưa đủ điều kiện**: Nếu còn nợ môn hoặc chứng chỉ.
+3. Khi chọn *Chưa đủ điều kiện*:
+   - Tích chọn ít nhất một lý do cụ thể.
+   - Nếu nợ môn, bấm **＋ Thêm học phần** và nhập tên môn còn nợ.
+   - Nhập thông tin chứng chỉ Tiếng Anh hoặc mô tả chi tiết nếu có.
+4. Bấm **Tiếp tục** để sang Bước 2 chọn GVHD và hoàn tất đăng ký.
+
+### Dành cho Admin - Xem và Thẩm định điều kiện:
+1. Vào tab **Quản lý Đăng ký đề tài**.
+2. Quan sát cột trạng thái điều kiện: Badge xanh lá `✓ Đủ điều kiện` hoặc đỏ `! Chưa đủ ĐK`.
+3. Sử dụng bộ lọc nhanh để lọc riêng các sinh viên chưa đủ điều kiện.
+4. Bấm vào badge hoặc nút **Thẩm định** để mở popup xem chi tiết tờ khai của sinh viên.
+5. Cập nhật kết luận thẩm định của Khoa và bấm **Lưu kết quả thẩm định**.
+
+---
+
+## 8. HƯỚNG DẪN KHI BẬT LẠI MÁY HHHH-HP (SÁNG MAI)
+
+Khi Quản trị viên mở lại máy HHHH-HP:
+1. Hủy (Cancel/Abort) phiên làm việc cũ của Antigravity đang treo dở trên HHHH-HP.
+2. Mở terminal tại thư mục dự án trên HHHH-HP.
+3. Chạy lệnh:
+   ```bash
+   git status
+   git fetch origin
+   git pull origin main
+   npm test
+   ```
+4. Kiểm tra đảm bảo HHHH-HP nhận đủ commit mới nhất và toàn bộ 263 tests đều PASS.
+5. Không cần làm lại bất kỳ bước nào trong 3 yêu cầu trên vì toàn bộ mã nguồn đã hoàn chỉnh trên GitHub.
