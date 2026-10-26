@@ -224,11 +224,18 @@ test('--- YÊU CẦU 2: LINK THAM GIA ĐỢT TỐT NGHIỆP ---', async (t) => {
       roundId: 'r1',
       joinMethod: 'link',
       source: 'self_join_link',
-      eligible: true
+      eligible: false,
+      eligibilityDeclaration: {
+        status: 'undeclared'
+      }
     };
 
-    // Must NOT contain topic approval or eligibility declaration status
-    assert.strictEqual(selfJoinPayload.eligibilityDeclaration, undefined);
+    // Must NOT be recognized as eligible, must use 'undeclared' (Chưa khai báo)
+    assert.strictEqual(selfJoinPayload.eligible, false);
+    assert.deepStrictEqual(selfJoinPayload.eligibilityDeclaration, { status: 'undeclared' });
+    assert.notStrictEqual(selfJoinPayload.eligibilityDeclaration?.status, 'eligible');
+    assert.notStrictEqual(selfJoinPayload.eligibilityDeclaration?.status, 'pending');
+    assert.strictEqual(selfJoinPayload.adminReview, undefined);
     assert.strictEqual(selfJoinPayload.topicApprovalStatus, undefined);
     assert.strictEqual(selfJoinPayload.assignedSupervisor, undefined);
     assert.strictEqual(selfJoinPayload.officialAssignments, undefined);

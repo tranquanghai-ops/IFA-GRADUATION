@@ -70,8 +70,9 @@ async function checkStudentEligibilityAndRegistration(roundId) {
       getDoc(doc(db, 'graduationRounds', roundId, 'officialAssignments', mssv)).catch(() => null)
     ]);
 
-    const hasExplicitBlacklist = elDoc?.exists() && elDoc.data()?.eligible === false;
-    const hasExplicitEligible = elDoc?.exists() && elDoc.data()?.eligible !== false;
+    const isSelfJoined = Boolean(elDoc?.exists() && (elDoc.data()?.joinMethod === 'link' || elDoc.data()?.source === 'self_join_link'));
+    const hasExplicitBlacklist = Boolean(elDoc?.exists() && elDoc.data()?.eligible === false && !isSelfJoined);
+    const hasExplicitEligible = Boolean(elDoc?.exists() && (isSelfJoined ? (elDoc.data()?.eligible === true) : (elDoc.data()?.eligible !== false)));
     const hasReg = Boolean(regDoc?.exists());
     const hasAssignment = Boolean(assignmentDoc?.exists());
     const isActAsStudent = Boolean(state.impersonation && (state.impersonation.target?.type === 'student' || state.impersonation.target?.mssv === mssv));
@@ -85,7 +86,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
       if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
       if (heroCard) heroCard.classList.remove('hidden');
       if (journeyCard) journeyCard.classList.remove('hidden');
-    } else if (allowPre) {
+    } else if (allowPre || isSelfJoined) {
       state.isEligible = 'pending';
       state.eligibilityState = 'pending';
       if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');

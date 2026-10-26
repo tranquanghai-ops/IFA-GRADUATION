@@ -980,7 +980,7 @@ window.saveSelectedSupervisorsToRound = async function() {
 
   const batch = writeBatch(db);
   toAdd.forEach(sup => {
-    const supId = sup.id;
+    const supId = String(sup.id || '').trim();
     const ref = doc(db, 'graduationRounds', roundId, 'supervisors', supId);
     batch.set(ref, {
       supervisorId: supId,
@@ -999,7 +999,7 @@ window.saveSelectedSupervisorsToRound = async function() {
       activeInRound: true,
       sortOrder: 1,
       createdAt: serverTimestamp()
-    });
+    }, { merge: true });
   });
 
   try {

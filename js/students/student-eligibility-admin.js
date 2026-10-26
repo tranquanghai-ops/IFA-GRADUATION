@@ -282,6 +282,24 @@ function renderAdminEligibleStudentsTable() {
       ? window.renderUserActivityBadge(s.studentId)
       : '<span class="text-slate-400 text-xs">--</span>';
 
+    let eligibilityBadge = '<span class="badge badge-open">Đủ ĐK</span>';
+    if (s.joinMethod === 'link' || s.source === 'self_join_link' || s.eligible === false) {
+      const reg = status.registration;
+      const decl = reg?.eligibilityDeclaration || s.eligibilityDeclaration;
+      const adminRev = reg?.adminReview || s.adminReview;
+      if (adminRev?.status === 'eligible') {
+        eligibilityBadge = '<span class="badge badge-open">Đủ ĐK (Khoa)</span>';
+      } else if (adminRev?.status === 'ineligible') {
+        eligibilityBadge = '<span class="badge badge-closed">Chưa đủ ĐK</span>';
+      } else if (decl?.status === 'eligible') {
+        eligibilityBadge = '<span class="badge badge-pending">SV khai Đủ ĐK</span>';
+      } else if (decl?.status === 'ineligible') {
+        eligibilityBadge = '<span class="badge badge-closed">SV khai Chưa đủ ĐK</span>';
+      } else {
+        eligibilityBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-300">Chưa khai báo</span>';
+      }
+    }
+
     return `
     <tr class="hover:bg-slate-50 transition-colors">
       <td class="p-3 font-mono font-bold text-slate-900">${escapeHtml(s.studentId)}</td>
@@ -298,7 +316,7 @@ function renderAdminEligibleStudentsTable() {
       </td>
       <td class="p-3 font-mono text-slate-700">${String(s.resolvedClass).includes('<span') ? s.resolvedClass : escapeHtml(s.resolvedClass)}</td>
       <td class="p-3 text-slate-700">${escapeHtml(s.resolvedMajor)}</td>
-      <td class="p-3"><span class="badge badge-open">Đủ ĐK</span></td>
+      <td class="p-3">${eligibilityBadge}</td>
       <td class="p-3 whitespace-nowrap">
         <button type="button" onclick="openStudentActivityHistoryModal('${s.studentId}')" class="text-left group hover:opacity-80 transition-all cursor-pointer p-0 bg-transparent border-0 inline-block" title="Bấm để xem lịch sử 10 hoạt động gần nhất">
           ${activityBadge}

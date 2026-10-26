@@ -78,7 +78,7 @@ after(async () => {
 
 test('--- FIRESTORE RULES: SELF-JOIN ELIGIBLE STUDENTS ---', async (t) => {
 
-  await t.test('1. Sinh viên hợp lệ có thể tự ghi danh vào đợt mở allowSelfJoin == true', async () => {
+  await t.test('1. Sinh viên hợp lệ có thể tự ghi danh với trạng thái Chưa khai báo (undeclared)', async () => {
     const db = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
     const payload = {
       studentId: student1Mssv,
@@ -92,12 +92,90 @@ test('--- FIRESTORE RULES: SELF-JOIN ELIGIBLE STUDENTS ---', async (t) => {
       roundId: roundOpenId,
       joinMethod: 'link',
       source: 'self_join_link',
-      eligible: true
+      eligible: false,
+      eligibilityDeclaration: {
+        status: 'undeclared'
+      }
     };
     await assertSucceeds(setDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student1Mssv}`), payload));
   });
 
-  await t.test('2. Sinh viên KHÔNG THỂ mạo danh để ghi danh cho MSSV khác', async () => {
+  await t.test('2. Sinh viên KHÔNG THỂ tự khai mình đã được duyệt đủ điều kiện (eligible == true)', async () => {
+    const db = env.authenticatedContext('student2_uid', actor(student2Email)).firestore();
+    const payload = {
+      studentId: student2Mssv,
+      mssv: student2Mssv,
+      name: 'Trần Thị B',
+      fullName: 'Trần Thị B',
+      email: student2Email,
+      className: '22050101',
+      studentClass: '22050101',
+      major: 'Thiết kế Nội thất',
+      roundId: roundOpenId,
+      joinMethod: 'link',
+      source: 'self_join_link',
+      eligible: true // CỐ TÌNH TỰ NHẬN ĐỦ ĐIỀU KIỆN
+    };
+    await assertFails(setDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student2Mssv}`), payload));
+  });
+
+  await t.test('3. Sinh viên KHÔNG THỂ tự khai status == "eligible" hoặc "pending" trong eligibilityDeclaration', async () => {
+    const db = env.authenticatedContext('student2_uid', actor(student2Email)).firestore();
+    
+    // Thử status: eligible
+    await assertFails(setDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student2Mssv}`), {
+      studentId: student2Mssv,
+      email: student2Email,
+      roundId: roundOpenId,
+      joinMethod: 'link',
+      source: 'self_join_link',
+      eligible: false,
+      eligibilityDeclaration: {
+        status: 'eligible'
+      }
+    }));
+
+    // Thử status: pending (không thuộc schema tự tham gia)
+    await assertFails(setDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student2Mssv}`), {
+      studentId: student2Mssv,
+      email: student2Email,
+      roundId: roundOpenId,
+      joinMethod: 'link',
+      source: 'self_join_link',
+      eligible: false,
+      eligibilityDeclaration: {
+        status: 'pending'
+      }
+    }));
+  });
+
+  await t.test('4. Sinh viên KHÔNG THỂ tự chèn kết quả thẩm định adminReview hoặc điểm', async () => {
+    const db = env.authenticatedContext('student2_uid', actor(student2Email)).firestore();
+    
+    await assertFails(setDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student2Mssv}`), {
+      studentId: student2Mssv,
+      email: student2Email,
+      roundId: roundOpenId,
+      joinMethod: 'link',
+      source: 'self_join_link',
+      eligible: false,
+      eligibilityDeclaration: { status: 'undeclared' },
+      adminReview: { status: 'eligible' } // MẠO DANH QUYỀN KHOA
+    }));
+
+    await assertFails(setDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student2Mssv}`), {
+      studentId: student2Mssv,
+      email: student2Email,
+      roundId: roundOpenId,
+      joinMethod: 'link',
+      source: 'self_join_link',
+      eligible: false,
+      eligibilityDeclaration: { status: 'undeclared' },
+      scores: { total: 10 } // MẠO DANH ĐIỂM
+    }));
+  });
+
+  await t.test('5. Sinh viên KHÔNG THỂ mạo danh để ghi danh cho MSSV khác', async () => {
     const db = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
     const payload = {
       studentId: student2Mssv, // Mạo danh student 2
@@ -111,122 +189,146 @@ test('--- FIRESTORE RULES: SELF-JOIN ELIGIBLE STUDENTS ---', async (t) => {
       roundId: roundOpenId,
       joinMethod: 'link',
       source: 'self_join_link',
-      eligible: true
+      eligible: false,
+      eligibilityDeclaration: { status: 'undeclared' }
     };
     await assertFails(setDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student2Mssv}`), payload));
   });
 
-  await t.test('3. Sinh viên KHÔNG THỂ ghi danh khi đợt khóa link (allowSelfJoin == false)', async () => {
+  await t.test('6. Sinh viên KHÔNG THỂ ghi danh khi đợt khóa link (allowSelfJoin == false)', async () => {
     const db = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
     const payload = {
       studentId: student1Mssv,
-      mssv: student1Mssv,
-      name: 'Nguyễn Văn A',
-      fullName: 'Nguyễn Văn A',
       email: student1Email,
-      className: '19050101',
-      studentClass: '19050101',
-      major: 'Thiết kế Nội thất',
       roundId: roundDisabledId,
       joinMethod: 'link',
       source: 'self_join_link',
-      eligible: true
+      eligible: false,
+      eligibilityDeclaration: { status: 'undeclared' }
     };
     await assertFails(setDoc(doc(db, `graduationRounds/${roundDisabledId}/eligibleStudents/${student1Mssv}`), payload));
   });
 
-  await t.test('4. Sinh viên KHÔNG THỂ ghi danh vào đợt đã kết thúc (isClosed == true)', async () => {
+  await t.test('7. Sinh viên KHÔNG THỂ ghi danh vào đợt đã kết thúc hoặc lưu trữ', async () => {
     const db = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
-    const payload = {
+    const pClosed = {
       studentId: student1Mssv,
-      mssv: student1Mssv,
-      name: 'Nguyễn Văn A',
-      fullName: 'Nguyễn Văn A',
       email: student1Email,
-      className: '19050101',
-      studentClass: '19050101',
-      major: 'Thiết kế Nội thất',
       roundId: roundClosedId,
       joinMethod: 'link',
       source: 'self_join_link',
-      eligible: true
+      eligible: false,
+      eligibilityDeclaration: { status: 'undeclared' }
     };
-    await assertFails(setDoc(doc(db, `graduationRounds/${roundClosedId}/eligibleStudents/${student1Mssv}`), payload));
-  });
+    await assertFails(setDoc(doc(db, `graduationRounds/${roundClosedId}/eligibleStudents/${student1Mssv}`), pClosed));
 
-  await t.test('5. Sinh viên KHÔNG THỂ ghi danh vào đợt đã lưu trữ (isHidden == true)', async () => {
-    const db = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
-    const payload = {
+    const pHidden = {
       studentId: student1Mssv,
-      mssv: student1Mssv,
-      name: 'Nguyễn Văn A',
-      fullName: 'Nguyễn Văn A',
       email: student1Email,
-      className: '19050101',
-      studentClass: '19050101',
-      major: 'Thiết kế Nội thất',
       roundId: roundHiddenId,
       joinMethod: 'link',
       source: 'self_join_link',
-      eligible: true
+      eligible: false,
+      eligibilityDeclaration: { status: 'undeclared' }
     };
-    await assertFails(setDoc(doc(db, `graduationRounds/${roundHiddenId}/eligibleStudents/${student1Mssv}`), payload));
+    await assertFails(setDoc(doc(db, `graduationRounds/${roundHiddenId}/eligibleStudents/${student1Mssv}`), pHidden));
   });
 
-  await t.test('6. Sinh viên KHÔNG THỂ chèn thêm các trường ngoài whitelist (vd điểm số, đề tài)', async () => {
-    const db = env.authenticatedContext('student2_uid', actor(student2Email)).firestore();
-    const payloadWithIllegalField = {
-      studentId: student2Mssv,
-      mssv: student2Mssv,
-      name: 'Trần Thị B',
-      fullName: 'Trần Thị B',
-      email: student2Email,
-      className: '22050101',
-      studentClass: '22050101',
-      major: 'Thiết kế Nội thất',
-      roundId: roundOpenId,
-      joinMethod: 'link',
-      source: 'self_join_link',
-      eligible: true,
-      hackedScores: 10, // TRƯỜNG BẤT HỢP PHÁP
-      topicApproved: true // TRƯỜNG BẤT HỢP PHÁP
-    };
-    await assertFails(setDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student2Mssv}`), payloadWithIllegalField));
-  });
-
-  await t.test('7. Sinh viên KHÔNG THỂ cập nhật (update) bản ghi eligibleStudents đã tồn tại', async () => {
+  await t.test('8. Sinh viên KHÔNG THỂ cập nhật (update) hoặc xóa (delete) bản ghi eligibleStudents', async () => {
     const db = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
     await assertFails(updateDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student1Mssv}`), {
-      name: 'Tên Đã Bị Sửa'
+      eligible: true
     }));
-  });
-
-  await t.test('8. Sinh viên KHÔNG THỂ xóa (delete) bản ghi eligibleStudents', async () => {
-    const db = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
     await assertFails(deleteDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student1Mssv}`)));
   });
 
-  await t.test('9. Admin có toàn quyền tạo, sửa, xóa bản ghi eligibleStudents', async () => {
-    const db = env.authenticatedContext('admin_uid', actor(adminEmail)).firestore();
-    const payload = {
-      studentId: 'admin_added_mssv',
-      mssv: 'admin_added_mssv',
-      name: 'SV Do Admin Thêm',
-      eligible: true
+  await t.test('9. Sinh viên tự tham gia có thể đăng ký đề tài vào registrations/{studentId}', async () => {
+    const db = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
+    const regPayload = {
+      studentId: student1Mssv,
+      email: student1Email,
+      topicTitle: 'Nghiên cứu thiết kế không gian công cộng',
+      projectType: 'Chuyên luận',
+      status: 'submitted',
+      preferences: [
+        { rank: 1, supervisorId: 'sup_1', supervisorName: 'GVHD 1' }
+      ],
+      eligibilityDeclaration: {
+        status: 'eligible',
+        reasons: [],
+        missingCourses: []
+      }
     };
-    await assertSucceeds(setDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/admin_added_mssv`), payload));
-    await assertSucceeds(updateDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/admin_added_mssv`), {
-      name: 'SV Đã Cập Nhật'
-    }));
-    await assertSucceeds(deleteDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/admin_added_mssv`)));
+    await assertSucceeds(setDoc(doc(db, `graduationRounds/${roundOpenId}/registrations/${student1Mssv}`), regPayload));
   });
 
-  await t.test('10. Người dùng chưa đăng nhập KHÔNG THỂ ghi hoặc đọc eligibleStudents', async () => {
+  await t.test('10. Sinh viên từ Excel đã có trong danh sách: bảo toàn và chống sửa đè', async () => {
+    // Admin nhập sinh viên từ Excel
+    const adminDb = env.authenticatedContext('admin_uid', actor(adminEmail)).firestore();
+    const excelMssv = '12000888';
+    const excelEmail = `${excelMssv}@student.tdtu.edu.vn`;
+    await assertSucceeds(setDoc(doc(adminDb, `graduationRounds/${roundOpenId}/eligibleStudents/${excelMssv}`), {
+      studentId: excelMssv,
+      name: 'Sinh viên từ Excel',
+      email: excelEmail,
+      eligible: true,
+      source: 'excel_import'
+    }));
+
+    // Sinh viên khác không thể ghi đè hoặc sửa bản ghi này
+    const studentDb = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
+    await assertFails(setDoc(doc(studentDb, `graduationRounds/${roundOpenId}/eligibleStudents/${excelMssv}`), {
+      studentId: excelMssv,
+      email: excelEmail,
+      name: 'Tên Sửa Đè',
+      eligible: false
+    }));
+  });
+
+  await t.test('11. Hai Admin thêm cùng GVHD: khóa document cố định supervisors/{supId}, không tạo trùng', async () => {
+    const adminDb = env.authenticatedContext('admin_uid', actor(adminEmail)).firestore();
+    const supId = 'sup_nguyen_van_c';
+
+    // Admin 1 thêm GVHD với quota mặc định 5
+    await assertSucceeds(setDoc(doc(adminDb, `graduationRounds/${roundOpenId}/supervisors/${supId}`), {
+      supervisorId: supId,
+      name: 'TS. Nguyễn Văn C',
+      capacity: 5,
+      activeInRound: true
+    }));
+
+    // Admin điều chỉnh hạn ngạch lên 8
+    await assertSucceeds(updateDoc(doc(adminDb, `graduationRounds/${roundOpenId}/supervisors/${supId}`), {
+      capacity: 8
+    }));
+
+    // Admin 2 ghi đồng thời cùng khóa supId: Document duy nhất supId, không tạo bản ghi thứ hai
+    await assertSucceeds(setDoc(doc(adminDb, `graduationRounds/${roundOpenId}/supervisors/${supId}`), {
+      supervisorId: supId,
+      name: 'TS. Nguyễn Văn C',
+      activeInRound: true
+    }, { merge: true }));
+
+    // Đọc lại document: chỉ tồn tại duy nhất 1 document với supId
+    const snap = await getDoc(doc(adminDb, `graduationRounds/${roundOpenId}/supervisors/${supId}`));
+    assert.equal(snap.exists(), true);
+    assert.equal(snap.data().supervisorId, supId);
+    assert.equal(snap.data().capacity, 8); // Hạn ngạch 8 không bị ghi đè!
+
+    // Sinh viên không được phép sửa hoặc xóa GVHD trong đợt
+    const studentDb = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
+    await assertFails(updateDoc(doc(studentDb, `graduationRounds/${roundOpenId}/supervisors/${supId}`), {
+      capacity: 20
+    }));
+    await assertFails(deleteDoc(doc(studentDb, `graduationRounds/${roundOpenId}/supervisors/${supId}`)));
+  });
+
+  await t.test('12. Người dùng chưa đăng nhập KHÔNG THỂ ghi hoặc đọc eligibleStudents', async () => {
     const db = env.unauthenticatedContext().firestore();
     await assertFails(getDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student1Mssv}`)));
     await assertFails(setDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student1Mssv}`), {
       studentId: student1Mssv,
-      eligible: true
+      eligible: false
     }));
   });
 });

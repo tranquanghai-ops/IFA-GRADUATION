@@ -410,7 +410,7 @@ window.confirmStudentSelfJoinRound = async function() {
       return;
     }
 
-    // Write new eligible record
+    // Write new record for self-joined student (status: undeclared, not auto-eligible)
     const payload = {
       studentId: studentMssv,
       mssv: studentMssv,
@@ -425,7 +425,10 @@ window.confirmStudentSelfJoinRound = async function() {
       createdAt: serverTimestamp(),
       joinMethod: 'link',
       source: 'self_join_link',
-      eligible: true
+      eligible: false,
+      eligibilityDeclaration: {
+        status: 'undeclared'
+      }
     };
 
     await setDoc(studentRef, payload);

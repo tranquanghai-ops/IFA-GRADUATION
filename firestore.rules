@@ -102,7 +102,7 @@ service cloud.firestore {
           || (student()
               && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
               && request.resource.data.studentId == studentId
-              && request.resource.data.eligible == true
+              && request.resource.data.get('eligible', false) != true
               && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.allowSelfJoin == true
               && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['isClosed'])
                   || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.isClosed == false)
@@ -110,7 +110,15 @@ service cloud.firestore {
                   || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.isHidden == false)
               && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status'])
                   || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'active'])
-              && request.resource.data.keys().hasOnly(['studentId', 'mssv', 'name', 'fullName', 'email', 'className', 'studentClass', 'major', 'roundId', 'joinedAt', 'createdAt', 'joinMethod', 'source', 'eligible']));
+              && request.resource.data.keys().hasOnly(['studentId', 'mssv', 'name', 'fullName', 'email', 'className', 'studentClass', 'major', 'roundId', 'joinedAt', 'createdAt', 'joinMethod', 'source', 'eligible', 'eligibilityDeclaration'])
+              && (!('eligibilityDeclaration' in request.resource.data)
+                  || (request.resource.data.eligibilityDeclaration is map
+                      && request.resource.data.eligibilityDeclaration.status == 'undeclared'
+                      && request.resource.data.eligibilityDeclaration.keys().hasOnly(['status'])))
+              && !('adminReview' in request.resource.data)
+              && !('reviewResult' in request.resource.data)
+              && !('scores' in request.resource.data)
+              && !('councilScores' in request.resource.data));
         allow update, delete: if admin();
       }
 
@@ -229,10 +237,9 @@ service cloud.firestore {
               || (exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId))
                 && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.assignmentStatus == 'published'))
             && (
-              (exists(/databases/$(database)/documents/graduationRounds/$(roundId)/eligibleStudents/$(studentId))
-               && get(/databases/$(database)/documents/graduationRounds/$(roundId)/eligibleStudents/$(studentId)).data.eligible == true)
+              exists(/databases/$(database)/documents/graduationRounds/$(roundId)/eligibleStudents/$(studentId))
               ||
-              (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.allowRegistrationBeforeEligibility == true
+              (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.get('allowRegistrationBeforeEligibility', false) == true
                && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['eligibilityFinalized'])
                    || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.eligibilityFinalized == false))
             )
