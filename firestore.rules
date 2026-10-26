@@ -98,7 +98,20 @@ service cloud.firestore {
       match /eligibleStudents/{studentId} {
         allow get: if admin() || staff() || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$'));
         allow list: if admin() || staff();
-        allow create, update, delete: if admin();
+        allow create: if admin()
+          || (student()
+              && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
+              && request.resource.data.studentId == studentId
+              && request.resource.data.eligible == true
+              && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.allowSelfJoin == true
+              && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['isClosed'])
+                  || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.isClosed == false)
+              && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['isHidden'])
+                  || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.isHidden == false)
+              && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status'])
+                  || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'active'])
+              && request.resource.data.keys().hasOnly(['studentId', 'mssv', 'name', 'fullName', 'email', 'className', 'studentClass', 'major', 'roundId', 'joinedAt', 'createdAt', 'joinMethod', 'source', 'eligible']));
+        allow update, delete: if admin();
       }
 
       // Official supervisor assignment exists independently from registration.
@@ -586,7 +599,7 @@ service cloud.firestore {
         allow create: if (admin() && request.resource.data.by == email())
           || (student()
               && request.resource.data.by == email()
-              && request.resource.data.action in ['Nộp bài', 'Rút bài', 'Nộp bài bổ sung']
+              && request.resource.data.action in ['Nộp bài', 'Rút bài', 'Nộp bài bổ sung', 'Tham gia đợt qua link']
               && request.resource.data.roundId == roundId)
           || (staff()
               && request.resource.data.by == email()

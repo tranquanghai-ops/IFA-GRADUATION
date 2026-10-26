@@ -752,7 +752,7 @@ function renderAdminRoundSupervisorsTable(roundId, list) {
   if (!tbody) return;
 
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Chưa có GVHD nào trong đợt này. Bấm "+ Thêm GVHD từ kho Master" để thêm.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Chưa có GVHD nào trong đợt này. Bấm "+ Thêm GVHD từ Danh sách GVHD chính" để thêm.</td></tr>';
     return;
   }
 
@@ -853,25 +853,73 @@ window.toggleSelectAllSupPicker = function() {
   updateSupPickerCount();
 };
 
-window.openAddSupervisorsToRoundModal = async function() {
-  await loadAdminSupervisorsMaster();
-  const listEl = document.getElementById('sup-master-picker-list');
-  const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
-  
-  const activeSups = state.supervisorsMaster.filter(s => s.active !== false);
-  const totalBadge = document.getElementById('sup-picker-total-badge');
-  if (totalBadge) totalBadge.textContent = `${activeSups.length} GVHD khả dụng`;
+window.openAddSupervisorsToRoundModal = async function(targetRoundId) {
+  const roundId = targetRoundId || document.getElementById('admin-round-sup-select')?.value || state.selectedRoundId || state.activeRound?.id;
+  if (!roundId) {
+    showToast('Vui lòng chọn đợt tốt nghiệp trước khi thêm GVHD.', 'warning');
+    return;
+  }
+  state.currentSupervisorRoundId = roundId;
+  const sel = document.getElementById('admin-round-sup-select');
+  if (sel && sel.value !== roundId) sel.value = roundId;
 
-  listEl.innerHTML = activeSups.map(s => `
-    <label class="flex items-center gap-3.5 p-3 hover:bg-slate-50 cursor-pointer rounded-xl transition-colors">
-      <input type="checkbox" value="${s.id}" onchange="updateSupPickerCount()" class="sup-picker-chk w-4 h-4 rounded text-blue-600">
-      <img src="${s.photoUrl || defaultAvatar}" class="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-sm shrink-0">
-      <div class="flex-1 min-w-0">
-        <span class="font-bold text-slate-800 text-xs block truncate">${s.name}</span>
-        <span class="text-[11px] text-slate-500 block truncate">${s.department || 'Thiết kế nội thất'} • ${s.expertise || 'Đang cập nhật'}</span>
-      </div>
-    </label>
-  `).join('');
+  await loadAdminSupervisorsMaster();
+
+  // Load currently participating supervisors in this round to exclude already added
+  let participatingSups = [];
+  try {
+    const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'supervisors'));
+    participatingSups = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.warn('[SupervisorsMaster] Load participating supervisors notice:', err);
+  }
+
+  // Build sets of already participating identifiers (normalized ID and email)
+  const existingIds = new Set();
+  const existingEmails = new Set();
+  participatingSups.forEach(s => {
+    if (s.id) existingIds.add(String(s.id).trim().toLowerCase());
+    if (s.supervisorId) existingIds.add(String(s.supervisorId).trim().toLowerCase());
+    if (s.email) existingEmails.add(String(s.email).trim().toLowerCase());
+  });
+
+  // Filter master pool: only active supervisors not yet participating in the round
+  const allMaster = Array.isArray(state.supervisorsMaster) ? state.supervisorsMaster : [];
+  const unaddedSups = allMaster.filter(s => {
+    if (s.active === false) return false;
+    const sId = String(s.id || '').trim().toLowerCase();
+    const sEmail = String(s.email || '').trim().toLowerCase();
+    if (existingIds.has(sId)) return false;
+    if (sEmail && existingEmails.has(sEmail)) return false;
+    return true;
+  });
+
+  const listEl = document.getElementById('sup-master-picker-list');
+  const totalBadge = document.getElementById('sup-picker-total-badge');
+  if (totalBadge) totalBadge.textContent = String(unaddedSups.length) + ' GVHD khả dụng';
+
+  if (unaddedSups.length === 0) {
+    listEl.innerHTML = '<div class="p-8 text-center text-slate-500 text-xs font-semibold">Tất cả giảng viên trong Danh sách GVHD chính đã được thêm vào đợt này.</div>';
+  } else {
+    listEl.innerHTML = unaddedSups.map(s => {
+      const escapedName = escapeHtml(s.name || '');
+      const escapedEmail = escapeHtml(s.email || '');
+      const escapedDept = escapeHtml(s.department || 'Thiết kế nội thất');
+      const escapedExp = escapeHtml(s.expertise || 'Đang cập nhật');
+      const avatarSrc = (s.photoUrl && s.photoUrl.trim()) ? s.photoUrl : getSupervisorAvatarSvgDataUri(s.name);
+
+      return [
+        '<label class="flex items-center gap-3.5 p-3 hover:bg-slate-50 cursor-pointer rounded-xl transition-colors">',
+        '  <input type="checkbox" value="' + escapeHtml(s.id) + '" data-email="' + escapedEmail + '" onchange="updateSupPickerCount()" class="sup-picker-chk w-4 h-4 rounded text-blue-600">',
+        '  <img src="' + avatarSrc + '" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri(\'' + escapedName + '\');" class="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-sm shrink-0" alt="' + escapedName + '">',
+        '  <div class="flex-1 min-w-0">',
+        '    <span class="font-bold text-slate-800 text-xs block truncate">' + escapedName + '</span>',
+        '    <span class="text-[11px] text-slate-500 block truncate">' + escapedDept + ' • ' + escapedExp + '</span>',
+        '  </div>',
+        '</label>'
+      ].join('\n');
+    }).join('');
+  }
 
   updateSupPickerCount();
   document.getElementById('modal-add-sup-to-round').classList.remove('hidden');
@@ -882,8 +930,11 @@ window.closeAddSupToRoundModal = function() {
 };
 
 window.saveSelectedSupervisorsToRound = async function() {
-  const roundId = document.getElementById('admin-round-sup-select').value;
-  if (!roundId) return;
+  const roundId = state.currentSupervisorRoundId || document.getElementById('admin-round-sup-select')?.value;
+  if (!roundId) {
+    showToast('Chưa xác định đợt tốt nghiệp.', 'error');
+    return;
+  }
 
   const chks = Array.from(document.querySelectorAll('.sup-picker-chk:checked'));
   if (chks.length === 0) {
@@ -891,12 +942,45 @@ window.saveSelectedSupervisorsToRound = async function() {
     return;
   }
 
-  const batch = writeBatch(db);
+  // Pre-commit re-check to avoid concurrent duplicates from another admin
+  let currentExistingIds = new Set();
+  let currentExistingEmails = new Set();
+  try {
+    const curSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'supervisors'));
+    curSnap.docs.forEach(d => {
+      const data = d.data() || {};
+      if (d.id) currentExistingIds.add(String(d.id).trim().toLowerCase());
+      if (data.supervisorId) currentExistingIds.add(String(data.supervisorId).trim().toLowerCase());
+      if (data.email) currentExistingEmails.add(String(data.email).trim().toLowerCase());
+    });
+  } catch (err) {
+    console.warn('[SupervisorsMaster] Pre-save duplicate check notice:', err);
+  }
+
+  const toAdd = [];
   chks.forEach(chk => {
     const supId = chk.value;
-    const sup = state.supervisorsMaster.find(s => s.id === supId);
+    const sup = (state.supervisorsMaster || []).find(s => s.id === supId);
     if (!sup) return;
 
+    const sId = String(sup.id || '').trim().toLowerCase();
+    const sEmail = String(sup.email || '').trim().toLowerCase();
+    if (currentExistingIds.has(sId) || (sEmail && currentExistingEmails.has(sEmail))) {
+      return; // Already added concurrently
+    }
+    toAdd.push(sup);
+  });
+
+  if (toAdd.length === 0) {
+    showToast('Tất cả giảng viên được chọn đã được thêm vào đợt bởi người quản trị khác.', 'info');
+    closeAddSupToRoundModal();
+    await loadAdminRoundSupervisors(roundId);
+    return;
+  }
+
+  const batch = writeBatch(db);
+  toAdd.forEach(sup => {
+    const supId = sup.id;
     const ref = doc(db, 'graduationRounds', roundId, 'supervisors', supId);
     batch.set(ref, {
       supervisorId: supId,
@@ -904,6 +988,7 @@ window.saveSelectedSupervisorsToRound = async function() {
       email: sup.email || '',
       phone: sup.phone || '',
       photoUrl: sup.photoUrl || '',
+      photoPath: sup.photoPath || '',
       department: sup.department || '',
       expertise: sup.expertise || '',
       bio: sup.bio || '',
@@ -922,11 +1007,11 @@ window.saveSelectedSupervisorsToRound = async function() {
     closeAddSupToRoundModal();
     await loadAdminRoundSupervisors(roundId);
     await refreshRoundCardMetrics(roundId);
+    showToast('✓ Đã thêm ' + toAdd.length + ' giảng viên vào đợt tốt nghiệp!', 'success');
   } catch (e) {
     showToast('Lỗi thêm GVHD: ' + e.message, 'error');
   }
 };
-
 
 // =========================================================================
 

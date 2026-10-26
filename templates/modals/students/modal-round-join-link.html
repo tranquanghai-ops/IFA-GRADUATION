@@ -1,0 +1,80 @@
+<!-- MODAL: LINK THAM GIA ĐỢT TỐT NGHIỆP (CHO ADMIN) -->
+<div id="modal-round-join-link" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+  <div class="modal-size-form bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-scale-up">
+    <!-- Header -->
+    <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0 bg-slate-50/60">
+      <div class="flex items-center gap-2.5">
+        <span class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-lg text-indigo-600 shadow-2xs">🔗</span>
+        <div>
+          <h3 class="font-black text-base text-slate-900">Link tham gia Đợt Tốt nghiệp</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Cung cấp liên kết để sinh viên tự xác nhận tham gia đợt</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeRoundJoinLinkModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center font-bold text-sm transition-colors cursor-pointer">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="p-5 space-y-4 text-xs overflow-y-auto">
+      <!-- Round Info Box -->
+      <div class="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-1">
+        <span class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-700 block">Đợt tốt nghiệp áp dụng</span>
+        <h4 id="round-join-link-title" class="font-bold text-slate-900 text-sm leading-snug">--</h4>
+        <p id="round-join-link-year" class="text-slate-600 text-[11px]"></p>
+      </div>
+
+      <!-- Toggle Switch for allowSelfJoin -->
+      <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-slate-800 text-xs">Cho phép SV tự tham gia qua link</span>
+            <span id="round-join-link-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">Đang kiểm tra...</span>
+          </div>
+          <p class="text-[11px] text-slate-500 leading-relaxed">Khi tắt, sinh viên mở link sẽ không thể ghi danh mới. Dữ liệu SV đã tham gia trước đó được giữ nguyên.</p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+          <input type="checkbox" id="round-join-link-toggle" onchange="toggleRoundSelfJoin(this.checked)" class="sr-only peer">
+          <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+        </label>
+      </div>
+
+      <!-- Link URL Box -->
+      <div class="space-y-1.5">
+        <label for="round-join-link-url" class="font-bold text-slate-700 block">Đường dẫn tham gia (Dành cho Sinh viên):</label>
+        <div class="flex items-center gap-2">
+          <input type="text" id="round-join-link-url" readonly onclick="this.select()" class="flex-1 bg-white border border-slate-300 rounded-xl font-mono text-xs px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs select-all" placeholder="Đang tạo link...">
+          <button type="button" id="btn-copy-round-join-link" onclick="copyRoundJoinLink()" class="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shrink-0 flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer">
+            <span>📋</span>
+            <span>Sao chép</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Buttons: Open Test -->
+      <div class="flex items-center justify-between pt-1">
+        <span class="text-[11px] text-slate-400 italic">Link hoạt động trên cả trình duyệt máy tính và điện thoại</span>
+        <button type="button" onclick="testOpenRoundJoinLink()" class="text-blue-600 hover:text-blue-800 font-bold text-xs flex items-center gap-1 hover:underline cursor-pointer">
+          <span>↗</span>
+          <span>Mở thử link</span>
+        </button>
+      </div>
+
+      <!-- Notes Box -->
+      <div class="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-[11px] text-amber-900 space-y-1">
+        <div class="font-bold flex items-center gap-1 text-amber-950">
+          <span>💡</span>
+          <span>Quy tắc vận hành:</span>
+        </div>
+        <ul class="list-disc list-inside space-y-0.5 text-amber-800">
+          <li>Sinh viên bắt buộc đăng nhập tài khoản Google TDTU (<code>@student.tdtu.edu.vn</code>).</li>
+          <li>Hệ thống tự động liên kết hồ sơ và bổ sung trực tiếp vào đợt, không cần duyệt thủ công.</li>
+          <li>Mỗi sinh viên chỉ tham gia 1 lần; nếu đã tham gia qua link hoặc Excel thì không bị trùng lặp.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end items-center p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+      <button type="button" onclick="closeRoundJoinLinkModal()" class="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer">Đóng</button>
+    </div>
+  </div>
+</div>

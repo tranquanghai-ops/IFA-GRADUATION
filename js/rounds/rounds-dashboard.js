@@ -4,3 +4,4 @@
 import './rounds-loader.js';
 import './rounds-timeline-preview.js';
 import './rounds-cards.js';
+import './rounds-self-join.js';

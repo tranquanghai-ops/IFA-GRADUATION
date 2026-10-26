@@ -2115,7 +2115,7 @@
           </div>
 
           <button onclick="openAddSupervisorsToRoundModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all self-start sm:self-auto">
-            + Thêm GVHD từ kho Master
+            + Thêm GVHD từ Danh sách GVHD chính
           </button>
         </div>
 
@@ -2334,6 +2334,9 @@
                 <span>📥 Tải lên danh sách SV (.xlsx)</span>
                 <input type="file" id="excel-file-input" accept=".xlsx,.xls" onchange="handleExcelFileUpload(event)" class="hidden">
               </label>
+              <button type="button" onclick="openRoundJoinLinkModal()" class="cursor-pointer px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all inline-flex items-center gap-1.5">
+                <span>🔗 Link tham gia</span>
+              </button>
             </div>
           </div>
 
@@ -3991,6 +3994,11 @@
                   <input type="file" id="round-eligible-file-input" accept=".xlsx,.xls,.csv" onchange="handleRoundEligibleUpload(event)" class="hidden">
                 </label>
 
+                <!-- Link tham gia cho sinh viên -->
+                <button type="button" onclick="openRoundJoinLinkModal(document.getElementById('round-form-id')?.value || state.currentEditingRoundId)" class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 cursor-pointer shrink-0 shadow-sm transition-colors">
+                  <span>🔗 Link tham gia</span>
+                </button>
+
                 <!-- Clear all eligible students of this round -->
                 <button type="button" onclick="clearRoundModalEligibleStudents()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg font-semibold text-xs shrink-0 border border-rose-200 transition-colors">
                   <span>Xóa hết</span>
@@ -4212,6 +4220,189 @@
       </div>
     </div>
   </div>
+<!-- MODAL: LINK THAM GIA ĐỢT TỐT NGHIỆP (CHO ADMIN) -->
+<div id="modal-round-join-link" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+  <div class="modal-size-form bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-scale-up">
+    <!-- Header -->
+    <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0 bg-slate-50/60">
+      <div class="flex items-center gap-2.5">
+        <span class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-lg text-indigo-600 shadow-2xs">🔗</span>
+        <div>
+          <h3 class="font-black text-base text-slate-900">Link tham gia Đợt Tốt nghiệp</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Cung cấp liên kết để sinh viên tự xác nhận tham gia đợt</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeRoundJoinLinkModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center font-bold text-sm transition-colors cursor-pointer">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="p-5 space-y-4 text-xs overflow-y-auto">
+      <!-- Round Info Box -->
+      <div class="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-xl space-y-1">
+        <span class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-700 block">Đợt tốt nghiệp áp dụng</span>
+        <h4 id="round-join-link-title" class="font-bold text-slate-900 text-sm leading-snug">--</h4>
+        <p id="round-join-link-year" class="text-slate-600 text-[11px]"></p>
+      </div>
+
+      <!-- Toggle Switch for allowSelfJoin -->
+      <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-slate-800 text-xs">Cho phép SV tự tham gia qua link</span>
+            <span id="round-join-link-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">Đang kiểm tra...</span>
+          </div>
+          <p class="text-[11px] text-slate-500 leading-relaxed">Khi tắt, sinh viên mở link sẽ không thể ghi danh mới. Dữ liệu SV đã tham gia trước đó được giữ nguyên.</p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+          <input type="checkbox" id="round-join-link-toggle" onchange="toggleRoundSelfJoin(this.checked)" class="sr-only peer">
+          <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+        </label>
+      </div>
+
+      <!-- Link URL Box -->
+      <div class="space-y-1.5">
+        <label for="round-join-link-url" class="font-bold text-slate-700 block">Đường dẫn tham gia (Dành cho Sinh viên):</label>
+        <div class="flex items-center gap-2">
+          <input type="text" id="round-join-link-url" readonly onclick="this.select()" class="flex-1 bg-white border border-slate-300 rounded-xl font-mono text-xs px-3 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs select-all" placeholder="Đang tạo link...">
+          <button type="button" id="btn-copy-round-join-link" onclick="copyRoundJoinLink()" class="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shrink-0 flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer">
+            <span>📋</span>
+            <span>Sao chép</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Buttons: Open Test -->
+      <div class="flex items-center justify-between pt-1">
+        <span class="text-[11px] text-slate-400 italic">Link hoạt động trên cả trình duyệt máy tính và điện thoại</span>
+        <button type="button" onclick="testOpenRoundJoinLink()" class="text-blue-600 hover:text-blue-800 font-bold text-xs flex items-center gap-1 hover:underline cursor-pointer">
+          <span>↗</span>
+          <span>Mở thử link</span>
+        </button>
+      </div>
+
+      <!-- Notes Box -->
+      <div class="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-[11px] text-amber-900 space-y-1">
+        <div class="font-bold flex items-center gap-1 text-amber-950">
+          <span>💡</span>
+          <span>Quy tắc vận hành:</span>
+        </div>
+        <ul class="list-disc list-inside space-y-0.5 text-amber-800">
+          <li>Sinh viên bắt buộc đăng nhập tài khoản Google TDTU (<code>@student.tdtu.edu.vn</code>).</li>
+          <li>Hệ thống tự động liên kết hồ sơ và bổ sung trực tiếp vào đợt, không cần duyệt thủ công.</li>
+          <li>Mỗi sinh viên chỉ tham gia 1 lần; nếu đã tham gia qua link hoặc Excel thì không bị trùng lặp.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-end items-center p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+      <button type="button" onclick="closeRoundJoinLinkModal()" class="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: SINH VIÊN XÁC NHẬN THAM GIA ĐỢT TỐT NGHIỆP -->
+<div id="modal-student-confirm-join-round" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+  <div class="modal-size-form bg-white rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-scale-up">
+    <!-- Header -->
+    <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
+      <div class="flex items-center gap-3">
+        <span class="w-10 h-10 rounded-2xl bg-tdtu-blue text-white flex items-center justify-center text-xl font-black shadow-sm">🎓</span>
+        <div>
+          <h3 class="font-black text-base text-slate-900 tracking-tight">THAM GIA ĐỢT TỐT NGHIỆP</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Xác nhận thông tin để ghi danh vào đợt tốt nghiệp</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeStudentJoinRoundModal()" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60 flex items-center justify-center font-bold text-sm transition-colors cursor-pointer">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="p-5 space-y-4 text-xs overflow-y-auto max-h-[75vh]">
+      <!-- Round Info Banner -->
+      <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+        <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Tên đợt tốt nghiệp</span>
+        <h4 id="student-join-round-title" class="font-black text-slate-900 text-sm sm:text-base leading-snug">--</h4>
+        <div class="flex items-center gap-2 pt-1 text-slate-600">
+          <span>Năm học:</span>
+          <strong id="student-join-round-year" class="text-slate-800 font-bold">--</strong>
+        </div>
+      </div>
+
+      <!-- State A: Form xác nhận tham gia -->
+      <div id="student-join-form-section" class="space-y-3.5">
+        <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-[11px] text-blue-900 flex items-start gap-2">
+          <span class="text-sm shrink-0">ℹ️</span>
+          <span>Vui lòng kiểm tra và xác nhận thông tin sinh viên trước khi tham gia. MSSV được xác thực tự động từ tài khoản Google TDTU của bạn.</span>
+        </div>
+
+        <!-- Student Form Fields -->
+        <div class="space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="student-join-mssv" class="font-bold text-slate-700 block mb-1">Mã số sinh viên (MSSV):</label>
+              <input type="text" id="student-join-mssv" readonly class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl font-mono font-black text-xs text-slate-800 cursor-not-allowed">
+            </div>
+            <div>
+              <label for="student-join-email" class="font-bold text-slate-700 block mb-1">Email sinh viên:</label>
+              <input type="text" id="student-join-email" readonly class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-600 truncate cursor-not-allowed">
+            </div>
+          </div>
+
+          <div>
+            <label for="student-join-fullname" class="font-bold text-slate-700 block mb-1">Họ và tên sinh viên: <span class="text-rose-500">*</span></label>
+            <input type="text" id="student-join-fullname" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Nhập họ và tên đầy đủ...">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="student-join-class" class="font-bold text-slate-700 block mb-1">Lớp: <span class="text-rose-500">*</span></label>
+              <input type="text" id="student-join-class" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="VD: 20050101">
+            </div>
+            <div>
+              <label for="student-join-major" class="font-bold text-slate-700 block mb-1">Ngành đào tạo: <span class="text-rose-500">*</span></label>
+              <select id="student-join-major" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option value="Thiết kế Nội thất">Thiết kế Nội thất</option>
+                <option value="Thiết kế Đồ họa">Thiết kế Đồ họa</option>
+                <option value="Thiết kế Thời trang">Thiết kế Thời trang</option>
+                <option value="Thiết kế Công nghiệp">Thiết kế Công nghiệp</option>
+                <option value="Nghệ thuật số">Nghệ thuật số</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-[11px] text-amber-900">
+          <strong>Lưu ý:</strong> Tham gia đợt chỉ xác nhận bạn có tên trong đợt tốt nghiệp. Bạn vẫn cần tự khai báo tình trạng đủ điều kiện và đăng ký đề tài/GVHD theo đúng thời hạn của đợt.
+        </div>
+      </div>
+
+      <!-- State B: Đã tham gia hoặc Tham gia thành công -->
+      <div id="student-join-result-section" class="hidden p-6 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-3">
+        <div class="w-14 h-14 mx-auto bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl font-black shadow-inner">✓</div>
+        <div class="space-y-1">
+          <h4 id="student-join-result-title" class="font-black text-base text-emerald-950">Bạn đã tham gia đợt tốt nghiệp thành công.</h4>
+          <p id="student-join-result-desc" class="text-xs text-emerald-800">Thông tin của bạn đã được ghi nhận vào danh sách chính thức của đợt.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex justify-between items-center p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+      <button type="button" onclick="closeStudentJoinRoundModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs transition-colors cursor-pointer">Đóng</button>
+      <div id="student-join-actions-wrap" class="flex items-center gap-2">
+        <button type="button" id="btn-confirm-student-join" onclick="confirmStudentSelfJoinRound()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md transition-colors flex items-center gap-1.5 cursor-pointer">
+          <span>✓</span>
+          <span>Xác nhận tham gia</span>
+        </button>
+        <button type="button" id="btn-view-joined-round" onclick="viewJoinedRoundPortal()" class="hidden px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition-colors flex items-center gap-1.5 cursor-pointer">
+          <span>↗</span>
+          <span>Xem đợt tốt nghiệp</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
   <!-- 2. CREATE / EDIT SUPERVISOR MASTER MODAL -->
   <div id="modal-supervisor" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
@@ -4334,7 +4525,7 @@
       <div class="flex items-center justify-between p-5 border-b border-slate-100 shrink-0">
         <div>
           <h3 class="font-bold text-base text-tdtu-blue">Thêm Giảng viên vào Đợt Tốt nghiệp</h3>
-          <p class="text-xs text-slate-500 mt-0.5">Chọn giảng viên từ Danh sách GVHD để tham gia hướng dẫn trong đợt này</p>
+          <p class="text-xs text-slate-500 mt-0.5">Chọn giảng viên từ Danh sách GVHD chính để bổ sung vào đợt tốt nghiệp.</p>
         </div>
         <button onclick="closeAddSupToRoundModal()" class="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
       </div>

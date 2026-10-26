@@ -114,6 +114,9 @@ export async function setupAuthListener() {
         // Tự động kiểm tra và chuyển thẳng vào phòng chấm Hội đồng nếu có liên kết ?hd=
         setTimeout(() => {
           checkAndHandlePendingCouncilDirectLink();
+          if (typeof window.checkAndHandlePendingRoundJoin === 'function') {
+            window.checkAndHandlePendingRoundJoin();
+          }
         }, 300);
 
       } catch (err) {
@@ -168,6 +171,14 @@ export async function setupAuthListener() {
         if (standardInst) standardInst.classList.remove('hidden');
         if (councilInst) councilInst.classList.add('hidden');
         if (promptCard) promptCard.classList.add('hidden');
+      }
+
+      const joinParam = urlParams.get('join') || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('pendingJoinRound') : null);
+      if (joinParam && typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('pendingJoinRound', joinParam);
+        if (typeof window.checkAndHandlePendingRoundJoin === 'function') {
+          window.checkAndHandlePendingRoundJoin();
+        }
       }
 
       document.body.classList.remove('council-standalone-active');
