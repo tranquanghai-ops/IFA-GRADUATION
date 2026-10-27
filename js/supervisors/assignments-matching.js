@@ -297,21 +297,21 @@ function renderSupervisorsGrid() {
     if (isWizard) {
       const isSelectedForCurrentWizard = (assignedRank === state.wizardRank);
       buttonHtml = `
-        <button type="button" onclick="selectWizardPreference('${s.id}', '${encodeURIComponent(s.name)}')" class="w-full py-2 px-3 rounded-xl text-xs font-bold transition-all ${isSelectedForCurrentWizard ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
+        <button type="button" onclick="event.stopPropagation(); selectWizardPreference('${s.id}', '${encodeURIComponent(s.name)}')" class="w-full py-2 px-3 rounded-xl text-xs font-bold transition-all ${isSelectedForCurrentWizard ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}">
           ${isSelectedForCurrentWizard ? '✓ Đang chọn cho NV' + state.wizardRank : 'Chọn cho NV' + state.wizardRank}
         </button>
       `;
     } else {
       if (isSelected) {
         buttonHtml = `
-          <button type="button" onclick="removePreference('${s.id}')" class="w-full py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all">
+          <button type="button" onclick="event.stopPropagation(); removePreference('${s.id}')" class="w-full py-2 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all">
             ✕ Bỏ chọn (NV${assignedRank})
           </button>
         `;
       } else {
         const canAddMore = state.selectedPreferences.length < maxPref;
         buttonHtml = `
-          <button type="button" onclick="addCardPreference('${s.id}', '${encodeURIComponent(s.name)}')" ${!canAddMore ? 'disabled' : ''} class="w-full py-2 px-3 bg-tdtu-blue hover:bg-tdtu-dark disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
+          <button type="button" onclick="event.stopPropagation(); addCardPreference('${s.id}', '${encodeURIComponent(s.name)}')" ${!canAddMore ? 'disabled' : ''} class="w-full py-2 px-3 bg-tdtu-blue hover:bg-tdtu-dark disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
             + Chọn Nguyện vọng
           </button>
         `;
@@ -337,25 +337,28 @@ function renderSupervisorsGrid() {
       : '';
 
     return `
-      <div class="card-surface p-3.5 sm:p-4 flex flex-col justify-between card-hover relative rounded-2xl border border-slate-200/90 shadow-sm cursor-pointer select-none transition-all group ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/25 border-blue-400' : 'bg-white hover:border-blue-300 hover:shadow-md'}"
+      <div class="card-surface p-3.5 sm:p-4 flex flex-col justify-between h-full card-hover relative rounded-2xl border border-slate-200/90 shadow-sm cursor-pointer select-none transition-all group ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/25 border-blue-400' : 'bg-white hover:border-blue-300 hover:shadow-md'}"
            tabindex="0"
            role="button"
            aria-label="${isSelected ? `Bỏ chọn nguyện vọng cho ${escapedName}` : `Chọn ${escapedName} làm nguyện vọng`}"
            onclick="handleSupervisorCardClick(event, '${s.id}', '${encodeURIComponent(s.name)}', ${isWizard}, ${isSelected})"
            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();handleSupervisorCardClick(event, '${s.id}', '${encodeURIComponent(s.name)}', ${isWizard}, ${isSelected});}">
-        <div>
-          <!-- Portrait photo matching ifa.tdtu.edu.vn/gioi-thieu (height reduced ~28% via aspect-[16/13] with object-cover object-top) -->
-          <div class="relative w-full aspect-[16/13] max-h-52 overflow-hidden rounded-xl bg-slate-100 mb-3 border border-slate-200/80 shadow-2xs group-hover:opacity-95 transition-opacity">
-            <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-full h-full object-cover object-top" alt="${escapedName}">
-            ${isSelected ? `<span class="absolute right-2.5 top-2.5 px-2.5 py-1 rounded-full bg-amber-500 text-slate-900 font-black text-xs shadow-md">NV${assignedRank}</span>` : ''}
+        <div class="flex-1 flex flex-col">
+          <!-- Portrait photo with fixed aspect-[3/4] and object-contain to strictly prevent face/head cropping -->
+          <div class="relative w-full aspect-[3/4] overflow-hidden rounded-xl bg-slate-100 mb-3 border border-slate-200/80 shadow-2xs group-hover:opacity-95 transition-opacity flex items-center justify-center">
+            <!-- Blurred ambient backdrop layer of the same photo for aesthetic framing -->
+            <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="absolute inset-0 w-full h-full object-cover blur-sm opacity-20 scale-110 pointer-events-none select-none" alt="" aria-hidden="true">
+            <!-- Sharp, uncropped portrait photo with object-contain -->
+            <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="relative z-10 w-full h-full object-contain p-0.5 select-none" alt="${escapedName}">
+            ${isSelected ? `<span class="absolute right-2.5 top-2.5 z-20 px-2.5 py-1 rounded-full bg-amber-500 text-slate-900 font-black text-xs shadow-md">NV${assignedRank}</span>` : ''}
           </div>
 
           <!-- Supervisor Information -->
-          <div class="space-y-1">
-            <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug">${escapedName}</h3>
-            <p class="text-xs text-slate-500 font-medium">${escapeHtml(dept)}</p>
+          <div class="space-y-1 mb-2 flex-1">
+            <h3 class="font-bold text-slate-900 text-sm sm:text-base leading-snug line-clamp-2 min-h-[2.5rem] flex items-start" title="${escapedName}">${escapedName}</h3>
+            <p class="text-xs text-slate-500 font-medium truncate">${escapeHtml(dept)}</p>
             ${email ? `
-              <p class="text-xs text-blue-600 truncate flex items-center gap-1.5 font-mono pt-1">
+              <p class="text-xs text-blue-600 truncate flex items-center gap-1.5 font-mono pt-1" title="${escapeHtml(email)}">
                 <svg class="w-3.5 h-3.5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                 </svg>
@@ -366,7 +369,7 @@ function renderSupervisorsGrid() {
         </div>
 
         <!-- Action Buttons -->
-        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
+        <div class="mt-auto pt-3 border-t border-slate-100 flex items-center gap-2">
           ${detailBtnHtml}
           <div class="flex-1 min-w-0">
             ${buttonHtml}

@@ -181,9 +181,9 @@ test('Phần 2: Khử trùng lặp Loại hình đồ án và bố cục chia 2 
 test('Phần 3 & 4: Kích thước ảnh aspect-[16/13] và click thẻ/ảnh chọn NV', async () => {
   const matchingCode = fs.readFileSync(path.resolve(__dirname, '../js/supervisors/assignments-matching.js'), 'utf8');
 
-  // Verify aspect ratio reduced by ~28%
-  assert.ok(matchingCode.includes('aspect-[16/13]'), 'Ảnh phải sử dụng aspect-[16/13] để giảm chiều cao ~28%');
-  assert.ok(matchingCode.includes('object-cover object-top'), 'Ảnh phải giữ object-cover object-top để không cắt mặt');
+  // Verify portrait aspect ratio and object-contain to strictly prevent face crop
+  assert.ok(matchingCode.includes('aspect-[3/4]'), 'Ảnh phải sử dụng aspect-[3/4] phù hợp tỷ lệ ảnh chân dung');
+  assert.ok(matchingCode.includes('object-contain'), 'Ảnh phải sử dụng object-contain để không cắt mất khuôn mặt');
 
   // Verify click card handler and keyboard handlers
   assert.ok(matchingCode.includes('handleSupervisorCardClick'), 'Phải có hàm handleSupervisorCardClick');
