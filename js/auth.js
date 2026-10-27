@@ -783,16 +783,42 @@ async function bootstrapProjectTypesIfNeeded() {
 function renderProjectTypesDropdown() {
   const container = document.getElementById('project-types-checkbox-list');
   if (!container) return;
-  const activeTypes = (state.projectTypes && state.projectTypes.length > 0)
+  const rawTypes = (state.projectTypes && state.projectTypes.length > 0)
     ? state.projectTypes.filter(p => p.active !== false).sort((a, b) => (a.order || 0) - (b.order || 0))
     : DEFAULT_PROJECT_TYPES.map((name, i) => ({ name, order: i + 1 }));
 
-  container.innerHTML = activeTypes.map(p => `
-    <label class="flex items-start gap-2.5 p-2.5 bg-white border border-slate-200 rounded-xl hover:border-blue-300 cursor-pointer transition-colors">
-      <input type="checkbox" class="project-type-checkbox mt-0.5 h-4 w-4 accent-blue-600" value="${escapeHtml(p.name)}" onchange="handleProjectTypeSelection(this)">
+  // De-duplicate by normalized name (preserving stable order)
+  const seen = new Set();
+  const activeTypes = [];
+  for (const item of rawTypes) {
+    const key = (item.name || '').trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    activeTypes.push(item);
+  }
+
+  // Split into 2 columns: column 1 (e.g. 1-6) and column 2 (e.g. 7-11)
+  const mid = Math.ceil(activeTypes.length / 2);
+  const col1 = activeTypes.slice(0, mid);
+  const col2 = activeTypes.slice(mid);
+
+  const renderItem = (p) => `
+    <label class="flex items-start gap-2.5 p-2.5 bg-white border border-slate-200 rounded-xl hover:border-blue-300 cursor-pointer transition-colors shadow-2xs">
+      <input type="checkbox" class="project-type-checkbox mt-0.5 h-4 w-4 accent-blue-600 cursor-pointer" value="${escapeHtml(p.name)}" onchange="handleProjectTypeSelection(this)">
       <span class="text-xs font-semibold text-slate-700 leading-snug">${escapeHtml(p.name)}</span>
     </label>
-  `).join('');
+  `;
+
+  container.className = "grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl";
+  container.innerHTML = `
+    <div class="flex flex-col gap-2">
+      ${col1.map(renderItem).join('')}
+    </div>
+    <div class="flex flex-col gap-2">
+      ${col2.map(renderItem).join('')}
+    </div>
+  `;
+
   setSelectedProjectTypes(parseStoredProjectTypes(document.getElementById('select-project-type')?.value || ''));
 }
 

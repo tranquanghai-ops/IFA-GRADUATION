@@ -956,6 +956,9 @@ window.validateAndGoToStep2 = function() {
     document.getElementById('student-eligibility-declaration-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
+  if (declResult && declResult.valid && declResult.declaration) {
+    state.currentEligibilityDeclaration = declResult.declaration;
+  }
 
   const topicInput = document.getElementById('input-topic-title');
   const errorEl = document.getElementById('topic-title-error');
@@ -1109,6 +1112,22 @@ window.submitRegistration = async function() {
     return;
   }
 
+  // Collect and validate eligibility declaration safely
+  const declResult = (typeof window.collectStudentEligibilityDeclaration === 'function')
+    ? window.collectStudentEligibilityDeclaration()
+    : null;
+
+  if (declResult && !declResult.valid && !state.myRegistration?.eligibilityDeclaration && !state.currentEligibilityDeclaration) {
+    showToast(declResult.error, 'warning');
+    goToStep(1);
+    document.getElementById('student-eligibility-declaration-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  const finalDeclaration = (declResult && declResult.valid && declResult.declaration)
+    ? declResult.declaration
+    : (state.currentEligibilityDeclaration || state.myRegistration?.eligibilityDeclaration || null);
+
   const btn = document.getElementById('btn-submit-registration');
   btn.disabled = true;
   btn.innerHTML = '<span>⏳ Đang ghi nhận đăng ký...</span>';
@@ -1184,7 +1203,8 @@ window.submitRegistration = async function() {
       // student back to the waiting state on first registration.
       reviewStatus: directAssignment && primaryPublishedSupervisor ? 'manually_assigned' : (directAssignment ? 'direct_assignment_pending' : 'waiting'),
       eligibilityStatus: eligibilityStatus,
-      eligibilityDeclaration: declResult?.declaration || null,
+      eligibilityDeclaration: finalDeclaration,
+      ...(previous?.adminReview ? { adminReview: previous.adminReview } : {}),
       ...(primaryPublishedSupervisor ? {
         officialSupervisors: publishedSupervisors,
         acceptedSupervisorId: primaryPublishedSupervisor.supervisorId || '',
@@ -1221,6 +1241,7 @@ window.submitRegistration = async function() {
     showToast(directAssignment
       ? (primaryPublishedSupervisor ? '🎉 ĐĂNG KÝ THÀNH CÔNG! GVHD đã phân công được giữ nguyên.' : '🎉 ĐĂNG KÝ THÀNH CÔNG! Vui lòng chờ Khoa phân công GVHD.')
       : '🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
+    state.currentEligibilityDeclaration = null;
     await checkStudentEligibilityAndRegistration(roundId);
   } catch (err) {
     console.error('Lỗi khi nộp đăng ký:', err);

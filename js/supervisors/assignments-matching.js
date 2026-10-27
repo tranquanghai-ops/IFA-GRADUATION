@@ -331,16 +331,21 @@ function renderSupervisorsGrid() {
     );
 
     const detailBtnHtml = hasDetails
-      ? `<button type="button" onclick="openBioModal('${s.id}')" class="px-2.5 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold shrink-0" title="Xem hồ sơ chi tiết">
+      ? `<button type="button" onclick="event.stopPropagation(); openBioModal('${s.id}')" class="px-2.5 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold shrink-0" title="Xem hồ sơ chi tiết">
            ℹ️ Chi tiết
          </button>`
       : '';
 
     return `
-      <div class="card-surface p-4 flex flex-col justify-between card-hover relative rounded-2xl border border-slate-200/90 shadow-sm ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20' : 'bg-white'}">
+      <div class="card-surface p-3.5 sm:p-4 flex flex-col justify-between card-hover relative rounded-2xl border border-slate-200/90 shadow-sm cursor-pointer select-none transition-all group ${isSelected ? 'ring-2 ring-blue-500 bg-blue-50/25 border-blue-400' : 'bg-white hover:border-blue-300 hover:shadow-md'}"
+           tabindex="0"
+           role="button"
+           aria-label="${isSelected ? `Bỏ chọn nguyện vọng cho ${escapedName}` : `Chọn ${escapedName} làm nguyện vọng`}"
+           onclick="handleSupervisorCardClick(event, '${s.id}', '${encodeURIComponent(s.name)}', ${isWizard}, ${isSelected})"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();handleSupervisorCardClick(event, '${s.id}', '${encodeURIComponent(s.name)}', ${isWizard}, ${isSelected});}">
         <div>
-          <!-- Portrait photo matching ifa.tdtu.edu.vn/gioi-thieu -->
-          <div class="relative w-full aspect-[4/5] overflow-hidden rounded-xl bg-slate-100 mb-3.5 border border-slate-200/80 shadow-2xs">
+          <!-- Portrait photo matching ifa.tdtu.edu.vn/gioi-thieu (height reduced ~28% via aspect-[16/13] with object-cover object-top) -->
+          <div class="relative w-full aspect-[16/13] max-h-52 overflow-hidden rounded-xl bg-slate-100 mb-3 border border-slate-200/80 shadow-2xs group-hover:opacity-95 transition-opacity">
             <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-full h-full object-cover object-top" alt="${escapedName}">
             ${isSelected ? `<span class="absolute right-2.5 top-2.5 px-2.5 py-1 rounded-full bg-amber-500 text-slate-900 font-black text-xs shadow-md">NV${assignedRank}</span>` : ''}
           </div>
@@ -376,6 +381,28 @@ function renderSupervisorsGrid() {
 
 window.filterSupervisorsList = function() {
   renderSupervisorsGrid();
+};
+
+window.handleSupervisorCardClick = function(event, supervisorId, encName, isWizard, isSelected) {
+  // Prevent double trigger if clicked directly on an interactive button, link, or input
+  if (event.target && event.target.closest('button, a, input, textarea, select')) {
+    return;
+  }
+  if (isWizard) {
+    if (typeof window.selectWizardPreference === 'function') {
+      window.selectWizardPreference(supervisorId, encName);
+    }
+  } else {
+    if (isSelected) {
+      if (typeof window.removePreference === 'function') {
+        window.removePreference(supervisorId);
+      }
+    } else {
+      if (typeof window.addCardPreference === 'function') {
+        window.addCardPreference(supervisorId, encName);
+      }
+    }
+  }
 };
 
 window.addCardPreference = function(supervisorId, encName) {
