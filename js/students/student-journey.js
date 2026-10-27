@@ -864,6 +864,12 @@ window.renderStudentTimelineWeeks = function() {
     const startW = Math.max(1, state.timelineTrackIndex - 1);
     pageIndicator.textContent = `${startW} / ${durationWeeks} tuần`;
   }
+
+  if (typeof applyStudentProgressVisibility === 'function') {
+    applyStudentProgressVisibility();
+  } else if (typeof window.applyStudentProgressVisibility === 'function') {
+    window.applyStudentProgressVisibility();
+  }
 };
 if (typeof window !== 'undefined') {
   window.renderSupervisorRoundTimeline = renderSupervisorRoundTimeline;

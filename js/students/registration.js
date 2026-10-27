@@ -1,7 +1,7 @@
 const renderRoundHeader = () => window.renderRoundHeader?.();
 
 // --- Module Bridges ---
-const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : []);
+const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window.getOfficialSupervisors ? window.getOfficialSupervisors(reg) : (reg?.officialSupervisors || reg?.supervisors || []));
 const normalizeOfficialAssignment = (a, r) => (typeof window !== 'undefined' && window.normalizeOfficialAssignment ? window.normalizeOfficialAssignment(a, r) : (a || r));
 const shouldSkipStudentSupervisorPreference = (rnd) => (typeof window !== 'undefined' && window.shouldSkipStudentSupervisorPreference ? window.shouldSkipStudentSupervisorPreference(rnd) : false);
 async function loadStudentSelfProfile(mssv) {
@@ -22,6 +22,123 @@ if (typeof window !== 'undefined') window.loadStudentSelfProfile = loadStudentSe
 const populateRegistrationStudentForm = () => window.populateRegistrationStudentForm?.();
 const collectOfficialFormFields = () => (typeof window !== 'undefined' && window.collectOfficialFormFields ? window.collectOfficialFormFields() : {});
 const validateOfficialFormFields = (f) => (typeof window !== 'undefined' && window.validateOfficialFormFields ? window.validateOfficialFormFields(f) : true);
+
+export function applyStudentProgressVisibility() {
+  const isStudentView = state.currentView === 'student' || state.impersonation?.target?.type === 'student' || (!state.isAdmin && state.isStudent);
+  if (!isStudentView && state.isAdmin && !state.impersonation) {
+    return;
+  }
+
+  const journeyCard = document.getElementById('student-journey-card');
+  const milestonesWrap = document.getElementById('hero-milestones-count-wrap')
+    || document.getElementById('hero-milestones-count')?.closest('div');
+  const thesisGuideLink = document.getElementById('hero-thesis-guide-link');
+  const supervisorCard = document.getElementById('hero-supervisor-info-card');
+  const finalScoreCard = document.getElementById('student-final-score-card');
+  const ctaCard = document.getElementById('registration-cta-card');
+  const flowContainer = document.getElementById('registration-flow-container');
+  const reviewInProgressCard = document.getElementById('review-in-progress-card');
+  const alreadyRegCard = document.getElementById('already-registered-card');
+
+  // Not eligible state: hide hero & journey (already handled by not_eligible check)
+  if (state.eligibilityState === 'not_eligible') {
+    const hero = document.getElementById('student-hero-card');
+    if (hero) hero.classList.add('hidden');
+    if (journeyCard) journeyCard.classList.add('hidden');
+    return;
+  }
+
+  const reg = state.myRegistration;
+  const assignment = state.myOfficialAssignment;
+  const effectiveAssignment = (typeof normalizeOfficialAssignment === 'function')
+    ? normalizeOfficialAssignment(assignment, reg)
+    : (assignment || reg);
+  const officialList = (effectiveAssignment && typeof getOfficialSupervisors === 'function')
+    ? getOfficialSupervisors(effectiveAssignment)
+    : (effectiveAssignment?.officialSupervisors || effectiveAssignment?.supervisors || []);
+
+  const hasTopic = Boolean(
+    reg && (reg.topicTitle || reg.topic || reg.proposalTitle || reg.title || reg.topicName)
+  );
+  const isDraft = Boolean(reg && reg.status === 'draft');
+  const isSubmitted = Boolean(reg && !isDraft && hasTopic);
+
+  const hasOfficialSup = Boolean(
+    (assignment?.assignmentStatus === 'published' && officialList.length > 0) ||
+    (reg?.assignmentStatus === 'published' && officialList.length > 0) ||
+    (reg?.reviewStatus === 'accepted' && officialList.length > 0) ||
+    (reg?.reviewStatus === 'manually_assigned' && officialList.length > 0)
+  );
+
+  // Case 4: BOTH completed topic registration AND has official supervisor
+  const shouldShowRoadmap = isSubmitted && hasOfficialSup;
+
+  // 1. Roadmap card
+  if (journeyCard) {
+    journeyCard.classList.toggle('hidden', !shouldShowRoadmap);
+  }
+
+  // 2. Hero milestones count badge
+  if (milestonesWrap) {
+    milestonesWrap.classList.toggle('hidden', !shouldShowRoadmap);
+  }
+
+  // 3. Thesis guide link
+  if (thesisGuideLink) {
+    thesisGuideLink.classList.toggle('hidden', !shouldShowRoadmap);
+  }
+
+  // 4. Hero supervisor card: only show when there is an official supervisor
+  if (supervisorCard) {
+    supervisorCard.classList.toggle('hidden', !hasOfficialSup);
+  }
+
+  // 5. Final scores card
+  if (finalScoreCard && !shouldShowRoadmap) {
+    finalScoreCard.classList.add('hidden');
+  }
+
+  // 6. Manage Cases 1, 2, 3 messages & UI components
+  if (!shouldShowRoadmap) {
+    if (!hasTopic && !isDraft) {
+      // CASE 1: Joined round, no registration, no supervisor
+      if (ctaCard) {
+        ctaCard.classList.remove('hidden');
+        const ctaTitle = document.getElementById('registration-cta-title');
+        const ctaDesc = document.getElementById('registration-cta-description');
+        if (ctaTitle) {
+          ctaTitle.classList.remove('hidden');
+          ctaTitle.textContent = 'Đăng ký Đề tài ĐATN/ĐATH';
+        }
+        if (ctaDesc) {
+          ctaDesc.classList.remove('hidden');
+          ctaDesc.textContent = 'Bạn chưa hoàn tất đăng ký đề tài và phân công giảng viên hướng dẫn. Vui lòng thực hiện đăng ký để tiếp tục.';
+        }
+      }
+      if (flowContainer) flowContainer.classList.add('hidden');
+      if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
+    } else if (isDraft) {
+      // CASE 2: Draft registration saved, not submitted
+      if (ctaCard) ctaCard.classList.add('hidden');
+      if (flowContainer) flowContainer.classList.remove('hidden');
+      if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
+    } else if (isSubmitted && !hasOfficialSup) {
+      // CASE 3: Submitted registration, awaiting official supervisor assignment
+      if (ctaCard) ctaCard.classList.add('hidden');
+      if (flowContainer) flowContainer.classList.add('hidden');
+      if (reviewInProgressCard) {
+        reviewInProgressCard.classList.remove('hidden');
+        const reviewText = reviewInProgressCard.querySelector('p');
+        if (reviewText) {
+          reviewText.textContent = 'Hồ sơ đăng ký của bạn đang được xử lý. Lộ trình thực hiện sẽ hiển thị khi hoàn tất phân công giảng viên hướng dẫn.';
+        }
+      }
+      if (alreadyRegCard) alreadyRegCard.classList.remove('hidden');
+    }
+  }
+}
+if (typeof window !== 'undefined') window.applyStudentProgressVisibility = applyStudentProgressVisibility;
+
 /**
  * IFA+ Graduation — Students, Eligibility & IFAA Master Module
  */
@@ -131,6 +248,21 @@ async function checkStudentEligibilityAndRegistration(roundId) {
     }
     if (regDoc.exists()) {
       state.myRegistration = normalizeOfficialAssignment(state.myOfficialAssignment, regDoc.data());
+      const isDraft = state.myRegistration?.status === 'draft';
+      if (isDraft) {
+        if (flowContainer) flowContainer.classList.remove('hidden');
+        if (ctaCard) ctaCard.classList.add('hidden');
+        if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
+        if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
+        if (officialResultCard) officialResultCard.classList.add('hidden');
+        goToStep(1);
+        updateStudentJourneyStepper();
+        updateStudentPersonalSidebar();
+        renderRoundHeader();
+        applyStudentProgressVisibility();
+        return;
+      }
+
       if (flowContainer) flowContainer.classList.add('hidden');
       if (ctaCard) ctaCard.classList.add('hidden');
 
@@ -151,6 +283,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
         updateStudentJourneyStepper();
         updateStudentPersonalSidebar();
         renderRoundHeader();
+        applyStudentProgressVisibility();
         return;
       }
 
@@ -162,10 +295,15 @@ async function checkStudentEligibilityAndRegistration(roundId) {
 
         const reviewTag = document.getElementById('review-round-tag');
         if (reviewTag) reviewTag.textContent = 'ĐANG XỬ LÝ';
-        if (reviewInProgressCard) reviewInProgressCard.classList.remove('hidden');
+        if (reviewInProgressCard) {
+          reviewInProgressCard.classList.remove('hidden');
+          const pEl = reviewInProgressCard.querySelector('p');
+          if (pEl) pEl.textContent = 'Hồ sơ đăng ký của bạn đang được xử lý. Lộ trình thực hiện sẽ hiển thị khi hoàn tất phân công giảng viên hướng dẫn.';
+        }
         updateStudentJourneyStepper();
         updateStudentPersonalSidebar();
         renderRoundHeader();
+        applyStudentProgressVisibility();
         return;
       }
 
@@ -178,6 +316,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
       updateStudentJourneyStepper();
       updateStudentPersonalSidebar();
       renderRoundHeader();
+      applyStudentProgressVisibility();
 
     } else {
       if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
@@ -194,6 +333,7 @@ async function checkStudentEligibilityAndRegistration(roundId) {
       updateStudentJourneyStepper();
       updateStudentPersonalSidebar();
       renderRoundHeader();
+      applyStudentProgressVisibility();
     }
   } catch (e) {
     console.error('Error checking student eligibility:', e);

@@ -606,7 +606,7 @@ service cloud.firestore {
         allow create: if (admin() && request.resource.data.by == email())
           || (student()
               && request.resource.data.by == email()
-              && request.resource.data.action in ['Nộp bài', 'Rút bài', 'Nộp bài bổ sung', 'Tham gia đợt qua link']
+              && request.resource.data.action in ['Nộp bài', 'Rút bài', 'Nộp bài bổ sung', 'Tham gia đợt qua link', 'Tham gia đợt tốt nghiệp']
               && request.resource.data.roundId == roundId)
           || (staff()
               && request.resource.data.by == email()

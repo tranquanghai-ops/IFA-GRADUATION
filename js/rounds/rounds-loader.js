@@ -353,6 +353,7 @@ function renderRoundHeader() {
 
   // Hero Card Quick Metrics
   const milestonesCountEl = document.getElementById('hero-milestones-count');
+  const milestonesWrap = document.getElementById('hero-milestones-count-wrap') || milestonesCountEl?.parentElement;
   if (milestonesCountEl) {
     const roundActivities = Array.isArray(round.activities) ? round.activities : [];
     const canSeeDrafts = state.isAdmin && !state.impersonation;
@@ -362,9 +363,26 @@ function renderRoundHeader() {
     milestonesCountEl.textContent = `${actCount} mốc kế hoạch`;
   }
   const assignedSupEl = document.getElementById('hero-assigned-sup');
+  const reg = state.myRegistration;
+  const assignment = state.myOfficialAssignment;
   const effectiveAssignment = normalizeOfficialAssignment(state.myOfficialAssignment, state.myRegistration);
   const officialList = effectiveAssignment ? ((typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(effectiveAssignment) : (window.getOfficialSupervisors ? window.getOfficialSupervisors(effectiveAssignment) : [])) : [];
-  const hasOfficialSup = officialList.length > 0 || Boolean(effectiveAssignment?.assignedSupervisorId || effectiveAssignment?.officialSupervisor || effectiveAssignment?.acceptedSupervisorName || effectiveAssignment?.supervisorName);
+  
+  const hasTopic = Boolean(
+    reg && (reg.topicTitle || reg.topic || reg.proposalTitle || reg.title || reg.topicName)
+  );
+  const isDraft = Boolean(reg && reg.status === 'draft');
+  const isSubmitted = Boolean(reg && !isDraft && hasTopic);
+
+  const hasOfficialSup = Boolean(
+    (assignment?.assignmentStatus === 'published' && officialList.length > 0) ||
+    (reg?.assignmentStatus === 'published' && officialList.length > 0) ||
+    (reg?.reviewStatus === 'accepted' && officialList.length > 0) ||
+    (reg?.reviewStatus === 'manually_assigned' && officialList.length > 0)
+  );
+
+  const isStudentView = state.currentView === 'student' || state.impersonation?.target?.type === 'student' || (!state.isAdmin && state.isStudent);
+  const shouldShowRoadmap = (!isStudentView && state.isAdmin && !state.impersonation) || (isSubmitted && hasOfficialSup);
 
   if (assignedSupEl) {
     if (officialList.length > 0) {
@@ -380,25 +398,42 @@ function renderRoundHeader() {
   // Render one or two published supervisors with contact details (Horizontal compact layout: Image left, text right).
   const supervisorCard = document.getElementById('hero-supervisor-info-card');
   if (supervisorCard) {
-    const profiles = hasOfficialSup ? resolveStudentSupervisorProfiles(officialList, effectiveAssignment).slice(0, 2) : [];
-    supervisorCard.innerHTML = profiles.length
-      ? `<div class="space-y-2.5">${profiles.map(profile => {
-        const fallback = getSupervisorAvatarSvgDataUri(profile.name);
-        const avatar = profile.photoUrl || fallback;
-        const phoneHref = String(profile.phone || '').replace(/[^\d+]/g, '');
-        return `<div class="flex items-center gap-3.5 min-w-0">
-          <img src="${escapeHtml(avatar)}" data-fallback="${escapeHtml(fallback)}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="${escapeHtml(profile.name)}" class="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/40 object-cover shrink-0 shadow-md bg-white/10">
-          <div class="min-w-0 flex-1 space-y-1 text-left">
-            <div class="flex items-center gap-1.5">
-              <span class="rounded-md bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 uppercase tracking-wide">${escapeHtml(profile.label)}</span>
+    if (hasOfficialSup) {
+      supervisorCard.classList.remove('hidden');
+      const profiles = resolveStudentSupervisorProfiles(officialList, effectiveAssignment).slice(0, 2);
+      supervisorCard.innerHTML = profiles.length
+        ? `<div class="space-y-2.5">${profiles.map(profile => {
+          const fallback = getSupervisorAvatarSvgDataUri(profile.name);
+          const avatar = profile.photoUrl || fallback;
+          const phoneHref = String(profile.phone || '').replace(/[^\d+]/g, '');
+          return `<div class="flex items-center gap-3.5 min-w-0">
+            <img src="${escapeHtml(avatar)}" data-fallback="${escapeHtml(fallback)}" onerror="this.onerror=null;this.src=this.dataset.fallback" alt="${escapeHtml(profile.name)}" class="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl border-2 border-white/40 object-cover shrink-0 shadow-md bg-white/10">
+            <div class="min-w-0 flex-1 space-y-1 text-left">
+              <div class="flex items-center gap-1.5">
+                <span class="rounded-md bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 uppercase tracking-wide">${escapeHtml(profile.label)}</span>
+              </div>
+              <h4 class="text-sm sm:text-base font-black text-white truncate leading-snug" title="${escapeHtml(profile.name)}">${escapeHtml(profile.name)}</h4>
+              ${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}" class="truncate flex items-center gap-1 text-xs text-blue-100 hover:underline" title="${escapeHtml(profile.email)}"><span>✉️</span><span class="truncate">${escapeHtml(profile.email)}</span></a>` : ''}
+              ${profile.phone ? `<a href="tel:${escapeHtml(phoneHref)}" class="flex items-center gap-1 text-xs font-bold text-emerald-300 hover:underline" title="${escapeHtml(profile.phone)}"><span>📞</span><span>${escapeHtml(profile.phone)}</span></a>` : ''}
             </div>
-            <h4 class="text-sm sm:text-base font-black text-white truncate leading-snug" title="${escapeHtml(profile.name)}">${escapeHtml(profile.name)}</h4>
-            ${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}" class="truncate flex items-center gap-1 text-xs text-blue-100 hover:underline" title="${escapeHtml(profile.email)}"><span>✉️</span><span class="truncate">${escapeHtml(profile.email)}</span></a>` : ''}
-            ${profile.phone ? `<a href="tel:${escapeHtml(phoneHref)}" class="flex items-center gap-1 text-xs font-bold text-emerald-300 hover:underline" title="${escapeHtml(profile.phone)}"><span>📞</span><span>${escapeHtml(profile.phone)}</span></a>` : ''}
-          </div>
-        </div>`;
-      }).join('')}</div>`
-      : '<div class="flex items-center gap-3.5 text-left"><div class="w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center text-2xl shrink-0">👨‍🏫</div><div class="min-w-0"><span class="rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-black text-white uppercase">GVHD</span><p class="mt-0.5 text-sm text-blue-100 font-bold">Chưa phân công</p></div></div>';
+          </div>`;
+        }).join('')}</div>`
+        : '';
+    } else {
+      supervisorCard.classList.add('hidden');
+      supervisorCard.innerHTML = '';
+    }
+  }
+
+  if (milestonesWrap) {
+    milestonesWrap.classList.toggle('hidden', !shouldShowRoadmap);
+  }
+  const thesisGuideLink = document.getElementById('hero-thesis-guide-link');
+  if (thesisGuideLink) {
+    thesisGuideLink.classList.toggle('hidden', !shouldShowRoadmap);
+  }
+  if (journeyCard) {
+    journeyCard.classList.toggle('hidden', !shouldShowRoadmap);
   }
 
   // Tinh giản banner sinh viên theo yêu cầu: ẩn các badge và thông tin trùng lặp
@@ -441,7 +476,6 @@ function renderRoundHeader() {
   const topicVersionBadge = document.getElementById('hero-topic-version-badge');
   const topicReviewNoteEl = document.getElementById('hero-registered-topic-review-note');
   const topicDownloadBtn = document.getElementById('hero-download-topic-form-btn');
-  const reg = state.myRegistration;
   const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
     ? window.getApprovedTopicVersions(reg)
     : [];
@@ -553,6 +587,12 @@ function renderRoundHeader() {
   // Render thanh tiến độ 12 tuần thực hiện ĐATN
   if (typeof renderStudentTimelineWeeks === 'function') {
     renderStudentTimelineWeeks();
+  }
+
+  if (typeof applyStudentProgressVisibility === 'function') {
+    applyStudentProgressVisibility();
+  } else if (typeof window.applyStudentProgressVisibility === 'function') {
+    window.applyStudentProgressVisibility();
   }
 }
 

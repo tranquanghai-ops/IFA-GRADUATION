@@ -173,10 +173,19 @@ export async function loadUserActivities(forceReload = false) {
 }
 window.loadUserActivities = loadUserActivities;
 
+function getTimestampMs(ts) {
+  if (!ts) return 0;
+  if (typeof ts.toMillis === 'function') return ts.toMillis();
+  if (typeof ts.toDate === 'function') return ts.toDate().getTime();
+  if (ts instanceof Date) return ts.getTime();
+  const parsed = new Date(ts).getTime();
+  return isNaN(parsed) ? 0 : parsed;
+}
+
 /**
  * Look up activity info for a student, supervisor, or council member
  */
-export function getUserActivityInfo(identifier) {
+export function getUserActivityInfo(identifier, options = {}) {
   if (!identifier) {
     return { hasLoggedIn: false, statusText: 'Chưa từng đăng nhập', timeAgo: 'Chưa từng đăng nhập', lastAction: '' };
   }
@@ -198,7 +207,31 @@ export function getUserActivityInfo(identifier) {
     data = map.get(studentEmail);
   }
 
+  const el = options?.eligibleRecord;
+  const joinedTs = el?.joinedAt || el?.createdAt;
+  const joinedMs = getTimestampMs(joinedTs);
+
   if (!data || (!data.lastLoginAt && !data.lastActiveAt && !data.lastActionAt)) {
+    if (joinedMs > 0) {
+      return {
+        hasLoggedIn: true,
+        statusText: 'Đã tham gia đợt',
+        timeAgo: formatActivityTimeAgo(joinedTs),
+        formattedDate: formatActivityDateTime(joinedTs),
+        lastLoginAt: null,
+        lastLoginFormattedDate: '--',
+        lastLoginTimeAgo: 'Chưa từng đăng nhập',
+        lastActiveAt: joinedTs,
+        lastActionAt: joinedTs,
+        lastActionFormattedDate: formatActivityDateTime(joinedTs),
+        lastActionTimeAgo: formatActivityTimeAgo(joinedTs),
+        lastAction: 'Tham gia đợt tốt nghiệp',
+        lastActionDetails: (el.joinMethod === 'link' || el.source === 'self_join_link') ? 'Qua link tham gia' : '',
+        displayName: '',
+        role: 'student',
+        raw: null
+      };
+    }
     return {
       hasLoggedIn: false,
       statusText: 'Chưa từng đăng nhập',
@@ -219,21 +252,41 @@ export function getUserActivityInfo(identifier) {
 
   const loginTs = data.lastLoginAt;
   const actionTs = data.lastActionAt || data.lastActiveAt;
-  const effectiveActionTs = actionTs || loginTs;
+  let effectiveActionTs = actionTs || loginTs;
+  let lastAction = data.lastAction || (loginTs ? 'Đăng nhập hệ thống' : '');
+  let lastActionDetails = data.lastActionDetails || '';
+
+  const loginMs = getTimestampMs(loginTs);
+  const actionMs = getTimestampMs(actionTs);
+  if (loginMs > actionMs && loginMs > 0) {
+    effectiveActionTs = loginTs;
+    lastAction = 'Đăng nhập hệ thống';
+    lastActionDetails = '';
+  }
+
+  if (joinedMs > 0) {
+    const curLatestMs = getTimestampMs(effectiveActionTs);
+    if (joinedMs > curLatestMs) {
+      effectiveActionTs = joinedTs;
+      lastAction = 'Tham gia đợt tốt nghiệp';
+      lastActionDetails = (el.joinMethod === 'link' || el.source === 'self_join_link') ? 'Qua link tham gia' : '';
+    }
+  }
+
   return {
-    hasLoggedIn: Boolean(data.lastLoginAt || data.lastActiveAt),
+    hasLoggedIn: Boolean(data.lastLoginAt || data.lastActiveAt || joinedMs > 0),
     statusText: 'Đã đăng nhập',
     lastLoginAt: data.lastLoginAt,
     lastLoginFormattedDate: loginTs ? formatActivityDateTime(loginTs) : '--',
     lastLoginTimeAgo: loginTs ? formatActivityTimeAgo(loginTs) : 'Chưa từng đăng nhập',
     lastActiveAt: data.lastActiveAt,
-    lastActionAt: actionTs,
+    lastActionAt: effectiveActionTs,
     lastActionFormattedDate: effectiveActionTs ? formatActivityDateTime(effectiveActionTs) : '--',
     lastActionTimeAgo: effectiveActionTs ? formatActivityTimeAgo(effectiveActionTs) : '',
     timeAgo: formatActivityTimeAgo(effectiveActionTs),
     formattedDate: formatActivityDateTime(effectiveActionTs),
-    lastAction: data.lastAction || (loginTs ? 'Đăng nhập hệ thống' : ''),
-    lastActionDetails: data.lastActionDetails || '',
+    lastAction: lastAction,
+    lastActionDetails: lastActionDetails,
     displayName: data.displayName || '',
     role: data.role || '',
     raw: data
@@ -244,8 +297,8 @@ window.getUserActivityInfo = getUserActivityInfo;
 /**
  * Render visual badge for table row or card
  */
-export function renderUserActivityBadge(identifier, { compact = false, showAction = true } = {}) {
-  const info = getUserActivityInfo(identifier);
+export function renderUserActivityBadge(identifier, { compact = false, showAction = true, eligibleRecord = null } = {}) {
+  const info = getUserActivityInfo(identifier, { eligibleRecord });
 
   if (!info.hasLoggedIn) {
     if (compact) {
@@ -694,8 +747,22 @@ export async function openStudentActivityHistoryModal(studentId, optRoleType) {
     }
 
     if (isStudent) {
-      // 2. Registrations & Topic Proposals
+      // 1b. Round Participation (Self-joined via link or enrolled)
       const targetRoundId = state.selectedRoundId || state.activeRound?.id;
+      const elStudent = (state.eligibleStudents || []).find(e => String(e.studentId || e.mssv || e.id).trim().toUpperCase() === sid);
+      const joinedTs = elStudent?.joinedAt || elStudent?.createdAt;
+      if (joinedTs) {
+        events.push({
+          type: 'round_joined',
+          title: 'Tham gia đợt tốt nghiệp',
+          details: `Đợt: ${state.activeRound?.title || state.activeRound?.name || targetRoundId || ''}${(elStudent.joinMethod === 'link' || elStudent.source === 'self_join_link') ? ' • Qua link tham gia' : ''}`,
+          timestamp: joinedTs,
+          icon: '🎓',
+          badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        });
+      }
+
+      // 2. Registrations & Topic Proposals
       if (targetRoundId) {
         const reg = state.eligibleStudentDetails?.registrations?.get(sid);
         if (reg) {

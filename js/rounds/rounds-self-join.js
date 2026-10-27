@@ -435,16 +435,41 @@ window.confirmStudentSelfJoinRound = async function() {
 
     // Audit log (gracefully catch if rules reject)
     try {
+      const actorEmail = (state.user?.email || '').toLowerCase().trim();
       await addDoc(collection(db, 'graduationRounds', round.id, 'auditLogs'), {
-        action: 'Tham gia đợt qua link',
-        by: state.user?.email || studentMssv,
+        action: 'Tham gia đợt tốt nghiệp',
+        by: actorEmail || `${studentMssv.toLowerCase()}@student.tdtu.edu.vn`,
+        email: actorEmail || `${studentMssv.toLowerCase()}@student.tdtu.edu.vn`,
+        uid: state.user?.uid || '',
         roundId: round.id,
         studentId: studentMssv,
+        mssv: studentMssv,
         fullName: fullName,
+        joinMethod: 'link',
+        source: 'link',
         timestamp: serverTimestamp()
       });
     } catch (auditErr) {
       console.warn('[SelfJoin] Audit log notice:', auditErr);
+    }
+
+    // Track user activity in userActivities
+    try {
+      if (typeof trackUserActivity === 'function') {
+        await trackUserActivity('Tham gia đợt tốt nghiệp', {
+          context: round.title || round.name || round.id,
+          roundId: round.id,
+          joinMethod: 'link'
+        });
+      } else if (typeof window !== 'undefined' && typeof window.trackUserActivity === 'function') {
+        await window.trackUserActivity('Tham gia đợt tốt nghiệp', {
+          context: round.title || round.name || round.id,
+          roundId: round.id,
+          joinMethod: 'link'
+        });
+      }
+    } catch (trackErr) {
+      console.warn('[SelfJoin] Track activity notice:', trackErr);
     }
 
     // Success UI State

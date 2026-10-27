@@ -4,6 +4,21 @@ const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window
 const normalizeOfficialAssignment = (a, r) => (typeof window !== 'undefined' && window.normalizeOfficialAssignment ? window.normalizeOfficialAssignment(a, r) : (a || r));
 const isDirectSupervisorAssignment = (rnd) => (typeof window !== 'undefined' && window.isDirectSupervisorAssignment ? window.isDirectSupervisorAssignment(rnd) : false);
 const refreshRoundCardMetrics = (roundId) => (typeof window !== 'undefined' && typeof window.refreshRoundCardMetrics === 'function' ? window.refreshRoundCardMetrics(roundId) : Promise.resolve());
+
+export function getStudentJoinMethodBadge(s) {
+  const method = String(s?.joinMethod || s?.source || s?.importMethod || '').toLowerCase().trim();
+  if (method === 'link' || method === 'self_join_link') {
+    return '<span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">Qua link tham gia</span>';
+  }
+  if (method === 'excel' || method === 'excel_import' || method === 'file') {
+    return '<span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">Từ file nhập</span>';
+  }
+  if (method === 'manual' || method === 'manual_supplement' || method === 'admin') {
+    return '<span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">Admin thêm</span>';
+  }
+  return '<span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-slate-50 text-slate-400 border border-slate-200">Chưa xác định</span>';
+}
+if (typeof window !== 'undefined') window.getStudentJoinMethodBadge = getStudentJoinMethodBadge;
 /**
  * IFA+ Graduation — Admin Eligible Students Management & Excel Import
  */
@@ -279,7 +294,7 @@ function renderAdminEligibleStudentsTable() {
     }
 
     const activityBadge = typeof window.renderUserActivityBadge === 'function'
-      ? window.renderUserActivityBadge(s.studentId)
+      ? window.renderUserActivityBadge(s.studentId, { eligibleRecord: s })
       : '<span class="text-slate-400 text-xs">--</span>';
 
     let eligibilityBadge = '<span class="badge badge-open">Đủ ĐK</span>';
@@ -305,7 +320,7 @@ function renderAdminEligibleStudentsTable() {
       <td class="p-3 font-mono font-bold text-slate-900">${escapeHtml(s.studentId)}</td>
       <td class="p-3">
         <div class="font-bold text-slate-800">${s.isMissingInfo ? s.resolvedName : escapeHtml(s.resolvedName)}</div>
-        ${!s.isFoundInMaster && !s.isMissingInfo ? '<span class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-slate-100 text-slate-500">Từ file nhập</span>' : ''}
+        ${getStudentJoinMethodBadge(s)}
       </td>
       <td class="p-3 min-w-[260px]">
         <div class="flex items-center gap-1.5 flex-wrap">
@@ -453,6 +468,7 @@ window.addEligibleStudentByMssv = async function() {
       studentClass: className,
       major: master.major || 'Thiết kế Nội thất',
       eligible: true,
+      joinMethod: 'manual',
       source: 'manual_supplement',
       createdAt: serverTimestamp()
     });
@@ -623,6 +639,8 @@ window.confirmExcelImport = async function() {
           className: s.className || '',
           major: s.major || 'Thiết kế Nội thất',
           eligible: true,
+          joinMethod: 'excel',
+          source: 'excel_import',
           createdAt: serverTimestamp()
         }, { merge: true });
       });
