@@ -50,9 +50,24 @@
                   <th class="p-3.5 text-center">Trạng thái ĐK</th>
                   <th class="p-3.5">Đề tài</th>
                   <th class="p-3.5">Loại hình</th>
-                  <th class="p-3.5">Nguyện vọng 1</th>
-                  <th class="p-3.5">Nguyện vọng 2</th>
-                  <th class="p-3.5">Nguyện vọng 3</th>
+                  <th id="th-sort-nv1" onclick="toggleRegistrationsSort('nv1')" class="p-3.5 cursor-pointer hover:bg-slate-200 transition-colors select-none group" title="Bấm để sắp xếp theo GVHD Nguyện vọng 1 (A-Z / Z-A)">
+                    <div class="inline-flex items-center gap-1.5">
+                      <span>Nguyện vọng 1</span>
+                      <span id="sort-icon-nv1" class="text-slate-400 group-hover:text-slate-600 text-xs font-mono">↕</span>
+                    </div>
+                  </th>
+                  <th id="th-sort-nv2" onclick="toggleRegistrationsSort('nv2')" class="p-3.5 cursor-pointer hover:bg-slate-200 transition-colors select-none group" title="Bấm để sắp xếp theo GVHD Nguyện vọng 2 (A-Z / Z-A)">
+                    <div class="inline-flex items-center gap-1.5">
+                      <span>Nguyện vọng 2</span>
+                      <span id="sort-icon-nv2" class="text-slate-400 group-hover:text-slate-600 text-xs font-mono">↕</span>
+                    </div>
+                  </th>
+                  <th id="th-sort-nv3" onclick="toggleRegistrationsSort('nv3')" class="p-3.5 cursor-pointer hover:bg-slate-200 transition-colors select-none group" title="Bấm để sắp xếp theo GVHD Nguyện vọng 3 (A-Z / Z-A)">
+                    <div class="inline-flex items-center gap-1.5">
+                      <span>Nguyện vọng 3</span>
+                      <span id="sort-icon-nv3" class="text-slate-400 group-hover:text-slate-600 text-xs font-mono">↕</span>
+                    </div>
+                  </th>
                   <th class="p-3.5 text-center">Điều kiện</th>
                   <th class="p-3.5">Trạng thái xét</th>
                   <th class="p-3.5">Thao tác cuối cùng</th>

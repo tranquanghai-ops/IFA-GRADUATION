@@ -244,20 +244,29 @@ function renderAdminEligibleStudentsTable() {
       ? window.getTopicPendingProposal(registration || published)
       : null;
     const topic = officialApprovedTitle || String(registration?.topicTitle || registration?.topic || published?.topicTitle || draft?.topicTitle || '').trim();
-    const rawTopicStatus = pendingProposal ? 'pending' : (officialApprovedTitle ? 'approved' : (registration?.topicApprovalStatus || registration?.approvalStatus || published?.topicApprovalStatus || draft?.topicApprovalStatus));
-    const topicApprovalStatus = rawTopicStatus || (topic ? 'pending' : '');
+
+    // Use shared topic approval resolution helper
+    const topicApproval = (typeof window !== 'undefined' && typeof window.resolveStudentTopicApproval === 'function')
+      ? window.resolveStudentTopicApproval(registration, published, draft)
+      : { status: (registration?.topicApprovalStatus === 'approved' ? 'approved' : (topic ? 'pending' : '')), label: (topic ? 'Chờ duyệt' : 'Chưa đăng ký') };
+
+    const topicApprovalStatus = topicApproval.status;
     const preferences = !directAssignment && !names.length && Array.isArray(registration?.preferences)
       ? registration.preferences.slice().sort((a, b) => Number(a.rank) - Number(b.rank))
         .map(pref => `NV${pref.rank}: ${pref.supervisorName || pref.name || ''}`).filter(item => !item.endsWith(': '))
       : [];
-    return { topic, names, preferences, topicApprovalStatus, registration, pendingProposal, officialApprovedTitle };
+    return { topic, names, preferences, topicApprovalStatus, topicApproval, registration, pendingProposal, officialApprovedTitle };
   };
 
   const filtered = mergedList.filter(s => {
     if (!searchTerm) return true;
     const nameText = typeof s.resolvedName === 'string' ? s.resolvedName.replace(/<[^>]*>/g, '').toLowerCase() : '';
     const status = getStudentStatus(s);
-    const statusText = status.topicApprovalStatus === 'approved' ? 'đã duyệt da duyet' : (status.topicApprovalStatus === 'rejected' ? 'yêu cầu sửa yeu cau sua' : (status.topic ? 'chờ duyệt cho duyet đang chờ duyệt dang cho duyet' : 'chưa đăng ký chua dang ky'));
+    const statusText = status.topicApprovalStatus === 'approved' || status.topicApprovalStatus === 'approved_with_pending_proposal'
+      ? 'đã duyệt da duyet'
+      : (status.topicApprovalStatus === 'rejected'
+        ? 'không duyệt khong duyet yêu cầu sửa yeu cau sua'
+        : (status.topic ? 'chờ duyệt cho duyet đang chờ duyệt dang cho duyet' : 'chưa đăng ký chua dang ky'));
     return (s.studentId || '').toLowerCase().includes(searchTerm) ||
       nameText.includes(searchTerm) ||
       status.topic.toLowerCase().includes(searchTerm) ||
@@ -282,7 +291,9 @@ function renderAdminEligibleStudentsTable() {
 
     let topicBadge = '';
     if (status.topic) {
-      if (status.pendingProposal && status.officialApprovedTitle) {
+      if (status.topicApproval?.badgeHtml) {
+        topicBadge = status.topicApproval.badgeHtml;
+      } else if (status.pendingProposal && status.topicApprovalStatus === 'approved') {
         topicBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">✓ Đã duyệt</span> <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">⏳ Chờ duyệt Lần ' + status.pendingProposal.version + '</span>';
       } else if (status.topicApprovalStatus === 'approved') {
         topicBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">✓ Đã duyệt</span>';
@@ -291,6 +302,8 @@ function renderAdminEligibleStudentsTable() {
       } else {
         topicBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">⏳ Chờ duyệt</span>';
       }
+    } else {
+      topicBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-300 shrink-0">Chưa đăng ký</span>';
     }
 
     const activityBadge = typeof window.renderUserActivityBadge === 'function'

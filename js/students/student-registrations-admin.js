@@ -1,6 +1,148 @@
 /**
  * IFA+ Graduation — Admin Registrations Table & Eligibility Status Sync
  */
+
+/**
+ * Shared Topic Approval Resolution
+ * Deterministically resolves topic approval status across all Admin panels.
+ */
+window.resolveStudentTopicApproval = function(reg, published = null, draft = null) {
+  const topic = String(
+    reg?.topicTitle || reg?.topic || published?.topicTitle || draft?.topicTitle || ''
+  ).trim();
+
+  if (!reg && !topic) {
+    return {
+      status: 'unregistered',
+      label: 'Chưa đăng ký',
+      badgeHtml: '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-300 shrink-0">Chưa đăng ký</span>'
+    };
+  }
+
+  const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
+    ? (window.getApprovedTopicVersions(reg) || window.getApprovedTopicVersions(published) || [])
+    : [];
+  const hasApprovedVersion = approvedVersions.length > 0;
+  const latestApproved = hasApprovedVersion ? approvedVersions[approvedVersions.length - 1] : null;
+
+  const pendingProposal = (typeof window.getTopicPendingProposal === 'function')
+    ? window.getTopicPendingProposal(reg || published)
+    : null;
+
+  const explicitStatus = reg?.topicApprovalStatus || reg?.approvalStatus || published?.topicApprovalStatus || draft?.topicApprovalStatus || '';
+
+  if (explicitStatus === 'rejected') {
+    return {
+      status: 'rejected',
+      label: 'Không duyệt (Yêu cầu sửa)',
+      badgeHtml: '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">✕ Không duyệt (Yêu cầu sửa)</span>'
+    };
+  }
+
+  if (hasApprovedVersion && pendingProposal) {
+    return {
+      status: 'approved_with_pending_proposal',
+      label: `Đã duyệt (Lần ${latestApproved.version}) · Chờ duyệt Lần ${pendingProposal.version}`,
+      badgeHtml: `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">✓ Đã duyệt (Lần ${latestApproved.version})</span> <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">⏳ Chờ duyệt Lần ${pendingProposal.version}</span>`
+    };
+  }
+
+  if (explicitStatus === 'approved' || hasApprovedVersion) {
+    return {
+      status: 'approved',
+      label: 'Đã duyệt',
+      badgeHtml: '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">✓ Đã duyệt</span>'
+    };
+  }
+
+  if (topic) {
+    return {
+      status: 'pending',
+      label: 'Chờ duyệt',
+      badgeHtml: '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">⏳ Chờ duyệt</span>'
+    };
+  }
+
+  return {
+    status: 'unregistered',
+    label: 'Chưa đăng ký',
+    badgeHtml: '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-300 shrink-0">Chưa đăng ký</span>'
+  };
+};
+
+// State for sorting supervisor preferences in Admin registrations table
+if (typeof state !== 'undefined' && !state.regSortState) {
+  state.regSortState = { column: null, direction: 'asc' };
+}
+
+window.toggleRegistrationsSort = function(column) {
+  if (typeof state === 'undefined') return;
+  if (!state.regSortState) {
+    state.regSortState = { column: null, direction: 'asc' };
+  }
+  if (state.regSortState.column === column) {
+    state.regSortState.direction = state.regSortState.direction === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.regSortState.column = column;
+    state.regSortState.direction = 'asc';
+  }
+  filterAdminRegistrationsTable();
+};
+
+function sortRegistrationsList(list, sortState) {
+  if (!sortState || !sortState.column) return list;
+  const rankMap = { nv1: 1, nv2: 2, nv3: 3 };
+  const targetRank = rankMap[sortState.column];
+  if (!targetRank) return list;
+
+  const collator = new Intl.Collator('vi', { sensitivity: 'base', numeric: true });
+  const isAsc = sortState.direction === 'asc';
+
+  return [...list].sort((a, b) => {
+    const aSup = String((a.preferences || []).find(p => Number(p.rank) === targetRank)?.supervisorName || '').trim();
+    const bSup = String((b.preferences || []).find(p => Number(p.rank) === targetRank)?.supervisorName || '').trim();
+    const aHas = Boolean(aSup);
+    const bHas = Boolean(bSup);
+
+    // Those without supervisor in this preference slot always go to the bottom
+    if (!aHas && !bHas) {
+      return String(a.studentId || a.mssv || '').localeCompare(String(b.studentId || b.mssv || ''));
+    }
+    if (!aHas) return 1;
+    if (!bHas) return -1;
+
+    // Both have supervisor: compare Vietnamese names
+    const comp = collator.compare(aSup, bSup);
+    if (comp !== 0) {
+      return isAsc ? comp : -comp;
+    }
+
+    // Secondary sort: MSSV ascending
+    return String(a.studentId || a.mssv || '').localeCompare(String(b.studentId || b.mssv || ''));
+  });
+}
+
+function updateRegistrationsSortHeaders() {
+  const cols = ['nv1', 'nv2', 'nv3'];
+  const curCol = (typeof state !== 'undefined' && state.regSortState?.column) || null;
+  const curDir = (typeof state !== 'undefined' && state.regSortState?.direction) || 'asc';
+
+  cols.forEach(col => {
+    const th = document.getElementById(`th-sort-${col}`);
+    const icon = document.getElementById(`sort-icon-${col}`);
+    if (!th || !icon) return;
+
+    if (curCol === col) {
+      th.classList.add('bg-blue-100/70', 'text-blue-900');
+      icon.textContent = curDir === 'asc' ? '↑ A-Z' : '↓ Z-A';
+      icon.className = 'text-blue-700 font-extrabold text-[11px] bg-blue-200/60 px-1.5 py-0.5 rounded';
+    } else {
+      th.classList.remove('bg-blue-100/70', 'text-blue-900');
+      icon.textContent = '↕';
+      icon.className = 'text-slate-400 group-hover:text-slate-600 text-xs font-mono';
+    }
+  });
+}
 window.loadAdminRegistrations = async function(roundId) {
   try {
     const [regSnap, elSnap] = await Promise.all([
@@ -74,7 +216,10 @@ window.filterAdminRegistrationsTable = function() {
     filtered = filtered.filter(r => r.eligibilityStatus === 'not_eligible');
   }
 
-  renderAdminRegistrationsTable(filtered);
+  const sorted = sortRegistrationsList(filtered, state.regSortState);
+  updateRegistrationsSortHeaders();
+  state.lastFilteredRegistrations = sorted;
+  renderAdminRegistrationsTable(sorted);
 };
 
 function renderAdminRegistrationsTable(list) {
@@ -94,6 +239,9 @@ function renderAdminRegistrationsTable(list) {
     const regBadge = isReg
       ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">✓ Đã đăng ký</span>'
       : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs">⏳ Chưa đăng ký</span>';
+
+    // Topic approval status
+    const topicApproval = window.resolveStudentTopicApproval(r);
 
     // Self-declaration & Admin verification status
     const decl = r.eligibilityDeclaration || {};
@@ -152,6 +300,10 @@ function renderAdminRegistrationsTable(list) {
         reviewBadge = '<span class="text-emerald-700 font-bold text-xs">✓ Đã tiếp nhận</span>';
       } else if (r.reviewStatus === 'rejected') {
         reviewBadge = '<span class="text-rose-600 font-bold text-xs">Chuyển NV sau</span>';
+      } else if (topicApproval.status === 'rejected') {
+        reviewBadge = '<span class="text-rose-600 font-bold text-xs">✕ Không duyệt</span>';
+      } else if (topicApproval.status === 'approved' || topicApproval.status === 'approved_with_pending_proposal') {
+        reviewBadge = '<span class="text-emerald-700 font-bold text-xs">✓ Đã duyệt</span>';
       } else {
         reviewBadge = '<span class="text-slate-600 font-semibold text-xs">Chờ duyệt</span>';
       }
@@ -166,7 +318,12 @@ function renderAdminRegistrationsTable(list) {
         <td class="p-3.5 font-mono font-bold text-slate-900">${escapeHtml(r.studentId)}</td>
         <td class="p-3.5 font-semibold text-slate-800">${escapeHtml(r.studentName || '--')}</td>
         <td class="p-3.5 text-center whitespace-nowrap">${regBadge}</td>
-        <td class="p-3.5 max-w-[220px] truncate font-bold ${isReg ? 'text-blue-900' : 'text-slate-400 italic'}" title="${escapeHtml(r.topicTitle || '')}">${escapeHtml(r.topicTitle || (isReg ? '--' : '(Chưa đăng ký đề tài)'))}</td>
+        <td class="p-3.5 max-w-[260px]">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="font-bold truncate max-w-[180px] ${isReg ? 'text-blue-900' : 'text-slate-400 italic'}" title="${escapeHtml(r.topicTitle || '')}">${escapeHtml(r.topicTitle || (isReg ? '--' : '(Chưa đăng ký đề tài)'))}</span>
+            ${isReg && r.topicTitle ? topicApproval.badgeHtml : ''}
+          </div>
+        </td>
         <td class="p-3.5 text-slate-600">${escapeHtml(r.projectType || '--')}</td>
         <td class="p-3.5 font-bold text-slate-700">${escapeHtml(getSupName(1))}</td>
         <td class="p-3.5 text-slate-600">${escapeHtml(getSupName(2))}</td>
@@ -188,7 +345,7 @@ window.exportRegistrationsCSV = function() {
   const roundId = document.getElementById('admin-round-reg-select')?.value;
   if (!roundId) return;
 
-  const list = state.currentAdminRegistrations || [];
+  const list = state.lastFilteredRegistrations || state.currentAdminRegistrations || [];
   if (list.length === 0) {
     showToast('Không có dữ liệu đăng ký để xuất.', 'warning');
     return;
@@ -202,6 +359,22 @@ window.exportRegistrationsCSV = function() {
     if (r.eligibilityStatus === 'pending') elText = 'Chờ xét';
     else if (r.eligibilityStatus === 'not_eligible') elText = 'Không đủ điều kiện';
 
+    const topicApproval = window.resolveStudentTopicApproval(r);
+    let reviewText = 'Chưa nộp';
+    if (r.isRegistered) {
+      if (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') {
+        reviewText = 'Đã tiếp nhận';
+      } else if (r.reviewStatus === 'rejected') {
+        reviewText = 'Chuyển NV sau';
+      } else if (topicApproval.status === 'rejected') {
+        reviewText = 'Không duyệt';
+      } else if (topicApproval.status === 'approved' || topicApproval.status === 'approved_with_pending_proposal') {
+        reviewText = 'Đã duyệt';
+      } else {
+        reviewText = 'Chờ duyệt';
+      }
+    }
+
     return [
       r.studentId || '',
       r.studentName || '',
@@ -213,7 +386,7 @@ window.exportRegistrationsCSV = function() {
       `"${getSup(2)}"`,
       `"${getSup(3)}"`,
       `"${elText}"`,
-      `"${r.reviewStatus || 'Chờ duyệt'}"`,
+      `"${reviewText}"`,
       dt
     ];
   });
