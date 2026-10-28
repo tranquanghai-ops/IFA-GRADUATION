@@ -350,8 +350,10 @@ function renderStudentOfficialResult(reg) {
     const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='8' r='4' fill='%23cbd5e1'/%3E%3Cpath fill='%23cbd5e1' d='M12 14c-6 0-8 4-8 4v2h16v-2s-2-4-8-4z'/%3E%3C/svg%3E";
 
     const supervisorsCardsHtml = officialList.map(item => {
-      const sup = (state.roundSupervisors || []).find(s => s.id === item.supervisorId || s.supervisorId === item.supervisorId)
-        || (state.supervisorsMaster || []).find(s => s.id === item.supervisorId);
+      const sup = (typeof resolveSupervisorProfile === 'function')
+        ? resolveSupervisorProfile(item.supervisorId || item.id || item.supervisorEmail)
+        : ((state.supervisorsMaster || []).find(s => s.id === item.supervisorId || (item.supervisorEmail && s.email === item.supervisorEmail))
+          || (state.roundSupervisors || []).find(s => s.id === item.supervisorId || s.supervisorId === item.supervisorId));
 
       const isPrimary = (item.role === 'primary');
       const roleBadge = isPrimary
@@ -360,7 +362,7 @@ function renderStudentOfficialResult(reg) {
 
       const showEmail = (state.activeRound?.showEmailAfterPublish !== false && sup?.email);
       const showPhone = (state.activeRound?.showPhoneAfterPublish !== false && sup?.phone);
-      const supName = item.supervisorName || sup?.name || 'Giảng viên Hướng dẫn';
+      const supName = sup?.name || item.supervisorName || 'Giảng viên Hướng dẫn';
       const escapedSupName = escapeHtml(supName);
       const avatarSrc = (sup?.photoUrl && sup.photoUrl.trim()) ? sup.photoUrl : getSupervisorAvatarSvgDataUri(supName);
 
@@ -519,12 +521,15 @@ function renderStudentExistingRegistration(reg) {
     return;
   }
   listEl.innerHTML = (reg.preferences || []).map(p => {
-    const sup = (state.roundSupervisors || []).find(s => s.id === p.supervisorId) ||
-                (state.supervisorsMaster || []).find(s => s.id === p.supervisorId);
+    const sup = (typeof resolveSupervisorProfile === 'function')
+      ? resolveSupervisorProfile(p.supervisorId || p.id || p.email)
+      : ((state.roundSupervisors || []).find(s => s.id === p.supervisorId) ||
+         (state.supervisorsMaster || []).find(s => s.id === p.supervisorId));
+    const supName = sup?.name || p.supervisorName || '';
     const avatarSrc = (sup?.showPhoto !== false && sup?.photoUrl && sup.photoUrl.trim())
       ? sup.photoUrl
-      : getSupervisorAvatarSvgDataUri(p.supervisorName || 'GV');
-    const escapedName = escapeHtml(p.supervisorName || '');
+      : getSupervisorAvatarSvgDataUri(supName || 'GV');
+    const escapedName = escapeHtml(supName || '');
 
     return `
       <div class="flex items-center gap-3.5 p-2.5 bg-white rounded-xl border border-emerald-100 shadow-2xs text-xs">
@@ -1060,12 +1065,15 @@ function renderConfirmationPanel() {
 
   listEl.className = 'flex flex-wrap sm:flex-nowrap items-end justify-center gap-3 sm:gap-5 pt-5 pb-2';
   listEl.innerHTML = orderedPreferences.map(p => {
-    const sup = (state.roundSupervisors || []).find(s => s.id === p.supervisorId) ||
-                (state.supervisorsMaster || []).find(s => s.id === p.supervisorId);
+    const sup = (typeof resolveSupervisorProfile === 'function')
+      ? resolveSupervisorProfile(p.supervisorId || p.id || p.email)
+      : ((state.roundSupervisors || []).find(s => s.id === p.supervisorId) ||
+         (state.supervisorsMaster || []).find(s => s.id === p.supervisorId));
+    const supName = sup?.name || p.supervisorName || '';
     const avatarSrc = (sup?.showPhoto !== false && sup?.photoUrl && sup.photoUrl.trim())
       ? sup.photoUrl
-      : getSupervisorAvatarSvgDataUri(p.supervisorName);
-    const escapedName = escapeHtml(p.supervisorName || '');
+      : getSupervisorAvatarSvgDataUri(supName);
+    const escapedName = escapeHtml(supName || '');
 
     const rank = Number(p.rank);
     const isFirst = rank === 1;

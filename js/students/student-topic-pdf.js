@@ -73,9 +73,22 @@ function resolveOfficialSupervisorName(st, fallback = 'Giảng viên Hướng d�
     return s === '' || s === '--' || s === 'giảng viên hướng dẫn' || s === 'giang vien huong dan';
   };
 
-  // 1. Check officialSupervisors
   const officials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(st) : (Array.isArray(st.officialSupervisors) ? st.officialSupervisors : []);
   const primary = officials.find(s => s.role === 'primary') || officials[0];
+
+  // 1. Resolve through Master Supervisor Resolver if ID or Email is available
+  const supId = primary?.supervisorId || st.acceptedSupervisorId || st.supervisorId;
+  const supEmail = primary?.supervisorEmail || st.acceptedSupervisorEmail || st.supervisorEmail;
+  if (supId || supEmail) {
+    const resolvedMasterName = (typeof window !== 'undefined' && typeof window.resolveSupervisorName === 'function')
+      ? window.resolveSupervisorName(supId || supEmail, '')
+      : '';
+    if (resolvedMasterName && !isInvalid(resolvedMasterName)) {
+      return resolvedMasterName.trim();
+    }
+  }
+
+  // 2. Check officialSupervisors
   if (primary?.supervisorName && !isInvalid(primary.supervisorName)) {
     return primary.supervisorName.trim();
   }
@@ -112,9 +125,9 @@ function resolveOfficialSupervisorName(st, fallback = 'Giảng viên Hướng d�
   }
 
   // 5. Look in supervisors master / roundSupervisors by id or email
-  const supId = st.supervisorId || primary?.supervisorId;
-  if (supId && Array.isArray(state.roundSupervisors)) {
-    const found = state.roundSupervisors.find(s => s.id === supId || s.supervisorId === supId);
+  const lookupSupId = supId || st.supervisorId || primary?.supervisorId;
+  if (lookupSupId && Array.isArray(state.roundSupervisors)) {
+    const found = state.roundSupervisors.find(s => s.id === lookupSupId || s.supervisorId === lookupSupId);
     if (found?.name && !isInvalid(found.name)) return found.name.trim();
     if (found?.supervisorName && !isInvalid(found.supervisorName)) return found.supervisorName.trim();
   }

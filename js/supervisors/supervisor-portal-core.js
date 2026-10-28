@@ -408,34 +408,34 @@ window.loadSupervisorPortalData = async function(roundId) {
     supervisorIdentityIds.has(String(s.supervisorId || '').trim())
   );
   let currentSup = roundSupervisor;
-  if (!currentSup) {
-    currentSup = matchingMaster;
+  if (matchingMaster) {
+    currentSup = roundSupervisor ? { ...roundSupervisor, ...matchingMaster } : matchingMaster;
   }
 
   const candidateEmails = new Set([
     emailLower,
+    matchingMaster?.email,
     currentSup?.email,
     currentSup?.institutionalEmail,
     currentSup?.personalEmail,
-    matchingMaster?.email,
     matchingMaster?.personalEmail,
     matchingMaster?.institutionalEmail,
     roundSupervisor?.email,
     roundSupervisor?.institutionalEmail,
     roundSupervisor?.personalEmail,
-    ...(Array.isArray(currentSup?.emails) ? currentSup.emails : []),
     ...(Array.isArray(matchingMaster?.emails) ? matchingMaster.emails : []),
+    ...(Array.isArray(currentSup?.emails) ? currentSup.emails : []),
     ...(Array.isArray(roundSupervisor?.emails) ? roundSupervisor.emails : [])
   ].filter(Boolean).map(e => String(e).toLowerCase().trim()));
 
-  const mySupId = currentSup?.id || currentSup?.supervisorId || matchingMaster?.id || matchingMaster?.supervisorId;
+  const mySupId = matchingMaster?.id || matchingMaster?.supervisorId || currentSup?.id || currentSup?.supervisorId;
   const supervisorIdsSet = new Set([
     mySupId,
     ...supervisorIdentityIds,
-    roundSupervisor?.id,
-    roundSupervisor?.supervisorId,
     matchingMaster?.id,
-    matchingMaster?.supervisorId
+    matchingMaster?.supervisorId,
+    roundSupervisor?.id,
+    roundSupervisor?.supervisorId
   ].filter(Boolean).map(v => String(v).trim()));
 
   // Header and Hero Information
@@ -444,7 +444,7 @@ window.loadSupervisorPortalData = async function(roundId) {
   const activeBadgeEl = document.getElementById('sup-active-round-badge');
   const reviewIndicator = document.getElementById('sup-round-review-indicator');
 
-  const supDisplayName = currentSup?.name || actor.displayName || 'Thầy/Cô';
+  const supDisplayName = matchingMaster?.name || currentSup?.name || actor.displayName || 'Thầy/Cô';
   if (greetingEl) greetingEl.innerHTML = `Kính chào Thầy/Cô<br class="sm:hidden"> <span class="font-black">${escapeHtml(supDisplayName)}</span>`;
   const roundYear = round.academicYear ? ` (${round.academicYear})` : '';
   if (roundInfoEl) roundInfoEl.textContent = `${round.title || ''}${roundYear}`;
@@ -455,9 +455,9 @@ window.loadSupervisorPortalData = async function(roundId) {
   const supHeroEmail = document.getElementById('hero-supervisor-email');
   const supHeroAvatar = document.getElementById('hero-supervisor-avatar');
   if (supHeroName) supHeroName.textContent = supDisplayName;
-  if (supHeroEmail) supHeroEmail.textContent = currentSup?.email || actor.email || '--';
+  if (supHeroEmail) supHeroEmail.textContent = matchingMaster?.email || currentSup?.email || actor.email || '--';
   if (supHeroAvatar) {
-    const photoUrl = currentSup?.photoUrl || actor.photoURL;
+    const photoUrl = matchingMaster?.photoUrl || currentSup?.photoUrl || actor.photoURL;
     supHeroAvatar.src = (photoUrl && photoUrl.trim()) ? photoUrl : getSupervisorAvatarSvgDataUri(supDisplayName);
   }
 

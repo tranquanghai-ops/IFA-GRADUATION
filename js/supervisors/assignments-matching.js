@@ -14,33 +14,69 @@ const populateRoundSelectors = () => window.populateRoundSelectors?.();
 // OFFICIAL SUPERVISORS HELPERS (v1.6.0-beta.3)
 // ============================================================================
 export function getOfficialSupervisors(reg) {
-
   if (!reg) return [];
+  let officials = [];
   if (Array.isArray(reg.officialSupervisors) && reg.officialSupervisors.length > 0) {
-    return reg.officialSupervisors;
+    officials = reg.officialSupervisors;
+  } else {
+    // Backward compatibility: derive from acceptedSupervisorId / finalSupervisorId
+    const primaryId = reg.acceptedSupervisorId || reg.finalSupervisorId;
+    if (primaryId) {
+      officials = [{
+        supervisorId: primaryId,
+        supervisorName: reg.acceptedSupervisorName || '',
+        source: 'preference',
+        role: 'primary',
+        addedAt: reg.acceptedAt || reg.updatedAt || new Date().toISOString()
+      }];
+    }
   }
-  // Backward compatibility: derive from acceptedSupervisorId / finalSupervisorId
-  const primaryId = reg.acceptedSupervisorId || reg.finalSupervisorId;
-  if (primaryId) {
-    return [{
-      supervisorId: primaryId,
-      supervisorName: reg.acceptedSupervisorName || '',
-      source: 'preference',
-      role: 'primary',
-      addedAt: reg.acceptedAt || reg.updatedAt || new Date().toISOString()
-    }];
-  }
-  return [];
+  return officials.map(item => {
+    const supId = item.supervisorId || item.id;
+    const supEmail = item.supervisorEmail || item.email;
+    const resolvedName = (typeof window !== 'undefined' && typeof window.resolveSupervisorName === 'function')
+      ? window.resolveSupervisorName(supId || supEmail, item.supervisorName)
+      : item.supervisorName;
+    const profile = (typeof window !== 'undefined' && typeof window.resolveSupervisorProfile === 'function')
+      ? window.resolveSupervisorProfile(supId || supEmail, item)
+      : item;
+    return {
+      ...item,
+      supervisorName: resolvedName || item.supervisorName || '',
+      supervisorEmail: profile?.email || item.supervisorEmail || item.email || '',
+      photoUrl: profile?.photoUrl || item.photoUrl || ''
+    };
+  });
 }
 
 export function normalizeOfficialAssignment(assignment, registration = null) {
   if (!assignment && !registration) return null;
   const source = assignment || {};
   const legacy = registration || {};
-  const supervisors = Array.isArray(source.supervisors) && source.supervisors.length > 0
+  const rawSupervisors = Array.isArray(source.supervisors) && source.supervisors.length > 0
     ? source.supervisors
     : getOfficialSupervisors(legacy);
+  const supervisors = rawSupervisors.map(item => {
+    const supId = item.supervisorId || item.id;
+    const supEmail = item.supervisorEmail || item.email;
+    const resolvedName = (typeof window !== 'undefined' && typeof window.resolveSupervisorName === 'function')
+      ? window.resolveSupervisorName(supId || supEmail, item.supervisorName)
+      : item.supervisorName;
+    const profile = (typeof window !== 'undefined' && typeof window.resolveSupervisorProfile === 'function')
+      ? window.resolveSupervisorProfile(supId || supEmail, item)
+      : item;
+    return {
+      ...item,
+      supervisorName: resolvedName || item.supervisorName || '',
+      supervisorEmail: profile?.email || item.supervisorEmail || item.email || '',
+      photoUrl: profile?.photoUrl || item.photoUrl || ''
+    };
+  });
   const primary = supervisors.find(s => s.role === 'primary') || supervisors[0] || null;
+  const acceptedSupId = source.acceptedSupervisorId || primary?.supervisorId || legacy.acceptedSupervisorId || '';
+  const acceptedSupName = (typeof window !== 'undefined' && typeof window.resolveSupervisorName === 'function')
+    ? window.resolveSupervisorName(acceptedSupId, source.acceptedSupervisorName || primary?.supervisorName || legacy.acceptedSupervisorName || '')
+    : (source.acceptedSupervisorName || primary?.supervisorName || legacy.acceptedSupervisorName || '');
   return {
     ...legacy,
     ...source,
@@ -49,9 +85,10 @@ export function normalizeOfficialAssignment(assignment, registration = null) {
     email: source.studentEmail || source.email || legacy.email || '',
     topicTitle: legacy.topicTitle || source.topicTitle || '',
     projectType: legacy.projectType || source.projectType || '',
+    supervisors: supervisors,
     officialSupervisors: supervisors,
-    acceptedSupervisorId: source.acceptedSupervisorId || primary?.supervisorId || legacy.acceptedSupervisorId || '',
-    acceptedSupervisorName: source.acceptedSupervisorName || primary?.supervisorName || legacy.acceptedSupervisorName || '',
+    acceptedSupervisorId: acceptedSupId,
+    acceptedSupervisorName: acceptedSupName,
     acceptedRank: source.acceptedRank || legacy.acceptedRank || 'manual',
     reviewStatus: supervisors.length > 0 ? 'manually_assigned' : (legacy.reviewStatus || 'unassigned'),
     assignmentStatus: source.assignmentStatus || (legacy.reviewStatus === 'accepted' || legacy.reviewStatus === 'manually_assigned' ? 'published' : '')
@@ -234,15 +271,15 @@ async function loadRoundSupervisors(roundId) {
     ]);
     state.roundSupervisors = snap.docs.map(d => {
       const roundSupervisor = { id: d.id, ...d.data() };
-      const master = (state.supervisorsMaster || []).find(item => item.id === roundSupervisor.supervisorId || item.id === roundSupervisor.id);
-      // Old round records can predate a phone/email change in the master list.
-      // Prefer the per-round snapshot, then seamlessly fall back to Master.
+      const master = (state.supervisorsMaster || []).find(item => item.id === roundSupervisor.supervisorId || item.id === roundSupervisor.id || (roundSupervisor.email && item.email && item.email.toLowerCase().trim() === roundSupervisor.email.toLowerCase().trim()));
+      // Master profile is the SINGLE SOURCE OF TRUTH for lecturer profile attributes.
       return {
-        ...master,
         ...roundSupervisor,
-        email: roundSupervisor.email || master?.email || '',
-        phone: roundSupervisor.phone || master?.phone || '',
-        photoUrl: roundSupervisor.photoUrl || master?.photoUrl || ''
+        ...(master || {}),
+        capacity: typeof roundSupervisor.capacity === 'number' ? roundSupervisor.capacity : (master?.defaultQuota || 10),
+        activeInRound: roundSupervisor.activeInRound !== false,
+        roundProgress: roundSupervisor.roundProgress || {},
+        sortOrder: roundSupervisor.sortOrder || 1
       };
     });
     renderSupervisorsGrid();
@@ -489,10 +526,13 @@ function renderPreferencesTray() {
     const pref = state.selectedPreferences.find(p => p.rank === rank);
     if (pref) {
       const idx = state.selectedPreferences.indexOf(pref);
+      const supDisplayName = (typeof window !== 'undefined' && typeof window.resolveSupervisorName === 'function')
+        ? window.resolveSupervisorName(pref.supervisorId || pref.id || pref.email, pref.supervisorName)
+        : pref.supervisorName;
       html += `
         <div class="flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs shadow-sm">
           <span class="w-5 h-5 rounded-full bg-amber-500 text-slate-900 font-extrabold text-[10px] flex items-center justify-center">NV${rank}</span>
-          <span class="font-bold text-slate-100 max-w-[120px] truncate" title="${pref.supervisorName}">${pref.supervisorName}</span>
+          <span class="font-bold text-slate-100 max-w-[120px] truncate" title="${escapeHtml(supDisplayName)}">${escapeHtml(supDisplayName)}</span>
           <div class="flex items-center gap-0.5 ml-1">
             <button type="button" onclick="movePreferenceOrder(${idx}, ${idx - 1})" ${idx === 0 ? 'disabled' : ''} class="p-0.5 text-slate-400 hover:text-white disabled:opacity-20 text-[10px]">▲</button>
             <button type="button" onclick="movePreferenceOrder(${idx}, ${idx + 1})" ${idx === state.selectedPreferences.length - 1 ? 'disabled' : ''} class="p-0.5 text-slate-400 hover:text-white disabled:opacity-20 text-[10px]">▼</button>

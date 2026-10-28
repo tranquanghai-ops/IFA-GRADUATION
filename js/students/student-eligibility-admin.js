@@ -139,7 +139,8 @@ window.loadAdminEligibleStudents = async function(roundId) {
       getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents')),
       getDocs(collection(db, 'graduationRounds', roundId, 'registrations')),
       getDocs(collection(db, 'graduationRounds', roundId, 'officialAssignments')),
-      getDocs(collection(db, 'graduationRounds', roundId, 'assignmentDrafts'))
+      getDocs(collection(db, 'graduationRounds', roundId, 'assignmentDrafts')),
+      (typeof ensureSupervisorsMasterLoaded === 'function' ? ensureSupervisorsMasterLoaded() : Promise.resolve())
     ]);
     if (typeof window.loadUserActivities === 'function') {
       await window.loadUserActivities().catch(() => {});
@@ -232,10 +233,11 @@ function renderAdminEligibleStudentsTable() {
       published?.assignmentStatus === 'published' ? published : (draft || published), registration
     );
     const supervisors = getOfficialSupervisors(effective);
-    const names = supervisors.map(item => item.supervisorName || item.name || '').filter(Boolean);
+    const names = supervisors.map(item => (typeof resolveSupervisorName === 'function' ? resolveSupervisorName(item.supervisorId || item.id || item.supervisorEmail, item.supervisorName || item.name || '') : (item.supervisorName || item.name || ''))).filter(Boolean);
     if (!names.length) {
       const fallback = effective?.acceptedSupervisorName || effective?.assignedSupervisorName || effective?.supervisorName || registration?.acceptedSupervisorName;
-      if (fallback) names.push(fallback);
+      const fallbackId = effective?.acceptedSupervisorId || effective?.assignedSupervisorId || registration?.acceptedSupervisorId;
+      if (fallback) names.push(typeof resolveSupervisorName === 'function' ? resolveSupervisorName(fallbackId, fallback) : fallback);
     }
     const officialApprovedTitle = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function')
       ? (window.getOfficialApprovedTopicTitle(registration, '') || window.getOfficialApprovedTopicTitle(published, ''))
@@ -253,7 +255,12 @@ function renderAdminEligibleStudentsTable() {
     const topicApprovalStatus = topicApproval.status;
     const preferences = !directAssignment && !names.length && Array.isArray(registration?.preferences)
       ? registration.preferences.slice().sort((a, b) => Number(a.rank) - Number(b.rank))
-        .map(pref => `NV${pref.rank}: ${pref.supervisorName || pref.name || ''}`).filter(item => !item.endsWith(': '))
+        .map(pref => {
+          const pName = (typeof resolveSupervisorName === 'function')
+            ? resolveSupervisorName(pref.supervisorId || pref.id || pref.email, pref.supervisorName || pref.name || '')
+            : (pref.supervisorName || pref.name || '');
+          return `NV${pref.rank}: ${pName}`;
+        }).filter(item => !item.endsWith(': '))
       : [];
     return { topic, names, preferences, topicApprovalStatus, topicApproval, registration, pendingProposal, officialApprovedTitle };
   };

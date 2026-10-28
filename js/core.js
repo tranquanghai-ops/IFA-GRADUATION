@@ -333,6 +333,122 @@ export function getSupervisorId(s) {
 }
 window.getSupervisorId = getSupervisorId;
 
+// =========================================================================
+// CENTRAL MASTER SUPERVISOR RESOLVER (SINGLE SOURCE OF TRUTH)
+// =========================================================================
+export function getSupervisorMasterRecord(ref) {
+  if (!ref) return null;
+  const masterList = (typeof state !== 'undefined' && Array.isArray(state.supervisorsMaster)) ? state.supervisorsMaster : [];
+  const roundList = (typeof state !== 'undefined' && Array.isArray(state.roundSupervisors)) ? state.roundSupervisors : [];
+
+  let candidateId = '';
+  let candidateEmail = '';
+
+  if (typeof ref === 'string') {
+    const s = ref.trim();
+    if (s.includes('@')) {
+      candidateEmail = s.toLowerCase();
+    } else {
+      candidateId = s;
+    }
+  } else if (typeof ref === 'object') {
+    candidateId = String(ref.supervisorId || ref.id || '').trim();
+    const rawEmail = String(ref.supervisorEmail || ref.email || ref.institutionalEmail || ref.personalEmail || '').trim();
+    if (rawEmail) candidateEmail = rawEmail.toLowerCase();
+  }
+
+  // 1. Primary match: state.supervisorsMaster (Single Source of Truth)
+  if (candidateId) {
+    const byId = masterList.find(s => s.id === candidateId || s.supervisorId === candidateId);
+    if (byId) return byId;
+  }
+  if (candidateEmail) {
+    const byEmail = masterList.find(s => {
+      const e = String(s.email || '').toLowerCase().trim();
+      if (e && e === candidateEmail) return true;
+      if (Array.isArray(s.emails) && s.emails.some(x => String(x || '').toLowerCase().trim() === candidateEmail)) return true;
+      return false;
+    });
+    if (byEmail) return byEmail;
+  }
+
+  // 2. Secondary fallback: state.roundSupervisors
+  if (candidateId) {
+    const byRoundId = roundList.find(s => s.id === candidateId || s.supervisorId === candidateId);
+    if (byRoundId) return byRoundId;
+  }
+  if (candidateEmail) {
+    const byRoundEmail = roundList.find(s => {
+      const e = String(s.email || '').toLowerCase().trim();
+      return e && e === candidateEmail;
+    });
+    if (byRoundEmail) return byRoundEmail;
+  }
+
+  return null;
+}
+
+export function resolveSupervisorProfile(ref, fallback = {}) {
+  const master = getSupervisorMasterRecord(ref);
+  if (!master) {
+    return (ref && typeof ref === 'object') ? { ...fallback, ...ref } : (fallback || null);
+  }
+  const base = (ref && typeof ref === 'object') ? { ...fallback, ...ref } : (fallback || {});
+  return {
+    ...base,
+    ...master,
+    name: master.name || base.name || base.supervisorName || '',
+    email: master.email || base.email || base.supervisorEmail || '',
+    department: master.department || base.department || '',
+    photoUrl: master.photoUrl || base.photoUrl || '',
+    phone: master.phone || base.phone || ''
+  };
+}
+
+export function resolveSupervisorName(ref, fallbackName = '') {
+  if (!ref && !fallbackName) return '';
+  const master = getSupervisorMasterRecord(ref);
+  if (master && master.name && String(master.name).trim()) {
+    return String(master.name).trim();
+  }
+  if (fallbackName && String(fallbackName).trim()) {
+    return String(fallbackName).trim();
+  }
+  if (ref && typeof ref === 'object') {
+    const objName = ref.name || ref.supervisorName || '';
+    if (objName && String(objName).trim()) return String(objName).trim();
+  }
+  if (typeof ref === 'string' && !ref.includes('@') && !ref.includes('/')) {
+    if (/^[A-Za-z0-9_-]{16,32}$/.test(ref)) {
+      return fallbackName || '--';
+    }
+    return ref;
+  }
+  return fallbackName || '--';
+}
+
+export function resolveSupervisorDepartment(ref, fallbackDept = '') {
+  const master = getSupervisorMasterRecord(ref);
+  if (master && master.department && String(master.department).trim()) {
+    return String(master.department).trim();
+  }
+  return fallbackDept || (typeof ref === 'object' ? ref.department : '') || '--';
+}
+
+export function resolveSupervisorPhoto(ref, fallbackPhoto = '') {
+  const master = getSupervisorMasterRecord(ref);
+  if (master && master.photoUrl && String(master.photoUrl).trim()) {
+    return String(master.photoUrl).trim();
+  }
+  return fallbackPhoto || (typeof ref === 'object' ? ref.photoUrl : '') || '';
+}
+
+window.getSupervisorMasterRecord = getSupervisorMasterRecord;
+window.resolveSupervisorProfile = resolveSupervisorProfile;
+window.resolveSupervisorName = resolveSupervisorName;
+window.resolveSupervisorDepartment = resolveSupervisorDepartment;
+window.resolveSupervisorPhoto = resolveSupervisorPhoto;
+
 // Toggle "Mở ngay" checkbox
 window.toggleRoundOpenImmediately = function(openNow) {
   const dateInput = document.getElementById('round-open-date');
@@ -709,30 +825,57 @@ if (typeof window !== 'undefined') {
 // --- OFFICIAL SUPERVISORS & ASSIGNMENT DOMAIN HELPERS ---
 export function getOfficialSupervisors(reg) {
   if (!reg) return [];
+  let officials = [];
   if (Array.isArray(reg.officialSupervisors) && reg.officialSupervisors.length > 0) {
-    return reg.officialSupervisors;
+    officials = reg.officialSupervisors;
+  } else {
+    const primaryId = reg.acceptedSupervisorId || reg.finalSupervisorId;
+    if (primaryId) {
+      officials = [{
+        supervisorId: primaryId,
+        supervisorName: reg.acceptedSupervisorName || '',
+        source: 'preference',
+        role: 'primary',
+        addedAt: reg.acceptedAt || reg.updatedAt || new Date().toISOString()
+      }];
+    }
   }
-  const primaryId = reg.acceptedSupervisorId || reg.finalSupervisorId;
-  if (primaryId) {
-    return [{
-      supervisorId: primaryId,
-      supervisorName: reg.acceptedSupervisorName || '',
-      source: 'preference',
-      role: 'primary',
-      addedAt: reg.acceptedAt || reg.updatedAt || new Date().toISOString()
-    }];
-  }
-  return [];
+  return officials.map(item => {
+    const supId = item.supervisorId || item.id;
+    const supEmail = item.supervisorEmail || item.email;
+    const resolvedName = resolveSupervisorName(supId || supEmail, item.supervisorName);
+    const profile = resolveSupervisorProfile(supId || supEmail, item);
+    return {
+      ...item,
+      supervisorName: resolvedName || item.supervisorName || '',
+      supervisorEmail: profile?.email || item.supervisorEmail || item.email || '',
+      photoUrl: profile?.photoUrl || item.photoUrl || ''
+    };
+  });
 }
 
 export function normalizeOfficialAssignment(assignment, registration = null) {
   if (!assignment && !registration) return null;
   const source = assignment || {};
   const legacy = registration || {};
-  const supervisors = Array.isArray(source.supervisors) && source.supervisors.length > 0
+  const rawSupervisors = Array.isArray(source.supervisors) && source.supervisors.length > 0
     ? source.supervisors
     : getOfficialSupervisors(legacy);
+  const supervisors = rawSupervisors.map(item => {
+    const supId = item.supervisorId || item.id;
+    const supEmail = item.supervisorEmail || item.email;
+    const resolvedName = resolveSupervisorName(supId || supEmail, item.supervisorName);
+    const profile = resolveSupervisorProfile(supId || supEmail, item);
+    return {
+      ...item,
+      supervisorName: resolvedName || item.supervisorName || '',
+      supervisorEmail: profile?.email || item.supervisorEmail || item.email || '',
+      photoUrl: profile?.photoUrl || item.photoUrl || ''
+    };
+  });
   const primary = supervisors.find(s => s.role === 'primary') || supervisors[0] || null;
+  const acceptedSupId = source.acceptedSupervisorId || primary?.supervisorId || legacy.acceptedSupervisorId || '';
+  const acceptedSupName = resolveSupervisorName(acceptedSupId, source.acceptedSupervisorName || primary?.supervisorName || legacy.acceptedSupervisorName || '');
   return {
     ...legacy,
     ...source,
@@ -741,9 +884,10 @@ export function normalizeOfficialAssignment(assignment, registration = null) {
     email: source.studentEmail || source.email || legacy.email || '',
     topicTitle: legacy.topicTitle || source.topicTitle || '',
     projectType: legacy.projectType || source.projectType || '',
+    supervisors: supervisors,
     officialSupervisors: supervisors,
-    acceptedSupervisorId: source.acceptedSupervisorId || primary?.supervisorId || legacy.acceptedSupervisorId || '',
-    acceptedSupervisorName: source.acceptedSupervisorName || primary?.supervisorName || legacy.acceptedSupervisorName || '',
+    acceptedSupervisorId: acceptedSupId,
+    acceptedSupervisorName: acceptedSupName,
     acceptedRank: source.acceptedRank || legacy.acceptedRank || 'manual',
     reviewStatus: supervisors.length > 0 ? 'manually_assigned' : (legacy.reviewStatus || 'unassigned'),
     assignmentStatus: source.assignmentStatus || (legacy.reviewStatus === 'accepted' || legacy.reviewStatus === 'manually_assigned' ? 'published' : '')

@@ -147,3 +147,23 @@
 - [x] **KHÔNG tạo đợt thi giả hoặc dữ liệu sinh viên giả trên Production**.
 - [x] **KHÔNG can thiệp hoặc sửa đổi điểm số Hội đồng**.
 - [x] **KHÔNG can thiệp Google Drive**.
+
+---
+
+## 7. HOTFIX ĐỒNG BỘ THÔNG TIN GVHD TOÀN HỆ THỐNG (SINGLE SOURCE OF TRUTH)
+
+### 7.1. Nguyên lý cốt lõi
+- **"Một hồ sơ GVHD chính – Nhiều nơi sử dụng"**: Collection `supervisorMaster` là nguồn chuẩn duy nhất (Single Source of Truth) cho tên, học vị, bộ môn, email, ảnh đại diện của GVHD.
+- **Định danh liên kết ổn định**: `supervisorId` (doc ID Firestore) và `email` chuẩn hóa (`toLowerCase().trim()`). KHÔNG dùng chuỗi học vị hay họ tên làm khóa liên kết.
+- **Phân biệt chuẩn xác hai giảng viên cùng tên**:
+  1. `oWS52UHJbLDk2rkzQyPR` / `nguyenminhhieu@tdtu.edu.vn`: `TS. KTS Nguyễn Minh Hiếu` (Khoa Kiến trúc).
+  2. `rsyOJ7pZB6joEwZrBp3d` / `nguyenminhhieu.nt@tdtu.edu.vn`: `ThS. Nguyễn Minh Hiếu` (Mỹ thuật công nghiệp).
+- **Cơ chế Resolve linh hoạt**:
+  - `getSupervisorMasterRecord(ref)`: Tìm hồ sơ chuẩn từ `state.supervisorsMaster`.
+  - `resolveSupervisorProfile(ref, fallback)`: Trả về hồ sơ đồng bộ đầy đủ.
+  - `resolveSupervisorName(ref, fallbackName)`: Trả về họ tên + học vị mới nhất từ Master; nếu không có mới dùng fallbackName.
+  - `resolveSupervisorDepartment(ref, fallbackDept)`: Trả về bộ môn chuẩn từ Master.
+  - `resolveSupervisorPhoto(ref, fallbackPhoto)`: Trả về ảnh chuẩn từ Master.
+- **Không can thiệp cơ sở dữ liệu (Non-destructive)**: Dữ liệu hồ sơ sinh viên, nguyện vọng và phân công gốc trên Firestore giữ nguyên 100% không bị ghi đè, toàn bộ tên hiển thị được đồng bộ tự động tại thời điểm render.
+- **Đồng bộ bộ nhớ tức thì**: Khi Admin sửa hồ sơ GVHD chính, `saveSupervisorMaster` cập nhật trực tiếp `state.roundSupervisors` và `state.adminReviewData.supervisors` trong bộ nhớ và re-render ngay, không cần tải lại trang.
+- **Đã kiểm thử**: `tests/test-supervisor-master-profile-sync.cjs` (7/7 tests passed) và toàn bộ bộ test `npm test` (262/262 passed).

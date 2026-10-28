@@ -99,8 +99,10 @@ function sortRegistrationsList(list, sortState) {
   const isAsc = sortState.direction === 'asc';
 
   return [...list].sort((a, b) => {
-    const aSup = String((a.preferences || []).find(p => Number(p.rank) === targetRank)?.supervisorName || '').trim();
-    const bSup = String((b.preferences || []).find(p => Number(p.rank) === targetRank)?.supervisorName || '').trim();
+    const aPref = (a.preferences || []).find(p => Number(p.rank) === targetRank);
+    const bPref = (b.preferences || []).find(p => Number(p.rank) === targetRank);
+    const aSup = String(aPref ? (typeof resolveSupervisorName === 'function' ? resolveSupervisorName(aPref.supervisorId || aPref.id || aPref.email, aPref.supervisorName) : (window.resolveSupervisorName ? window.resolveSupervisorName(aPref.supervisorId || aPref.id || aPref.email, aPref.supervisorName) : aPref.supervisorName)) : '').trim();
+    const bSup = String(bPref ? (typeof resolveSupervisorName === 'function' ? resolveSupervisorName(bPref.supervisorId || bPref.id || bPref.email, bPref.supervisorName) : (window.resolveSupervisorName ? window.resolveSupervisorName(bPref.supervisorId || bPref.id || bPref.email, bPref.supervisorName) : bPref.supervisorName)) : '').trim();
     const aHas = Boolean(aSup);
     const bHas = Boolean(bSup);
 
@@ -147,7 +149,8 @@ window.loadAdminRegistrations = async function(roundId) {
   try {
     const [regSnap, elSnap] = await Promise.all([
       getDocs(collection(db, 'graduationRounds', roundId, 'registrations')),
-      getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents'))
+      getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents')),
+      (typeof ensureSupervisorsMasterLoaded === 'function' ? ensureSupervisorsMasterLoaded() : Promise.resolve())
     ]);
     if (typeof window.loadUserActivities === 'function') {
       await window.loadUserActivities().catch(() => {});
@@ -232,7 +235,14 @@ function renderAdminRegistrationsTable(list) {
   }
 
   tbody.innerHTML = list.map(r => {
-    const getSupName = rank => (r.preferences || []).find(p => p.rank === rank)?.supervisorName || '--';
+    const getSupName = rank => {
+      const p = (r.preferences || []).find(pref => Number(pref.rank) === rank);
+      if (!p) return '--';
+      const resolved = (typeof resolveSupervisorName === 'function')
+        ? resolveSupervisorName(p.supervisorId || p.id || p.email, p.supervisorName || '--')
+        : (window.resolveSupervisorName ? window.resolveSupervisorName(p.supervisorId || p.id || p.email, p.supervisorName || '--') : (p.supervisorName || '--'));
+      return resolved || '--';
+    };
     const subDate = r.submittedAt ? (r.submittedAt.toDate ? r.submittedAt.toDate() : new Date(r.submittedAt)) : null;
 
     const isReg = Boolean(r.isRegistered);

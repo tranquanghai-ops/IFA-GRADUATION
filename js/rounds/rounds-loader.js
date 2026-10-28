@@ -316,21 +316,16 @@ function resolveStudentSupervisorProfiles(officialList = [], effectiveAssignment
   return [...assigned].sort((a, b) => (a.role === 'primary' ? -1 : 1) - (b.role === 'primary' ? -1 : 1)).map((item, index) => {
     const id = String(item.supervisorId || item.id || '').trim();
     const itemEmail = String(item.supervisorEmail || item.email || '').trim().toLowerCase();
-    const itemName = String(item.supervisorName || item.name || '').trim().toLowerCase();
-    const profiles = [...(state.roundSupervisors || []), ...(state.supervisorsMaster || [])];
-    const profile = profiles.find(s => id && (s.id === id || s.supervisorId === id))
-      || profiles.find(s => itemEmail && String(s.email || '').trim().toLowerCase() === itemEmail)
-      || profiles.find(s => itemName && String(s.name || s.supervisorName || '').trim().toLowerCase() === itemName)
-      || {};
-    const master = (state.supervisorsMaster || []).find(s =>
-      (id && (s.id === id || s.supervisorId === id)) ||
-      (itemEmail && String(s.email || '').trim().toLowerCase() === itemEmail)) || {};
+    const master = (typeof resolveSupervisorProfile === 'function')
+      ? resolveSupervisorProfile(id || itemEmail, item)
+      : ((state.supervisorsMaster || []).find(s => (id && (s.id === id || s.supervisorId === id)) || (itemEmail && String(s.email || '').trim().toLowerCase() === itemEmail)) || {});
+    const resolvedName = master?.name || item.supervisorName || item.name || 'Giảng viên hướng dẫn';
     return {
       label: assigned.length > 1 ? `GVHD ${index + 1}` : 'GVHD',
-      name: item.supervisorName || item.name || profile.name || master.name || 'Giảng viên hướng dẫn',
-      email: item.supervisorEmail || item.email || profile.email || master.email || effectiveAssignment?.supervisorEmail || '',
-      phone: item.phone || item.phoneNumber || profile.phone || profile.phoneNumber || profile.mobile || master.phone || master.phoneNumber || master.mobile || effectiveAssignment?.supervisorPhone || '',
-      photoUrl: item.photoUrl || profile.photoUrl || master.photoUrl || ''
+      name: resolvedName,
+      email: master?.email || item.supervisorEmail || item.email || effectiveAssignment?.supervisorEmail || '',
+      phone: master?.phone || item.phone || item.phoneNumber || effectiveAssignment?.supervisorPhone || '',
+      photoUrl: master?.photoUrl || item.photoUrl || ''
     };
   });
 }

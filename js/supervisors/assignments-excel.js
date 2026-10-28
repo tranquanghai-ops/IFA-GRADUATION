@@ -40,9 +40,9 @@ window.exportSupervisorAssignmentsExcel = function() {
       sanitizeExcelCell((typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function') ? window.getOfficialApprovedTopicTitle(row.registration || row.effective, 'Chưa đăng ký đề tài') : (row.registration?.topicTitle || 'Chưa đăng ký đề tài')),
       row.isRegistered ? 'Đã đăng ký' : 'Chưa đăng ký',
       sanitizeExcelCell(primary.supervisorEmail || ''),
-      sanitizeExcelCell(primary.supervisorName || ''),
+      sanitizeExcelCell((typeof resolveSupervisorName === 'function' ? resolveSupervisorName(primary.supervisorId || primary.supervisorEmail, primary.supervisorName) : (window.resolveSupervisorName ? window.resolveSupervisorName(primary.supervisorId || primary.supervisorEmail, primary.supervisorName) : (primary.supervisorName || '')))),
       sanitizeExcelCell(support.supervisorEmail || ''),
-      sanitizeExcelCell(support.supervisorName || '')
+      sanitizeExcelCell((typeof resolveSupervisorName === 'function' ? resolveSupervisorName(support.supervisorId || support.supervisorEmail, support.supervisorName) : (window.resolveSupervisorName ? window.resolveSupervisorName(support.supervisorId || support.supervisorEmail, support.supervisorName) : (support.supervisorName || ''))))
     ]);
   });
 

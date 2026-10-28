@@ -35,9 +35,30 @@ window.loadAdminReviewData = async function(roundId) {
       };
     }
 
-    // 2. Fetch Supervisors
-    const supSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'supervisors'));
-    const supervisors = supSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // 2. Fetch Supervisors & Master Catalog
+    const [supSnap] = await Promise.all([
+      getDocs(collection(db, 'graduationRounds', roundId, 'supervisors')),
+      (typeof ensureSupervisorsMasterLoaded === 'function' ? ensureSupervisorsMasterLoaded() : Promise.resolve())
+    ]);
+    const supervisors = supSnap.docs.map(d => {
+      const roundSup = { id: d.id, ...d.data() };
+      const master = (typeof resolveSupervisorProfile === 'function')
+        ? resolveSupervisorProfile(roundSup.id || roundSup.supervisorId || roundSup.email, roundSup)
+        : null;
+      return {
+        ...roundSup,
+        ...(master ? {
+          name: master.name,
+          email: master.email || roundSup.email,
+          department: master.department || roundSup.department,
+          phone: master.phone || roundSup.phone,
+          photoUrl: master.photoUrl || roundSup.photoUrl,
+          expertise: master.expertise || roundSup.expertise,
+          bio: master.bio || roundSup.bio,
+          employmentType: master.employmentType || roundSup.employmentType
+        } : {})
+      };
+    });
 
     // 3. Fetch Registrations
     const regSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'registrations'));
@@ -282,10 +303,17 @@ function renderAdminReviewSupervisorsTable() {
       statusBadge = '<span class="badge bg-amber-100 text-amber-800 font-bold">⏳ Đang chờ</span>';
     }
 
+    const resolvedName = (typeof resolveSupervisorName === 'function')
+      ? resolveSupervisorName(s.id || s.supervisorId || s.email, s.name)
+      : (window.resolveSupervisorName ? window.resolveSupervisorName(s.id || s.supervisorId || s.email, s.name) : s.name);
+    const resolvedDept = (typeof resolveSupervisorDepartment === 'function')
+      ? resolveSupervisorDepartment(s.id || s.supervisorId || s.email, s.department)
+      : (window.resolveSupervisorDepartment ? window.resolveSupervisorDepartment(s.id || s.supervisorId || s.email, s.department) : (s.department || '--'));
+
     return `
       <tr class="hover:bg-slate-50">
-        <td class="p-3.5 font-bold text-slate-900">${s.name}</td>
-        <td class="p-3.5 text-slate-600">${s.department || '--'}</td>
+        <td class="p-3.5 font-bold text-slate-900">${escapeHtml(resolvedName)}</td>
+        <td class="p-3.5 text-slate-600">${escapeHtml(resolvedDept)}</td>
         <td class="p-3.5 text-center font-bold text-slate-800">${totalCap}</td>
         <td class="p-3.5 text-center font-bold text-emerald-600">${acceptedPrev}</td>
         <td class="p-3.5 text-center font-bold text-indigo-600">${candidates.length}</td>
@@ -319,7 +347,12 @@ function renderAdminManualAssignmentTable() {
     const r = row.registration || {};
     const studentId = row.studentId;
     const studentDisplayName = resolveStudentName(studentId, r.studentName || row.eligibleStudent?.fullName || row.eligibleStudent?.name);
-    const prefsText = (r.preferences || []).map(p => `NV${p.rank}: ${p.supervisorName}`).join(' • ') || '--';
+    const prefsText = (r.preferences || []).map(p => {
+      const pName = (typeof resolveSupervisorName === 'function')
+        ? resolveSupervisorName(p.supervisorId || p.id || p.email, p.supervisorName)
+        : (window.resolveSupervisorName ? window.resolveSupervisorName(p.supervisorId || p.id || p.email, p.supervisorName) : p.supervisorName);
+      return `NV${p.rank}: ${pName}`;
+    }).join(' • ') || '--';
 
     return `
       <tr class="hover:bg-slate-50">
@@ -547,7 +580,10 @@ window.openAdminInspectSupModal = function(supId) {
 
   const decisions = state.adminReviewData.decisions;
 
-  document.getElementById('inspect-sup-name').textContent = `Chi tiết Xét duyệt: ${sup.name}`;
+  const resolvedSupName = (typeof resolveSupervisorName === 'function')
+    ? resolveSupervisorName(sup.id || sup.supervisorId || sup.email, sup.name)
+    : (window.resolveSupervisorName ? window.resolveSupervisorName(sup.id || sup.supervisorId || sup.email, sup.name) : sup.name);
+  document.getElementById('inspect-sup-name').textContent = `Chi tiết Xét duyệt: ${resolvedSupName}`;
   document.getElementById('inspect-sup-quota-info').textContent = `Chỉ tiêu: ${totalCap} | Đã nhận trước: ${acceptedPrev} | Ứng viên Vòng ${currentRound}: ${candidates.length}`;
 
   const tbody = document.getElementById('inspect-sup-candidates-tbody');
@@ -606,11 +642,14 @@ window.openAdminManualAssignModal = function(studentId) {
     const acceptedCount = getSupervisorAssignmentCount(s.id, row.studentId);
     const remaining = allowedCap - acceptedCount;
     const typeLabel = employmentType === 'adjunct' ? 'Thỉnh giảng' : 'Cơ hữu';
+    const resolvedName = (typeof resolveSupervisorName === 'function')
+      ? resolveSupervisorName(s.id || s.supervisorId || s.email, s.name)
+      : (window.resolveSupervisorName ? window.resolveSupervisorName(s.id || s.supervisorId || s.email, s.name) : s.name);
 
     if (remaining <= 0) {
-      return `<option value="${s.id}" disabled class="text-slate-400 bg-slate-100">${s.name} (${typeLabel} • ĐÃ ĐỦ CHỈ TIÊU: ${acceptedCount}/${allowedCap})</option>`;
+      return `<option value="${s.id}" disabled class="text-slate-400 bg-slate-100">${escapeHtml(resolvedName)} (${typeLabel} • ĐÃ ĐỦ CHỈ TIÊU: ${acceptedCount}/${allowedCap})</option>`;
     }
-    return `<option value="${s.id}">${s.name} (${typeLabel} • Còn ${remaining} chỗ • ${acceptedCount}/${allowedCap})</option>`;
+    return `<option value="${s.id}">${escapeHtml(resolvedName)} (${typeLabel} • Còn ${remaining} chỗ • ${acceptedCount}/${allowedCap})</option>`;
   }).join('');
 
   document.getElementById('modal-admin-manual-assign').classList.remove('hidden');
@@ -786,8 +825,11 @@ window.openTeacherProfileModal = function(supId = null) {
 
   let sup = null;
   if (supId) {
-    sup = (state.roundSupervisors || []).find(s => s.id === supId || s.email === supId) ||
-          (state.supervisorsMaster || []).find(s => s.id === supId || s.email === supId);
+    const master = (typeof resolveSupervisorProfile === 'function')
+      ? resolveSupervisorProfile(supId)
+      : ((state.supervisorsMaster || []).find(s => s.id === supId || s.email === supId));
+    const roundSup = (state.roundSupervisors || []).find(s => s.id === supId || s.email === supId);
+    sup = master ? { ...roundSup, ...master } : (roundSup || master);
   }
   
   if (!sup && isSelf) {
@@ -915,10 +957,13 @@ function buildEditSupervisorOptions(selectEl, currentSupervisorId, allowEmpty = 
     if (!info) return '';
     const isSelf = currentReg ? isOfficialSupervisor(currentReg, s.id) : (s.id === currentSupervisorId);
     const typeLabel = info.employmentType === 'adjunct' ? 'Thỉnh giảng' : 'Cơ hữu';
+    const resolvedName = (typeof resolveSupervisorName === 'function')
+      ? resolveSupervisorName(s.id || s.supervisorId || s.email, s.name)
+      : (window.resolveSupervisorName ? window.resolveSupervisorName(s.id || s.supervisorId || s.email, s.name) : s.name);
     if (info.remaining <= 0 && !isSelf) {
-      return `<option value="${s.id}" disabled class="text-slate-400 bg-slate-100">${s.name} (${typeLabel} • ĐÃ ĐỦ CHỈ TIÊU: ${info.used}/${info.allowedCap})</option>`;
+      return `<option value="${s.id}" disabled class="text-slate-400 bg-slate-100">${escapeHtml(resolvedName)} (${typeLabel} • ĐÃ ĐỦ CHỈ TIÊU: ${info.used}/${info.allowedCap})</option>`;
     }
-    return `<option value="${s.id}">${s.name} (${typeLabel} • Còn ${info.remaining} chỗ • ${info.used}/${info.allowedCap})</option>`;
+    return `<option value="${s.id}">${escapeHtml(resolvedName)} (${typeLabel} • Còn ${info.remaining} chỗ • ${info.used}/${info.allowedCap})</option>`;
   }).join('');
 }
 
@@ -940,8 +985,14 @@ window.openAdminEditSupervisorModal = function(studentId) {
   const editTopic = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function') ? window.getOfficialApprovedTopicTitle(reg, reg.topicTitle || '--') : (reg.topicTitle || '--');
   document.getElementById('edit-sup-topic-info').textContent = `Đề tài: ${editTopic}${reg.projectType ? ' (' + reg.projectType + ')' : ''}`;
   document.getElementById('edit-sup-round-info').textContent = `Đợt tốt nghiệp: ${state.activeRound?.title || state.activeRound?.name || state.selectedRoundId || '--'}`;
-  document.getElementById('edit-sup-current-primary').textContent = primary?.supervisorName || 'Chưa phân công';
-  document.getElementById('edit-sup-current-secondary').textContent = secondary?.supervisorName || 'Chưa có';
+  const primaryDisplayName = (typeof resolveSupervisorName === 'function')
+    ? resolveSupervisorName(primary?.supervisorId || primary?.supervisorEmail, primary?.supervisorName)
+    : (primary?.supervisorName || 'Chưa phân công');
+  const secondaryDisplayName = (typeof resolveSupervisorName === 'function')
+    ? resolveSupervisorName(secondary?.supervisorId || secondary?.supervisorEmail, secondary?.supervisorName)
+    : (secondary?.supervisorName || 'Chưa có');
+  document.getElementById('edit-sup-current-primary').textContent = primaryDisplayName || 'Chưa phân công';
+  document.getElementById('edit-sup-current-secondary').textContent = secondaryDisplayName || 'Chưa có';
 
   buildEditSupervisorOptions(document.getElementById('select-edit-primary-supervisor'), primary?.supervisorId || '');
   buildEditSupervisorOptions(document.getElementById('select-edit-secondary-supervisor'), secondary?.supervisorId || '', true);

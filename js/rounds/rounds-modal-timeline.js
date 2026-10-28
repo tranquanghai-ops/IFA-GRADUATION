@@ -48,17 +48,27 @@ export function getSupervisorDefaultAndMaxQuota(s) {
 }
 window.getSupervisorDefaultAndMaxQuota = getSupervisorDefaultAndMaxQuota;
 
+let _supervisorsMasterLoadingPromise = null;
+
 export async function ensureSupervisorsMasterLoaded(force = false) {
   if (!force && Array.isArray(state.supervisorsMaster) && state.supervisorsMaster.length > 0) {
     return state.supervisorsMaster;
   }
-  try {
-    const snap = await getDocs(query(collection(db, 'supervisorMaster'), orderBy('name', 'asc')));
-    state.supervisorsMaster = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch (e) {
-    console.error('Error loading supervisorMaster:', e);
+  if (!force && _supervisorsMasterLoadingPromise) {
+    return _supervisorsMasterLoadingPromise;
   }
-  return state.supervisorsMaster || [];
+  _supervisorsMasterLoadingPromise = (async () => {
+    try {
+      const snap = await getDocs(query(collection(db, 'supervisorMaster'), orderBy('name', 'asc')));
+      state.supervisorsMaster = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) {
+      console.error('Error loading supervisorMaster:', e);
+    } finally {
+      _supervisorsMasterLoadingPromise = null;
+    }
+    return state.supervisorsMaster || [];
+  })();
+  return _supervisorsMasterLoadingPromise;
 }
 window.ensureSupervisorsMasterLoaded = ensureSupervisorsMasterLoaded;
 

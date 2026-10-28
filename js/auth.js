@@ -737,7 +737,8 @@ window.switchView = async function(targetView) {
 async function loadInitialData() {
   await Promise.allSettled([
     loadProjectTypes(),
-    loadRounds()
+    loadRounds(),
+    (typeof ensureSupervisorsMasterLoaded === 'function' ? ensureSupervisorsMasterLoaded() : (window.ensureSupervisorsMasterLoaded ? window.ensureSupervisorsMasterLoaded() : Promise.resolve()))
   ]);
 }
 

@@ -717,9 +717,57 @@ window.saveSupervisorMaster = async function(e) {
       state.supervisorsMaster.unshift(supObj);
     }
 
+    // Synchronize in-memory roundSupervisors if loaded
+    if (Array.isArray(state.roundSupervisors)) {
+      const rIdx = state.roundSupervisors.findIndex(s => s.id === savedId || s.supervisorId === savedId || (payload.email && s.email && s.email.toLowerCase().trim() === payload.email.toLowerCase().trim()));
+      if (rIdx >= 0) {
+        state.roundSupervisors[rIdx] = {
+          ...state.roundSupervisors[rIdx],
+          name: payload.name,
+          department: payload.department,
+          email: payload.email,
+          phone: payload.phone,
+          photoUrl: payload.photoUrl
+        };
+      }
+    }
+
+    // Synchronize in-memory adminReviewData.supervisors if loaded
+    if (state.adminReviewData && Array.isArray(state.adminReviewData.supervisors)) {
+      const aIdx = state.adminReviewData.supervisors.findIndex(s => s.id === savedId || s.supervisorId === savedId);
+      if (aIdx >= 0) {
+        state.adminReviewData.supervisors[aIdx] = {
+          ...state.adminReviewData.supervisors[aIdx],
+          name: payload.name,
+          department: payload.department,
+          email: payload.email,
+          phone: payload.phone,
+          photoUrl: payload.photoUrl
+        };
+      }
+    }
+
     renderAdminSupervisorsMasterTable();
     closeSupervisorModal();
     showToast('✓ Lưu Giảng viên Hướng dẫn thành công!', 'success');
+
+    // Trigger re-render of any open/active tables
+    if (typeof renderAdminRoundSupervisorsTable === 'function' && document.getElementById('admin-round-supervisors-tbody') && state.selectedRoundId) {
+      const curRoundSnap = (state.roundSupervisors && state.roundSupervisors.length > 0) ? state.roundSupervisors : [];
+      if (curRoundSnap.length > 0) renderAdminRoundSupervisorsTable(state.selectedRoundId, curRoundSnap);
+    }
+    if (typeof renderAdminReviewSupervisorsTable === 'function' && document.getElementById('admin-review-supervisors-tbody')) {
+      renderAdminReviewSupervisorsTable();
+    }
+    if (typeof renderAdminAssignedSupervisorsTable === 'function' && document.getElementById('admin-assigned-supervisors-tbody')) {
+      renderAdminAssignedSupervisorsTable();
+    }
+    if (typeof filterAdminRegistrationsTable === 'function' && document.getElementById('admin-registrations-tbody')) {
+      filterAdminRegistrationsTable();
+    }
+    if (typeof renderAdminEligibleStudentsTable === 'function' && document.getElementById('admin-eligible-students-tbody')) {
+      renderAdminEligibleStudentsTable();
+    }
 
     // Background sync
     loadAdminSupervisorsMaster().catch(console.error);
@@ -738,7 +786,10 @@ window.saveSupervisorMaster = async function(e) {
 // --- ADMIN: ROUND SUPERVISORS ---
 window.loadAdminRoundSupervisors = async function(roundId) {
   try {
-    const snap = await getDocs(collection(db, 'graduationRounds', roundId, 'supervisors'));
+    const [snap] = await Promise.all([
+      getDocs(collection(db, 'graduationRounds', roundId, 'supervisors')),
+      (typeof ensureSupervisorsMasterLoaded === 'function' ? ensureSupervisorsMasterLoaded() : Promise.resolve())
+    ]);
     if (typeof window.loadUserActivities === 'function') await window.loadUserActivities().catch(() => {});
     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderAdminRoundSupervisorsTable(roundId, list);
@@ -757,7 +808,11 @@ function renderAdminRoundSupervisorsTable(roundId, list) {
   }
 
   tbody.innerHTML = list.map(s => {
-    const supMaster = (state.supervisorsMaster || []).find(x => x.id === s.id);
+    const supMaster = (typeof resolveSupervisorProfile === 'function')
+      ? resolveSupervisorProfile(s.id || s.supervisorId || s.email, s)
+      : ((state.supervisorsMaster || []).find(x => x.id === s.id) || s);
+    const resolvedName = supMaster?.name || s.name;
+    const resolvedDept = supMaster?.department || s.department || '--';
     const { employmentType, maxCap, defaultQuota } = getSupervisorDefaultAndMaxQuota(supMaster || s);
     const curCap = typeof s.capacity === 'number' ? s.capacity : defaultQuota;
     const typeBadge = employmentType === 'adjunct'
@@ -771,10 +826,10 @@ function renderAdminRoundSupervisorsTable(roundId, list) {
     return `
       <tr class="hover:bg-slate-50">
         <td class="p-3.5">
-          <span class="font-bold text-slate-900 block">${escapeHtml(s.name)}</span>
+          <span class="font-bold text-slate-900 block">${escapeHtml(resolvedName)}</span>
           ${typeBadge}
         </td>
-        <td class="p-3.5 text-slate-600">${escapeHtml(s.department || '--')}</td>
+        <td class="p-3.5 text-slate-600">${escapeHtml(resolvedDept)}</td>
         <td class="p-3.5">
           <input type="number" id="cap-input-${s.id}" value="${curCap}" min="1" max="${maxCap}" class="w-20 p-1 border rounded-lg font-bold text-center">
         </td>
