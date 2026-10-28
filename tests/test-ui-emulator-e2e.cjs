@@ -183,8 +183,8 @@ async function runBrowserUITests() {
           studentName: 'Sinh viên Giả lập 01',
           className: '20050302',
           candidateRank: 1,
-          topicTitle: 'Nghiên cứu thiết kế nhận diện đồ án mẫu',
-          topicDescription: 'Mô tả chi tiết giải pháp thiết kế định hướng.',
+          topicTitle: 'Nghiên cứu thiết kế nhận diện thương hiệu cho dự án nông nghiệp số',
+          topicDescription: 'Dự án tập trung vào việc chuẩn hóa hệ thống nhận diện số và vật lý cho các hợp tác xã nông sản sạch khu vực Tây Nam Bộ. Bao gồm thiết kế logo, ấn phẩm bao bì sinh học, ứng dụng di động theo dõi nguồn gốc xuất xứ và quy chuẩn trưng bày tại điểm bán hàng.',
           projectType: 'Bộ nhận diện thương hiệu'
         },
         {
@@ -192,12 +192,14 @@ async function runBrowserUITests() {
           studentName: 'Sinh viên Giả lập 02',
           className: '20050303',
           candidateRank: 1,
-          topicTitle: 'Nghiên cứu kiến trúc nội thất thông minh',
-          topicDescription: 'Mô tả không gian ứng dụng thực tiễn.',
+          topicTitle: 'Nghiên cứu không gian triển lãm nghệ thuật đương đại tương tác',
+          topicDescription: 'Thiết kế cải tạo nhà xưởng cũ thành trung tâm triển lãm đa phương tiện, tích hợp công nghệ trình chiếu tương tác và vật liệu tái chế.',
           projectType: 'Không gian nội thất cộng đồng'
         }
       ];
-      window.state.supervisorDecisions = {};
+      window.state.supervisorDecisions = {
+        '99200001': 'selected'
+      };
       window.state.supervisorAcceptedStudents = [];
 
       // Switch to supervisor view
@@ -206,7 +208,38 @@ async function runBrowserUITests() {
       } else if (typeof window.renderSupervisorPortal === 'function') {
         window.renderSupervisorPortal();
       }
+
+      // Ensure review tab is switched
+      if (typeof window.switchSupervisorTab === 'function') {
+        window.switchSupervisorTab('review');
+      }
     });
+
+    // Check UI states for Preference Review
+    const uiChecks = await page.evaluate(() => {
+      const timeline = document.getElementById('supervisor-round-timeline');
+      const planSection = document.getElementById('supervisor-plan-section');
+      const assignedTab = document.getElementById('sup-tab-btn-assigned');
+      const reviewTab = document.getElementById('sup-tab-btn-review');
+      const tbody = document.getElementById('sup-candidates-tbody');
+      const modal = document.getElementById('modal-supervisor-confirm');
+      const modalContent = modal ? modal.textContent : '';
+
+      return {
+        timelineHidden: timeline ? timeline.classList.contains('hidden') : true,
+        planSectionHidden: planSection ? planSection.classList.contains('hidden') : true,
+        assignedTabHidden: assignedTab ? assignedTab.classList.contains('hidden') : true,
+        reviewTabVisible: reviewTab ? !reviewTab.classList.contains('hidden') : false,
+        tbodyHasRows: tbody ? tbody.children.length > 0 : false,
+        modalHasAdminSentence: modalContent.includes('Quản trị viên sẽ thấy Thầy/Cô đã hoàn tất lựa chọn')
+      };
+    });
+
+    console.log(`Timeline Hidden in Review: ${uiChecks.timelineHidden}`);
+    console.log(`Plan Section Hidden in Review: ${uiChecks.planSectionHidden}`);
+    console.log(`Assigned Tab Hidden in Review: ${uiChecks.assignedTabHidden}`);
+    console.log(`Review Tab Visible: ${uiChecks.reviewTabVisible}`);
+    console.log(`Confirmation Modal omits admin sentence: ${!uiChecks.modalHasAdminSentence}`);
 
     const shot1 = path.join(SCREENSHOT_DIR, 'ui_1920_supervisor_review.png');
     await page.screenshot({ path: shot1, fullPage: false });
@@ -292,6 +325,17 @@ async function runBrowserUITests() {
     const shot4 = path.join(SCREENSHOT_DIR, 'ui_375_mobile_supervisor_view.png');
     await page.screenshot({ path: shot4, fullPage: false });
     console.log(`✓ Saved 375px screenshot: ${shot4}`);
+
+    // Copy to brain artifacts directory if present
+    const brainScreenshotsDir = 'C:\\Users\\HHHH-HP\\.gemini\\antigravity\\brain\\85d98480-3b40-4985-ae5c-72405fe52acd\\screenshots';
+    if (fs.existsSync(brainScreenshotsDir)) {
+      [shot1, shot2, shot3, shot4].forEach(f => {
+        try {
+          fs.copyFileSync(f, path.join(brainScreenshotsDir, path.basename(f)));
+        } catch (e) {}
+      });
+      console.log(`✓ Copied screenshots to artifacts directory: ${brainScreenshotsDir}`);
+    }
 
     console.log('\n================================================================');
     console.log('✅ ALL UI TESTS & VIEWPORT SCREENSHOTS COMPLETED SUCCESSFULLY');

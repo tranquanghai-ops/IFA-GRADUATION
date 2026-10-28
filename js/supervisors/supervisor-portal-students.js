@@ -415,9 +415,15 @@ window.setSupervisorStudentFilter = function(filterKey) {
 };
 
 window.switchSupervisorTab = function(tabName) {
+  const isDirect = isDirectSupervisorAssignment(state.activeRound);
+  const isAssignmentPublished = typeof isSupervisorRoundAssignmentPublished === 'function' ? isSupervisorRoundAssignmentPublished(state.activeRound) : true;
+
+  if (!isAssignmentPublished && (tabName === 'assigned' || tabName === 'accepted')) {
+    tabName = 'review';
+  }
+
   state.currentSupervisorTab = tabName;
   state.supervisorTab = tabName;
-  const isDirect = isDirectSupervisorAssignment(state.activeRound);
   const tabs = {
     assigned: ['sup-tab-btn-assigned', 'sup-panel-assigned'],
     review: ['sup-tab-btn-review', 'sup-panel-review'],
@@ -432,6 +438,16 @@ window.switchSupervisorTab = function(tabName) {
     const isTarget = (k === tabName);
 
     if (btn) {
+      if (!isAssignmentPublished && (k === 'assigned' || k === 'accepted')) {
+        btn.classList.add('hidden');
+        if (panel) panel.classList.add('hidden');
+        return;
+      }
+      if (k === 'accepted') {
+        btn.classList.add('hidden');
+        if (panel) panel.classList.add('hidden');
+        return;
+      }
       if (isDirect && (k === 'review' || k === 'accepted')) {
         btn.classList.add('hidden');
         if (panel) panel.classList.add('hidden');

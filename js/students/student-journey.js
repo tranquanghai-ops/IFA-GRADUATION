@@ -327,6 +327,14 @@ function _getTimelineVisibleCount() {
 function renderSupervisorRoundTimeline(round) {
   const container = document.getElementById('supervisor-round-timeline');
   if (!container) return;
+
+  // If preference review is active and assignments are not published, hide timeline completely
+  if (typeof isSupervisorRoundAssignmentPublished === 'function' && !isSupervisorRoundAssignmentPublished(round)) {
+    container.innerHTML = '';
+    container.classList.add('hidden');
+    return;
+  }
+
   if (typeof renderUnifiedRoundTimeline === 'function') {
     const html = renderUnifiedRoundTimeline(round, { role: 'supervisor' });
     container.innerHTML = html;
@@ -364,6 +372,14 @@ function renderSupervisorPlanList(round) {
   const section = document.getElementById('supervisor-plan-section');
   const container = document.getElementById('supervisor-plan-list');
   if (!section || !container) return;
+
+  // If preference review is active and assignments are not published, hide plan section completely
+  if (typeof isSupervisorRoundAssignmentPublished === 'function' && !isSupervisorRoundAssignmentPublished(round)) {
+    container.innerHTML = '';
+    section.classList.add('hidden');
+    return;
+  }
+
   section.classList.remove('hidden');
   if (typeof renderUnifiedPlanList === 'function') {
     renderUnifiedPlanList(round, { role: 'supervisor', container, prefix: 'sup' });

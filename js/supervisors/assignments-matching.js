@@ -777,13 +777,42 @@ function renderSupervisorCandidatesTable(readOnly) {
   const tbody = document.getElementById('sup-candidates-tbody');
   if (!tbody) return;
 
-  const searchTerm = (document.getElementById('search-sup-candidates')?.value || '').toLowerCase();
-  const filtered = state.supervisorCandidates.filter(c => {
-    return (c.studentId || '').toLowerCase().includes(searchTerm) || (c.studentName || '').toLowerCase().includes(searchTerm);
+  const searchTerm = (document.getElementById('search-sup-candidates')?.value || '').toLowerCase().trim();
+  const currentFilter = state.supervisorCandidateFilter || 'all';
+
+  const allCandidates = state.supervisorCandidates || [];
+  const selectedCountAll = allCandidates.filter(c => state.supervisorDecisions[c.studentId] === 'selected').length;
+  const unselectedCountAll = allCandidates.length - selectedCountAll;
+
+  // Update filter counter badges
+  const setElText = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  setElText('sup-cand-cnt-all', allCandidates.length);
+  setElText('sup-cand-cnt-selected', selectedCountAll);
+  setElText('sup-cand-cnt-unselected', unselectedCountAll);
+
+  const filtered = allCandidates.filter(c => {
+    const isSelected = state.supervisorDecisions[c.studentId] === 'selected';
+    if (currentFilter === 'selected' && !isSelected) return false;
+    if (currentFilter === 'unselected' && isSelected) return false;
+
+    if (!searchTerm) return true;
+    return (
+      (c.studentId || '').toLowerCase().includes(searchTerm) ||
+      (c.studentName || '').toLowerCase().includes(searchTerm) ||
+      (c.className || '').toLowerCase().includes(searchTerm) ||
+      (c.topicTitle || '').toLowerCase().includes(searchTerm)
+    );
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400">Không có ứng viên nào đăng ký Thầy/Cô ở Nguyện vọng này (hoặc đã được nhận ở vòng trước).</td></tr>';
+    const emptyMsg = searchTerm
+      ? 'Không tìm thấy ứng viên nào phù hợp với từ khóa tìm kiếm.'
+      : (currentFilter === 'selected'
+        ? 'Chưa có ứng viên nào được chọn nhận trong đợt này.'
+        : (currentFilter === 'unselected'
+          ? 'Tất cả ứng viên trong danh sách đều đã được chọn nhận.'
+          : 'Không có ứng viên nào đăng ký Thầy/Cô ở Nguyện vọng này (hoặc đã được nhận ở vòng trước).'));
+    tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 font-medium">${emptyMsg}</td></tr>`;
     return;
   }
 
@@ -792,15 +821,18 @@ function renderSupervisorCandidatesTable(readOnly) {
     const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
     return (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid));
   });
-  const totalCap = currentSup?.capacity || 10;
+  const totalCap = currentSup?.capacity ?? 10;
   const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
   const selectedCurr = Object.values(state.supervisorDecisions).filter(v => v === 'selected').length;
   const remainingCap = Math.max(0, totalCap - acceptedPrev - selectedCurr);
 
-  tbody.innerHTML = filtered.map(c => {
+  tbody.innerHTML = filtered.map((c, idx) => {
     const isSelected = state.supervisorDecisions[c.studentId] === 'selected';
+    const isLoading = Boolean(state.supervisorDecisionLoading && state.supervisorDecisionLoading[c.studentId]);
     const topicTitle = String(c.topicTitle || 'Chưa cập nhật tên đề tài');
     const topicDescription = String(c.topicDescription || 'Sinh viên chưa bổ sung mô tả định hướng thiết kế.');
+    const isExpanded = Boolean(state.expandedDescriptions && state.expandedDescriptions[c.studentId]);
+    const hasLongDesc = topicDescription.length > 120;
 
     let prefBadge = '';
     if (c.isEarlyTransition) {
@@ -814,52 +846,103 @@ function renderSupervisorCandidatesTable(readOnly) {
     }
 
     let actionBtn = '';
-    if (readOnly) {
-      actionBtn = isSelected
-        ? '<span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Đã chọn nhận</span>'
-        : '<span class="text-slate-400 font-semibold text-xs">Chưa chọn</span>';
+    if (isLoading) {
+      actionBtn = `
+        <div class="flex flex-col gap-1.5 items-center justify-center">
+          <button disabled class="w-28 h-8 rounded-xl text-[11px] font-bold inline-flex items-center justify-center bg-slate-100 text-slate-500 border border-slate-300 cursor-wait">
+            ⏳ Đang lưu...
+          </button>
+        </div>
+      `;
+    } else if (readOnly) {
+      actionBtn = `
+        <div class="flex flex-col gap-1.5 items-center justify-center">
+          ${isSelected
+            ? '<span class="w-28 h-8 rounded-xl text-[11px] font-bold inline-flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">✓ Đã chọn</span>'
+            : '<span class="w-28 h-8 rounded-xl text-[11px] font-semibold inline-flex items-center justify-center text-slate-400 bg-slate-50 border border-slate-200">Chưa chọn</span>'}
+        </div>
+      `;
     } else {
       if (isSelected) {
         actionBtn = `
-          <div class="flex flex-col gap-1 items-end min-w-[120px]">
-            <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">✓ Đã chọn nhận</span>
-            <button onclick="setSupervisorDecision('${c.studentId}', 'unselected')" class="px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 hover:border-rose-300 font-bold rounded-lg transition-all text-xs">✕ Bỏ chọn</button>
+          <div class="flex flex-col gap-1.5 items-center justify-center">
+            <span class="w-28 h-8 rounded-xl text-[11px] font-bold inline-flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">✓ Đã chọn</span>
+            <button type="button" onclick="setSupervisorDecision('${c.studentId}', 'unselected')" class="w-28 h-8 rounded-xl text-[11px] font-bold inline-flex items-center justify-center bg-white hover:bg-rose-50 text-rose-600 border border-rose-300 hover:border-rose-400 transition-all cursor-pointer shadow-2xs">✕ Bỏ chọn</button>
           </div>
         `;
       } else {
         if (remainingCap <= 0) {
           actionBtn = `
-            <button onclick="setSupervisorDecision('${c.studentId}', 'selected')" class="px-3 py-1.5 bg-slate-100 text-slate-400 border border-slate-200 font-bold rounded-xl transition-all text-xs cursor-not-allowed" title="Đã hết chỉ tiêu (${totalCap} SV)">✓ Chọn nhận SV</button>
+            <div class="flex flex-col gap-1.5 items-center justify-center">
+              <button disabled class="w-28 h-8 rounded-xl text-[11px] font-bold inline-flex items-center justify-center bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed" title="Đã hết chỉ tiêu (${totalCap} SV)">✓ Chọn nhận SV</button>
+            </div>
           `;
         } else {
           actionBtn = `
-            <button onclick="setSupervisorDecision('${c.studentId}', 'selected')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm transition-all text-xs">✓ Chọn nhận SV</button>
+            <div class="flex flex-col gap-1.5 items-center justify-center">
+              <button type="button" onclick="setSupervisorDecision('${c.studentId}', 'selected')" class="w-28 h-8 rounded-xl text-[11px] font-bold inline-flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-all cursor-pointer">✓ Chọn nhận SV</button>
+            </div>
           `;
         }
       }
     }
 
     return `
-      <tr class="hover:bg-slate-50 transition-colors ${isSelected ? 'bg-emerald-50/30' : ''}">
-        <td class="p-3.5 font-mono font-bold text-slate-900">${c.studentId}</td>
-        <td class="p-3.5">
-          <span class="font-semibold text-slate-800 block">${escapeHtml(c.studentName || '--')}</span>
-          <span class="text-[11px] text-slate-500">Lớp: ${escapeHtml(c.className || '--')}</span>
+      <tr class="border-b border-slate-100 transition-colors hover:bg-slate-50/80 ${isSelected ? 'bg-emerald-50/30' : (idx % 2 === 1 ? 'bg-slate-50/20' : 'bg-white')}">
+        <td class="p-3.5 align-top font-mono font-bold text-slate-900">${c.studentId}</td>
+        <td class="p-3.5 align-top">
+          <span class="font-bold text-slate-900 block leading-tight">${escapeHtml(c.studentName || '--')}</span>
+          <span class="text-[11px] text-slate-500 block mt-0.5">Lớp: ${escapeHtml(c.className || '--')}</span>
           ${prefBadge}
         </td>
-        <td class="p-3.5 max-w-lg">
+        <td class="p-3.5 align-top">
           <p class="font-bold text-slate-900 leading-snug">${escapeHtml(topicTitle)}</p>
           <div class="mt-1.5 pt-1.5 border-t border-slate-100">
-            <span class="text-[10px] font-black uppercase tracking-wide text-blue-700">Mô tả định hướng</span>
-            <p class="mt-0.5 text-[11px] leading-relaxed text-slate-600 whitespace-pre-line text-justify">${escapeHtml(topicDescription)}</p>
+            <span class="text-[10px] font-black uppercase tracking-wider text-tdtu-blue block">Mô tả định hướng</span>
+            <p class="mt-0.5 text-[11px] leading-relaxed text-slate-600 whitespace-pre-line text-justify ${!isExpanded && hasLongDesc ? 'line-clamp-3' : ''}">${escapeHtml(topicDescription)}</p>
+            ${hasLongDesc ? `
+              <button type="button" onclick="toggleSupervisorCandidateDesc('${c.studentId}')" class="mt-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer inline-flex items-center gap-1">
+                ${isExpanded ? 'Thu gọn ▲' : 'Xem thêm ▼'}
+              </button>
+            ` : ''}
           </div>
         </td>
-        <td class="p-3.5 text-slate-600">${c.projectType || '--'}</td>
-        <td class="p-3.5 text-center">${actionBtn}</td>
+        <td class="p-3.5 align-top text-slate-700 text-xs whitespace-normal break-words leading-relaxed">${escapeHtml(c.projectType || '--')}</td>
+        <td class="p-3.5 align-top text-center">${actionBtn}</td>
       </tr>
     `;
   }).join('');
 }
+
+window.setSupervisorCandidateFilter = function(filter) {
+  state.supervisorCandidateFilter = filter;
+  ['all', 'selected', 'unselected'].forEach(f => {
+    const btn = document.getElementById(`sup-cand-flt-${f}`);
+    if (!btn) return;
+    if (f === filter) {
+      if (f === 'selected') {
+        btn.className = 'px-3 py-1.5 rounded-xl font-bold text-xs bg-emerald-700 text-white shadow-xs cursor-pointer transition-all';
+      } else {
+        btn.className = 'px-3 py-1.5 rounded-xl font-bold text-xs bg-slate-900 text-white shadow-xs cursor-pointer transition-all';
+      }
+    } else {
+      if (f === 'selected') {
+        btn.className = 'px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 cursor-pointer transition-all';
+      } else {
+        btn.className = 'px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 cursor-pointer transition-all';
+      }
+    }
+  });
+  const isLocked = Boolean(state.activeRound?.reviewLocks && state.activeRound?.reviewLocks['round_' + (state.activeRound?.currentReviewRound || 1)]);
+  renderSupervisorCandidatesTable(isLocked);
+};
+
+window.toggleSupervisorCandidateDesc = function(studentId) {
+  state.expandedDescriptions = state.expandedDescriptions || {};
+  state.expandedDescriptions[studentId] = !state.expandedDescriptions[studentId];
+  const isLocked = Boolean(state.activeRound?.reviewLocks && state.activeRound?.reviewLocks['round_' + (state.activeRound?.currentReviewRound || 1)]);
+  renderSupervisorCandidatesTable(isLocked);
+};
 
 window.filterSupervisorCandidates = function() {
   const isLocked = Boolean(state.activeRound?.reviewLocks && state.activeRound?.reviewLocks['round_' + (state.activeRound?.currentReviewRound || 1)]);
@@ -867,6 +950,7 @@ window.filterSupervisorCandidates = function() {
 };
 
 window.setSupervisorDecision = async function(studentId, nextDecision) {
+  if (state.supervisorDecisionLoading?.[studentId]) return;
   if (!checkImpersonationWriteGuard('Thay đổi quyết định chọn sinh viên')) return;
 
   const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
@@ -881,8 +965,8 @@ window.setSupervisorDecision = async function(studentId, nextDecision) {
 
   // If selecting, check remaining quota
   if (nextDecision === 'selected') {
-    const totalCap = currentSup.capacity || 10;
-    const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup.acceptedCount || 0);
+    const totalCap = currentSup.capacity ?? 10;
+    const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
     const selectedCurr = Object.values(state.supervisorDecisions).filter(v => v === 'selected').length;
     const remaining = totalCap - acceptedPrev - selectedCurr;
 
@@ -895,12 +979,16 @@ window.setSupervisorDecision = async function(studentId, nextDecision) {
     delete state.supervisorDecisions[studentId];
   }
 
+  // Set loading state for this candidate
+  state.supervisorDecisionLoading = state.supervisorDecisionLoading || {};
+  state.supervisorDecisionLoading[studentId] = true;
+
   // Update local state immediately for snappy UI
   renderSupervisorCandidatesTable(false);
 
   // Recalculate and update stats badges
-  const totalCapacity = currentSup.capacity || 10;
-  const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup.acceptedCount || 0);
+  const totalCapacity = currentSup.capacity ?? 10;
+  const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
   const selectedCurr = Object.values(state.supervisorDecisions).filter(v => v === 'selected').length;
   const remainingCap = Math.max(0, totalCapacity - acceptedPrev - selectedCurr);
 
@@ -909,6 +997,12 @@ window.setSupervisorDecision = async function(studentId, nextDecision) {
   setVal('sup-stat-remaining-cap', remainingCap);
   setVal('sup-review-stat-selected-curr', selectedCurr);
   setVal('sup-review-stat-remaining-cap', remainingCap);
+
+  // Update hero stat if in preference review phase
+  const isAssignmentPublished = typeof isSupervisorRoundAssignmentPublished === 'function' ? isSupervisorRoundAssignmentPublished(state.activeRound) : false;
+  if (!isAssignmentPublished) {
+    setVal('sup-stat-assigned-total', selectedCurr);
+  }
 
   // Persist decision to Firestore
   try {
@@ -942,6 +1036,9 @@ window.setSupervisorDecision = async function(studentId, nextDecision) {
   } catch (err) {
     console.error('Error saving review decision:', err);
     showToast('Lỗi lưu quyết định: ' + err.message, 'error');
+  } finally {
+    state.supervisorDecisionLoading[studentId] = false;
+    renderSupervisorCandidatesTable(false);
   }
 };
 
@@ -952,18 +1049,30 @@ window.toggleSupervisorDecision = function(studentId) {
 
 window.openSupervisorConfirmModal = function() {
   const currentRound = state.activeRound?.currentReviewRound || 1;
-  const selectedCount = Object.values(state.supervisorDecisions).filter(v => v === 'selected').length;
-  const remCount = document.getElementById('sup-stat-remaining-cap')?.textContent || '0';
+  const currentSup = (state.roundSupervisors || []).find(s => {
+    const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
+    const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
+    return (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid));
+  });
+  const totalCap = currentSup?.capacity ?? 10;
+  const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
+  const selectedCount = Object.values(state.supervisorDecisions || {}).filter(v => v === 'selected').length;
+  const remCount = Math.max(0, totalCap - acceptedPrev - selectedCount);
 
-  document.getElementById('modal-sup-confirm-round-title').textContent = `Xét duyệt Nguyện vọng ${currentRound}`;
-  document.getElementById('modal-sup-selected-count').textContent = `${selectedCount} Sinh viên`;
-  document.getElementById('modal-sup-rem-count').textContent = `${remCount} Sinh viên`;
+  const titleEl = document.getElementById('modal-sup-confirm-round-title');
+  if (titleEl) titleEl.textContent = `Xét duyệt Nguyện vọng ${currentRound}`;
+  const selEl = document.getElementById('modal-sup-selected-count');
+  if (selEl) selEl.textContent = `${selectedCount} SV`;
+  const remEl = document.getElementById('modal-sup-rem-count');
+  if (remEl) remEl.textContent = `${remCount} SV`;
+  const totalEl = document.getElementById('modal-sup-total-cap');
+  if (totalEl) totalEl.textContent = `${totalCap} SV`;
 
-  document.getElementById('modal-supervisor-confirm').classList.remove('hidden');
+  document.getElementById('modal-supervisor-confirm')?.classList.remove('hidden');
 };
 
 window.closeSupervisorConfirmModal = function() {
-  document.getElementById('modal-supervisor-confirm').classList.add('hidden');
+  document.getElementById('modal-supervisor-confirm')?.classList.add('hidden');
 };
 
 window.confirmSupervisorRoundCompletion = async function() {
@@ -1030,9 +1139,15 @@ window.reopenSupervisorRound = async function() {
 };
 
 window.switchSupervisorTab = function(tabKey) {
+  const isDirect = typeof isDirectSupervisorAssignment === 'function' ? isDirectSupervisorAssignment(state.activeRound) : false;
+  const isAssignmentPublished = typeof isSupervisorRoundAssignmentPublished === 'function' ? isSupervisorRoundAssignmentPublished(state.activeRound) : true;
+
+  if (!isAssignmentPublished && (tabKey === 'assigned' || tabKey === 'accepted')) {
+    tabKey = 'review';
+  }
+
   state.supervisorTab = tabKey;
   state.currentSupervisorTab = tabKey;
-  const isDirect = typeof isDirectSupervisorAssignment === 'function' ? isDirectSupervisorAssignment(state.activeRound) : false;
 
   const btnAssigned = document.getElementById('sup-tab-btn-assigned');
   const btnReview = document.getElementById('sup-tab-btn-review');
@@ -1048,7 +1163,7 @@ window.switchSupervisorTab = function(tabKey) {
 
   const allBtns = [
     { btn: btnAssigned, panel: panelAssigned, key: 'assigned', activeCls: 'bg-tdtu-blue text-white' },
-    { btn: btnReview, panel: panelReview, key: 'review', activeCls: 'bg-indigo-600 text-white' },
+    { btn: btnReview, panel: panelReview, key: 'review', activeCls: 'bg-slate-900 text-white' },
     { btn: btnAccepted, panel: panelAccepted, key: 'accepted', activeCls: 'bg-emerald-600 text-white' },
     { btn: btnPrelim, panel: panelPrelim, key: 'preliminary', activeCls: 'bg-amber-600 text-white' },
     { btn: btnReviewer, panel: panelReviewer, key: 'reviewer', activeCls: 'bg-blue-600 text-white' }
@@ -1056,6 +1171,16 @@ window.switchSupervisorTab = function(tabKey) {
 
   allBtns.forEach(item => {
     if (!item.btn || !item.panel) return;
+    if (!isAssignmentPublished && (item.key === 'assigned' || item.key === 'accepted')) {
+      item.btn.classList.add('hidden');
+      item.panel.classList.add('hidden');
+      return;
+    }
+    if (item.key === 'accepted') {
+      item.btn.classList.add('hidden');
+      item.panel.classList.add('hidden');
+      return;
+    }
     if (isDirect && (item.key === 'review' || item.key === 'accepted')) {
       item.btn.classList.add('hidden');
       item.panel.classList.add('hidden');

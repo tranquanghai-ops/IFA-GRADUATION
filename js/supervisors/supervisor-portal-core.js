@@ -8,6 +8,22 @@ const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window
 const normalizeOfficialAssignment = (a, r) => (typeof window !== 'undefined' && window.normalizeOfficialAssignment ? window.normalizeOfficialAssignment(a, r) : (a || r));
 const isDirectSupervisorAssignment = (rnd) => (typeof window !== 'undefined' && window.isDirectSupervisorAssignment ? window.isDirectSupervisorAssignment(rnd) : false);
 
+export function isSupervisorRoundAssignmentPublished(round) {
+  if (!round) return false;
+  const reviewStatus = round.reviewStatus;
+  // If actively in preference review rounds or awaiting manual assignment / not started, it's NOT published
+  if (['round_1', 'round_2', 'round_3', 'manual_assignment', 'reviewing', 'not_started', 'draft'].includes(reviewStatus)) {
+    return false;
+  }
+  if (round.assignmentPublicationState === 'published') return true;
+  if (round.reviewStatus === 'completed') return true;
+  if (round.status === 'published' && !reviewStatus) return true;
+  return false;
+}
+if (typeof window !== 'undefined') {
+  window.isSupervisorRoundAssignmentPublished = isSupervisorRoundAssignmentPublished;
+}
+
 // PHASE 3: SUPERVISOR PORTAL COMPLETE IMPLEMENTATION
 // ============================================================================
 
@@ -756,6 +772,9 @@ window.loadSupervisorPortalData = async function(roundId) {
   const hasSupervisorDuties = isParticipatingInRound || totalAssignedCount > 0 || actor.isAdmin;
   loadingCard?.classList.add('hidden');
 
+  const isAssignmentPublished = isSupervisorRoundAssignmentPublished(round);
+  const heroLabel = document.getElementById('sup-hero-stat-label');
+
   if (!hasSupervisorDuties) {
     const timelineEl = document.getElementById('supervisor-round-timeline');
     if (timelineEl) {
@@ -773,23 +792,64 @@ window.loadSupervisorPortalData = async function(roundId) {
     if (reviewPanel) reviewPanel.classList.add('hidden');
     const acceptedPanel = document.getElementById('sup-panel-accepted');
     if (acceptedPanel) acceptedPanel.classList.add('hidden');
+  } else if (!isAssignmentPublished) {
+    // 1. Preference Review Phase: HIDE timeline and plan section completely
+    const timelineEl = document.getElementById('supervisor-round-timeline');
+    if (timelineEl) {
+      timelineEl.innerHTML = '';
+      timelineEl.classList.add('hidden');
+    }
+    const planSection = document.getElementById('supervisor-plan-section');
+    if (planSection) {
+      planSection.classList.add('hidden');
+    }
+
+    if (notAssignedAlert) notAssignedAlert.classList.add('hidden');
+    if (subTabsContainer) subTabsContainer.classList.remove('hidden');
+
+    // 2. Hide Assigned and Accepted tabs; show Review tab
+    if (tabAssignedBtn) tabAssignedBtn.classList.add('hidden');
+    if (tabAcceptedBtn) tabAcceptedBtn.classList.add('hidden');
+    if (tabReviewBtn) tabReviewBtn.classList.remove('hidden');
+
+    if (totalAssignedCount === 0) defaultTab = 'review';
+    defaultTab = 'review';
+
+    // 3. Update Hero Stat Label to "Đang chọn vòng này"
+    if (heroLabel) heroLabel.textContent = 'Đang chọn vòng này';
+
+    // 4. Load candidate data
+    await loadSupervisorReviewData(roundId);
+
+    // Update hero stat count with current selections count
+    const selectedCurr = Object.values(state.supervisorDecisions || {}).filter(v => v === 'selected').length;
+    if (statAssignedEl) statAssignedEl.textContent = selectedCurr;
+
+    // 5. Default to review tab
+    switchSupervisorTab('review');
   } else {
+    // Assignments are officially published
     renderSupervisorRoundTimeline(round);
     renderSupervisorPlanList(round);
     if (notAssignedAlert) notAssignedAlert.classList.add('hidden');
     if (subTabsContainer) subTabsContainer.classList.remove('hidden');
     if (assignedPanel) assignedPanel.classList.remove('hidden');
 
-    // In preference-based rounds, unhide review & accepted tabs and load candidate data
+    if (tabAssignedBtn) tabAssignedBtn.classList.remove('hidden');
+    if (tabAcceptedBtn) tabAcceptedBtn.classList.add('hidden');
     if (tabReviewBtn) tabReviewBtn.classList.toggle('hidden', isDirect);
-    if (tabAcceptedBtn) tabAcceptedBtn.classList.toggle('hidden', isDirect);
+
+    defaultTab = 'assigned';
+
+    if (heroLabel) heroLabel.textContent = 'Số SV hướng dẫn';
+    if (statAssignedEl) statAssignedEl.textContent = totalAssignedCount;
+
     if (!isDirect) {
       await loadSupervisorReviewData(roundId);
-      if (totalAssignedCount === 0) defaultTab = 'review';
     }
 
     // Switch to the appropriate default tab if current tab is hidden
-    const currentTab = defaultTab === 'review' ? 'review' : (state.currentSupervisorTab || defaultTab);
+    const currentTab = state.currentSupervisorTab || defaultTab;
     const currentBtn = document.getElementById(`sup-tab-btn-${currentTab}`);
     if (!currentBtn || currentBtn.classList.contains('hidden')) {
       switchSupervisorTab(defaultTab);
