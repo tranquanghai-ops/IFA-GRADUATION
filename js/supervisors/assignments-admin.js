@@ -571,7 +571,7 @@ window.openAdminLockRoundModal = function(publishEarly = false) {
         planKhoaAssignCount++;
       } else {
         const nv2Cap = supCapacityMap.get(nv2.supervisorId);
-        const nv2Rem = (nv2Cap ? nv2Cap.total - nv2Cap.acceptedBefore - nv2Cap.newSelectedInRound : 10);
+        const nv2Rem = (nv2Cap ? nv2Cap.total - nv2Cap.acceptedBefore - nv2Cap.newSelectedInRound : 0);
         if (nv2Rem > 0) {
           planNextPrefCount++;
         } else {
@@ -580,7 +580,7 @@ window.openAdminLockRoundModal = function(publishEarly = false) {
             planKhoaAssignCount++;
           } else {
             const nv3Cap = supCapacityMap.get(nv3.supervisorId);
-            const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 10);
+            const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 0);
             if (nv3Rem > 0) {
               planSkipNv3Count++;
             } else {
@@ -597,7 +597,7 @@ window.openAdminLockRoundModal = function(publishEarly = false) {
           planKhoaAssignCount++;
         } else {
           const nv3Cap = supCapacityMap.get(nv3.supervisorId);
-          const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 10);
+          const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 0);
           if (nv3Rem > 0) {
             planNextPrefCount++;
           } else {
@@ -747,7 +747,7 @@ window.confirmAdminLockRound = async function() {
             });
           } else {
             const nv2Cap = supCapacityMap.get(nv2.supervisorId);
-            const nv2Rem = (nv2Cap ? nv2Cap.total - nv2Cap.acceptedBefore - nv2Cap.newSelectedInRound : 10);
+            const nv2Rem = (nv2Cap ? nv2Cap.total - nv2Cap.acceptedBefore - nv2Cap.newSelectedInRound : 0);
             if (nv2Rem > 0) {
               batch.update(regRef, {
                 reviewStatus: 'in_review',
@@ -767,7 +767,7 @@ window.confirmAdminLockRound = async function() {
                 });
               } else {
                 const nv3Cap = supCapacityMap.get(nv3.supervisorId);
-                const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 10);
+                const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 0);
                 if (nv3Rem > 0) {
                   // Skip NV2 straight to NV3
                   batch.update(regRef, {
@@ -804,7 +804,7 @@ window.confirmAdminLockRound = async function() {
               });
             } else {
               const nv3Cap = supCapacityMap.get(nv3.supervisorId);
-              const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 10);
+              const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 0);
               if (nv3Rem > 0) {
                 batch.update(regRef, {
                   reviewStatus: 'in_review',

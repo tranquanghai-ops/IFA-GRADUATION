@@ -18,7 +18,8 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   GoogleAuthProvider,
-  signOut
+  signOut,
+  connectAuthEmulator
 } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js';
 import {
   getFirestore,
@@ -37,7 +38,8 @@ import {
   serverTimestamp,
   writeBatch as rawWriteBatch,
   runTransaction as rawRunTransaction,
-  onSnapshot
+  onSnapshot,
+  connectFirestoreEmulator
 } from 'https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js';
 
 
@@ -755,6 +757,24 @@ export function hideLoading() {
 
 
 // --- INITIALIZATION ---
+function renderEmulatorModeBanner() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById('emulator-mode-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'emulator-mode-banner';
+  banner.className = 'w-full bg-amber-500 text-slate-900 px-4 py-2 text-xs md:text-sm font-semibold flex items-center justify-between shadow-md sticky top-0 z-[99999] border-b border-amber-600';
+  banner.innerHTML = `
+    <div class="flex items-center gap-2">
+      <span class="inline-block animate-pulse text-base">⚡</span>
+      <span><strong>CHẾ ĐỘ LOCAL EMULATOR ĐỘC LẬP:</strong> Firestore: <code>127.0.0.1:8088</code> | Auth: <code>127.0.0.1:9099</code> | <span class="text-amber-950 font-normal">Dữ liệu thử nghiệm hoàn toàn cô lập, không ảnh hưởng Production.</span></span>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="?emulator=false" class="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs transition font-medium" onclick="try{localStorage.removeItem('IFA_USE_EMULATOR');}catch(_){}">Tắt Emulator</a>
+    </div>
+  `;
+  document.body.prepend(banner);
+}
+
 async function initFirebase() {
   const config = {
     apiKey: "AIzaSyBwpZyNyskZ1OJ6tDvh249aeH70MLtO1iI",
@@ -768,6 +788,38 @@ async function initFirebase() {
   app = getApps().length > 0 ? getApp() : initializeApp(config);
   auth = getAuth(app);
   db = getFirestore(app);
+
+  // STRICT LOCAL EMULATOR CONNECTION GUARD
+  // Only connects when explicitly enabled on localhost/127.0.0.1
+  if (typeof window !== 'undefined') {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const params = new URLSearchParams(window.location.search);
+    const emuParam = params.get('emulator');
+    if (emuParam === 'true' || emuParam === '1') {
+      try { localStorage.setItem('IFA_USE_EMULATOR', 'true'); } catch (_) {}
+    } else if (emuParam === 'false' || emuParam === '0') {
+      try { localStorage.removeItem('IFA_USE_EMULATOR'); } catch (_) {}
+    }
+    const hasEmuFlag = (emuParam === 'true' || emuParam === '1') || 
+      (typeof localStorage !== 'undefined' && localStorage.getItem('IFA_USE_EMULATOR') === 'true');
+
+    if (isLocal && hasEmuFlag && !window.__EMULATOR_CONNECTED__) {
+      window.__EMULATOR_CONNECTED__ = true;
+      try {
+        connectFirestoreEmulator(db, '127.0.0.1', 8088);
+        connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+        console.warn('⚡ [IFA LOCAL TEST] Successfully connected to Firestore (127.0.0.1:8088) & Auth (127.0.0.1:9099) Emulator.');
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', renderEmulatorModeBanner);
+        } else {
+          renderEmulatorModeBanner();
+        }
+      } catch (err) {
+        console.error('Error connecting to Firebase Emulators:', err);
+      }
+    }
+  }
+
   try {
     storage = getStorage(app);
   } catch (e) {
