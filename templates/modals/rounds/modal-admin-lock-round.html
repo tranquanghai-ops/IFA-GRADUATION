@@ -15,15 +15,52 @@
           ⚠️ <strong>CẢNH BÁO:</strong> Vẫn còn <span id="modal-admin-pending-sups-count" class="font-bold">0</span> giảng viên chưa xác nhận hoàn thành vòng.
         </div>
 
-        <div class="bg-slate-50 p-4 rounded-xl border space-y-2">
-          <p class="font-bold text-slate-800">Các thay đổi sẽ được thực thi khi chốt vòng:</p>
-          <ul class="list-disc list-inside space-y-1 text-slate-600">
-            <li>Tất cả sinh viên được GVHD chọn ở vòng này sẽ được đánh dấu <strong>Trúng tuyển chính thức</strong>.</li>
-            <li>Cập nhật chỉ tiêu đã nhận của các GVHD liên quan.</li>
-            <li>Khóa quyền chỉnh sửa của GVHD ở vòng này.</li>
-            <li>Chuyển toàn bộ sinh viên chưa trúng tuyển sang xét <strong>Nguyện vọng kế tiếp</strong> (hoặc Phân công thủ công nếu đã hết NV).</li>
+        <!-- Dynamic Preview Stats Grid -->
+        <div id="modal-admin-lock-preview-container" class="space-y-3">
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-indigo-50 border border-indigo-100 p-2.5 rounded-xl">
+              <span class="text-slate-500 text-[11px] block">Ứng viên xét vòng này</span>
+              <span id="modal-lock-stat-registered" class="text-lg font-black text-indigo-700">0</span>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl">
+              <span class="text-slate-500 text-[11px] block">GVHD chọn nhận (Chốt)</span>
+              <span id="modal-lock-stat-selected" class="text-lg font-black text-emerald-700">0</span>
+            </div>
+            <div class="bg-amber-50 border border-amber-100 p-2.5 rounded-xl">
+              <span class="text-slate-500 text-[11px] block">Chưa được chọn</span>
+              <span id="modal-lock-stat-unselected" class="text-lg font-black text-amber-700">0</span>
+            </div>
+          </div>
+
+          <!-- Transition Plan Breakdown -->
+          <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <p class="font-bold text-slate-800 text-xs">📋 Kế hoạch chuyển vòng tự động khi chốt:</p>
+            <div class="space-y-1.5 text-[11px] text-slate-700">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-1">
+                <span>• Chuyển sang nguyện vọng tiếp theo (GVHD còn chỉ tiêu):</span>
+                <strong id="modal-lock-plan-next-pref" class="text-indigo-700 font-bold">0 SV</strong>
+              </div>
+              <div class="flex items-center justify-between border-b border-slate-100 pb-1">
+                <span class="text-purple-900">• Bỏ qua NV2 do GVHD đã FULL, <span class="font-bold text-purple-700">chuyển ngay sang NV3</span>:</span>
+                <strong id="modal-lock-plan-skip-nv3" class="text-purple-700 font-bold">0 SV</strong>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-rose-900">• Hết nguyện vọng / NV2 và NV3 đều FULL → <span class="font-bold text-rose-700">Khoa phân công</span>:</span>
+                <strong id="modal-lock-plan-khoa-assign" class="text-rose-700 font-bold">0 SV</strong>
+              </div>
+            </div>
+            <p id="modal-lock-sup-quota-info" class="text-[10px] text-slate-500 pt-1 italic"></p>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5">
+          <p class="font-bold text-slate-800 text-[11px]">Quy tắc chốt vòng đảm bảo:</p>
+          <ul class="list-disc list-inside space-y-0.5 text-[11px] text-slate-600">
+            <li>Sinh viên được chọn ở vòng này được đánh dấu <strong>Trúng tuyển chính thức</strong>.</li>
+            <li>Khóa chỉnh sửa của GVHD ở vòng này; chống chốt đúp và chống trùng sinh viên.</li>
+            <li>Tự động chuyển tiếp sinh viên chưa trúng tuyển theo đúng quy định.</li>
           </ul>
-          <p id="modal-admin-lock-round-detail" class="pt-2 text-[11px] font-semibold text-slate-600"></p>
+          <p id="modal-admin-lock-round-detail" class="pt-1 text-[11px] font-semibold text-slate-600"></p>
         </div>
       </div>
 

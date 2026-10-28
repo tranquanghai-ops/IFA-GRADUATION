@@ -179,42 +179,59 @@ function renderAdminReviewDashboard() {
     return;
   }
 
-  if (reviewStatus === 'not_started' || reviewStatus === 'draft' || currentRound === 0) {
-    statusPill.className = 'badge bg-slate-200 text-slate-800 font-black';
-    statusPill.textContent = 'Chưa bắt đầu xét';
-    titleEl.textContent = 'Chưa bắt đầu Xét Nguyện vọng';
-    descEl.textContent = 'Đợt đăng ký đã có ' + totalReg + ' hồ sơ. Bấm Bắt đầu Xét Nguyện vọng 1 để mở quyền lựa chọn cho Giảng viên.';
+  const effectiveReviewRound = Math.max(1, Math.min(preferenceCount, currentRound || 1));
+  const isRound1Active = (!reviewStatus || reviewStatus === 'not_started' || reviewStatus === 'draft' || reviewStatus === 'round_1');
+
+  if (isRound1Active) {
+    statusPill.className = 'badge bg-amber-400 text-slate-900 font-black';
+    statusPill.textContent = 'Đang xét Nguyện vọng 1';
+    titleEl.textContent = `Đang tiến hành: Xét duyệt Nguyện vọng 1 / ${preferenceCount}`;
+    descEl.textContent = 'Vòng 1 mở tự động ngay khi sinh viên đăng ký đề tài. GVHD có thể đăng nhập và chọn nhận SV ngay trong chỉ tiêu. Khi GVHD đã chọn xong, bấm Kết thúc Vòng 1 để chốt và chuyển sang Vòng 2.';
     actionsWrap.innerHTML = `
-      <button onclick="startAdminReviewRound1()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
-        <span>▶️ BẮT ĐẦU XÉT NGUYỆN VỌNG 1</span>
+      <button type="button" onclick="openAdminLockRoundModal()" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer">
+        <span>🔒 KẾT THÚC VÒNG 1 (Chốt NV1 & Chuyển NV2)</span>
+      </button>
+      <button type="button" onclick="openAdminLockRoundModal(true)" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer">
+        <span>📢 CHỐT & CÔNG BỐ SAU VÒNG 1</span>
       </button>
     `;
-  } else if (reviewStatus.startsWith('round_')) {
+  } else if (reviewStatus === 'round_2') {
     statusPill.className = 'badge bg-amber-400 text-slate-900 font-black';
-    statusPill.textContent = `Đang xét Nguyện vọng ${currentRound}`;
-    titleEl.textContent = `Đang tiến hành: Xét duyệt Nguyện vọng ${currentRound} / ${preferenceCount}`;
-    descEl.textContent = `Theo dõi tiến độ hoàn thành của các GVHD. Khi các GVHD đã chọn xong, bấm Chốt vòng để cập nhật kết quả và chuyển sang vòng tiếp theo.`;
-
+    statusPill.textContent = 'Đang xét Nguyện vọng 2';
+    titleEl.textContent = `Đang tiến hành: Xét duyệt Nguyện vọng 2 / ${preferenceCount}`;
+    descEl.textContent = 'Xét NV2 cho sinh viên chưa trúng tuyển Vòng 1. Sinh viên có GVHD NV2 đã đủ chỉ tiêu được chuyển thẳng sang NV3 ngay từ Vòng 2.';
     actionsWrap.innerHTML = `
-      <button type="button" onclick="openAdminLockRoundModal()" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
-        <span>🔒 CHỐT NGUYỆN VỌNG ${currentRound} & CHUYỂN VÒNG →</span>
+      <button type="button" onclick="openAdminLockRoundModal()" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer">
+        <span>🔒 KẾT THÚC VÒNG 2 (Chốt NV2 & Chuyển NV3)</span>
       </button>
-      ${currentRound <= 2 ? `<button type="button" onclick="openAdminLockRoundModal(true)" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2"><span>📢 CHỐT & CÔNG BỐ SAU VÒNG ${currentRound}</span></button>` : ''}
+      <button type="button" onclick="openAdminLockRoundModal(true)" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer">
+        <span>📢 CHỐT & CÔNG BỐ SAU VÒNG 2</span>
+      </button>
+    `;
+  } else if (reviewStatus === 'round_3') {
+    statusPill.className = 'badge bg-amber-400 text-slate-900 font-black';
+    statusPill.textContent = 'Đang xét Nguyện vọng 3';
+    titleEl.textContent = `Đang tiến hành: Xét duyệt Nguyện vọng 3 / ${preferenceCount}`;
+    descEl.textContent = 'Xét NV3 cho sinh viên chưa trúng tuyển qua các vòng trước. Kết thúc Vòng 3 sẽ chuyển toàn bộ sinh viên còn lại vào danh sách Khoa phân công.';
+    actionsWrap.innerHTML = `
+      <button type="button" onclick="openAdminLockRoundModal()" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer">
+        <span>🔒 KẾT THÚC VÒNG 3 (Chốt NV3 & Chuyển Khoa phân công)</span>
+      </button>
     `;
   } else if (reviewStatus === 'manual_assignment') {
     const endedAfterRound = Number(round.reviewEndedAfterRound || 0);
     const endedEarly = endedAfterRound >= 1 && endedAfterRound <= 2;
     statusPill.className = 'badge bg-indigo-200 text-indigo-900 font-black';
-    statusPill.textContent = endedEarly ? `Đã chốt sau NV${endedAfterRound}` : 'Phân công thủ công';
+    statusPill.textContent = endedEarly ? `Đã chốt sau NV${endedAfterRound}` : 'Khoa phân công';
     titleEl.textContent = endedEarly
       ? `Đã chốt sau Nguyện vọng ${endedAfterRound} — Sẵn sàng công bố`
-      : 'Giai đoạn: Phân công GVHD Thủ công';
+      : 'Giai đoạn: Khoa phân công GVHD';
     descEl.textContent = endedEarly
-      ? `Không cần xét các nguyện vọng còn lại. Còn ${unassignedCount} sinh viên chưa có GVHD; bạn có thể phân công bổ sung hoặc công bố ngay kết quả hiện tại.`
-      : `Tất cả ${preferenceCount} vòng nguyện vọng đã kết thúc. Còn ${unassignedCount} sinh viên chưa có GVHD. Hãy phân công sinh viên vào các GVHD còn chỉ tiêu trước khi Công bố kết quả.`;
+      ? `Không cần xét các nguyện vọng còn lại. Còn ${unassignedCount} sinh viên chưa có GVHD; bạn có thể phân công bổ sung trong bảng bên dưới hoặc công bố ngay kết quả.`
+      : `Tất cả các vòng nguyện vọng đã kết thúc. Còn ${unassignedCount} sinh viên chưa có GVHD. Hãy phân công sinh viên trong bảng Khoa phân công bên dưới trước khi Công bố kết quả.`;
 
     actionsWrap.innerHTML = `
-      <button onclick="publishAdminResults()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2">
+      <button onclick="publishAdminResults()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer">
         <span>📢 HOÀN TẤT & CÔNG BỐ KẾT QUẢ CHÍNH THỨC</span>
       </button>
     `;
@@ -257,33 +274,61 @@ function renderAdminReviewSupervisorsTable() {
   const tbody = document.getElementById('admin-review-supervisors-tbody');
   if (!tbody) return;
 
-  const currentRound = state.activeRound?.currentReviewRound || 1;
-  const supervisors = state.adminReviewData.supervisors;
-  const registrations = state.adminReviewData.registrations;
-  const decisions = state.adminReviewData.decisions;
+  const currentRound = Number(state.activeRound?.currentReviewRound || 1);
+  const supervisors = state.adminReviewData.supervisors || [];
+  const registrations = state.adminReviewData.registrations || [];
+  const decisions = state.adminReviewData.decisions || [];
+
+  const supCapacityMap = new Map();
+  supervisors.forEach(s => {
+    supCapacityMap.set(s.id, {
+      total: typeof s.capacity === 'number' ? s.capacity : 10,
+      acceptedCount: s.acceptedCount || 0
+    });
+  });
 
   let completedCount = 0;
 
   tbody.innerHTML = supervisors.map(s => {
-    const totalCap = s.capacity || 10;
-    
+    const totalCap = typeof s.capacity === 'number' ? s.capacity : 10;
+
     // Accepted previously in rounds < currentRound
     const acceptedPrev = registrations.filter(r => {
       return (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') &&
-        (r.acceptedSupervisorId === s.id || r.acceptedSupervisorId === s.supervisorId) &&
-        (r.acceptedRank < currentRound);
+        (r.acceptedSupervisorId === s.id || r.acceptedSupervisorId === s.supervisorId);
     }).length;
 
-    // Candidates in current round
+    // Candidates in current round per 3-Round rules (including Rule 3.5 early skip to NV3)
     const candidates = registrations.filter(r => {
-      if (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') return false;
-      const pref = (r.preferences || []).find(p => p.rank === currentRound);
-      return pref && (pref.supervisorId === s.id || pref.supervisorId === s.supervisorId);
+      if (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned' ||
+          r.eligibilityStatus === 'not_eligible' || r.draft === true) return false;
+
+      const pref1 = (r.preferences || []).find(p => Number(p.rank) === 1);
+      const pref2 = (r.preferences || []).find(p => Number(p.rank) === 2);
+      const pref3 = (r.preferences || []).find(p => Number(p.rank) === 3);
+      const matchesS = (pref) => pref && (pref.supervisorId === s.id || pref.supervisorId === s.supervisorId);
+
+      if (currentRound === 1) {
+        return matchesS(pref1);
+      } else if (currentRound === 2) {
+        const nv2SupCap = pref2 ? supCapacityMap.get(pref2.supervisorId) : null;
+        const nv2IsFullFromR1 = nv2SupCap && (nv2SupCap.acceptedCount >= nv2SupCap.total);
+        const isExplicitlySkippedToNv3 = r.skipNV2Reason === 'nv2_full' || (r.currentPrefRank === 3 && r.isEarlyTransition);
+
+        if (nv2IsFullFromR1 || isExplicitlySkippedToNv3) {
+          return matchesS(pref3);
+        }
+        return matchesS(pref2);
+      } else if (currentRound === 3) {
+        return matchesS(pref3);
+      }
+      return false;
     });
 
     // Currently selected in this round
     const selectedCount = candidates.filter(c => {
-      const dec = decisions.find(d => d.round === currentRound && (d.supervisorId === s.id || d.supervisorId === s.supervisorId) && d.studentId === c.studentId);
+      const candRank = (currentRound === 2 && (r => (r.skipNV2Reason === 'nv2_full' || (r.currentPrefRank === 3 && r.isEarlyTransition)))(c)) ? 3 : currentRound;
+      const dec = decisions.find(d => Number(d.round) === candRank && (d.supervisorId === s.id || d.supervisorId === s.supervisorId) && d.studentId === c.studentId);
       return dec && dec.decision === 'selected';
     }).length;
 
@@ -311,7 +356,7 @@ function renderAdminReviewSupervisorsTable() {
       : (window.resolveSupervisorDepartment ? window.resolveSupervisorDepartment(s.id || s.supervisorId || s.email, s.department) : (s.department || '--'));
 
     return `
-      <tr class="hover:bg-slate-50">
+      <tr class="hover:bg-slate-50 transition-colors">
         <td class="p-3.5 font-bold text-slate-900">${escapeHtml(resolvedName)}</td>
         <td class="p-3.5 text-slate-600">${escapeHtml(resolvedDept)}</td>
         <td class="p-3.5 text-center font-bold text-slate-800">${totalCap}</td>
@@ -321,7 +366,7 @@ function renderAdminReviewSupervisorsTable() {
         <td class="p-3.5 text-center font-bold ${remainingCap > 0 ? 'text-amber-600' : 'text-slate-400'}">${remainingCap}</td>
         <td class="p-3.5 text-center">${statusBadge}</td>
         <td class="p-3.5 text-right">
-          <button onclick="openAdminInspectSupModal('${s.id}')" class="text-blue-600 hover:underline font-bold text-xs">Xem chi tiết</button>
+          <button onclick="openAdminInspectSupModal('${s.id}')" class="text-blue-600 hover:underline font-bold text-xs cursor-pointer">Xem chi tiết</button>
         </td>
       </tr>
     `;
@@ -334,12 +379,14 @@ function renderAdminManualAssignmentTable() {
   const tbody = document.getElementById('admin-manual-assign-tbody');
   if (!tbody) return;
 
-  const registrations = state.adminReviewData.registrations;
   const directAssignment = isDirectSupervisorAssignment();
   const unassigned = getAdminAssignmentRows().filter(row => !row.isAssigned);
 
+  const countTag = document.getElementById('adm-unassigned-count-tag');
+  if (countTag) countTag.textContent = `${unassigned.length} SV`;
+
   if (unassigned.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${directAssignment ? 6 : 7}" class="p-6 text-center text-emerald-700 font-bold bg-emerald-50/50">🎉 Tất cả sinh viên đã được phân công Giảng viên hướng dẫn!</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-emerald-700 font-bold bg-emerald-50/50">🎉 Tất cả sinh viên đã được phân công Giảng viên hướng dẫn!</td></tr>`;
     return;
   }
 
@@ -347,23 +394,47 @@ function renderAdminManualAssignmentTable() {
     const r = row.registration || {};
     const studentId = row.studentId;
     const studentDisplayName = resolveStudentName(studentId, r.studentName || row.eligibleStudent?.fullName || row.eligibleStudent?.name);
+    const className = r.className || row.eligibleStudent?.className || '--';
+    const topicTitle = r.topicTitle || '<span class="text-slate-400 italic">Chưa đăng ký đề tài</span>';
+    const projectType = r.projectType || '--';
+
     const prefsText = (r.preferences || []).map(p => {
       const pName = (typeof resolveSupervisorName === 'function')
         ? resolveSupervisorName(p.supervisorId || p.id || p.email, p.supervisorName)
         : (window.resolveSupervisorName ? window.resolveSupervisorName(p.supervisorId || p.id || p.email, p.supervisorName) : p.supervisorName);
-      return `NV${p.rank}: ${pName}`;
-    }).join(' • ') || '--';
+      return `<span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 font-medium mr-1">NV${p.rank}: ${escapeHtml(pName)}</span>`;
+    }).join(' ') || '<span class="text-slate-400">Chưa đăng ký</span>';
+
+    // Reason badge
+    let reasonBadge = '';
+    if (r.routeToKhoaReason === 'nv2_and_nv3_full') {
+      reasonBadge = '<span class="badge bg-purple-100 text-purple-900 border border-purple-200 font-bold text-[10px]">⚡ Cả NV2 & NV3 đều FULL chỉ tiêu</span>';
+    } else if (r.routeToKhoaReason === 'nv3_full') {
+      reasonBadge = '<span class="badge bg-amber-100 text-amber-900 border border-amber-200 font-bold text-[10px]">GVHD NV3 đã FULL chỉ tiêu</span>';
+    } else if (r.routeToKhoaReason === 'unselected_after_round_3') {
+      reasonBadge = '<span class="badge bg-rose-100 text-rose-900 border border-rose-200 font-bold text-[10px]">Chưa được nhận qua 3 vòng NV</span>';
+    } else if (r.routeToKhoaReason === 'unselected_nv3_early') {
+      reasonBadge = '<span class="badge bg-rose-100 text-rose-900 border border-rose-200 font-bold text-[10px]">Chưa được nhận ở NV3 sớm</span>';
+    } else if (!r.preferences || r.preferences.length === 0) {
+      reasonBadge = '<span class="badge bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10px]">Chưa đăng ký nguyện vọng</span>';
+    } else {
+      reasonBadge = '<span class="badge bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10px]">Khoa phân công</span>';
+    }
 
     return `
-      <tr class="hover:bg-slate-50">
+      <tr class="hover:bg-slate-50 transition-colors">
         <td class="p-3.5 font-mono font-bold text-slate-900">${studentId}</td>
         <td class="p-3.5 font-semibold text-slate-800">${escapeHtml(studentDisplayName)}</td>
-        <td class="p-3.5 max-w-xs font-medium text-slate-900" title="${r.topicTitle || 'Chưa đăng ký đề tài'}">${r.topicTitle || '<span class="text-slate-400 italic">Chưa đăng ký đề tài</span>'}</td>
-        <td class="p-3.5 text-slate-600">${r.projectType || '--'}</td>
-        ${directAssignment ? '' : `<td class="p-3.5 text-[11px] text-slate-500 max-w-xs truncate" title="${prefsText}">${prefsText}</td>`}
+        <td class="p-3.5 text-slate-600">${escapeHtml(className)}</td>
+        <td class="p-3.5 max-w-xs">
+          <p class="font-bold text-slate-900 leading-snug line-clamp-2" title="${escapeHtml(r.topicTitle || '')}">${topicTitle}</p>
+          <span class="text-[10px] text-slate-500 font-medium">${projectType}</span>
+        </td>
+        <td class="p-3.5 text-[11px] text-slate-600 max-w-xs">${prefsText}</td>
+        <td class="p-3.5">${reasonBadge}</td>
         <td class="p-3.5 font-bold text-amber-700 text-xs">Chưa phân công</td>
         <td class="p-3.5 text-right">
-          <button onclick="openAdminManualAssignModal('${studentId}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-sm">
+          <button onclick="openAdminManualAssignModal('${studentId}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer">
             Phân công GVHD
           </button>
         </td>
@@ -394,12 +465,15 @@ window.startAdminReviewRound1 = async function() {
 };
 
 window.openAdminLockRoundModal = function(publishEarly = false) {
-  const currentRound = state.activeRound?.currentReviewRound || 1;
+  const currentRound = Number(state.activeRound?.currentReviewRound || 1);
   if (publishEarly && (currentRound < 1 || currentRound > 2)) {
     showToast('Chỉ có thể chốt và công bố sớm sau vòng 1 hoặc vòng 2.', 'warning');
     return;
   }
   const supervisors = state.adminReviewData?.supervisors || [];
+  const registrations = state.adminReviewData?.registrations || [];
+  const decisions = state.adminReviewData?.decisions || [];
+
   const pendingSups = supervisors.filter(s => {
     return !(s.roundProgress && s.roundProgress['round_' + currentRound]?.status === 'completed');
   });
@@ -408,17 +482,20 @@ window.openAdminLockRoundModal = function(publishEarly = false) {
   const titleEl = document.getElementById('modal-admin-lock-round-title');
   const detailEl = document.getElementById('modal-admin-lock-round-detail');
   const confirmBtn = document.getElementById('btn-confirm-admin-lock-round');
+
   if (titleEl) titleEl.textContent = publishEarly
     ? `Chốt Nguyện vọng ${currentRound} & Công bố kết quả`
-    : `Khóa & Chốt Nguyện vọng ${currentRound}`;
+    : `Khóa & Kết thúc Vòng ${currentRound} (Nguyện vọng ${currentRound})`;
+
   if (detailEl) detailEl.textContent = publishEarly
-    ? `Sau khi chốt, hệ thống sẽ đưa bạn đến bước công bố kết quả. Nguyện vọng còn lại sẽ không tiếp tục xét.`
-    : `Sinh viên chưa được chọn sẽ chuyển sang ${currentRound < preferenceCount ? `Nguyện vọng ${currentRound + 1}` : 'phân công thủ công'}.`;
+    ? `Sau khi chốt, hệ thống sẽ đưa bạn đến bước công bố kết quả. Các nguyện vọng còn lại sẽ không tiếp tục xét.`
+    : `Sinh viên chưa được nhận sẽ chuyển sang ${currentRound < preferenceCount ? `Nguyện vọng ${currentRound + 1}` : 'Khoa phân công'}.`;
+
   if (confirmBtn) {
     confirmBtn.dataset.publishEarly = publishEarly ? 'true' : 'false';
-    confirmBtn.textContent = publishEarly ? '📢 Chốt & sang bước công bố' : '🔒 Xác nhận Chốt Vòng';
+    confirmBtn.textContent = publishEarly ? '📢 Chốt & sang bước công bố' : `🔒 Xác nhận Kết thúc Vòng ${currentRound}`;
   }
-  
+
   const warningEl = document.getElementById('modal-admin-lock-warning');
   if (pendingSups.length > 0) {
     document.getElementById('modal-admin-pending-sups-count').textContent = pendingSups.length;
@@ -426,6 +503,130 @@ window.openAdminLockRoundModal = function(publishEarly = false) {
   } else {
     warningEl.classList.add('hidden');
   }
+
+  // --- Calculate Preview Statistics ---
+  const supCapacityMap = new Map();
+  supervisors.forEach(s => {
+    supCapacityMap.set(s.id, {
+      total: typeof s.capacity === 'number' ? s.capacity : 10,
+      acceptedBefore: s.acceptedCount || 0,
+      newSelectedInRound: 0
+    });
+  });
+
+  const roundCandidates = [];
+  registrations.forEach(r => {
+    if (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned' ||
+        r.eligibilityStatus === 'not_eligible' || r.draft === true) return;
+
+    const pref1 = (r.preferences || []).find(p => Number(p.rank) === 1);
+    const pref2 = (r.preferences || []).find(p => Number(p.rank) === 2);
+    const pref3 = (r.preferences || []).find(p => Number(p.rank) === 3);
+
+    if (currentRound === 1) {
+      if (pref1) roundCandidates.push({ reg: r, rank: 1, pref: pref1, isEarly: false });
+    } else if (currentRound === 2) {
+      const nv2SupCap = pref2 ? supCapacityMap.get(pref2.supervisorId) : null;
+      const nv2IsFullFromR1 = nv2SupCap && (nv2SupCap.acceptedBefore >= nv2SupCap.total);
+      const isExplicitlySkippedToNv3 = r.skipNV2Reason === 'nv2_full' || (r.currentPrefRank === 3 && r.isEarlyTransition);
+
+      if ((nv2IsFullFromR1 || isExplicitlySkippedToNv3) && pref3) {
+        roundCandidates.push({ reg: r, rank: 3, pref: pref3, isEarly: true });
+      } else if (!nv2IsFullFromR1 && !isExplicitlySkippedToNv3 && pref2) {
+        roundCandidates.push({ reg: r, rank: 2, pref: pref2, isEarly: false });
+      }
+    } else if (currentRound === 3) {
+      if (pref3) roundCandidates.push({ reg: r, rank: 3, pref: pref3, isEarly: false });
+    }
+  });
+
+  let selectedCount = 0;
+  let unselectedCount = 0;
+  let planNextPrefCount = 0;
+  let planSkipNv3Count = 0;
+  let planKhoaAssignCount = 0;
+
+  // Pass 1: Mark who is selected & increment cap
+  roundCandidates.forEach(cand => {
+    const sId = cand.pref?.supervisorId;
+    const dec = decisions.find(d => Number(d.round) === cand.rank && (d.supervisorId === sId) && d.studentId === cand.reg.studentId);
+    if (dec && dec.decision === 'selected') {
+      cand.isSelected = true;
+      selectedCount++;
+      const sCap = supCapacityMap.get(sId);
+      if (sCap) sCap.newSelectedInRound++;
+    } else {
+      cand.isSelected = false;
+      unselectedCount++;
+    }
+  });
+
+  // Pass 2: Transition plan for unselected candidates
+  roundCandidates.filter(c => !c.isSelected).forEach(cand => {
+    const r = cand.reg;
+    if (currentRound === 1) {
+      const nv2 = (r.preferences || []).find(p => Number(p.rank) === 2);
+      const nv3 = (r.preferences || []).find(p => Number(p.rank) === 3);
+      if (!nv2) {
+        planKhoaAssignCount++;
+      } else {
+        const nv2Cap = supCapacityMap.get(nv2.supervisorId);
+        const nv2Rem = (nv2Cap ? nv2Cap.total - nv2Cap.acceptedBefore - nv2Cap.newSelectedInRound : 10);
+        if (nv2Rem > 0) {
+          planNextPrefCount++;
+        } else {
+          // Rule 3.5: NV2 is FULL! Check NV3!
+          if (!nv3) {
+            planKhoaAssignCount++;
+          } else {
+            const nv3Cap = supCapacityMap.get(nv3.supervisorId);
+            const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 10);
+            if (nv3Rem > 0) {
+              planSkipNv3Count++;
+            } else {
+              // Rule 3.6: Both NV2 and NV3 are FULL!
+              planKhoaAssignCount++;
+            }
+          }
+        }
+      }
+    } else if (currentRound === 2) {
+      if (cand.rank === 2) {
+        const nv3 = (r.preferences || []).find(p => Number(p.rank) === 3);
+        if (!nv3) {
+          planKhoaAssignCount++;
+        } else {
+          const nv3Cap = supCapacityMap.get(nv3.supervisorId);
+          const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 10);
+          if (nv3Rem > 0) {
+            planNextPrefCount++;
+          } else {
+            planKhoaAssignCount++;
+          }
+        }
+      } else {
+        // Was early NV3, unselected -> Khoa phân công
+        planKhoaAssignCount++;
+      }
+    } else if (currentRound === 3) {
+      planKhoaAssignCount++;
+    }
+  });
+
+  let fullSupsCount = 0;
+  supCapacityMap.forEach(cap => {
+    if ((cap.acceptedBefore + cap.newSelectedInRound) >= cap.total) fullSupsCount++;
+  });
+
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setVal('modal-lock-stat-registered', roundCandidates.length);
+  setVal('modal-lock-stat-selected', selectedCount);
+  setVal('modal-lock-stat-unselected', unselectedCount);
+  setVal('modal-lock-plan-next-pref', `${planNextPrefCount} SV`);
+  setVal('modal-lock-plan-skip-nv3', `${planSkipNv3Count} SV`);
+  setVal('modal-lock-plan-khoa-assign', `${planKhoaAssignCount} SV`);
+  setVal('modal-lock-sup-quota-info',
+    `Chỉ tiêu GVHD: ${fullSupsCount}/${supervisors.length} GV đã đầy chỉ tiêu (${supervisors.length - fullSupsCount} GV còn chỗ).`);
 
   document.getElementById('modal-admin-lock-round').classList.remove('hidden');
 };
@@ -436,7 +637,7 @@ window.closeAdminLockRoundModal = function() {
 
 window.confirmAdminLockRound = async function() {
   const roundId = state.selectedRoundId;
-  const currentRound = state.activeRound?.currentReviewRound || 1;
+  const currentRound = Number(state.activeRound?.currentReviewRound || 1);
   const preferenceCount = state.activeRound?.preferenceCount || 3;
   const supervisors = state.adminReviewData?.supervisors || [];
   const registrations = state.adminReviewData?.registrations || [];
@@ -462,48 +663,188 @@ window.confirmAdminLockRound = async function() {
     const supAcceptedIncrements = {};
     supervisors.forEach(s => supAcceptedIncrements[s.id] = 0);
 
-    // 1. Process candidate students in current round
+    const supCapacityMap = new Map();
+    supervisors.forEach(s => {
+      supCapacityMap.set(s.id, {
+        total: typeof s.capacity === 'number' ? s.capacity : 10,
+        acceptedBefore: s.acceptedCount || 0,
+        newSelectedInRound: 0
+      });
+    });
+
+    const roundCandidates = [];
     registrations.forEach(r => {
-      if (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') return;
+      if (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned' ||
+          r.eligibilityStatus === 'not_eligible' || r.draft === true) return;
 
-      const pref = (r.preferences || []).find(p => p.rank === currentRound);
-      if (!pref) return;
+      const pref1 = (r.preferences || []).find(p => Number(p.rank) === 1);
+      const pref2 = (r.preferences || []).find(p => Number(p.rank) === 2);
+      const pref3 = (r.preferences || []).find(p => Number(p.rank) === 3);
 
-      const supId = pref.supervisorId;
-      const dec = decisions.find(d => d.round === currentRound && (d.supervisorId === supId) && d.studentId === r.studentId);
+      if (currentRound === 1) {
+        if (pref1) roundCandidates.push({ reg: r, rank: 1, pref: pref1, isEarly: false });
+      } else if (currentRound === 2) {
+        const nv2SupCap = pref2 ? supCapacityMap.get(pref2.supervisorId) : null;
+        const nv2IsFullFromR1 = nv2SupCap && (nv2SupCap.acceptedBefore >= nv2SupCap.total);
+        const isExplicitlySkippedToNv3 = r.skipNV2Reason === 'nv2_full' || (r.currentPrefRank === 3 && r.isEarlyTransition);
 
-      const isSelected = dec && dec.decision === 'selected';
+        if ((nv2IsFullFromR1 || isExplicitlySkippedToNv3) && pref3) {
+          roundCandidates.push({ reg: r, rank: 3, pref: pref3, isEarly: true });
+        } else if (!nv2IsFullFromR1 && !isExplicitlySkippedToNv3 && pref2) {
+          roundCandidates.push({ reg: r, rank: 2, pref: pref2, isEarly: false });
+        }
+      } else if (currentRound === 3) {
+        if (pref3) roundCandidates.push({ reg: r, rank: 3, pref: pref3, isEarly: false });
+      }
+    });
 
-      if (isSelected) {
-        // Mark Student as Accepted
-        const regRef = doc(db, 'graduationRounds', roundId, 'registrations', r.studentId);
+    // Pass 1: Mark who is selected & increment quota
+    roundCandidates.forEach(cand => {
+      const sId = cand.pref?.supervisorId;
+      const dec = decisions.find(d => Number(d.round) === cand.rank && (d.supervisorId === sId) && d.studentId === cand.reg.studentId);
+      if (dec && dec.decision === 'selected') {
+        cand.isSelected = true;
+        const sCap = supCapacityMap.get(sId);
+        if (sCap) sCap.newSelectedInRound++;
+        if (supAcceptedIncrements[sId] !== undefined) supAcceptedIncrements[sId]++;
+      } else {
+        cand.isSelected = false;
+      }
+    });
+
+    // Pass 2: Update student registration records in Firestore batch
+    roundCandidates.forEach(cand => {
+      const r = cand.reg;
+      const sId = cand.pref?.supervisorId;
+      const sName = cand.pref?.supervisorName || '';
+      const resolvedSName = (typeof window.resolveSupervisorName === 'function')
+        ? window.resolveSupervisorName(sId, sName)
+        : sName;
+      const regRef = doc(db, 'graduationRounds', roundId, 'registrations', r.studentId);
+
+      if (cand.isSelected) {
         batch.update(regRef, {
           reviewStatus: 'accepted',
-          acceptedSupervisorId: supId,
-          acceptedSupervisorName: pref.supervisorName,
-          acceptedRank: currentRound,
+          acceptedSupervisorId: sId,
+          acceptedSupervisorName: resolvedSName,
+          acceptedRank: cand.rank,
           acceptedAt: serverTimestamp(),
-          acceptedBy: state.user?.email || 'admin'
+          acceptedBy: state.user?.email || 'admin',
+          currentPrefRank: cand.rank,
+          roundProgressStatus: 'accepted'
         });
-
-        if (supAcceptedIncrements[supId] !== undefined) {
-          supAcceptedIncrements[supId] += 1;
-        }
       } else {
-        // Check if student has next preference
-        const hasNextPref = (r.preferences || []).some(p => p.rank === currentRound + 1);
-        const regRef = doc(db, 'graduationRounds', roundId, 'registrations', r.studentId);
-
-        if (!hasNextPref || currentRound >= preferenceCount) {
+        if (currentRound === 1) {
+          const nv2 = (r.preferences || []).find(p => Number(p.rank) === 2);
+          const nv3 = (r.preferences || []).find(p => Number(p.rank) === 3);
+          if (!nv2) {
+            batch.update(regRef, {
+              reviewStatus: 'unassigned',
+              currentPrefRank: null,
+              routeToKhoaReason: 'no_nv2',
+              round1Status: 'unselected',
+              updatedAt: serverTimestamp()
+            });
+          } else {
+            const nv2Cap = supCapacityMap.get(nv2.supervisorId);
+            const nv2Rem = (nv2Cap ? nv2Cap.total - nv2Cap.acceptedBefore - nv2Cap.newSelectedInRound : 10);
+            if (nv2Rem > 0) {
+              batch.update(regRef, {
+                reviewStatus: 'in_review',
+                currentPrefRank: 2,
+                round1Status: 'unselected',
+                updatedAt: serverTimestamp()
+              });
+            } else {
+              // Rule 3.5: NV2 is FULL! Check NV3!
+              if (!nv3) {
+                batch.update(regRef, {
+                  reviewStatus: 'unassigned',
+                  currentPrefRank: null,
+                  routeToKhoaReason: 'nv2_full_no_nv3',
+                  round1Status: 'unselected',
+                  updatedAt: serverTimestamp()
+                });
+              } else {
+                const nv3Cap = supCapacityMap.get(nv3.supervisorId);
+                const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 10);
+                if (nv3Rem > 0) {
+                  // Skip NV2 straight to NV3
+                  batch.update(regRef, {
+                    reviewStatus: 'in_review',
+                    currentPrefRank: 3,
+                    skipNV2Reason: 'nv2_full',
+                    isEarlyTransition: true,
+                    round1Status: 'unselected',
+                    updatedAt: serverTimestamp()
+                  });
+                } else {
+                  // Rule 3.6: Both NV2 and NV3 are FULL!
+                  batch.update(regRef, {
+                    reviewStatus: 'unassigned',
+                    currentPrefRank: null,
+                    routeToKhoaReason: 'nv2_and_nv3_full',
+                    round1Status: 'unselected',
+                    updatedAt: serverTimestamp()
+                  });
+                }
+              }
+            }
+          }
+        } else if (currentRound === 2) {
+          if (cand.rank === 2) {
+            const nv3 = (r.preferences || []).find(p => Number(p.rank) === 3);
+            if (!nv3) {
+              batch.update(regRef, {
+                reviewStatus: 'unassigned',
+                currentPrefRank: null,
+                routeToKhoaReason: 'no_nv3',
+                round2Status: 'unselected',
+                updatedAt: serverTimestamp()
+              });
+            } else {
+              const nv3Cap = supCapacityMap.get(nv3.supervisorId);
+              const nv3Rem = (nv3Cap ? nv3Cap.total - nv3Cap.acceptedBefore - nv3Cap.newSelectedInRound : 10);
+              if (nv3Rem > 0) {
+                batch.update(regRef, {
+                  reviewStatus: 'in_review',
+                  currentPrefRank: 3,
+                  round2Status: 'unselected',
+                  updatedAt: serverTimestamp()
+                });
+              } else {
+                batch.update(regRef, {
+                  reviewStatus: 'unassigned',
+                  currentPrefRank: null,
+                  routeToKhoaReason: 'nv3_full',
+                  round2Status: 'unselected',
+                  updatedAt: serverTimestamp()
+                });
+              }
+            }
+          } else {
+            // Unselected at early NV3 in Round 2
+            batch.update(regRef, {
+              reviewStatus: 'unassigned',
+              currentPrefRank: null,
+              routeToKhoaReason: 'unselected_nv3_early',
+              round2Status: 'unselected',
+              updatedAt: serverTimestamp()
+            });
+          }
+        } else if (currentRound === 3) {
           batch.update(regRef, {
             reviewStatus: 'unassigned',
+            currentPrefRank: null,
+            routeToKhoaReason: 'unselected_after_round_3',
+            round3Status: 'unselected',
             updatedAt: serverTimestamp()
           });
         }
       }
     });
 
-    // 2. Update supervisor acceptedCount
+    // Pass 3: Update supervisors acceptedCount
     supervisors.forEach(s => {
       const inc = supAcceptedIncrements[s.id] || 0;
       if (inc > 0) {
@@ -516,7 +857,7 @@ window.confirmAdminLockRound = async function() {
       }
     });
 
-    // 3. Lock current round & Advance round
+    // Pass 4: Lock round & advance round
     const roundRef = doc(db, 'graduationRounds', roundId);
     const lockKey = `reviewLocks.round_${currentRound}`;
     const nextRound = currentRound + 1;
@@ -539,6 +880,14 @@ window.confirmAdminLockRound = async function() {
 
     await batch.commit();
 
+    await window.appendAuditLogRecord?.(roundId, {
+      type: 'review_round_lock',
+      action: `Kết thúc Vòng ${currentRound}`,
+      target: roundId,
+      detail: `Chốt trúng tuyển Vòng ${currentRound}; chuyển các sinh viên còn lại theo quy định 3 vòng`,
+      by: state.user?.email || 'admin'
+    });
+
     closeAdminLockRoundModal();
     if (publishEarly) {
       showToast(`🔒 Đã chốt Nguyện vọng ${currentRound}. Xác nhận công bố kết quả ở bước tiếp theo.`, 'success');
@@ -546,15 +895,15 @@ window.confirmAdminLockRound = async function() {
       await publishAdminResults();
       return;
     }
-    showToast(`🔒 ĐÃ CHỐT THÀNH CÔNG NGUYỆN VỌNG ${currentRound}!\nChuyển sang: ${nextStatus === 'manual_assignment' ? 'Phân công thủ công' : 'Xét Nguyện vọng ' + nextRound}`, 'info');
+    showToast(`🔒 ĐÃ KẾT THÚC THÀNH CÔNG VÒNG ${currentRound}!\nChuyển sang: ${nextStatus === 'manual_assignment' ? 'Khoa phân công' : 'Xét Nguyện vọng ' + nextRound}`, 'info');
     await loadAdminReviewData(roundId);
   } catch (err) {
-    console.error('Lỗi khi chốt vòng:', err);
+    console.error('Error locking review round:', err);
     showToast('Lỗi chốt vòng: ' + err.message, 'error');
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = publishEarly ? '📢 Chốt & sang bước công bố' : '🔒 Xác nhận Chốt Vòng';
+      btn.textContent = '🔒 Xác nhận Chốt Vòng';
     }
   }
 };

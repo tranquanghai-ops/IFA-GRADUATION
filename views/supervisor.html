@@ -160,6 +160,30 @@
             </div>
           </div>
 
+          <!-- Round Review Stats Grid (Requirement 4.3) -->
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center text-xs">
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <span class="text-slate-500 text-[11px] font-semibold block">Chỉ tiêu tối đa</span>
+              <span id="sup-review-stat-total-cap" class="text-lg font-black text-slate-800">0</span>
+            </div>
+            <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+              <span class="text-slate-500 text-[11px] font-semibold block">Đã nhận trước đó</span>
+              <span id="sup-review-stat-accepted-prev" class="text-lg font-black text-emerald-700">0</span>
+            </div>
+            <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
+              <span class="text-slate-500 text-[11px] font-semibold block">Đang chọn vòng này</span>
+              <span id="sup-review-stat-selected-curr" class="text-lg font-black text-blue-700">0</span>
+            </div>
+            <div class="bg-amber-50 p-3 rounded-xl border border-amber-100">
+              <span class="text-slate-500 text-[11px] font-semibold block">Chỉ tiêu còn lại</span>
+              <span id="sup-review-stat-remaining-cap" class="text-lg font-black text-amber-700">0</span>
+            </div>
+            <div class="bg-purple-50 p-3 rounded-xl border border-purple-100">
+              <span class="text-slate-500 text-[11px] font-semibold block">Ứng viên chờ xét</span>
+              <span id="sup-review-stat-waiting" class="text-lg font-black text-purple-700">0</span>
+            </div>
+          </div>
+
           <!-- Candidate List Table -->
           <div class="card-surface overflow-hidden rounded-2xl border border-slate-200">
             <div class="p-3.5 bg-slate-50 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2">

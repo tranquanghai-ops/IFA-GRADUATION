@@ -416,6 +416,7 @@ window.setSupervisorStudentFilter = function(filterKey) {
 
 window.switchSupervisorTab = function(tabName) {
   state.currentSupervisorTab = tabName;
+  state.supervisorTab = tabName;
   const isDirect = isDirectSupervisorAssignment(state.activeRound);
   const tabs = {
     assigned: ['sup-tab-btn-assigned', 'sup-panel-assigned'],
@@ -448,6 +449,9 @@ window.switchSupervisorTab = function(tabName) {
     }
   });
 
+  if (tabName === 'accepted' && typeof renderSupervisorAcceptedTable === 'function') {
+    renderSupervisorAcceptedTable();
+  }
   if (tabName === 'preliminary' && typeof renderSupervisorPreliminaryList === 'function') {
     renderSupervisorPreliminaryList();
   }

@@ -89,6 +89,7 @@ window.initSupervisorPortal = async function() {
 
 async function checkSupervisorParticipatesInRound(round, actor, matchingMaster, baseIdentityIds) {
   if (!round || !round.id) return false;
+  if (actor?.isAdmin) return true;
   const roundId = round.id;
   const emailLower = (actor?.email || '').toLowerCase().trim();
   const isStaffOrAdmin = Boolean(actor?.isAdmin || (emailLower && emailLower.endsWith('@tdtu.edu.vn')));
@@ -107,6 +108,9 @@ async function checkSupervisorParticipatesInRound(round, actor, matchingMaster, 
     baseIdentityIds.has(String(s.id || '').trim()) ||
     baseIdentityIds.has(String(s.supervisorId || '').trim())
   );
+
+  // If supervisor is configured in this round's roster, they participate in this round
+  if (roundSupervisor) return true;
 
   const currentSup = roundSupervisor || matchingMaster;
   const candidateEmails = new Set([
@@ -742,13 +746,14 @@ window.loadSupervisorPortalData = async function(roundId) {
 
   let defaultTab = 'assigned';
 
-  // Requirement 6: If GVHD is not assigned to supervise in this round, show notification and hide action menus
+  // Requirement 6: If GVHD is not participating in this round, show notification and hide action menus
   const notAssignedAlert = document.getElementById('supervisor-not-assigned-alert');
   const subTabsContainer = document.getElementById('supervisor-sub-tabs-container');
   const assignedPanel = document.getElementById('sup-panel-assigned');
 
-  // Check if supervisor has active duties in this round (must have assigned students, or be in pre-assignment preference review)
-  const hasSupervisorDuties = totalAssignedCount > 0 || (!isDirect && !round.isAssigned && Boolean(roundSupervisor));
+  // Check if supervisor participates in this round (in round's supervisor roster, or has assigned students, or is admin)
+  const isParticipatingInRound = Boolean(roundSupervisor) || Boolean(matchingMaster && (state.roundSupervisors || []).some(s => s.email === matchingMaster.email || s.supervisorId === matchingMaster.id));
+  const hasSupervisorDuties = isParticipatingInRound || totalAssignedCount > 0 || actor.isAdmin;
   loadingCard?.classList.add('hidden');
 
   if (!hasSupervisorDuties) {
@@ -775,10 +780,9 @@ window.loadSupervisorPortalData = async function(roundId) {
     if (subTabsContainer) subTabsContainer.classList.remove('hidden');
     if (assignedPanel) assignedPanel.classList.remove('hidden');
 
-    // In preference-based rounds, a participating GVHD with no assigned
-    // students is normally waiting to review NV1/NV2/NV3 applications. Load
-    // candidates first and focus the review tab so that work is immediately
-    // visible rather than presenting an empty guidance list.
+    // In preference-based rounds, unhide review & accepted tabs and load candidate data
+    if (tabReviewBtn) tabReviewBtn.classList.toggle('hidden', isDirect);
+    if (tabAcceptedBtn) tabAcceptedBtn.classList.toggle('hidden', isDirect);
     if (!isDirect) {
       await loadSupervisorReviewData(roundId);
       if (totalAssignedCount === 0) defaultTab = 'review';

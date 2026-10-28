@@ -576,12 +576,13 @@ export async function loadSupervisorReviewData(roundId) {
   if (activeBadgeEl) activeBadgeEl.textContent = state.activeRound?.roundName || state.activeRound?.title || 'Đợt ĐATN';
 
   if (!currentSup) {
-    document.getElementById('sup-stat-total-cap').textContent = '0';
-    document.getElementById('sup-stat-accepted-prev').textContent = '0';
-    document.getElementById('sup-stat-selected-curr').textContent = '0';
-    document.getElementById('sup-stat-remaining-cap').textContent = '0';
-    document.getElementById('sup-round-review-indicator').textContent = 'Thầy/Cô chưa tham gia đợt này';
-    document.getElementById('sup-candidates-tbody').innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400">Thầy/Cô chưa được cấu hình vào danh sách GVHD đợt này.</td></tr>';
+    const ids = ['sup-stat-total-cap', 'sup-stat-accepted-prev', 'sup-stat-selected-curr', 'sup-stat-remaining-cap',
+                 'sup-review-stat-total-cap', 'sup-review-stat-accepted-prev', 'sup-review-stat-selected-curr', 'sup-review-stat-remaining-cap', 'sup-review-stat-waiting'];
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; });
+    const ind = document.getElementById('sup-round-review-indicator');
+    if (ind) ind.textContent = 'Thầy/Cô chưa tham gia đợt này';
+    const tbody = document.getElementById('sup-candidates-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400">Thầy/Cô chưa được cấu hình vào danh sách GVHD đợt này.</td></tr>';
     return;
   }
 
@@ -599,42 +600,84 @@ export async function loadSupervisorReviewData(roundId) {
     const decSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'reviewDecisions'));
     const allDecisions = decSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    const currentReviewRound = 1;
+    const currentReviewRound = Number(state.activeRound?.currentReviewRound || 1);
     const reviewStatus = state.activeRound?.reviewStatus || 'round_1';
     const isLocked = Boolean(state.activeRound?.reviewLocks && state.activeRound?.reviewLocks['round_' + currentReviewRound]);
     const isCompleted = state.supervisorRoundProgress['round_' + currentReviewRound]?.status === 'completed';
 
-    const decisionByStudentRank = new Map();
-    allDecisions.forEach(decision => {
-      if (!decision.studentId || !decision.round || !decision.decision) return;
-      decisionByStudentRank.set(`${String(decision.studentId).trim().toUpperCase()}:${Number(decision.round)}`, decision);
+    // Map supervisor capacities to determine if NV2 supervisor was FULL from Round 1
+    const supCapacityMap = new Map();
+    (state.roundSupervisors || []).forEach(s => {
+      supCapacityMap.set(s.id, {
+        total: typeof s.capacity === 'number' ? s.capacity : 10,
+        acceptedCount: s.acceptedCount || 0
+      });
     });
 
-    // Rolling preference review: a student starts at NV1. A "Không chọn"
-    // decision immediately advances the application to the next preference,
-    // so one supervisor can see NV1, NV2 and NV3 candidates together.
+    // 4. Candidate identification per 3-Round rules (including Rule 3.5 early skip to NV3)
     const candidates = [];
     allRegistrations.forEach(registration => {
-      if (registration.reviewStatus === 'accepted' || registration.reviewStatus === 'manually_assigned' || registration.eligibilityStatus === 'not_eligible') return;
-      const studentId = String(registration.studentId || registration.id || '').trim().toUpperCase();
-      const preferences = [...(registration.preferences || [])].sort((a, b) => Number(a.rank) - Number(b.rank));
-      for (const preference of preferences) {
-        const rank = Number(preference.rank || 1);
-        const decision = decisionByStudentRank.get(`${studentId}:${rank}`);
-        if (decision?.decision === 'not_selected') continue;
+      if (registration.reviewStatus === 'accepted' || registration.reviewStatus === 'manually_assigned' ||
+          registration.eligibilityStatus === 'not_eligible' || registration.draft === true) return;
 
-        const belongsToCurrentSupervisor = preference.supervisorId === currentSup.id || preference.supervisorId === currentSup.supervisorId;
-        if (belongsToCurrentSupervisor) {
+      const studentId = String(registration.studentId || registration.id || '').trim().toUpperCase();
+      const pref1 = (registration.preferences || []).find(p => Number(p.rank) === 1);
+      const pref2 = (registration.preferences || []).find(p => Number(p.rank) === 2);
+      const pref3 = (registration.preferences || []).find(p => Number(p.rank) === 3);
+
+      const matchesSup = (pref) => pref && (pref.supervisorId === currentSup.id || pref.supervisorId === currentSup.supervisorId);
+
+      if (currentReviewRound === 1 || reviewStatus === 'round_1' || reviewStatus === 'not_started' || reviewStatus === 'draft') {
+        // Round 1: Only students who chose this supervisor as NV1
+        if (matchesSup(pref1)) {
+          const dec = allDecisions.find(d => String(d.studentId).trim().toUpperCase() === studentId && Number(d.round) === 1 && (d.supervisorId === currentSup.id || d.supervisorId === currentSup.supervisorId));
           candidates.push({
             ...registration,
             studentId,
-            candidateRank: rank,
-            currentDecision: decision?.decision || ''
+            candidateRank: 1,
+            isEarlyTransition: false,
+            currentDecision: dec?.decision === 'selected' ? 'selected' : ''
           });
         }
-        // Stop at the first preference that has not rejected the student. A
-        // selected or pending application must not leak to later choices.
-        break;
+      } else if (currentReviewRound === 2 || reviewStatus === 'round_2') {
+        // Round 2: Regular NV2, PLUS students whose NV2 supervisor was FULL from Round 1 (Rule 3.5 early skip to NV3)
+        const nv2SupCap = pref2 ? supCapacityMap.get(pref2.supervisorId) : null;
+        const nv2IsFullFromR1 = nv2SupCap && (nv2SupCap.acceptedCount >= nv2SupCap.total);
+        const isExplicitlySkippedToNv3 = registration.skipNV2Reason === 'nv2_full' || (registration.currentPrefRank === 3 && registration.isEarlyTransition);
+
+        if ((nv2IsFullFromR1 || isExplicitlySkippedToNv3) && matchesSup(pref3)) {
+          // Rule 3.5: NV3 supervisor sees this student in Round 2!
+          const dec = allDecisions.find(d => String(d.studentId).trim().toUpperCase() === studentId && Number(d.round) === 3 && (d.supervisorId === currentSup.id || d.supervisorId === currentSup.supervisorId));
+          candidates.push({
+            ...registration,
+            studentId,
+            candidateRank: 3,
+            isEarlyTransition: true,
+            currentDecision: dec?.decision === 'selected' ? 'selected' : ''
+          });
+        } else if (!nv2IsFullFromR1 && !isExplicitlySkippedToNv3 && matchesSup(pref2)) {
+          // Regular NV2 candidate
+          const dec = allDecisions.find(d => String(d.studentId).trim().toUpperCase() === studentId && Number(d.round) === 2 && (d.supervisorId === currentSup.id || d.supervisorId === currentSup.supervisorId));
+          candidates.push({
+            ...registration,
+            studentId,
+            candidateRank: 2,
+            isEarlyTransition: false,
+            currentDecision: dec?.decision === 'selected' ? 'selected' : ''
+          });
+        }
+      } else if (currentReviewRound === 3 || reviewStatus === 'round_3') {
+        // Round 3: NV3 candidates
+        if (matchesSup(pref3)) {
+          const dec = allDecisions.find(d => String(d.studentId).trim().toUpperCase() === studentId && Number(d.round) === 3 && (d.supervisorId === currentSup.id || d.supervisorId === currentSup.supervisorId));
+          candidates.push({
+            ...registration,
+            studentId,
+            candidateRank: 3,
+            isEarlyTransition: false,
+            currentDecision: dec?.decision === 'selected' ? 'selected' : ''
+          });
+        }
       }
     });
 
@@ -649,29 +692,37 @@ export async function loadSupervisorReviewData(roundId) {
     });
     state.supervisorAcceptedStudents = acceptedStudents;
 
-    // Build decisions map for each candidate's effective preference rank.
+    // Build decisions map
     const decisionsMap = {};
     candidates.forEach(candidate => {
-      if (candidate.currentDecision) decisionsMap[candidate.studentId] = candidate.currentDecision;
+      if (candidate.currentDecision === 'selected') decisionsMap[candidate.studentId] = 'selected';
     });
     state.supervisorDecisions = decisionsMap;
 
     // Calculate quota
-    const totalCapacity = supData.capacity || 10;
+    const totalCapacity = typeof supData.capacity === 'number' ? supData.capacity : (currentSup.capacity || 10);
     const acceptedPrev = acceptedStudents.length || (supData.acceptedCount || 0);
     const selectedCurr = candidates.filter(c => decisionsMap[c.studentId] === 'selected').length;
     const remainingCap = Math.max(0, totalCapacity - acceptedPrev - selectedCurr);
 
-    // Update Top Badges
-    document.getElementById('sup-stat-total-cap').textContent = totalCapacity;
-    document.getElementById('sup-stat-accepted-prev').textContent = acceptedPrev;
-    document.getElementById('sup-stat-selected-curr').textContent = selectedCurr;
-    document.getElementById('sup-stat-remaining-cap').textContent = remainingCap;
-    document.getElementById('sup-accepted-count-badge').textContent = acceptedStudents.length;
-    document.getElementById('sup-total-accepted-text').textContent = `Tổng: ${acceptedStudents.length} SV`;
+    // Update Top Badges & Detailed Review Stats Grid
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setVal('sup-stat-total-cap', totalCapacity);
+    setVal('sup-stat-accepted-prev', acceptedPrev);
+    setVal('sup-stat-selected-curr', selectedCurr);
+    setVal('sup-stat-remaining-cap', remainingCap);
+
+    setVal('sup-review-stat-total-cap', totalCapacity);
+    setVal('sup-review-stat-accepted-prev', acceptedPrev);
+    setVal('sup-review-stat-selected-curr', selectedCurr);
+    setVal('sup-review-stat-remaining-cap', remainingCap);
+    setVal('sup-review-stat-waiting', candidates.length);
+
+    setVal('sup-accepted-count-badge', acceptedStudents.length);
+    setVal('sup-total-accepted-text', `Tổng: ${acceptedStudents.length} SV`);
 
     // Render review UI
-    renderSupervisorReviewUI(currentSup, currentReviewRound, reviewStatus, isLocked, false, remainingCap);
+    renderSupervisorReviewUI(currentSup, currentReviewRound, reviewStatus, isLocked, isCompleted, remainingCap);
     renderSupervisorAcceptedTable();
   } catch (e) {
     console.error('Error loading supervisor review data:', e);
@@ -685,41 +736,37 @@ function renderSupervisorReviewUI(currentSup, currentRound, reviewStatus, isLock
   const indicator = document.getElementById('sup-round-review-indicator');
 
   if (isDirectSupervisorAssignment()) {
-    rankBadge.textContent = 'PHÂN CÔNG TRỰC TIẾP';
-    stateTag.textContent = 'Khoa phân công trực tiếp';
-    indicator.textContent = 'Khoa/Admin phân công GVHD trực tiếp; danh sách sinh viên đã được phân công hiển thị bên dưới.';
-    actionBtns.innerHTML = '<span class="text-xs text-slate-400 italic">Không có bước xét nguyện vọng trong đợt này.</span>';
+    if (rankBadge) rankBadge.textContent = 'PHÂN CÔNG TRỰC TIẾP';
+    if (stateTag) stateTag.textContent = 'Khoa phân công trực tiếp';
+    if (indicator) indicator.textContent = 'Khoa/Admin phân công GVHD trực tiếp; danh sách sinh viên đã được phân công hiển thị bên dưới.';
+    if (actionBtns) actionBtns.innerHTML = '<span class="text-xs text-slate-400 italic">Không có bước xét nguyện vọng trong đợt này.</span>';
     const tbody = document.getElementById('sup-candidates-tbody');
     if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400">Đợt này sử dụng phân công trực tiếp. Vui lòng xem danh sách sinh viên đã được phân công.</td></tr>';
     return;
   }
 
-  rankBadge.textContent = 'XÉT NGUYỆN VỌNG 1 → 3';
+  if (rankBadge) rankBadge.textContent = `XÉT NGUYỆN VỌNG ${currentRound}`;
 
-  if (reviewStatus === 'not_started' || reviewStatus === 'draft') {
-    stateTag.textContent = 'Đang xét Nguyện vọng 1';
-    indicator.textContent = 'Trạng thái: Vòng 1 bắt đầu ngay khi sinh viên đăng ký chọn GVHD.';
-    actionBtns.innerHTML = '<span class="text-xs text-blue-200 font-semibold">Quyết định được lưu ngay và tự động chuyển nguyện vọng</span>';
-  } else if (reviewStatus === 'completed' || state.activeRound?.status === 'published') {
-    stateTag.textContent = 'Đã hoàn tất & Công bố';
-    indicator.textContent = 'Trạng thái: Đã kết thúc toàn bộ quy trình xét duyệt.';
-    actionBtns.innerHTML = '<span class="text-xs text-emerald-400 font-bold">✓ Đã công bố kết quả</span>';
-  } else if (isLocked) {
-    stateTag.textContent = 'Đã chốt vòng';
-    indicator.textContent = `Trạng thái: Vòng ${currentRound} đã được Quản trị viên khóa cố định.`;
-    actionBtns.innerHTML = '<span class="px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-xl text-xs font-bold">🔒 Đã khóa danh sách</span>';
+  if (isLocked) {
+    if (stateTag) stateTag.textContent = `Đã chốt Vòng ${currentRound}`;
+    if (indicator) indicator.textContent = `Trạng thái: Vòng ${currentRound} đã được Quản trị viên khóa cố định.`;
+    if (actionBtns) actionBtns.innerHTML = '<span class="px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 rounded-xl text-xs font-bold">🔒 Đã khóa danh sách</span>';
   } else if (isCompleted) {
-    stateTag.textContent = 'Đã hoàn thành lựa chọn';
-    indicator.textContent = `Trạng thái: Thầy/Cô đã hoàn tất lựa chọn Vòng ${currentRound}.`;
-    actionBtns.innerHTML = `
+    if (stateTag) stateTag.textContent = 'Đã hoàn thành lựa chọn';
+    if (indicator) indicator.textContent = `Trạng thái: Thầy/Cô đã hoàn tất lựa chọn Vòng ${currentRound}. Bấm Mở lại nếu muốn chỉnh sửa trước khi Quản trị viên chốt vòng.`;
+    if (actionBtns) actionBtns.innerHTML = `
       <button onclick="reopenSupervisorRound()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5">
         <span>🔄 Mở lại để chỉnh sửa</span>
       </button>
     `;
   } else {
-    stateTag.textContent = 'Đang xét cuốn chiếu';
-    indicator.textContent = 'Trạng thái: Hiển thị chung ứng viên NV1, NV2 và NV3 đang đến lượt Thầy/Cô xét.';
-    actionBtns.innerHTML = '<span class="text-xs text-blue-200 font-semibold">Quyết định được lưu ngay và tự động chuyển nguyện vọng</span>';
+    if (stateTag) stateTag.textContent = `Đang mở xét Vòng ${currentRound}`;
+    if (indicator) indicator.textContent = `Thầy/Cô chọn các sinh viên muốn nhận hướng dẫn trong chỉ tiêu. Bấm Xác nhận hoàn tất khi đã chọn xong.`;
+    if (actionBtns) actionBtns.innerHTML = `
+      <button onclick="openSupervisorConfirmModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5">
+        <span>✓ Xác nhận hoàn tất Vòng ${currentRound}</span>
+      </button>
+    `;
   }
 
   // Render candidates table
@@ -740,32 +787,65 @@ function renderSupervisorCandidatesTable(readOnly) {
     return;
   }
 
+  const currentSup = state.roundSupervisors.find(s => {
+    const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
+    const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
+    return (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid));
+  });
+  const totalCap = currentSup?.capacity || 10;
+  const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
+  const selectedCurr = Object.values(state.supervisorDecisions).filter(v => v === 'selected').length;
+  const remainingCap = Math.max(0, totalCap - acceptedPrev - selectedCurr);
+
   tbody.innerHTML = filtered.map(c => {
     const isSelected = state.supervisorDecisions[c.studentId] === 'selected';
     const topicTitle = String(c.topicTitle || 'Chưa cập nhật tên đề tài');
     const topicDescription = String(c.topicDescription || 'Sinh viên chưa bổ sung mô tả định hướng thiết kế.');
 
+    let prefBadge = '';
+    if (c.isEarlyTransition) {
+      prefBadge = '<span class="mt-1.5 inline-flex px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-200 text-[10px] font-black">⚡ NV3 (Chuyển sớm - NV2 đầy)</span>';
+    } else if (Number(c.candidateRank) === 1) {
+      prefBadge = '<span class="mt-1.5 inline-flex px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border-amber-200 border text-[10px] font-black">NV1</span>';
+    } else if (Number(c.candidateRank) === 2) {
+      prefBadge = '<span class="mt-1.5 inline-flex px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border-blue-200 border text-[10px] font-black">NV2</span>';
+    } else {
+      prefBadge = '<span class="mt-1.5 inline-flex px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border-indigo-200 border text-[10px] font-black">NV3</span>';
+    }
+
     let actionBtn = '';
     if (readOnly) {
       actionBtn = isSelected
-        ? '<span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Đã chọn</span>'
-        : '<span class="text-slate-400 font-semibold text-xs">Không chọn</span>';
+        ? '<span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Đã chọn nhận</span>'
+        : '<span class="text-slate-400 font-semibold text-xs">Chưa chọn</span>';
     } else {
-      actionBtn = `
-        <div class="flex flex-col gap-1.5 min-w-[112px]">
-          <button onclick="setSupervisorDecision('${c.studentId}', 'selected')" class="px-3 py-1.5 ${isSelected ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'} font-bold rounded-xl shadow-sm transition-all text-xs">✓ Chọn SV</button>
-          <button onclick="setSupervisorDecision('${c.studentId}', 'not_selected')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl transition-all text-xs">✕ Không chọn</button>
-        </div>
-      `;
+      if (isSelected) {
+        actionBtn = `
+          <div class="flex flex-col gap-1 items-end min-w-[120px]">
+            <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">✓ Đã chọn nhận</span>
+            <button onclick="setSupervisorDecision('${c.studentId}', 'unselected')" class="px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 hover:border-rose-300 font-bold rounded-lg transition-all text-xs">✕ Bỏ chọn</button>
+          </div>
+        `;
+      } else {
+        if (remainingCap <= 0) {
+          actionBtn = `
+            <button onclick="setSupervisorDecision('${c.studentId}', 'selected')" class="px-3 py-1.5 bg-slate-100 text-slate-400 border border-slate-200 font-bold rounded-xl transition-all text-xs cursor-not-allowed" title="Đã hết chỉ tiêu (${totalCap} SV)">✓ Chọn nhận SV</button>
+          `;
+        } else {
+          actionBtn = `
+            <button onclick="setSupervisorDecision('${c.studentId}', 'selected')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm transition-all text-xs">✓ Chọn nhận SV</button>
+          `;
+        }
+      }
     }
 
     return `
-      <tr class="hover:bg-slate-50 transition-colors ${isSelected ? 'bg-blue-50/40' : ''}">
+      <tr class="hover:bg-slate-50 transition-colors ${isSelected ? 'bg-emerald-50/30' : ''}">
         <td class="p-3.5 font-mono font-bold text-slate-900">${c.studentId}</td>
         <td class="p-3.5">
           <span class="font-semibold text-slate-800 block">${escapeHtml(c.studentName || '--')}</span>
           <span class="text-[11px] text-slate-500">Lớp: ${escapeHtml(c.className || '--')}</span>
-          <span class="mt-1.5 inline-flex px-2 py-0.5 rounded-full ${Number(c.candidateRank) === 1 ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-100 text-blue-800 border-blue-200'} border text-[10px] font-black">NV${Number(c.candidateRank || 1)}</span>
+          ${prefBadge}
         </td>
         <td class="p-3.5 max-w-lg">
           <p class="font-bold text-slate-900 leading-snug">${escapeHtml(topicTitle)}</p>
@@ -796,10 +876,8 @@ window.setSupervisorDecision = async function(studentId, nextDecision) {
 
   if (!roundId || !currentSup) return;
 
-  const currentDecision = state.supervisorDecisions[studentId];
-  if (!['selected', 'not_selected'].includes(nextDecision) || currentDecision === nextDecision) return;
   const candidate = (state.supervisorCandidates || []).find(item => String(item.studentId) === String(studentId));
-  const decisionRank = Number(candidate?.candidateRank || 1);
+  const decisionRank = Number(candidate?.candidateRank || state.activeRound?.currentReviewRound || 1);
 
   // If selecting, check remaining quota
   if (nextDecision === 'selected') {
@@ -812,10 +890,12 @@ window.setSupervisorDecision = async function(studentId, nextDecision) {
       showToast(`Thầy/Cô đã đạt giới hạn chỉ tiêu (${totalCap} SV). Vui lòng bỏ chọn sinh viên khác trước khi chọn thêm.`, 'info');
       return;
     }
+    state.supervisorDecisions[studentId] = 'selected';
+  } else {
+    delete state.supervisorDecisions[studentId];
   }
 
   // Update local state immediately for snappy UI
-  state.supervisorDecisions[studentId] = nextDecision;
   renderSupervisorCandidatesTable(false);
 
   // Recalculate and update stats badges
@@ -824,24 +904,40 @@ window.setSupervisorDecision = async function(studentId, nextDecision) {
   const selectedCurr = Object.values(state.supervisorDecisions).filter(v => v === 'selected').length;
   const remainingCap = Math.max(0, totalCapacity - acceptedPrev - selectedCurr);
 
-  document.getElementById('sup-stat-selected-curr').textContent = selectedCurr;
-  document.getElementById('sup-stat-remaining-cap').textContent = remainingCap;
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setVal('sup-stat-selected-curr', selectedCurr);
+  setVal('sup-stat-remaining-cap', remainingCap);
+  setVal('sup-review-stat-selected-curr', selectedCurr);
+  setVal('sup-review-stat-remaining-cap', remainingCap);
 
   // Persist decision to Firestore
   try {
     const decId = `r${decisionRank}_${studentId}_${currentSup.id}`;
-    await setDoc(doc(db, 'graduationRounds', roundId, 'reviewDecisions', decId), {
-      round: decisionRank,
-      studentId,
-      supervisorId: currentSup.id,
-      supervisorEmail: emailLower,
-      decision: nextDecision,
-      decidedAt: serverTimestamp(),
-      decidedBy: emailLower
-    }, { merge: true });
-    showToast(nextDecision === 'selected'
-      ? `Đã chọn sinh viên ${studentId} ở NV${decisionRank}.`
-      : `Đã không chọn sinh viên ${studentId}; hồ sơ được chuyển tự động sang nguyện vọng tiếp theo.`, 'success');
+    if (nextDecision === 'selected') {
+      await setDoc(doc(db, 'graduationRounds', roundId, 'reviewDecisions', decId), {
+        round: decisionRank,
+        studentId,
+        supervisorId: currentSup.id,
+        supervisorEmail: emailLower,
+        decision: 'selected',
+        decidedAt: serverTimestamp(),
+        decidedBy: emailLower
+      }, { merge: true });
+      showToast(`Đã chọn nhận sinh viên ${studentId} ở NV${decisionRank}.`, 'success');
+    } else {
+      await deleteDoc(doc(db, 'graduationRounds', roundId, 'reviewDecisions', decId)).catch(async () => {
+        await setDoc(doc(db, 'graduationRounds', roundId, 'reviewDecisions', decId), {
+          round: decisionRank,
+          studentId,
+          supervisorId: currentSup.id,
+          supervisorEmail: emailLower,
+          decision: 'unselected',
+          decidedAt: serverTimestamp(),
+          decidedBy: emailLower
+        }, { merge: true });
+      });
+      showToast(`Đã bỏ chọn sinh viên ${studentId}.`, 'info');
+    }
     await loadSupervisorReviewData(roundId);
   } catch (err) {
     console.error('Error saving review decision:', err);
@@ -851,7 +947,7 @@ window.setSupervisorDecision = async function(studentId, nextDecision) {
 
 window.toggleSupervisorDecision = function(studentId) {
   const currentDecision = state.supervisorDecisions[studentId];
-  return window.setSupervisorDecision(studentId, currentDecision === 'selected' ? 'not_selected' : 'selected');
+  return window.setSupervisorDecision(studentId, currentDecision === 'selected' ? 'unselected' : 'selected');
 };
 
 window.openSupervisorConfirmModal = function() {
@@ -935,17 +1031,23 @@ window.reopenSupervisorRound = async function() {
 
 window.switchSupervisorTab = function(tabKey) {
   state.supervisorTab = tabKey;
+  state.currentSupervisorTab = tabKey;
+  const isDirect = typeof isDirectSupervisorAssignment === 'function' ? isDirectSupervisorAssignment(state.activeRound) : false;
+
+  const btnAssigned = document.getElementById('sup-tab-btn-assigned');
   const btnReview = document.getElementById('sup-tab-btn-review');
   const btnAccepted = document.getElementById('sup-tab-btn-accepted');
   const btnPrelim = document.getElementById('sup-tab-btn-preliminary');
   const btnReviewer = document.getElementById('sup-tab-btn-reviewer');
 
+  const panelAssigned = document.getElementById('sup-panel-assigned');
   const panelReview = document.getElementById('sup-panel-review');
   const panelAccepted = document.getElementById('sup-panel-accepted');
   const panelPrelim = document.getElementById('sup-panel-preliminary');
   const panelReviewer = document.getElementById('sup-panel-reviewer');
 
   const allBtns = [
+    { btn: btnAssigned, panel: panelAssigned, key: 'assigned', activeCls: 'bg-tdtu-blue text-white' },
     { btn: btnReview, panel: panelReview, key: 'review', activeCls: 'bg-indigo-600 text-white' },
     { btn: btnAccepted, panel: panelAccepted, key: 'accepted', activeCls: 'bg-emerald-600 text-white' },
     { btn: btnPrelim, panel: panelPrelim, key: 'preliminary', activeCls: 'bg-amber-600 text-white' },
@@ -954,18 +1056,24 @@ window.switchSupervisorTab = function(tabKey) {
 
   allBtns.forEach(item => {
     if (!item.btn || !item.panel) return;
+    if (isDirect && (item.key === 'review' || item.key === 'accepted')) {
+      item.btn.classList.add('hidden');
+      item.panel.classList.add('hidden');
+      return;
+    }
     if (item.key === tabKey) {
-      item.btn.className = `px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all ${item.activeCls}`;
+      item.btn.className = `px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${item.activeCls}`;
       item.panel.classList.remove('hidden');
     } else {
-      item.btn.className = 'px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all';
+      item.btn.className = 'px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer';
       item.panel.classList.add('hidden');
     }
   });
 
-  if (tabKey === 'accepted') renderSupervisorAcceptedTable();
-  else if (tabKey === 'preliminary') renderSupervisorPreliminaryList();
-  else if (tabKey === 'reviewer') renderSupervisorReviewerList();
+  if (tabKey === 'accepted' && typeof renderSupervisorAcceptedTable === 'function') renderSupervisorAcceptedTable();
+  else if (tabKey === 'assigned' && typeof renderSupervisorAssignedStudents === 'function') renderSupervisorAssignedStudents();
+  else if (tabKey === 'preliminary' && typeof renderSupervisorPreliminaryList === 'function') renderSupervisorPreliminaryList();
+  else if (tabKey === 'reviewer' && typeof renderSupervisorReviewerList === 'function') renderSupervisorReviewerList();
 };
 
 function renderSupervisorAcceptedTable() {
