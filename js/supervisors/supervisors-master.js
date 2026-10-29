@@ -5,7 +5,10 @@ const refreshRoundCardMetrics = (roundId) => (typeof window !== 'undefined' && t
 async function loadAdminSupervisorsMaster() {
   try {
     const snap = await getDocs(query(collection(db, 'supervisorMaster'), orderBy('name', 'asc')));
-    state.supervisorsMaster = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const rawDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    state.supervisorsMaster = (typeof filterAndDeduplicateMasterSupervisors === 'function')
+      ? filterAndDeduplicateMasterSupervisors(rawDocs)
+      : (window.filterAndDeduplicateMasterSupervisors ? window.filterAndDeduplicateMasterSupervisors(rawDocs) : rawDocs);
     renderAdminSupervisorsMasterTable();
   } catch (e) {
     console.error('Error loading master supervisors:', e);
@@ -62,7 +65,11 @@ function renderAdminSupervisorsMasterTable() {
   const tbody = document.getElementById('admin-supervisors-master-tbody');
   if (!tbody) return;
 
-  tbody.innerHTML = state.supervisorsMaster.map(s => {
+  const validSups = (typeof filterAndDeduplicateMasterSupervisors === 'function')
+    ? filterAndDeduplicateMasterSupervisors(state.supervisorsMaster || [])
+    : (window.filterAndDeduplicateMasterSupervisors ? window.filterAndDeduplicateMasterSupervisors(state.supervisorsMaster || []) : (state.supervisorsMaster || []));
+
+  tbody.innerHTML = validSups.map(s => {
     const isAdjunct = (s.employmentType === 'adjunct');
     const typeBadge = isAdjunct
       ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Thỉnh giảng</span>'
@@ -413,10 +420,13 @@ window.openCreateSupervisorModal = function() {
 };
 
 window.editSupervisorMasterModal = function(supId) {
-  const s = state.supervisorsMaster.find(x => x.id === supId);
+  const allMaster = Array.isArray(state.supervisorsMaster) ? state.supervisorsMaster : [];
+  const s = allMaster.find(x => x.id === supId || x.supervisorId === supId || (x.email && x.email.toLowerCase().trim() === String(supId || '').toLowerCase().trim()));
   if (!s) return;
 
-  document.getElementById('sup-form-id').value = s.id;
+  const stableId = (s.supervisorId && !s.supervisorId.includes('@')) ? s.supervisorId : s.id;
+  document.getElementById('sup-form-id').value = stableId;
+  state._editingSupervisorOriginalEmail = (s.email || '').toLowerCase().trim();
   document.getElementById('sup-form-name').value = s.name || '';
   document.getElementById('sup-form-email').value = s.email || '';
   document.getElementById('sup-form-phone').value = s.phone || '';
@@ -498,11 +508,13 @@ window.editSupervisorMasterModal = function(supId) {
 };
 
 window.deleteSupervisorMaster = async function(supId) {
-  const sup = state.supervisorsMaster.find(s => s.id === supId);
+  const sup = (state.supervisorsMaster || []).find(s => s.id === supId || s.supervisorId === supId || (s.email && s.email.toLowerCase().trim() === String(supId || '').toLowerCase().trim()));
   if (!sup) return;
 
+  const stableId = (sup.supervisorId && !sup.supervisorId.includes('@')) ? sup.supervisorId : (sup.id || supId);
+
   // Check if used in any rounds
-  const inRound = state.roundSupervisors.some(rs => rs.supervisorId === supId || rs.id === supId);
+  const inRound = (state.roundSupervisors || []).some(rs => rs.supervisorId === stableId || rs.id === stableId || (sup.email && rs.email && rs.email.toLowerCase().trim() === sup.email.toLowerCase().trim()));
   let msg = `Xóa giảng viên "${sup.name}" (${sup.email}) khỏi Danh sách GVHD?`;
   if (inRound) {
     msg = `⚠️ CẢNH BÁO: Giảng viên "${sup.name}" đang được phân công trong đợt tốt nghiệp hiện tại!\n\nBạn có chắc chắn muốn xóa khỏi Danh sách GVHD không?`;
@@ -512,14 +524,22 @@ window.deleteSupervisorMaster = async function(supId) {
   if (!confirmed) return;
 
   try {
-    await deleteDoc(doc(db, 'supervisorMaster', supId));
+    await deleteDoc(doc(db, 'supervisorMaster', stableId));
     if (sup.email && sup.email.includes('@')) {
       await deleteDoc(doc(db, 'supervisorMaster', sup.email.toLowerCase().trim())).catch(() => {});
+    }
+    if (supId !== stableId && supId.includes('@')) {
+      await deleteDoc(doc(db, 'supervisorMaster', supId.toLowerCase().trim())).catch(() => {});
     }
     if (sup.photoPath && storage) {
       deleteObject(storageRef(storage, sup.photoPath)).catch(console.warn);
     }
-    state.supervisorsMaster = state.supervisorsMaster.filter(s => s.id !== supId);
+    state.supervisorsMaster = (state.supervisorsMaster || []).filter(s =>
+      s.id !== stableId &&
+      s.supervisorId !== stableId &&
+      s.id !== supId &&
+      (sup.email ? (s.email || '').toLowerCase().trim() !== sup.email.toLowerCase().trim() : true)
+    );
     renderAdminSupervisorsMasterTable();
     showToast(`Đã xóa giảng viên "${sup.name}" thành công.`, 'success');
   } catch (err) {
@@ -562,6 +582,16 @@ window.saveSupervisorMaster = async function(e) {
   if (!name || !email || !email.includes('@')) {
     showToast('Vui lòng điền Họ tên và Email hợp lệ', 'error');
     return;
+  }
+
+  // Check duplicate email when creating a new supervisor profile
+  if (!id) {
+    const allMaster = Array.isArray(state.supervisorsMaster) ? state.supervisorsMaster : [];
+    const duplicate = allMaster.find(s => (s.email || '').toLowerCase().trim() === email);
+    if (duplicate) {
+      showToast(`Email "${email}" đã tồn tại cho giảng viên "${duplicate.name}". Vui lòng chỉnh sửa hồ sơ hiện có thay vì tạo mới.`, 'warning', 6000);
+      return;
+    }
   }
 
   const submitBtn = document.querySelector('#form-supervisor button[type="submit"]');
@@ -712,26 +742,38 @@ window.saveSupervisorMaster = async function(e) {
     }
 
     // Direct email index document for O(1) Firestore Rules authorization
-    if (email && email.includes('@')) {
+    const prevEmail = state._editingSupervisorOriginalEmail;
+    if (prevEmail && prevEmail !== email) {
+      const oldEmailDocRef = doc(db, 'supervisorMaster', prevEmail);
+      await deleteDoc(oldEmailDocRef).catch(err => console.warn('[Master] Old email index delete notice:', err));
+    }
+
+    if (email && email.includes('@') && email !== savedId) {
       const emailDocRef = doc(db, 'supervisorMaster', email);
       await setDoc(emailDocRef, {
-        ...payload,
         supervisorId: savedId,
+        authIndexFor: savedId,
+        isAuthIndex: true,
+        name: name,
         email: email,
-        active: active !== false
+        active: active !== false,
+        updatedAt: serverTimestamp()
       }, { merge: true }).catch(err => console.warn('[Master] Email auth index notice:', err));
     }
 
     state.pendingSupervisorPhotoBlob = null;
     state.pendingRemoveSupervisorPhoto = false;
 
-    const supObj = { id: savedId, ...payload };
-    const existingIdx = state.supervisorsMaster.findIndex(s => s.id === savedId);
+    const supObj = { id: savedId, supervisorId: savedId, ...payload, isAuthIndex: false };
+    const existingIdx = state.supervisorsMaster.findIndex(s => s.id === savedId || s.supervisorId === savedId || (payload.email && (s.email || '').toLowerCase().trim() === payload.email));
     if (existingIdx >= 0) {
       state.supervisorsMaster[existingIdx] = { ...state.supervisorsMaster[existingIdx], ...supObj };
     } else {
       state.supervisorsMaster.unshift(supObj);
     }
+    state.supervisorsMaster = (typeof filterAndDeduplicateMasterSupervisors === 'function')
+      ? filterAndDeduplicateMasterSupervisors(state.supervisorsMaster)
+      : state.supervisorsMaster;
 
     // Synchronize in-memory roundSupervisors if loaded
     if (Array.isArray(state.roundSupervisors)) {
@@ -745,6 +787,24 @@ window.saveSupervisorMaster = async function(e) {
           phone: payload.phone,
           photoUrl: payload.photoUrl
         };
+      }
+    }
+
+    // Synchronize to active round subcollection in Firestore if participating
+    const targetRoundId = state.activeRound?.id || state.selectedRoundId;
+    if (targetRoundId && savedId) {
+      try {
+        const roundSupRef = doc(db, 'graduationRounds', targetRoundId, 'supervisors', savedId);
+        await updateDoc(roundSupRef, {
+          name: payload.name,
+          department: payload.department,
+          email: payload.email,
+          phone: payload.phone,
+          photoUrl: payload.photoUrl,
+          updatedAt: serverTimestamp()
+        }).catch(() => {});
+      } catch (errSync) {
+        console.warn('[Master] Round supervisor subcollection sync notice:', errSync);
       }
     }
 
@@ -810,7 +870,10 @@ window.loadAdminRoundSupervisors = async function(roundId) {
       (typeof ensureSupervisorsMasterLoaded === 'function' ? ensureSupervisorsMasterLoaded() : Promise.resolve())
     ]);
     if (typeof window.loadUserActivities === 'function') await window.loadUserActivities().catch(() => {});
-    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const rawList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const list = (typeof filterRoundSupervisorsList === 'function')
+      ? filterRoundSupervisorsList(rawList)
+      : (window.filterRoundSupervisorsList ? window.filterRoundSupervisorsList(rawList) : rawList);
     renderAdminRoundSupervisorsTable(roundId, list);
   } catch (e) {
     console.error('Error loading admin round supervisors:', e);
@@ -821,15 +884,19 @@ function renderAdminRoundSupervisorsTable(roundId, list) {
   const tbody = document.getElementById('admin-round-supervisors-tbody');
   if (!tbody) return;
 
-  if (list.length === 0) {
+  const validList = (typeof filterRoundSupervisorsList === 'function')
+    ? filterRoundSupervisorsList(list)
+    : (window.filterRoundSupervisorsList ? window.filterRoundSupervisorsList(list) : (list || []));
+
+  if (validList.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Chưa có GVHD nào trong đợt này. Bấm "+ Thêm GVHD từ Danh sách GVHD chính" để thêm.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = list.map(s => {
+  tbody.innerHTML = validList.map(s => {
     const supMaster = (typeof resolveSupervisorProfile === 'function')
-      ? resolveSupervisorProfile(s.id || s.supervisorId || s.email, s)
-      : ((state.supervisorsMaster || []).find(x => x.id === s.id) || s);
+      ? resolveSupervisorProfile(s.supervisorId || s.id || s.email, s)
+      : (window.resolveSupervisorProfile ? window.resolveSupervisorProfile(s.supervisorId || s.id || s.email, s) : ((state.supervisorsMaster || []).find(x => x.id === (s.supervisorId || s.id) || x.email === s.email) || s));
     const resolvedName = supMaster?.name || s.name;
     const resolvedDept = supMaster?.department || s.department || '--';
     const { employmentType, maxCap, defaultQuota } = getSupervisorDefaultAndMaxQuota(supMaster || s);

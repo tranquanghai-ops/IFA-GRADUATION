@@ -5,9 +5,11 @@ function renderRoundModalSupervisorsList(filter = '') {
   const container = document.getElementById('round-supervisors-picker-list');
   if (!container) return;
 
-  const allSups = (state.supervisorsMaster && state.supervisorsMaster.length > 0)
-    ? state.supervisorsMaster.filter(s => s.active !== false)
-    : [];
+  const rawMaster = (state.supervisorsMaster && state.supervisorsMaster.length > 0) ? state.supervisorsMaster : [];
+  const cleanMaster = (typeof filterAndDeduplicateMasterSupervisors === 'function')
+    ? filterAndDeduplicateMasterSupervisors(rawMaster)
+    : (window.filterAndDeduplicateMasterSupervisors ? window.filterAndDeduplicateMasterSupervisors(rawMaster) : rawMaster);
+  const allSups = cleanMaster.filter(s => s.active !== false);
 
   const q = String(filter || '').trim().toLowerCase();
   const filtered = allSups.filter(s =>
@@ -111,7 +113,10 @@ window.updateRoundModalSupervisorQuota = function(supId, val) {
 };
 
 window.selectAllRoundModalSupervisors = function(select) {
-  const allSups = (state.supervisorsMaster || []).filter(s => s.active !== false);
+  const cleanAll = (typeof filterAndDeduplicateMasterSupervisors === 'function')
+    ? filterAndDeduplicateMasterSupervisors(state.supervisorsMaster || [])
+    : (state.supervisorsMaster || []);
+  const allSups = cleanAll.filter(s => s.active !== false);
 
   if (select) {
     allSups.forEach(s => {

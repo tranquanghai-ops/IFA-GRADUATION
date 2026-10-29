@@ -29,7 +29,10 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
           getDocs(collection(db, 'graduationRounds', roundFilter, 'officialAssignments')).catch(() => null)
         ]);
         if (roundSupervisorSnap && roundSupervisorSnap.docs) {
-          sups = roundSupervisorSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const rawRoundDocs = roundSupervisorSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          sups = (typeof filterRoundSupervisorsList === 'function')
+            ? filterRoundSupervisorsList(rawRoundDocs)
+            : (window.filterRoundSupervisorsList ? window.filterRoundSupervisorsList(rawRoundDocs) : rawRoundDocs);
         }
         const publishedDocs = (officialSnap && officialSnap.docs)
           ? officialSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => !d.assignmentStatus || d.assignmentStatus === 'published')
@@ -72,13 +75,22 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
 
     sups.forEach(s => {
       if (s.active !== false && s.email) {
+        const supId = String(s.supervisorId || s.id || '').trim();
+        const supEmail = String(s.email || '').trim().toLowerCase();
+        if (s.isAuthIndex || (s.id && s.id.includes('@') && supId && supId !== s.id)) return;
+        const resolvedName = (typeof resolveSupervisorName === 'function')
+          ? resolveSupervisorName(supId || supEmail, s.name || s.displayName || s.email)
+          : (window.resolveSupervisorName ? window.resolveSupervisorName(supId || supEmail, s.name || s.displayName || s.email) : (s.name || s.displayName || s.email));
+        const resolvedDept = (typeof resolveSupervisorDepartment === 'function')
+          ? resolveSupervisorDepartment(supId || supEmail, s.department || '')
+          : (window.resolveSupervisorDepartment ? window.resolveSupervisorDepartment(supId || supEmail, s.department || '') : (s.department || ''));
         addCandidate({
           type: 'supervisor',
-          id: s.id || s.email,
-          name: s.name || s.displayName || s.email,
+          id: supId || s.id || s.email,
+          name: resolvedName,
           email: s.email,
           code: s.code || s.lecturerCode || '',
-          department: s.department || '',
+          department: resolvedDept,
           roundId: (roundFilter !== 'all' ? roundFilter : ''),
           roundTitle: selRound ? (selRound.title || selRound.roundName || selRound.id) : '',
           roundShortCode: selRound?.shortCode || '',
@@ -217,7 +229,7 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
         addCandidate({
           type: 'reviewer',
           id: revId,
-          name: supInfo?.name || revId,
+          name: (typeof resolveSupervisorName === 'function' ? resolveSupervisorName(revId, supInfo?.name || revId) : (window.resolveSupervisorName ? window.resolveSupervisorName(revId, supInfo?.name || revId) : (supInfo?.name || revId))),
           email: supInfo?.email || (revId.includes('@') ? revId : ''),
           roundId: r.id,
           roundTitle: r.roundName || r.title || r.id,
@@ -280,7 +292,7 @@ export async function gatherRoundCandidates(roundFilter = 'all', roleFilter = 'a
           addCandidate({
             type: 'preliminary',
             id: s?.id || scorerId,
-            name: s?.name || scorerEmail,
+            name: (typeof resolveSupervisorName === 'function' ? resolveSupervisorName(s?.id || scorerId, s?.name || scorerEmail) : (window.resolveSupervisorName ? window.resolveSupervisorName(s?.id || scorerId, s?.name || scorerEmail) : (s?.name || scorerEmail))),
             email: scorerEmail,
             department: s?.department || '',
             roundId: r.id,

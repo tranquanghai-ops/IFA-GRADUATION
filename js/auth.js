@@ -545,7 +545,10 @@ export async function resolveActualRoles(user) {
     try {
       const fullSnap = await getDocs(collection(db, 'supervisorMaster')).catch(() => null);
       if (fullSnap && !fullSnap.empty) {
-        state.supervisorsMaster = fullSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const rawDocs = fullSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        state.supervisorsMaster = (typeof filterAndDeduplicateMasterSupervisors === 'function')
+          ? filterAndDeduplicateMasterSupervisors(rawDocs)
+          : (window.filterAndDeduplicateMasterSupervisors ? window.filterAndDeduplicateMasterSupervisors(rawDocs) : rawDocs);
         supervisorProfile = findMatchingSupervisorProfile(rawEmail, state.supervisorsMaster);
         if (supervisorProfile) isSupervisor = true;
       }

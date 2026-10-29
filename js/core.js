@@ -338,6 +338,107 @@ window.getSupervisorId = getSupervisorId;
 // =========================================================================
 // CENTRAL MASTER SUPERVISOR RESOLVER (SINGLE SOURCE OF TRUTH)
 // =========================================================================
+
+/**
+ * Deduplicates and filters raw documents from supervisorMaster collection.
+ * 1. Distinguishes between real master profiles and email auth-index documents.
+ * 2. Filters out documents where isAuthIndex === true.
+ * 3. Filters out documents whose ID is an email address when a canonical master record with the same email exists.
+ * 4. Ensures a stable supervisorId pointing to the canonical document ID.
+ * 5. Returns a clean array of unique master supervisor profiles.
+ */
+export function filterAndDeduplicateMasterSupervisors(rawDocs = []) {
+  if (!Array.isArray(rawDocs)) return [];
+
+  const canonicalMap = new Map(); // id -> doc
+  const emailToCanonicalMap = new Map(); // normalized email -> canonical doc
+  const indexDocs = [];
+
+  rawDocs.forEach(d => {
+    if (!d || typeof d !== 'object') return;
+    const docId = String(d.id || '').trim();
+    const docEmail = String(d.email || '').trim().toLowerCase();
+    const isExplicitIndex = Boolean(d.isAuthIndex === true);
+    const isEmailId = docId.includes('@');
+
+    if (isExplicitIndex || isEmailId) {
+      indexDocs.push(d);
+    } else {
+      // Non-email ID: canonical master profile
+      const cleanDoc = { ...d, id: docId, supervisorId: d.supervisorId || docId, isAuthIndex: false };
+      canonicalMap.set(docId, cleanDoc);
+      if (docEmail) {
+        emailToCanonicalMap.set(docEmail, cleanDoc);
+      }
+    }
+  });
+
+  // Process potential email-only master docs: if an email doc has NO non-email doc, keep it
+  indexDocs.forEach(d => {
+    const docId = String(d.id || '').trim();
+    const docEmail = String(d.email || (docId.includes('@') ? docId : '')).trim().toLowerCase();
+    const supTargetId = String(d.supervisorId || d.authIndexFor || '').trim();
+
+    if (supTargetId && canonicalMap.has(supTargetId)) return;
+    if (docEmail && emailToCanonicalMap.has(docEmail)) return;
+
+    if (!canonicalMap.has(docId)) {
+      const promoted = { ...d, id: docId, supervisorId: docId, isAuthIndex: false };
+      canonicalMap.set(docId, promoted);
+      if (docEmail) emailToCanonicalMap.set(docEmail, promoted);
+    }
+  });
+
+  return Array.from(canonicalMap.values());
+}
+window.filterAndDeduplicateMasterSupervisors = filterAndDeduplicateMasterSupervisors;
+
+/**
+ * Deduplicates and filters raw documents from graduationRounds/{roundId}/supervisors.
+ * Filters out email auth-index subcollection documents so each supervisor appears exactly once.
+ */
+export function filterRoundSupervisorsList(rawDocs = []) {
+  if (!Array.isArray(rawDocs)) return [];
+
+  const canonicalMap = new Map();
+  const emailToCanonicalMap = new Map();
+  const indexDocs = [];
+
+  rawDocs.forEach(d => {
+    if (!d || typeof d !== 'object') return;
+    const docId = String(d.id || '').trim();
+    const docEmail = String(d.email || '').trim().toLowerCase();
+    const isExplicitIndex = Boolean(d.isAuthIndex === true);
+    const isEmailId = docId.includes('@');
+
+    if (isExplicitIndex || (isEmailId && d.supervisorId && d.supervisorId !== docId)) {
+      indexDocs.push(d);
+    } else if (isEmailId) {
+      indexDocs.push(d);
+    } else {
+      canonicalMap.set(docId, { ...d, id: docId });
+      if (docEmail) emailToCanonicalMap.set(docEmail, { ...d, id: docId });
+    }
+  });
+
+  indexDocs.forEach(d => {
+    const docId = String(d.id || '').trim();
+    const docEmail = String(d.email || (docId.includes('@') ? docId : '')).trim().toLowerCase();
+    const supTargetId = String(d.supervisorId || '').trim();
+
+    if (supTargetId && canonicalMap.has(supTargetId)) return;
+    if (docEmail && emailToCanonicalMap.has(docEmail)) return;
+
+    if (!canonicalMap.has(docId)) {
+      canonicalMap.set(docId, { ...d, id: docId });
+      if (docEmail) emailToCanonicalMap.set(docEmail, { ...d, id: docId });
+    }
+  });
+
+  return Array.from(canonicalMap.values());
+}
+window.filterRoundSupervisorsList = filterRoundSupervisorsList;
+
 export function getSupervisorMasterRecord(ref) {
   if (!ref) return null;
   const masterList = (typeof state !== 'undefined' && Array.isArray(state.supervisorsMaster)) ? state.supervisorsMaster : [];

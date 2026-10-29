@@ -60,7 +60,10 @@ export async function ensureSupervisorsMasterLoaded(force = false) {
   _supervisorsMasterLoadingPromise = (async () => {
     try {
       const snap = await getDocs(query(collection(db, 'supervisorMaster'), orderBy('name', 'asc')));
-      state.supervisorsMaster = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const rawDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      state.supervisorsMaster = (typeof filterAndDeduplicateMasterSupervisors === 'function')
+        ? filterAndDeduplicateMasterSupervisors(rawDocs)
+        : (window.filterAndDeduplicateMasterSupervisors ? window.filterAndDeduplicateMasterSupervisors(rawDocs) : rawDocs);
     } catch (e) {
       console.error('Error loading supervisorMaster:', e);
     } finally {

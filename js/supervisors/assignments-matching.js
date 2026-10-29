@@ -285,16 +285,25 @@ async function loadRoundSupervisors(roundId) {
   try {
     const [snap] = await Promise.all([
       getDocs(collection(db, 'graduationRounds', roundId, 'supervisors')),
-      ensureSupervisorsMasterLoaded().catch(() => [])
+      (typeof ensureSupervisorsMasterLoaded === 'function' ? ensureSupervisorsMasterLoaded() : Promise.resolve([]))
     ]);
-    state.roundSupervisors = snap.docs.map(d => {
-      const roundSupervisor = { id: d.id, ...d.data() };
-      const master = (state.supervisorsMaster || []).find(item => item.id === roundSupervisor.supervisorId || item.id === roundSupervisor.id || (roundSupervisor.email && item.email && item.email.toLowerCase().trim() === roundSupervisor.email.toLowerCase().trim()));
+    const rawDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const filteredDocs = (typeof filterRoundSupervisorsList === 'function')
+      ? filterRoundSupervisorsList(rawDocs)
+      : (window.filterRoundSupervisorsList ? window.filterRoundSupervisorsList(rawDocs) : rawDocs.filter(d => !d.isAuthIndex && !(d.id.includes('@') && d.supervisorId && d.supervisorId !== d.id)));
+
+    state.roundSupervisors = filteredDocs.map(roundSupervisor => {
+      const stableId = roundSupervisor.supervisorId || roundSupervisor.id;
+      const resolved = (typeof resolveSupervisorProfile === 'function')
+        ? resolveSupervisorProfile(stableId || roundSupervisor.email, roundSupervisor)
+        : (window.resolveSupervisorProfile ? window.resolveSupervisorProfile(stableId || roundSupervisor.email, roundSupervisor) : roundSupervisor);
       // Master profile is the SINGLE SOURCE OF TRUTH for lecturer profile attributes.
       return {
         ...roundSupervisor,
-        ...(master || {}),
-        capacity: typeof roundSupervisor.capacity === 'number' ? roundSupervisor.capacity : (master?.defaultQuota || 10),
+        ...resolved,
+        id: roundSupervisor.id, // Preserve round document ID
+        supervisorId: stableId,
+        capacity: typeof roundSupervisor.capacity === 'number' ? roundSupervisor.capacity : (resolved?.defaultQuota || 10),
         activeInRound: roundSupervisor.activeInRound !== false,
         roundProgress: roundSupervisor.roundProgress || {},
         sortOrder: roundSupervisor.sortOrder || 1

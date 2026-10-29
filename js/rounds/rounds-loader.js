@@ -100,8 +100,14 @@ async function loadRounds() {
           round.eligibleCount = eligibleSnap.size;
           round.eligibleStudentsCount = eligibleSnap.size;
           round.registrationsCount = registrationsSnap ? registrationsSnap.size : 0;
-          round.supervisorCount = supervisorsSnap.size;
-          round.supervisorsCount = supervisorsSnap.size;
+          const validRoundSups = supervisorsSnap.docs.filter(d => {
+            const data = d.data() || {};
+            if (data.isAuthIndex === true) return false;
+            if (d.id.includes('@') && data.supervisorId && data.supervisorId !== d.id) return false;
+            return true;
+          });
+          round.supervisorCount = validRoundSups.length;
+          round.supervisorsCount = validRoundSups.length;
         } catch (error) {
           console.warn(`[Rounds] Could not hydrate assignment count for ${round.id}:`, error);
         }
@@ -255,8 +261,14 @@ async function refreshRoundCardMetrics(roundId) {
     round.eligibleCount = eligibleSnap.size;
     round.eligibleStudentsCount = eligibleSnap.size;
     round.registrationsCount = registrationsSnap ? registrationsSnap.size : 0;
-    round.supervisorCount = supervisorsSnap.size;
-    round.supervisorsCount = supervisorsSnap.size;
+    const validRoundSups2 = supervisorsSnap.docs.filter(d => {
+      const data = d.data() || {};
+      if (data.isAuthIndex === true) return false;
+      if (d.id.includes('@') && data.supervisorId && data.supervisorId !== d.id) return false;
+      return true;
+    });
+    round.supervisorCount = validRoundSups2.length;
+    round.supervisorsCount = validRoundSups2.length;
     round.assignedCount = assignedStudentIds.size;
     round.officialAssignmentsCount = officialSnap.size;
     // The round card may still hold the pre-publication review state. Only copy
