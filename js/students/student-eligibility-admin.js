@@ -130,16 +130,21 @@ window.handleRoundEligibleUpload = async function(event) {
 // --- ADMIN: ELIGIBLE STUDENTS (EXCEL PARSING & BATCH IMPORT) ---
 window.loadAdminEligibleStudents = async function(roundId) {
   try {
+    if (typeof window.resetSupervisorPreferencesStats === 'function') {
+      window.resetSupervisorPreferencesStats(roundId);
+    }
     if (typeof loadFacultyDatasetFromIFAA === 'function' && !state.facultyStudentsLoaded) {
       loadFacultyDatasetFromIFAA().then(() => {
         if (state.eligibleStudentDetails?.roundId === roundId) renderAdminEligibleStudentsTable();
       }).catch(err => console.warn('[EligibleStudents] Faculty dataset load notice:', err));
     }
-    const [eligibleSnap, registrationSnap, assignmentSnap, draftSnap] = await Promise.all([
+    const [eligibleSnap, registrationSnap, assignmentSnap, draftSnap, supSnap, decSnap] = await Promise.all([
       getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents')),
       getDocs(collection(db, 'graduationRounds', roundId, 'registrations')),
       getDocs(collection(db, 'graduationRounds', roundId, 'officialAssignments')),
       getDocs(collection(db, 'graduationRounds', roundId, 'assignmentDrafts')),
+      getDocs(collection(db, 'graduationRounds', roundId, 'supervisors')).catch(() => ({ docs: [] })),
+      getDocs(collection(db, 'graduationRounds', roundId, 'reviewDecisions')).catch(() => ({ docs: [] })),
       (typeof ensureSupervisorsMasterLoaded === 'function' ? ensureSupervisorsMasterLoaded() : Promise.resolve())
     ]);
     if (typeof window.loadUserActivities === 'function') {
@@ -151,9 +156,14 @@ window.loadAdminEligibleStudents = async function(roundId) {
       roundId,
       registrations: new Map(registrationSnap.docs.map(d => [d.id.toUpperCase(), d.data()])),
       assignments: new Map(assignmentSnap.docs.map(d => [d.id.toUpperCase(), d.data()])),
-      drafts: new Map(draftSnap.docs.map(d => [d.id.toUpperCase(), d.data()]))
+      drafts: new Map(draftSnap.docs.map(d => [d.id.toUpperCase(), d.data()])),
+      supervisors: supSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      decisions: decSnap.docs.map(d => ({ id: d.id, ...d.data() }))
     };
     renderAdminEligibleStudentsTable();
+    if (typeof window.renderAdminSupervisorPreferencesStats === 'function') {
+      window.renderAdminSupervisorPreferencesStats(roundId, state.eligibleStudentDetails);
+    }
     if (typeof filterReviewSubmissionsTable === 'function' && document.getElementById('subtab-panel-review-rounds') && !document.getElementById('subtab-panel-review-rounds').classList.contains('hidden')) {
       filterReviewSubmissionsTable();
     }

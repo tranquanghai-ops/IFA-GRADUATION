@@ -768,6 +768,9 @@ window.saveSupervisorMaster = async function(e) {
     if (typeof renderAdminEligibleStudentsTable === 'function' && document.getElementById('admin-eligible-students-tbody')) {
       renderAdminEligibleStudentsTable();
     }
+    if (typeof window.renderAdminSupervisorPreferencesStats === 'function' && state.eligibleStudentDetails?.roundId) {
+      window.renderAdminSupervisorPreferencesStats(state.eligibleStudentDetails.roundId, state.eligibleStudentDetails);
+    }
 
     // Background sync
     loadAdminSupervisorsMaster().catch(console.error);
