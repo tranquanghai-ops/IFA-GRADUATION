@@ -19,7 +19,32 @@ export function isSystemOwner(user = null) {
 }
 window.isSystemOwner = isSystemOwner;
 
-export function evaluateAccountDomainAndRole(rawEmail) {
+export function findMatchingSupervisorProfile(rawEmail, supervisorList) {
+  const email = (rawEmail || '').trim().toLowerCase();
+  if (!email || !Array.isArray(supervisorList) || supervisorList.length === 0) return null;
+
+  return supervisorList.find(s => {
+    if (!s) return false;
+    // Strict status check: must not be inactive, revoked, or disabled
+    if (s.active === false || s.status === 'revoked' || s.status === 'disabled') return false;
+
+    // 1. Primary email match (trimmed & lowercase)
+    const primary = String(s.email || '').trim().toLowerCase();
+    if (primary && primary === email) return true;
+
+    // 2. Extra declared emails array match
+    if (Array.isArray(s.emails) && s.emails.some(e => String(e || '').trim().toLowerCase() === email)) return true;
+
+    // 3. Personal or institutional email match
+    if (s.personalEmail && String(s.personalEmail).trim().toLowerCase() === email) return true;
+    if (s.institutionalEmail && String(s.institutionalEmail).trim().toLowerCase() === email) return true;
+
+    return false;
+  }) || null;
+}
+window.findMatchingSupervisorProfile = findMatchingSupervisorProfile;
+
+export function evaluateAccountDomainAndRole(rawEmail, supervisorList = null) {
   const email = (rawEmail || '').toLowerCase().trim();
   if (!email) {
     return {
@@ -29,7 +54,33 @@ export function evaluateAccountDomainAndRole(rawEmail) {
     };
   }
 
-  // 1. Student domain: @student.tdtu.edu.vn
+  // 1. Owner / Root System Admin: tranquanghai@tdtu.edu.vn
+  if (email === 'tranquanghai@tdtu.edu.vn') {
+    return {
+      isValid: true,
+      accountType: 'staff',
+      role: 'owner',
+      isOwner: true,
+      isAdmin: true,
+      email
+    };
+  }
+
+  // 2. Authorized Supervisor from Supervisor Master (including Visiting Lecturers with external email)
+  const masterList = supervisorList || state.supervisorsMaster || [];
+  const matchingSupervisor = findMatchingSupervisorProfile(email, masterList);
+  if (matchingSupervisor) {
+    return {
+      isValid: true,
+      accountType: 'supervisor',
+      isSupervisor: true,
+      isVisitingSupervisor: !email.endsWith('@tdtu.edu.vn'),
+      supervisorProfile: matchingSupervisor,
+      email
+    };
+  }
+
+  // 3. Student domain: @student.tdtu.edu.vn
   if (email.endsWith('@student.tdtu.edu.vn')) {
     const studentMatch = email.match(/^([a-z0-9]+)@student\.tdtu\.edu\.vn$/i);
     if (!studentMatch || !studentMatch[1]) {
@@ -49,26 +100,25 @@ export function evaluateAccountDomainAndRole(rawEmail) {
     };
   }
 
-  // 2. Staff / Faculty / Admin domain: @tdtu.edu.vn
+  // 4. Staff / Faculty / Admin domain: @tdtu.edu.vn
   if (email.endsWith('@tdtu.edu.vn')) {
-    const isOwner = email === 'tranquanghai@tdtu.edu.vn';
     return {
       isValid: true,
       accountType: 'staff',
       email,
-      isOwner
+      isOwner: false
     };
   }
 
-  // 3. Unauthorized personal or external domains
+  // 5. Unauthorized personal or external domains
   const isPersonal = email.includes('gmail.com') || email.includes('yahoo.com') || email.includes('outlook.com') || email.includes('hotmail.com');
   return {
     isValid: false,
     isPersonal,
     reason: isPersonal ? 'personal_email' : 'invalid_domain',
     message: isPersonal
-      ? 'Email cá nhân không được phép sử dụng trong hệ thống. Sinh viên vui lòng đăng nhập bằng MSSV@student.tdtu.edu.vn.'
-      : 'Ứng dụng chỉ dành cho sinh viên và giảng viên sử dụng tài khoản Google TDTU. Vui lòng đăng nhập bằng email được Trường cấp.'
+      ? 'Email cá nhân không được phép sử dụng trong hệ thống hoặc chưa được cấp quyền Giảng viên hướng dẫn. Sinh viên vui lòng đăng nhập bằng MSSV@student.tdtu.edu.vn.'
+      : 'Ứng dụng chỉ dành cho sinh viên và giảng viên được cấp quyền trong hệ thống IFA-Graduation.'
   };
 }
 window.evaluateAccountDomainAndRole = evaluateAccountDomainAndRole;
@@ -111,13 +161,44 @@ export async function setupAuthListener() {
     state.user = user;
 
     if (user) {
-      // 0. Strict Identity & Domain Gatekeeper: Reject personal/unauthorized accounts immediately
-      const evalResult = evaluateAccountDomainAndRole(user.email);
-      if (!evalResult.isValid) {
-        console.warn('[IFA-Graduation Auth] Unauthorized account rejected:', user.email, evalResult.reason);
-        showToast(evalResult.message, 'error', 10000);
+      // Phân giải quyền người dùng theo thứ tự phân cấp nghiêm ngặt (Strict Identity & Role Hierarchy):
+      // 1. Owner / Admin
+      // 2. GVHD được cấp quyền (kể cả email ngoài TDTU)
+      // 3. Sinh viên có email TDTU hợp lệ
+      // 4. Từ chối các tài khoản còn lại (KHÔNG signOut vội vã trước khi đối soát)
+      showLoading('Đang xác định vai trò người dùng...');
+      try {
+        await Promise.race([
+          resolveActualRoles(user),
+          new Promise(r => setTimeout(r, 4000))
+        ]);
+      } catch (e) {
+        console.warn('[IFA-Graduation] Role resolution notice:', e);
+      }
 
-        // Show prominent warning banner in login-required-section
+      // Kiểm tra bảo vệ: Nếu tài khoản không được cấp quyền trong hệ thống
+      if (state.actualRole === 'unauthorized' || (!state.isAdmin && !state.isSupervisor && !state.isStudent)) {
+        const rawEmail = (user.email || '').toLowerCase().trim();
+        const isPersonal = rawEmail.includes('gmail.com') || rawEmail.includes('yahoo.com') || rawEmail.includes('outlook.com') || rawEmail.includes('hotmail.com');
+        const isTdtuStaff = rawEmail.endsWith('@tdtu.edu.vn');
+
+        let rejectTitle = 'Từ chối truy cập';
+        let rejectMessage = '';
+
+        if (isTdtuStaff) {
+          rejectTitle = 'Tài khoản chưa được phân quyền';
+          rejectMessage = 'Tài khoản Google TDTU này chưa được gán quyền Quản trị viên hoặc Giảng viên hướng dẫn trong hệ thống IFA-Graduation. Vui lòng liên hệ Quản trị viên Khoa.';
+        } else if (isPersonal) {
+          rejectTitle = 'Email chưa được cấp quyền';
+          rejectMessage = 'Email cá nhân này chưa được cấp quyền Giảng viên hướng dẫn trong hệ thống. Sinh viên vui lòng đăng nhập bằng MSSV@student.tdtu.edu.vn.';
+        } else {
+          rejectTitle = 'Tài khoản không hợp lệ';
+          rejectMessage = 'Ứng dụng chỉ dành cho sinh viên và giảng viên được cấp quyền trong hệ thống IFA-Graduation.';
+        }
+
+        console.warn('[IFA-Graduation Auth] Account rejected:', rawEmail, rejectTitle);
+        showToast(rejectMessage, 'error', 10000);
+
         const loginSec = document.getElementById('login-required-section');
         if (loginSec) {
           loginSec.classList.remove('hidden');
@@ -133,8 +214,8 @@ export async function setupAuthListener() {
             <div class="flex items-start gap-2.5">
               <span class="text-rose-600 text-base">⚠️</span>
               <div class="flex-1">
-                <strong class="font-bold text-rose-950 block">Từ chối truy cập: ${window.escapeHtml ? window.escapeHtml(user.email) : user.email}</strong>
-                <p class="text-rose-800 leading-relaxed">${evalResult.message}</p>
+                <strong class="font-bold text-rose-950 block">${rejectTitle}: ${window.escapeHtml ? window.escapeHtml(user.email) : user.email}</strong>
+                <p class="text-rose-800 leading-relaxed">${rejectMessage}</p>
               </div>
             </div>
           `;
@@ -170,82 +251,13 @@ export async function setupAuthListener() {
       const prevErrCard = document.getElementById('login-auth-error-card');
       if (prevErrCard) prevErrCard.remove();
 
-      document.getElementById('login-required-section').classList.add('hidden');
+      document.getElementById('login-required-section')?.classList.add('hidden');
 
-      if (evalResult.accountType === 'student') {
-        state.isStudent = true;
-        state.studentMssv = evalResult.mssv;
-        state.userStudentId = evalResult.mssv;
-        state.actualRole = 'student';
-        try {
-          sessionStorage.setItem('ifa_student_mssv', evalResult.mssv);
-          sessionStorage.setItem('ifa_student_email', evalResult.email);
-        } catch (e) {}
-      } else {
-        state.isStudent = false;
-        state.studentMssv = '';
-        state.userStudentId = '';
-        try {
-          sessionStorage.removeItem('ifa_student_mssv');
-          sessionStorage.removeItem('ifa_student_email');
-        } catch (e) {}
-      }
+      state.realIsAdmin = Boolean(state.isAdmin);
+      state.realIsOwner = isSystemOwner(user);
+      state.isOwner = state.realIsOwner;
 
       try {
-        // 1. Phân giải quyền nhanh
-        showLoading('Đang xác định vai trò người dùng...');
-        try {
-          await Promise.race([
-            resolveActualRoles(user),
-            new Promise(r => setTimeout(r, 2500))
-          ]);
-        } catch (e) {
-          console.warn('[IFA-Graduation] Role resolution notice:', e);
-        }
-
-        // Kiểm tra bảo vệ: Tài khoản hợp lệ tên miền nhưng chưa được cấp quyền trong hệ thống
-        if (state.actualRole === 'unauthorized' || (!state.isAdmin && !state.isSupervisor && !state.isStudent)) {
-          console.warn('[IFA-Graduation Auth] Staff account without assigned roles in IFA-Graduation:', user.email);
-          showToast(`Tài khoản Google TDTU của Thầy/Cô (${user.email}) chưa được phân quyền trong hệ thống IFA-Graduation. Vui lòng liên hệ Quản trị viên Khoa.`, 'warning', 10000);
-
-          const loginSec = document.getElementById('login-required-section');
-          if (loginSec) {
-            loginSec.classList.remove('hidden');
-            let authErrCard = document.getElementById('login-auth-error-card');
-            if (!authErrCard) {
-              authErrCard = document.createElement('div');
-              authErrCard.id = 'login-auth-error-card';
-              const container = loginSec.querySelector('.card-surface') || loginSec;
-              container.prepend(authErrCard);
-            }
-            authErrCard.className = 'p-4 mb-4 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs text-left space-y-1.5 shadow-sm';
-            authErrCard.innerHTML = `
-              <div class="flex items-start gap-2.5">
-                <span class="text-amber-600 text-base">⚠️</span>
-                <div class="flex-1">
-                  <strong class="font-bold text-amber-950 block">Tài khoản chưa được phân quyền: ${window.escapeHtml ? window.escapeHtml(user.email) : user.email}</strong>
-                  <p class="text-amber-800 leading-relaxed">Tài khoản Google TDTU này chưa được gán quyền Quản trị viên hoặc Giảng viên hướng dẫn trong hệ thống IFA-Graduation. Vui lòng liên hệ Quản trị viên Khoa để được cấp quyền.</p>
-                </div>
-              </div>
-            `;
-          }
-
-          document.getElementById('view-student')?.classList.add('hidden');
-          document.getElementById('view-supervisor')?.classList.add('hidden');
-          document.getElementById('view-admin')?.classList.add('hidden');
-          document.getElementById('view-assessment')?.classList.add('hidden');
-
-          clearStudentSessionAndState();
-          try { await signOut(auth); } catch (e) {}
-          clearTimeout(safetyTimer);
-          hideLoading();
-          return;
-        }
-
-        state.realIsAdmin = Boolean(state.isAdmin);
-        state.realIsOwner = isSystemOwner(user);
-        state.isOwner = state.realIsOwner;
-
         // 1.1 Tải thiết lập hệ thống và kích hoạt Realtime Listener (chỉ dành riêng cho Owner)
         if (state.realIsOwner) {
           setupSystemSettingsRealtimeListener();
@@ -474,78 +486,106 @@ export async function resolveActualRoles(user) {
     return;
   }
 
-  const evalResult = evaluateAccountDomainAndRole(user.email);
-  if (!evalResult.isValid) {
+  const rawEmail = (user.email || '').trim().toLowerCase();
+  if (!rawEmail) {
     state.actualRole = 'unauthorized';
-    state.currentView = null;
-    state.role = 'student';
-    state.isAdmin = false;
-    state.isSupervisor = false;
-    state.isStudent = false;
-    state.studentMssv = '';
-    state.userStudentId = '';
+    clearStudentSessionAndState();
     return;
   }
 
-  // 1. SINH VIÊN: Chỉ tài khoản @student.tdtu.edu.vn có MSSV hợp lệ
-  if (evalResult.accountType === 'student') {
-    state.isAdmin = false;
-    state.isSupervisor = false;
-    state.isStudent = true;
-    state.studentMssv = evalResult.mssv;
-    state.userStudentId = evalResult.mssv;
+  // BẬC 1: OWNER / ROOT SYSTEM ADMIN & ADMINS
+  let isOwner = isSystemOwner(user);
+  let isAdmin = isOwner;
+  if (!isAdmin && window.__tdtu_user && (window.__tdtu_user.isAdmin || window.__tdtu_user.role === 'admin')) {
+    isAdmin = true;
+  }
+  if (!isAdmin) {
+    try {
+      const adminDoc = await getDoc(doc(db, 'admins', rawEmail)).catch(() => null);
+      if (adminDoc && adminDoc.exists()) {
+        isAdmin = true;
+      }
+    } catch (e) {}
+  }
+
+  // BẬC 2: GIẢNG VIÊN HƯỚNG DẪN ĐƯỢC CẤP QUYỀN (BAO GỒM GV CƠ HỮU TDTU & GV THỈNH GIẢNG EMAIL NGOÀI TDTU)
+  let isSupervisor = false;
+  let supervisorProfile = null;
+
+  // 2.1 Kiểm tra trước trong bộ nhớ state.supervisorsMaster (nếu đã tải)
+  if (Array.isArray(state.supervisorsMaster) && state.supervisorsMaster.length > 0) {
+    supervisorProfile = findMatchingSupervisorProfile(rawEmail, state.supervisorsMaster);
+    if (supervisorProfile) isSupervisor = true;
+  }
+
+  // 2.2 Nếu chưa thấy trong memory, truy vấn trực tiếp Firestore supervisorMaster
+  if (!isSupervisor) {
+    try {
+      // Truy vấn chính xác theo email được phân quyền trong supervisorMaster
+      const q = query(collection(db, 'supervisorMaster'), where('email', '==', rawEmail));
+      const snap = await getDocs(q).catch(() => null);
+      if (snap && !snap.empty) {
+        const found = snap.docs.map(d => ({ id: d.id, ...d.data() })).find(s => s.active !== false && s.status !== 'revoked' && s.status !== 'disabled');
+        if (found) {
+          isSupervisor = true;
+          supervisorProfile = found;
+          if (!state.supervisorsMaster) state.supervisorsMaster = [];
+          if (!state.supervisorsMaster.some(s => s.id === found.id)) {
+            state.supervisorsMaster.push(found);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[IFA-Graduation Auth] Supervisor direct query notice:', e);
+    }
+  }
+
+  // 2.3 Fallback an toàn: Nếu email là @tdtu.edu.vn, tải toàn bộ danh mục supervisorMaster để đối soát
+  if (!isSupervisor && rawEmail.endsWith('@tdtu.edu.vn')) {
+    try {
+      const fullSnap = await getDocs(collection(db, 'supervisorMaster')).catch(() => null);
+      if (fullSnap && !fullSnap.empty) {
+        state.supervisorsMaster = fullSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        supervisorProfile = findMatchingSupervisorProfile(rawEmail, state.supervisorsMaster);
+        if (supervisorProfile) isSupervisor = true;
+      }
+    } catch (e) {}
+  }
+
+  // BẬC 3: SINH VIÊN (BẮT BUỘC EMAIL @student.tdtu.edu.vn VÀ CÓ MSSV HỢP LỆ)
+  let isStudent = false;
+  let studentMssv = '';
+  if (!isAdmin && !isSupervisor && rawEmail.endsWith('@student.tdtu.edu.vn')) {
+    const studentMatch = rawEmail.match(/^([a-z0-9]+)@student\.tdtu\.edu\.vn$/i);
+    if (studentMatch && studentMatch[1]) {
+      isStudent = true;
+      studentMssv = String(studentMatch[1]).trim().toUpperCase();
+    }
+  }
+
+  // BẬC 4: THIẾT LẬP TRẠNG THÁI VÀ PHÂN QUYỀN
+  state.isAdmin = isAdmin;
+  state.isSupervisor = isSupervisor;
+  state.isStudent = isStudent;
+  state.studentMssv = studentMssv;
+  state.userStudentId = studentMssv;
+  state.supervisorProfile = supervisorProfile;
+
+  if (isStudent) {
     state.actualRole = 'student';
     state.currentView = 'student';
     state.role = 'student';
     try {
-      sessionStorage.setItem('ifa_student_mssv', evalResult.mssv);
-      sessionStorage.setItem('ifa_student_email', evalResult.email);
+      sessionStorage.setItem('ifa_student_mssv', studentMssv);
+      sessionStorage.setItem('ifa_student_email', rawEmail);
     } catch (e) {}
     return;
+  } else {
+    try {
+      sessionStorage.removeItem('ifa_student_mssv');
+      sessionStorage.removeItem('ifa_student_email');
+    } catch (e) {}
   }
-
-  // 2. GIẢNG VIÊN / QUẢN TRỊ VIÊN: Tài khoản @tdtu.edu.vn
-  const email = evalResult.email;
-
-  let isAdmin = false;
-  if (isSystemOwner(user)) {
-    isAdmin = true;
-  } else if (window.__tdtu_user && (window.__tdtu_user.isAdmin || window.__tdtu_user.role === 'admin')) {
-    isAdmin = true;
-  }
-
-  let isSupervisor = false;
-  try {
-    // Check if in-memory list already contains this active supervisor
-    if (state.supervisorsMaster && state.supervisorsMaster.length > 0) {
-      const match = state.supervisorsMaster.find(s => s.active !== false && s.email && s.email.toLowerCase().trim() === email);
-      if (match) isSupervisor = true;
-    }
-
-    // If not found in memory, query Firestore
-    if (!isSupervisor) {
-      await Promise.race([
-        Promise.all([
-          (!isAdmin ? getDoc(doc(db, 'admins', email)).then(d => { if (d.exists()) isAdmin = true; }).catch(() => {}) : Promise.resolve()),
-          getDocs(collection(db, 'supervisorMaster')).then(snap => {
-            const activeSups = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.active !== false);
-            if (activeSups.some(s => s.email && s.email.toLowerCase().trim() === email)) {
-              isSupervisor = true;
-            }
-          }).catch(() => {})
-        ]),
-        new Promise(r => setTimeout(r, 2500))
-      ]);
-    }
-  } catch (e) {
-    console.warn('[IFA-Graduation] Admins/Supervisor lookup notice:', e);
-  }
-
-  state.isAdmin = isAdmin;
-  state.isSupervisor = isSupervisor;
-  state.isStudent = false;
-  state.studentMssv = '';
-  state.userStudentId = '';
 
   if (isAdmin) {
     state.actualRole = 'admin';
@@ -1120,9 +1160,11 @@ document.getElementById('input-topic-title')?.addEventListener('input', e => {
 });
 
 // Start application
-initFirebase().then(() => {
-  setupAuthListener();
-});
+if (typeof initFirebase === 'function') {
+  initFirebase().then(() => {
+    setupAuthListener();
+  });
+}
 
 // --- SUBMODULE WINDOW BRIDGE ---
 if (typeof window !== 'undefined') {

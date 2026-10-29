@@ -511,6 +511,9 @@ window.deleteSupervisorMaster = async function(supId) {
 
   try {
     await deleteDoc(doc(db, 'supervisorMaster', supId));
+    if (sup.email && sup.email.includes('@')) {
+      await deleteDoc(doc(db, 'supervisorMaster', sup.email.toLowerCase().trim())).catch(() => {});
+    }
     if (sup.photoPath && storage) {
       deleteObject(storageRef(storage, sup.photoPath)).catch(console.warn);
     }
@@ -704,6 +707,17 @@ window.saveSupervisorMaster = async function(e) {
       payload.createdAt = serverTimestamp();
       const docRef = await addDoc(collection(db, 'supervisorMaster'), payload);
       savedId = docRef.id;
+    }
+
+    // Direct email index document for O(1) Firestore Rules authorization
+    if (email && email.includes('@')) {
+      const emailDocRef = doc(db, 'supervisorMaster', email);
+      await setDoc(emailDocRef, {
+        ...payload,
+        supervisorId: savedId,
+        email: email,
+        active: active !== false
+      }, { merge: true }).catch(err => console.warn('[Master] Email auth index notice:', err));
     }
 
     state.pendingSupervisorPhotoBlob = null;

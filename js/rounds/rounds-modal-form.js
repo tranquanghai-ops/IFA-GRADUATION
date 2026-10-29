@@ -1108,6 +1108,22 @@ window.saveRound = async function(e) {
             active: true,
             updatedAt: serverTimestamp()
           }, { merge: true });
+
+          // Direct email reference for O(1) Firestore Rules authorization
+          if (supData.email && supData.email.includes('@')) {
+            const emailClean = String(supData.email).trim().toLowerCase();
+            if (emailClean !== supData.id) {
+              const emailRef = doc(db, 'graduationRounds', savedId, 'supervisors', emailClean);
+              batch.set(emailRef, {
+                supervisorId: supData.id,
+                name: supData.name,
+                email: emailClean,
+                department: supData.department,
+                active: true,
+                updatedAt: serverTimestamp()
+              }, { merge: true });
+            }
+          }
         });
         await batch.commit().catch(console.warn);
       }

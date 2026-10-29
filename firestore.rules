@@ -8,6 +8,20 @@ service cloud.firestore {
     function owner(){ return staff() && email() == 'tranquanghai@tdtu.edu.vn'; }
     function admin(){ return owner() || (signedIn() && exists(/databases/$(database)/documents/admins/$(email()))); }
 
+    // Bổ sung ngoại lệ có kiểm soát cho Giảng viên hướng dẫn thỉnh giảng (Visiting Supervisor)
+    function isVisitingSupervisor() {
+      return signedIn() && exists(/databases/$(database)/documents/supervisorMaster/$(email().lower()))
+        && get(/databases/$(database)/documents/supervisorMaster/$(email().lower())).data.get('active', true) != false;
+    }
+
+    // Giảng viên tham gia đợt (Staff hoặc GVHD thỉnh giảng được phân công trong đợt)
+    function isRoundSupervisor(roundId) {
+      return signedIn() && (
+        staff()
+        || (isVisitingSupervisor() && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(email().lower())))
+      );
+    }
+
     // ==========================================
     // ADMINS & ACCESS CONTROL
     // ==========================================
@@ -35,7 +49,7 @@ service cloud.firestore {
     // ==========================================
     match /userActivities/{userEmail} {
       allow read: if signedIn();
-      allow create, update: if (student() || staff() || admin()) && (
+      allow create, update: if (student() || staff() || admin() || isVisitingSupervisor()) && (
         email().lower() == userEmail.lower() || admin()
       );
       allow delete: if admin();
@@ -47,7 +61,17 @@ service cloud.firestore {
 
     // Kho GVHD Master
     match /supervisorMaster/{supervisorId} {
-      allow read: if signedIn();
+      allow read: if admin() || staff() || student()
+        || (signedIn() && (
+            supervisorId == email()
+            || supervisorId == email().lower()
+            || (resource != null && (
+                resource.data.email == email()
+                || resource.data.email.lower() == email().lower()
+                || (resource.data.keys().hasAll(['emails']) && email().lower() in resource.data.emails)
+                || (resource.data.keys().hasAll(['personalEmail']) && resource.data.personalEmail.lower() == email().lower())
+               ))
+           ));
       allow create, update, delete: if admin();
     }
 
@@ -91,13 +115,20 @@ service cloud.firestore {
       match /supervisors/{supervisorId} {
         allow read: if signedIn();
         allow create, delete: if admin();
-        allow update: if admin() || (staff() && (email() == supervisorId || email() == resource.data.email));
+        allow update: if admin() || (signedIn() && (
+          email() == supervisorId
+          || email().lower() == supervisorId.lower()
+          || (resource != null && (
+              email() == resource.data.email
+              || email().lower() == resource.data.email.lower()
+             ))
+        ));
       }
 
       // Danh sách sinh viên đủ điều kiện
       match /eligibleStudents/{studentId} {
-        allow get: if admin() || staff() || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$'));
-        allow list: if admin() || staff();
+        allow get: if admin() || staff() || isRoundSupervisor(roundId) || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$'));
+        allow list: if admin() || staff() || isRoundSupervisor(roundId);
         allow create: if admin()
           || (student()
               && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
@@ -131,7 +162,7 @@ service cloud.firestore {
               || staff()
               || (signedIn() && (email() in resource.data.supervisorEmails || email().lower() in resource.data.supervisorEmails))
             ));
-        allow list: if admin() || staff()
+        allow list: if admin() || staff() || isVisitingSupervisor()
           || (signedIn()
             && resource.data.assignmentStatus == 'published'
             && (email() in resource.data.supervisorEmails || email().lower() in resource.data.supervisorEmails));
@@ -166,34 +197,49 @@ service cloud.firestore {
       // Quyết định xét duyệt của GVHD từng vòng
       match /reviewDecisions/{decisionId} {
         allow read: if admin()
-          || (staff() && (
-              (resource.data.keys().hasAll(['scorerEmail']) && resource.data.scorerEmail == email())
-              || (resource.data.keys().hasAll(['supervisorEmail']) && resource.data.supervisorEmail == email())
-              || (resource.data.keys().hasAll(['decidedBy']) && resource.data.decidedBy == email())
-              || (resource.data.keys().hasAll(['activityId', 'councilId'])
+          || (signedIn() && (
+              (resource.data.keys().hasAll(['scorerEmail']) && (resource.data.scorerEmail == email() || resource.data.scorerEmail.lower() == email().lower()))
+              || (resource.data.keys().hasAll(['supervisorEmail']) && (resource.data.supervisorEmail == email() || resource.data.supervisorEmail.lower() == email().lower()))
+              || (resource.data.keys().hasAll(['decidedBy']) && (resource.data.decidedBy == email() || resource.data.decidedBy.lower() == email().lower()))
+              || (staff() && resource.data.keys().hasAll(['activityId', 'councilId'])
                   && isCouncilMember(resource.data.activityId, resource.data.councilId, email()))
-          ))
-          || (signedIn() && resource.data.keys().hasAll(['scorerEmail']) && resource.data.scorerEmail == email());
-        allow create: if admin() || (staff() && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy))
+          ));
+        allow create: if admin()
+          || (signedIn()
+              && (email() == request.resource.data.supervisorEmail || email().lower() == request.resource.data.supervisorEmail.lower()
+                  || email() == request.resource.data.decidedBy || email().lower() == request.resource.data.decidedBy.lower())
+              && isRoundSupervisor(roundId))
+          || (staff() && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy))
           || (signedIn() && !staff()
             && validGuestCouncilDecision(request.resource.data, decisionId)
             && isCouncilMember(request.resource.data.activityId, request.resource.data.councilId, email())
             && isStudentInCouncil(request.resource.data.activityId, request.resource.data.councilId, request.resource.data.studentId));
-        allow update: if admin() || (staff()
-            && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy)
-            && (!resource.data.keys().hasAll(['activityId', 'councilId'])
-                || getCouncilStatus(resource.data.activityId, resource.data.councilId) in ['preparing', 'active', 'open', 'unknown']))
+        allow update: if admin()
+          || (signedIn()
+              && (email() == request.resource.data.supervisorEmail || email().lower() == request.resource.data.supervisorEmail.lower()
+                  || email() == request.resource.data.decidedBy || email().lower() == request.resource.data.decidedBy.lower())
+              && isRoundSupervisor(roundId)
+              && (!resource.data.keys().hasAll(['activityId', 'councilId'])
+                  || getCouncilStatus(resource.data.activityId, resource.data.councilId) in ['preparing', 'active', 'open', 'unknown']))
+          || (staff()
+              && (email() == request.resource.data.supervisorEmail || email() == request.resource.data.decidedBy)
+              && (!resource.data.keys().hasAll(['activityId', 'councilId'])
+                  || getCouncilStatus(resource.data.activityId, resource.data.councilId) in ['preparing', 'active', 'open', 'unknown']))
           || (signedIn() && !staff()
             && resource.data.scorerEmail == email()
             && validGuestCouncilDecision(request.resource.data, decisionId)
             && request.resource.data.activityId == resource.data.activityId
             && request.resource.data.councilId == resource.data.councilId
             && request.resource.data.studentId == resource.data.studentId
-            && isCouncilMember(resource.data.activityId, resource.data.councilId, email())
-            && isStudentInCouncil(resource.data.activityId, resource.data.councilId, resource.data.studentId)
+            && isCouncilMember(request.resource.data.activityId, request.resource.data.councilId, email())
+            && isStudentInCouncil(request.resource.data.activityId, request.resource.data.councilId, request.resource.data.studentId)
             && (!resource.data.keys().hasAll(['activityId', 'councilId'])
                 || getCouncilStatus(resource.data.activityId, resource.data.councilId) in ['preparing', 'active', 'open', 'unknown']));
-        allow delete: if admin();
+        allow delete: if admin()
+          || (signedIn()
+              && (email() == resource.data.supervisorEmail || email().lower() == resource.data.supervisorEmail.lower()
+                  || email() == resource.data.decidedBy || email().lower() == resource.data.decidedBy.lower())
+              && isRoundSupervisor(roundId));
       }
 
       // Đăng ký nguyện vọng của sinh viên
@@ -201,12 +247,13 @@ service cloud.firestore {
         allow get: if admin()
           || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$'))
           || staff()
+          || isRoundSupervisor(roundId)
           || (signedIn()
             && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId))
             && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.assignmentStatus == 'published'
             && (email() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.supervisorEmails
               || email().lower() in get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.supervisorEmails));
-        allow list: if admin() || staff();
+        allow list: if admin() || staff() || isRoundSupervisor(roundId);
 
         allow create: if (admin())
           || (student()
@@ -532,7 +579,7 @@ service cloud.firestore {
       match /publishedStudentResults/{studentId} {
         allow get: if admin()
           || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$') && (!('reviews' in resource.data) || isResultPublished(resource.data)))
-          || (staff() && isAssignedSupervisor(studentId) && (!('reviews' in resource.data) || isResultPublished(resource.data)));
+          || ((staff() || isVisitingSupervisor()) && isAssignedSupervisor(studentId) && (!('reviews' in resource.data) || isResultPublished(resource.data)));
         allow list: if admin();
         allow create, update, delete: if admin();
 
@@ -540,7 +587,7 @@ service cloud.firestore {
         match /reviews/{phaseKey} {
           allow get: if admin()
             || (student() && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$') && resource.data.status == 'published')
-            || (staff() && isAssignedSupervisor(studentId) && resource.data.status == 'published');
+            || ((staff() || isVisitingSupervisor()) && isAssignedSupervisor(studentId) && resource.data.status == 'published');
           allow list: if admin();
           allow create, update, delete: if admin();
         }
@@ -555,7 +602,7 @@ service cloud.firestore {
       match /submissions/{submissionId} {
         allow read: if admin()
           || (student() && email().matches('^' + resource.data.studentId + '@student\\.tdtu\\.edu\\.vn$'))
-          || (staff()
+          || ((staff() || isVisitingSupervisor())
               && (
                 (get(activityAccessDoc(resource.data.activityId)).data.supervisorCanView == true
                  && email() in get(supervisorDoc(resource.data.studentId)).data.supervisorEmails)
