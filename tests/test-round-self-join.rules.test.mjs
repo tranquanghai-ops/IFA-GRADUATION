@@ -251,7 +251,9 @@ test('--- FIRESTORE RULES: SELF-JOIN ELIGIBLE STUDENTS ---', async (t) => {
       projectType: 'Chuyên luận',
       status: 'submitted',
       preferences: [
-        { rank: 1, supervisorId: 'sup_1', supervisorName: 'GVHD 1' }
+        { rank: 1, supervisorId: 'sup_1', supervisorName: 'GVHD 1' },
+        { rank: 2, supervisorId: 'sup_2', supervisorName: 'GVHD 2' },
+        { rank: 3, supervisorId: 'sup_3', supervisorName: 'GVHD 3' }
       ],
       eligibilityDeclaration: {
         status: 'eligible',

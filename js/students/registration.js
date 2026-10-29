@@ -1112,26 +1112,42 @@ window.validateAndGoToStep3 = async function() {
     goToStep(3);
     return;
   }
-  const maxPref = parseInt(state.activeRound?.preferenceCount || 3, 10);
-  const count = state.selectedPreferences.length;
+  const count = (state.selectedPreferences || []).length;
 
   if (count === 0) {
-    showToast('Vui lòng chọn ít nhất 1 nguyện vọng GVHD trước khi tiếp tục.', 'warning');
+    showToast('Vui lòng chọn đầy đủ 3 nguyện vọng giảng viên hướng dẫn trước khi tiếp tục.', 'warning');
     return;
   }
 
-  if (count < maxPref) {
-    const ok = await window.showConfirm(
-      'Xác nhận số lượng nguyện vọng',
-      `Bạn hiện chỉ mới chọn ${count}/${maxPref} nguyện vọng GVHD. Nếu không chọn đủ ${maxPref} nguyện vọng, cơ hội được phân công đúng ý nguyện có thể giảm.\n\nBạn có chắc chắn muốn tiếp tục với ${count} nguyện vọng đã chọn?`,
-      {
-        confirmText: `Tiếp tục với ${count} nguyện vọng`,
-        cancelText: 'Chọn thêm GVHD',
-        danger: false
-      }
-    );
-    if (!ok) return;
+  if (count < 3) {
+    showToast(`Bạn hiện mới chọn ${count}/3 nguyện vọng. Bắt buộc phải chọn đủ 3 giảng viên hướng dẫn khác nhau trước khi tiếp tục.`, 'warning');
+    return;
   }
+
+  const supervisorIds = (state.selectedPreferences || []).map(p => p.supervisorId).filter(Boolean);
+  const uniqueIds = new Set(supervisorIds);
+  if (uniqueIds.size !== 3 || supervisorIds.length !== 3) {
+    showToast('Mỗi giảng viên hướng dẫn chỉ được chọn ở một nguyện vọng. Vui lòng chọn đúng 3 giảng viên khác nhau.', 'warning');
+    return;
+  }
+
+  if (Array.isArray(state.roundSupervisors) && state.roundSupervisors.length > 0) {
+    const roundSupIds = new Set(state.roundSupervisors.map(s => String(s.id || s.supervisorId || s.email || '').toLowerCase()));
+    const invalidSup = state.selectedPreferences.find(p => {
+      const id = String(p.supervisorId || '').toLowerCase();
+      return !roundSupIds.has(id);
+    });
+    if (invalidSup) {
+      showToast(`Giảng viên "${invalidSup.supervisorName || invalidSup.supervisorId}" không thuộc danh sách hướng dẫn của đợt này.`, 'error');
+      return;
+    }
+  }
+
+  // Ensure ranks are sequentially 1, 2, 3
+  state.selectedPreferences.sort((a, b) => Number(a.rank) - Number(b.rank));
+  state.selectedPreferences.forEach((p, idx) => {
+    p.rank = idx + 1;
+  });
 
   goToStep(3);
 };
@@ -1145,6 +1161,45 @@ function renderConfirmationPanel() {
   const preferencesSection = document.getElementById('confirmation-preferences-section');
   if (preferencesSection) preferencesSection.classList.toggle('hidden', directAssignment);
   const listEl = document.getElementById('confirm-preferences-list');
+  const submitBtn = document.getElementById('btn-submit-registration');
+
+  if (!directAssignment) {
+    const count = (state.selectedPreferences || []).length;
+    const supIds = (state.selectedPreferences || []).map(p => p.supervisorId).filter(Boolean);
+    const uniqueIds = new Set(supIds);
+    const isCompleteAndUnique = count === 3 && uniqueIds.size === 3;
+
+    if (!isCompleteAndUnique) {
+      if (listEl) {
+        listEl.className = 'p-4 bg-amber-50 rounded-xl border border-amber-300 text-amber-900 text-xs space-y-2';
+        listEl.innerHTML = `
+          <div class="font-bold flex items-center gap-2 text-rose-700">
+            <span>⚠️</span>
+            <span>Chưa hoàn tất đủ 3 nguyện vọng giảng viên hướng dẫn (Hiện có: ${count}/3)</span>
+          </div>
+          <p class="text-slate-600">Quy định bắt buộc bạn phải đăng ký đúng 3 giảng viên hướng dẫn khác nhau (Nguyện vọng 1, 2 và 3). Vui lòng quay lại Bước 2 để bổ sung.</p>
+          <div class="pt-1">
+            <button type="button" onclick="goToStep(2)" class="px-4 py-1.5 bg-tdtu-blue hover:bg-tdtu-dark text-white rounded-lg font-bold text-xs shadow-sm">
+              ← Quay lại Bước 2 chọn GVHD
+            </button>
+          </div>
+        `;
+      }
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.title = 'Vui lòng quay lại Bước 2 để chọn đủ 3 nguyện vọng GVHD';
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+      return;
+    }
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.title = '';
+    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+  }
+
   if (!listEl) return;
 
   const medalOrder = [2, 1, 3];
@@ -1227,6 +1282,35 @@ window.submitRegistration = async function() {
     ? declResult.declaration
     : (state.currentEligibilityDeclaration || state.myRegistration?.eligibilityDeclaration || null);
 
+  const directAssignment = shouldSkipStudentSupervisorPreference();
+  if (!directAssignment) {
+    const prefs = state.selectedPreferences || [];
+    if (prefs.length !== 3) {
+      showToast(`Bắt buộc phải chọn đủ 3 nguyện vọng giảng viên hướng dẫn (hiện có ${prefs.length}/3).`, 'warning');
+      goToStep(2);
+      return;
+    }
+    const supIds = prefs.map(p => p.supervisorId).filter(Boolean);
+    const uniqueIds = new Set(supIds);
+    if (uniqueIds.size !== 3 || supIds.length !== 3) {
+      showToast('Mỗi giảng viên hướng dẫn chỉ được chọn ở một nguyện vọng. Vui lòng chọn 3 giảng viên khác nhau.', 'warning');
+      goToStep(2);
+      return;
+    }
+    if (Array.isArray(state.roundSupervisors) && state.roundSupervisors.length > 0) {
+      const roundSupIds = new Set(state.roundSupervisors.map(s => String(s.id || s.supervisorId || s.email || '').toLowerCase()));
+      const invalidSup = prefs.find(p => {
+        const id = String(p.supervisorId || '').toLowerCase();
+        return !roundSupIds.has(id);
+      });
+      if (invalidSup) {
+        showToast(`Giảng viên "${invalidSup.supervisorName || invalidSup.supervisorId}" không thuộc danh sách hướng dẫn của đợt này.`, 'error');
+        goToStep(2);
+        return;
+      }
+    }
+  }
+
   const btn = document.getElementById('btn-submit-registration');
   btn.disabled = true;
   btn.innerHTML = '<span>⏳ Đang ghi nhận đăng ký...</span>';
@@ -1234,7 +1318,6 @@ window.submitRegistration = async function() {
   try {
     const isPending = (state.isEligible === 'pending' || state.eligibilityState === 'pending');
     const eligibilityStatus = isPending ? 'pending' : 'eligible';
-    const directAssignment = shouldSkipStudentSupervisorPreference();
     const publishedAssignment = state.myOfficialAssignment?.assignmentStatus === 'published'
       ? normalizeOfficialAssignment(state.myOfficialAssignment, null)
       : null;
@@ -1288,12 +1371,14 @@ window.submitRegistration = async function() {
       topicTitleHistory,
       topicApprovalStatus: 'pending',
       topicApprovalNote: '',
-      preferences: directAssignment ? [] : state.selectedPreferences.map(p => ({
-        rank: p.rank,
-        supervisorId: p.supervisorId,
-        supervisorName: p.supervisorName,
-        department: p.department || ''
-      })),
+      preferences: directAssignment ? [] : [...state.selectedPreferences]
+        .sort((a, b) => Number(a.rank) - Number(b.rank))
+        .map((p, idx) => ({
+          rank: idx + 1,
+          supervisorId: p.supervisorId,
+          supervisorName: p.supervisorName || '',
+          department: p.department || ''
+        })),
       submittedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       status: 'submitted',

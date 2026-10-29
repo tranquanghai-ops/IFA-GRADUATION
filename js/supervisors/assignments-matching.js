@@ -447,9 +447,17 @@ window.handleSupervisorCardClick = function(event, supervisorId, encName, isWiza
 
 window.addCardPreference = function(supervisorId, encName) {
   const name = decodeURIComponent(encName);
-  const maxPref = state.activeRound?.preferenceCount || 3;
+  const maxPref = 3;
+
+  // Prevent duplicate supervisor across preferences
+  const alreadySelected = state.selectedPreferences.some(p => p.supervisorId === supervisorId);
+  if (alreadySelected) {
+    showToast('Mỗi giảng viên hướng dẫn chỉ được chọn ở một nguyện vọng. Vui lòng chọn 3 giảng viên khác nhau.', 'warning');
+    return;
+  }
+
   if (state.selectedPreferences.length >= maxPref) {
-    showToast(`Bạn chỉ được chọn tối đa ${maxPref} nguyện vọng.`, 'info');
+    showToast('Bạn chỉ được chọn tối đa 3 nguyện vọng. Hãy bấm "✕" để bỏ bớt một nguyện vọng nếu muốn đổi GVHD khác.', 'info');
     return;
   }
 
@@ -483,8 +491,15 @@ window.movePreferenceOrder = function(fromIndex, toIndex) {
 
 window.selectWizardPreference = function(supervisorId, encName) {
   const name = decodeURIComponent(encName);
-  const maxPref = state.activeRound?.preferenceCount || 3;
-  const currentRank = state.wizardRank;
+  const maxPref = 3;
+  const currentRank = state.wizardRank || 1;
+
+  // Check if supervisor is already selected at a different rank
+  const duplicatePref = state.selectedPreferences.find(p => p.supervisorId === supervisorId && p.rank !== currentRank);
+  if (duplicatePref) {
+    showToast('Mỗi giảng viên hướng dẫn chỉ được chọn ở một nguyện vọng. Vui lòng chọn 3 giảng viên khác nhau.', 'warning');
+    return;
+  }
 
   const sup = state.roundSupervisors.find(s => s.id === supervisorId);
 
@@ -507,7 +522,7 @@ window.selectWizardPreference = function(supervisorId, encName) {
 };
 
 window.stepWizardRank = function(delta) {
-  const maxPref = state.activeRound?.preferenceCount || 3;
+  const maxPref = 3;
   const target = state.wizardRank + delta;
   if (target >= 1 && target <= maxPref) {
     state.wizardRank = target;
@@ -519,32 +534,48 @@ function renderPreferencesTray() {
   const tray = document.getElementById('preferences-tray-items');
   if (!tray) return;
 
-  const maxPref = state.activeRound?.preferenceCount || 3;
+  const maxPref = 3;
+  const count = state.selectedPreferences.length;
+
+  // Update dynamic tray progress hint
+  const hintEl = document.getElementById('tray-mode-hint');
+  if (hintEl) {
+    if (count === 3) {
+      hintEl.innerHTML = '<span class="text-emerald-400 font-bold">✓ Đã chọn đủ 3 nguyện vọng GVHD hợp lệ</span>';
+    } else if (count === 2) {
+      hintEl.innerHTML = '<span class="text-amber-300 font-medium">Đã chọn 2/3 nguyện vọng (Cần chọn thêm 1 GVHD bắt buộc)</span>';
+    } else if (count === 1) {
+      hintEl.innerHTML = '<span class="text-amber-300 font-medium">Đã chọn 1/3 nguyện vọng (Cần chọn thêm 2 GVHD khác nhau)</span>';
+    } else {
+      hintEl.innerHTML = '<span class="text-amber-400 font-semibold">Đã chọn 0/3 nguyện vọng (Bắt buộc chọn đủ 3 GVHD khác nhau)</span>';
+    }
+  }
 
   let html = '';
   for (let rank = 1; rank <= maxPref; rank++) {
     const pref = state.selectedPreferences.find(p => p.rank === rank);
+    const medal = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : '🥉');
     if (pref) {
       const idx = state.selectedPreferences.indexOf(pref);
       const supDisplayName = (typeof window !== 'undefined' && typeof window.resolveSupervisorName === 'function')
         ? window.resolveSupervisorName(pref.supervisorId || pref.id || pref.email, pref.supervisorName)
         : pref.supervisorName;
       html += `
-        <div class="flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs shadow-sm">
-          <span class="w-5 h-5 rounded-full bg-amber-500 text-slate-900 font-extrabold text-[10px] flex items-center justify-center">NV${rank}</span>
-          <span class="font-bold text-slate-100 max-w-[120px] truncate" title="${escapeHtml(supDisplayName)}">${escapeHtml(supDisplayName)}</span>
+        <div class="flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl text-xs shadow-sm" title="Nguyện vọng ${rank} – Bắt buộc">
+          <span class="w-6 h-6 rounded-full bg-amber-500 text-slate-900 font-extrabold text-[10px] flex items-center justify-center shadow-xs">${medal} NV${rank}</span>
+          <span class="font-bold text-slate-100 max-w-[130px] truncate" title="${escapeHtml(supDisplayName)}">${escapeHtml(supDisplayName)}</span>
           <div class="flex items-center gap-0.5 ml-1">
-            <button type="button" onclick="movePreferenceOrder(${idx}, ${idx - 1})" ${idx === 0 ? 'disabled' : ''} class="p-0.5 text-slate-400 hover:text-white disabled:opacity-20 text-[10px]">▲</button>
-            <button type="button" onclick="movePreferenceOrder(${idx}, ${idx + 1})" ${idx === state.selectedPreferences.length - 1 ? 'disabled' : ''} class="p-0.5 text-slate-400 hover:text-white disabled:opacity-20 text-[10px]">▼</button>
-            <button type="button" onclick="removePreference('${pref.supervisorId}')" class="p-0.5 text-rose-400 hover:text-rose-300 text-xs ml-1">✕</button>
+            <button type="button" onclick="movePreferenceOrder(${idx}, ${idx - 1})" ${idx === 0 ? 'disabled' : ''} class="p-0.5 text-slate-400 hover:text-white disabled:opacity-20 text-[10px]" title="Tăng ưu tiên">▲</button>
+            <button type="button" onclick="movePreferenceOrder(${idx}, ${idx + 1})" ${idx === state.selectedPreferences.length - 1 ? 'disabled' : ''} class="p-0.5 text-slate-400 hover:text-white disabled:opacity-20 text-[10px]" title="Giảm ưu tiên">▼</button>
+            <button type="button" onclick="removePreference('${pref.supervisorId}')" class="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 rounded text-xs ml-1 transition" title="Bỏ chọn nguyện vọng">✕</button>
           </div>
         </div>
       `;
     } else {
       html += `
-        <div class="flex items-center gap-1.5 bg-slate-800/40 border border-dashed border-slate-700 px-2.5 py-1.5 rounded-xl text-xs text-slate-400">
-          <span class="w-5 h-5 rounded-full bg-slate-700 text-slate-300 font-bold text-[10px] flex items-center justify-center">${rank}</span>
-          <span>Chưa chọn</span>
+        <div class="flex items-center gap-1.5 bg-slate-800/60 border border-dashed border-amber-500/50 px-3 py-1.5 rounded-xl text-xs text-slate-300">
+          <span class="w-6 h-6 rounded-full bg-slate-700 text-amber-300 font-black text-[10px] flex items-center justify-center">NV${rank}</span>
+          <span class="font-bold text-amber-200/90">NV${rank} – Bắt buộc</span>
         </div>
       `;
     }

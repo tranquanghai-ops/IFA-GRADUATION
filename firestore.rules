@@ -248,6 +248,18 @@ service cloud.firestore {
               && isRoundSupervisor(roundId));
       }
 
+      // Kiểm tra danh sách 3 nguyện vọng GVHD bắt buộc của sinh viên (3 GVHD khác nhau)
+      function validStudentPreferences(prefs) {
+        return prefs is list
+          && prefs.size() == 3
+          && prefs[0].supervisorId is string && prefs[0].supervisorId.size() > 0
+          && prefs[1].supervisorId is string && prefs[1].supervisorId.size() > 0
+          && prefs[2].supervisorId is string && prefs[2].supervisorId.size() > 0
+          && prefs[0].supervisorId != prefs[1].supervisorId
+          && prefs[0].supervisorId != prefs[2].supervisorId
+          && prefs[1].supervisorId != prefs[2].supervisorId;
+      }
+
       // Đăng ký nguyện vọng của sinh viên
       match /registrations/{studentId} {
         allow get: if admin()
@@ -284,11 +296,13 @@ service cloud.firestore {
             && (!request.resource.data.keys().hasAll(['courseGroup']) || (request.resource.data.courseGroup is string && request.resource.data.courseGroup.size() <= 20))
             && (!request.resource.data.keys().hasAll(['topicDescription']) || (request.resource.data.topicDescription is string && request.resource.data.topicDescription.size() <= 2000))
             && request.resource.data.preferences is list
-            && (request.resource.data.preferences.size() > 0
+            && (
+              validStudentPreferences(request.resource.data.preferences)
               || (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['supervisorAssignmentMode'])
                 && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.supervisorAssignmentMode == 'direct_assignment')
               || (exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId))
-                && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.assignmentStatus == 'published'))
+                && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.assignmentStatus == 'published')
+            )
             && (
               exists(/databases/$(database)/documents/graduationRounds/$(roundId)/eligibleStudents/$(studentId))
               ||
@@ -355,9 +369,13 @@ service cloud.firestore {
             && (!resource.data.keys().hasAll(['topicReviewedBy']) || request.resource.data.topicReviewedBy == resource.data.topicReviewedBy)
             && (!resource.data.keys().hasAll(['topicReviewedAt']) || request.resource.data.topicReviewedAt == resource.data.topicReviewedAt)
             && request.resource.data.preferences is list
-            && (request.resource.data.preferences.size() > 0
+            && (
+              validStudentPreferences(request.resource.data.preferences)
               || (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['supervisorAssignmentMode'])
-                && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.supervisorAssignmentMode == 'direct_assignment'))
+                && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.supervisorAssignmentMode == 'direct_assignment')
+              || (exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId))
+                && get(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId)).data.assignmentStatus == 'published')
+            )
             && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized', 'active']
                 || !get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status']))
             && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt'])

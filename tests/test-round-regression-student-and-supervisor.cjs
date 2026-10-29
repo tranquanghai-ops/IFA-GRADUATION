@@ -175,7 +175,9 @@ async function runRegressionTestSuite() {
       topicApprovalStatus: 'pending',
       topicApprovalNote: '',
       preferences: [
-        { rank: 1, supervisorId, supervisorName, department: 'Nội thất' }
+        { rank: 1, supervisorId: supervisorId, supervisorName: supervisorName, department: 'Nội thất' },
+        { rank: 2, supervisorId: 'sup_2', supervisorName: 'GVHD 2', department: 'Nội thất' },
+        { rank: 3, supervisorId: 'sup_3', supervisorName: 'GVHD 3', department: 'Nội thất' }
       ],
       status: 'submitted',
       reviewStatus: 'waiting',
