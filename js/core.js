@@ -575,6 +575,55 @@ export function writeBatch(firestore) {
   return batch;
 }
 
+export class SafeBatchManager {
+  constructor(firestore, maxOps = 400) {
+    this.firestore = firestore;
+    this.maxOps = maxOps;
+    this.currentBatch = writeBatch(firestore);
+    this.currentCount = 0;
+    this.batches = [this.currentBatch];
+  }
+
+  _check() {
+    if (this.currentCount >= this.maxOps) {
+      this.currentBatch = writeBatch(this.firestore);
+      this.batches.push(this.currentBatch);
+      this.currentCount = 0;
+    }
+  }
+
+  set(ref, data, options) {
+    this._check();
+    if (options) {
+      this.currentBatch.set(ref, data, options);
+    } else {
+      this.currentBatch.set(ref, data);
+    }
+    this.currentCount++;
+    return this;
+  }
+
+  update(ref, data) {
+    this._check();
+    this.currentBatch.update(ref, data);
+    this.currentCount++;
+    return this;
+  }
+
+  delete(ref) {
+    this._check();
+    this.currentBatch.delete(ref);
+    this.currentCount++;
+    return this;
+  }
+
+  async commit() {
+    for (const b of this.batches) {
+      await b.commit();
+    }
+  }
+}
+
 export async function runTransaction(firestore, updateFunction) {
   assertWriteAllowedForEffectiveActor('runTransaction');
   return await rawRunTransaction(firestore, updateFunction);
@@ -585,6 +634,7 @@ window.updateDoc = updateDoc;
 window.addDoc = addDoc;
 window.deleteDoc = deleteDoc;
 window.writeBatch = writeBatch;
+window.SafeBatchManager = SafeBatchManager;
 window.runTransaction = runTransaction;
 
 

@@ -1033,7 +1033,9 @@ window.saveSelectedSupervisorsToRound = async function() {
     return;
   }
 
-  const batch = writeBatch(db);
+  const batch = (typeof SafeBatchManager !== 'undefined')
+    ? new SafeBatchManager(db, 400)
+    : (window.SafeBatchManager ? new window.SafeBatchManager(db, 400) : writeBatch(db));
   toAdd.forEach(sup => {
     const supId = String(sup.id || '').trim();
     const ref = doc(db, 'graduationRounds', roundId, 'supervisors', supId);

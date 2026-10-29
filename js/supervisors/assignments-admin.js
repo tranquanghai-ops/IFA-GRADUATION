@@ -658,7 +658,27 @@ window.confirmAdminLockRound = async function() {
   }
 
   try {
-    const batch = writeBatch(db);
+    // Concurrency idempotency check: Ensure round hasn't been locked concurrently
+    try {
+      const freshRoundSnap = await getDoc(doc(db, 'graduationRounds', roundId));
+      if (freshRoundSnap.exists()) {
+        const freshRoundData = freshRoundSnap.data();
+        const freshCurrentRound = Number(freshRoundData.currentReviewRound || 1);
+        const isAlreadyLocked = freshRoundData.reviewLocks && freshRoundData.reviewLocks['round_' + currentRound];
+        if (freshCurrentRound !== currentRound || isAlreadyLocked) {
+          showToast(`⚠️ Vòng ${currentRound} đã được chốt hoặc cập nhật bởi quản trị viên khác. Hệ thống đang tải lại dữ liệu mới nhất.`, 'warning');
+          closeAdminLockRoundModal();
+          await loadAdminReviewData(roundId);
+          return;
+        }
+      }
+    } catch (checkErr) {
+      console.warn('Idempotency pre-check notice:', checkErr);
+    }
+
+    const batch = (typeof SafeBatchManager !== 'undefined')
+      ? new SafeBatchManager(db, 400)
+      : (window.SafeBatchManager ? new window.SafeBatchManager(db, 400) : writeBatch(db));
 
     const supAcceptedIncrements = {};
     supervisors.forEach(s => supAcceptedIncrements[s.id] = 0);
@@ -1105,7 +1125,9 @@ window.publishAdminResults = async function() {
   }
 
   try {
-    const batch = writeBatch(db);
+    const batch = (typeof SafeBatchManager !== 'undefined')
+      ? new SafeBatchManager(db, 400)
+      : (window.SafeBatchManager ? new window.SafeBatchManager(db, 400) : writeBatch(db));
     batch.update(doc(db, 'graduationRounds', roundId), {
       reviewStatus: 'completed',
       status: 'published',
