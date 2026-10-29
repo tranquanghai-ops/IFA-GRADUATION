@@ -561,9 +561,15 @@ function renderPreferencesTray() {
 export async function loadSupervisorReviewData(roundId) {
   if (!roundId) return;
 
+  if (typeof ensureSupervisorsMasterLoaded === 'function') {
+    try { await ensureSupervisorsMasterLoaded(); } catch (e) {}
+  }
+
   const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
-  const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
-  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
+  const emailLower = (actor?.email || state.user?.email || '').toLowerCase().trim();
+  const currentSup = (typeof resolveSupervisorIdentity === 'function')
+    ? resolveSupervisorIdentity(actor, state.roundSupervisors, state.supervisorsMaster)
+    : (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
 
   const greetingEl = document.getElementById('supervisor-greeting-name');
   const roundInfoEl = document.getElementById('supervisor-round-info');
@@ -589,7 +595,7 @@ export async function loadSupervisorReviewData(roundId) {
   try {
     // 1. Load round supervisors fresh
     const supDoc = await getDoc(doc(db, 'graduationRounds', roundId, 'supervisors', currentSup.id));
-    const supData = supDoc.exists() ? supDoc.data() : currentSup;
+    const supData = supDoc.exists() ? supDoc.data() : (currentSup.rawRoundSupervisor || currentSup);
     state.supervisorRoundProgress = supData.roundProgress || {};
 
     // 2. Load all registrations for this round
@@ -597,8 +603,23 @@ export async function loadSupervisorReviewData(roundId) {
     const allRegistrations = regSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     // 3. Load decisions made in this round
-    const decSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'reviewDecisions'));
-    const allDecisions = decSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let allDecisions = [];
+    try {
+      if (actor?.isAdmin) {
+        const decSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'reviewDecisions'));
+        allDecisions = decSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } else {
+        const q = query(
+          collection(db, 'graduationRounds', roundId, 'reviewDecisions'),
+          where('supervisorEmail', '==', emailLower)
+        );
+        const decSnap = await getDocs(q);
+        allDecisions = decSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+    } catch (decErr) {
+      console.warn('[SupervisorPortal] Could not query reviewDecisions by supervisorEmail:', decErr);
+      allDecisions = [];
+    }
 
     const currentReviewRound = Number(state.activeRound?.currentReviewRound || 1);
     const reviewStatus = state.activeRound?.reviewStatus || 'round_1';
@@ -609,7 +630,7 @@ export async function loadSupervisorReviewData(roundId) {
     const supCapacityMap = new Map();
     (state.roundSupervisors || []).forEach(s => {
       supCapacityMap.set(s.id, {
-        total: typeof s.capacity === 'number' ? s.capacity : 10,
+        total: typeof s.capacity === 'number' ? s.capacity : (typeof s.maxQuota === 'number' ? s.maxQuota : 10),
         acceptedCount: s.acceptedCount || 0
       });
     });
@@ -625,12 +646,27 @@ export async function loadSupervisorReviewData(roundId) {
       const pref2 = (registration.preferences || []).find(p => Number(p.rank) === 2);
       const pref3 = (registration.preferences || []).find(p => Number(p.rank) === 3);
 
-      const matchesSup = (pref) => pref && (pref.supervisorId === currentSup.id || pref.supervisorId === currentSup.supervisorId);
+      const matchesSup = (pref) => {
+        if (!pref) return false;
+        if (typeof currentSup.matchesPreference === 'function') return currentSup.matchesPreference(pref);
+        const pId = String(pref.supervisorId || pref.id || '').trim();
+        const pEmail = String(pref.supervisorEmail || pref.email || '').toLowerCase().trim();
+        return (pId && (pId === currentSup.id || pId === currentSup.supervisorId)) ||
+               (pEmail && pEmail === emailLower);
+      };
 
-      if (currentReviewRound === 1 || reviewStatus === 'round_1' || reviewStatus === 'not_started' || reviewStatus === 'draft') {
+      const matchesDecision = (d, roundNum) => {
+        if (String(d.studentId).trim().toUpperCase() !== studentId) return false;
+        if (Number(d.round) !== roundNum) return false;
+        if (d.supervisorId && (d.supervisorId === currentSup.id || d.supervisorId === currentSup.supervisorId)) return true;
+        if (d.supervisorEmail && (d.supervisorEmail.toLowerCase().trim() === emailLower || (currentSup.candidateEmails && currentSup.candidateEmails.has(d.supervisorEmail.toLowerCase().trim())))) return true;
+        return false;
+      };
+
+      if (currentReviewRound === 1 || reviewStatus === 'round_1' || reviewStatus === 'not_started' || reviewStatus === 'draft' || !reviewStatus) {
         // Round 1: Only students who chose this supervisor as NV1
         if (matchesSup(pref1)) {
-          const dec = allDecisions.find(d => String(d.studentId).trim().toUpperCase() === studentId && Number(d.round) === 1 && (d.supervisorId === currentSup.id || d.supervisorId === currentSup.supervisorId));
+          const dec = allDecisions.find(d => matchesDecision(d, 1));
           candidates.push({
             ...registration,
             studentId,
@@ -647,7 +683,7 @@ export async function loadSupervisorReviewData(roundId) {
 
         if ((nv2IsFullFromR1 || isExplicitlySkippedToNv3) && matchesSup(pref3)) {
           // Rule 3.5: NV3 supervisor sees this student in Round 2!
-          const dec = allDecisions.find(d => String(d.studentId).trim().toUpperCase() === studentId && Number(d.round) === 3 && (d.supervisorId === currentSup.id || d.supervisorId === currentSup.supervisorId));
+          const dec = allDecisions.find(d => matchesDecision(d, 3));
           candidates.push({
             ...registration,
             studentId,
@@ -657,7 +693,7 @@ export async function loadSupervisorReviewData(roundId) {
           });
         } else if (!nv2IsFullFromR1 && !isExplicitlySkippedToNv3 && matchesSup(pref2)) {
           // Regular NV2 candidate
-          const dec = allDecisions.find(d => String(d.studentId).trim().toUpperCase() === studentId && Number(d.round) === 2 && (d.supervisorId === currentSup.id || d.supervisorId === currentSup.supervisorId));
+          const dec = allDecisions.find(d => matchesDecision(d, 2));
           candidates.push({
             ...registration,
             studentId,
@@ -669,7 +705,7 @@ export async function loadSupervisorReviewData(roundId) {
       } else if (currentReviewRound === 3 || reviewStatus === 'round_3') {
         // Round 3: NV3 candidates
         if (matchesSup(pref3)) {
-          const dec = allDecisions.find(d => String(d.studentId).trim().toUpperCase() === studentId && Number(d.round) === 3 && (d.supervisorId === currentSup.id || d.supervisorId === currentSup.supervisorId));
+          const dec = allDecisions.find(d => matchesDecision(d, 3));
           candidates.push({
             ...registration,
             studentId,
@@ -687,8 +723,12 @@ export async function loadSupervisorReviewData(roundId) {
 
     // Filter Accepted Students across rounds for this supervisor
     const acceptedStudents = allRegistrations.filter(r => {
-      return (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') &&
-        (r.acceptedSupervisorId === currentSup.id || r.acceptedSupervisorId === currentSup.supervisorId);
+      const isAcceptedStatus = r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned';
+      if (!isAcceptedStatus) return false;
+      const accId = String(r.acceptedSupervisorId || '').trim();
+      const accEmail = String(r.acceptedSupervisorEmail || r.supervisorEmail || '').toLowerCase().trim();
+      return (accId && (accId === currentSup.id || accId === currentSup.supervisorId || (currentSup.identityIds && currentSup.identityIds.has(accId)))) ||
+             (accEmail && (accEmail === emailLower || (currentSup.candidateEmails && currentSup.candidateEmails.has(accEmail))));
     });
     state.supervisorAcceptedStudents = acceptedStudents;
 
@@ -700,7 +740,11 @@ export async function loadSupervisorReviewData(roundId) {
     state.supervisorDecisions = decisionsMap;
 
     // Calculate quota
-    const totalCapacity = typeof supData.capacity === 'number' ? supData.capacity : (currentSup.capacity || 10);
+    const totalCapacity = typeof supData.capacity === 'number'
+      ? supData.capacity
+      : (typeof supData.maxQuota === 'number'
+          ? supData.maxQuota
+          : (typeof currentSup.capacity === 'number' ? currentSup.capacity : (currentSup.defaultQuota || 10)));
     const acceptedPrev = acceptedStudents.length || (supData.acceptedCount || 0);
     const selectedCurr = candidates.filter(c => decisionsMap[c.studentId] === 'selected').length;
     const remainingCap = Math.max(0, totalCapacity - acceptedPrev - selectedCurr);
@@ -816,11 +860,11 @@ function renderSupervisorCandidatesTable(readOnly) {
     return;
   }
 
-  const currentSup = state.roundSupervisors.find(s => {
-    const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
-    const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
-    return (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid));
-  });
+  const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
+  const emailLower = (actor?.email || state.user?.email || '').toLowerCase().trim();
+  const currentSup = (typeof resolveSupervisorIdentity === 'function')
+    ? resolveSupervisorIdentity(actor, state.roundSupervisors, state.supervisorsMaster)
+    : (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
   const totalCap = currentSup?.capacity ?? 10;
   const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
   const selectedCurr = Object.values(state.supervisorDecisions).filter(v => v === 'selected').length;
@@ -955,8 +999,10 @@ window.setSupervisorDecision = async function(studentId, nextDecision) {
 
   const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
   const roundId = state.selectedRoundId;
-  const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
-  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
+  const emailLower = (actor?.email || state.user?.email || '').toLowerCase().trim();
+  const currentSup = (typeof resolveSupervisorIdentity === 'function')
+    ? resolveSupervisorIdentity(actor, state.roundSupervisors, state.supervisorsMaster)
+    : (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
 
   if (!roundId || !currentSup) return;
 
@@ -1049,11 +1095,11 @@ window.toggleSupervisorDecision = function(studentId) {
 
 window.openSupervisorConfirmModal = function() {
   const currentRound = state.activeRound?.currentReviewRound || 1;
-  const currentSup = (state.roundSupervisors || []).find(s => {
-    const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
-    const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
-    return (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid));
-  });
+  const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
+  const emailLower = (actor?.email || state.user?.email || '').toLowerCase().trim();
+  const currentSup = (typeof resolveSupervisorIdentity === 'function')
+    ? resolveSupervisorIdentity(actor, state.roundSupervisors, state.supervisorsMaster)
+    : (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
   const totalCap = currentSup?.capacity ?? 10;
   const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
   const selectedCount = Object.values(state.supervisorDecisions || {}).filter(v => v === 'selected').length;
@@ -1081,8 +1127,10 @@ window.confirmSupervisorRoundCompletion = async function() {
   const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
   const roundId = state.selectedRoundId;
   const currentRound = state.activeRound?.currentReviewRound || 1;
-  const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
-  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
+  const emailLower = (actor?.email || state.user?.email || '').toLowerCase().trim();
+  const currentSup = (typeof resolveSupervisorIdentity === 'function')
+    ? resolveSupervisorIdentity(actor, state.roundSupervisors, state.supervisorsMaster)
+    : (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
 
   if (!roundId || !currentSup) return;
 
@@ -1116,8 +1164,10 @@ window.reopenSupervisorRound = async function() {
     return;
   }
 
-  const emailLower = (actor?.email || state.user?.email || '').toLowerCase();
-  const currentSup = state.roundSupervisors.find(s => (s.email || '').toLowerCase() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
+  const emailLower = (actor?.email || state.user?.email || '').toLowerCase().trim();
+  const currentSup = (typeof resolveSupervisorIdentity === 'function')
+    ? resolveSupervisorIdentity(actor, state.roundSupervisors, state.supervisorsMaster)
+    : (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
   if (!roundId || !currentSup) return;
 
   if (!(await showConfirm('Mở lại vòng lựa chọn', `Mở lại Vòng ${currentRound} để chỉnh sửa danh sách lựa chọn?`, { confirmText: 'Mở lại vòng', danger: false }))) return;
@@ -1425,6 +1475,8 @@ if (typeof window !== 'undefined') {
   if (typeof switchAdminTab !== 'undefined') window.switchAdminTab = switchAdminTab;
   if (typeof loadSupervisorReviewData !== 'undefined') window.loadSupervisorReviewData = loadSupervisorReviewData;
   if (typeof renderSupervisorReviewCards !== 'undefined') window.renderSupervisorReviewCards = renderSupervisorReviewCards;
+  if (typeof renderSupervisorCandidatesTable !== 'undefined') window.renderSupervisorCandidatesTable = renderSupervisorCandidatesTable;
+  if (typeof renderSupervisorReviewUI !== 'undefined') window.renderSupervisorReviewUI = renderSupervisorReviewUI;
   if (typeof acceptCandidate !== 'undefined') window.acceptCandidate = acceptCandidate;
   if (typeof rejectCandidate !== 'undefined') window.rejectCandidate = rejectCandidate;
   if (typeof undoCandidateDecision !== 'undefined') window.undoCandidateDecision = undoCandidateDecision;

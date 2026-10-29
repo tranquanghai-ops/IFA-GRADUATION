@@ -53,8 +53,10 @@ export function getSupervisorAvatarSvgDataUri(name) {
   return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
 }
 
-window.getSupervisorInitials = getSupervisorInitials;
-window.getSupervisorAvatarSvgDataUri = getSupervisorAvatarSvgDataUri;
+if (typeof window !== 'undefined') {
+  window.getSupervisorInitials = getSupervisorInitials;
+  window.getSupervisorAvatarSvgDataUri = getSupervisorAvatarSvgDataUri;
+}
 
 function renderAdminSupervisorsMasterTable() {
   const tbody = document.getElementById('admin-supervisors-master-tbody');
@@ -1089,8 +1091,132 @@ window.saveSelectedSupervisorsToRound = async function() {
 
 // =========================================================================
 
+/**
+ * Unified Supervisor Identity Resolver
+ * Resolves a stable supervisor identity from Firebase Auth / Actor and supervisorMaster.
+ * Enforces:
+ * 1. Matches strictly by authenticated email (primary email, emails array, personalEmail, institutionalEmail).
+ * 2. If impersonating, also matches target.id / target.supervisorId.
+ * 3. Does NOT use full name as key.
+ * 4. Does NOT grant permissions to unlisted emails.
+ * 5. Does NOT allow real accounts to hijack another supervisorId.
+ */
+export function resolveSupervisorIdentity(actorParam = null, roundSupervisors = null, supervisorsMaster = null) {
+  const actor = actorParam || (typeof getEffectiveActor === 'function' ? getEffectiveActor() : null);
+  const isImpersonating = Boolean(actor?.impersonating || (typeof state !== 'undefined' && state.impersonation));
+  const targetId = isImpersonating ? String(actor?.target?.id || actor?.target?.supervisorId || actor?.uid || '').trim() : '';
+  const targetEmail = isImpersonating ? String(actor?.target?.email || '').toLowerCase().trim() : '';
+  const emailLower = (targetEmail || actor?.email || (typeof state !== 'undefined' && state.user?.email) || '').toLowerCase().trim();
+  const masterList = Array.isArray(supervisorsMaster) ? supervisorsMaster : ((typeof state !== 'undefined' && state.supervisorsMaster) || []);
+  const roundList = Array.isArray(roundSupervisors) ? roundSupervisors : ((typeof state !== 'undefined' && state.roundSupervisors) || []);
+
+  if (!emailLower && !targetId) return null;
+
+  // 1. Locate matching master record
+  const matchingMaster = masterList.find(s => {
+    if (s.active === false || s.status === 'revoked' || s.status === 'disabled') return false;
+    const primEmail = (s.email || '').toLowerCase().trim();
+    if (primEmail && (primEmail === emailLower || (targetEmail && primEmail === targetEmail))) return true;
+    if (Array.isArray(s.emails) && s.emails.some(e => {
+      const el = (e || '').toLowerCase().trim();
+      return el === emailLower || (targetEmail && el === targetEmail);
+    })) return true;
+    if (s.personalEmail) {
+      const pe = s.personalEmail.toLowerCase().trim();
+      if (pe === emailLower || (targetEmail && pe === targetEmail)) return true;
+    }
+    if (s.institutionalEmail) {
+      const ie = s.institutionalEmail.toLowerCase().trim();
+      if (ie === emailLower || (targetEmail && ie === targetEmail)) return true;
+    }
+    if (isImpersonating && targetId && (s.id === targetId || s.supervisorId === targetId)) return true;
+    return false;
+  });
+
+  // Candidate emails associated with this supervisor identity
+  const candidateEmails = new Set([
+    emailLower,
+    targetEmail,
+    matchingMaster?.email,
+    matchingMaster?.personalEmail,
+    matchingMaster?.institutionalEmail,
+    ...(Array.isArray(matchingMaster?.emails) ? matchingMaster.emails : [])
+  ].filter(Boolean).map(e => String(e).toLowerCase().trim()));
+
+  // Stable Identity IDs Set
+  const identityIds = new Set([
+    matchingMaster?.id,
+    matchingMaster?.supervisorId,
+    ...(isImpersonating && targetId ? [targetId] : [])
+  ].filter(Boolean).map(v => String(v).trim()));
+
+  // 2. Locate supervisor in round roster (if roundSupervisors provided)
+  const roundSup = roundList.find(s => {
+    const sEmail = (s.email || '').toLowerCase().trim();
+    if (sEmail && candidateEmails.has(sEmail)) return true;
+    if (Array.isArray(s.emails) && s.emails.some(e => candidateEmails.has((e || '').toLowerCase().trim()))) return true;
+    if (s.personalEmail && candidateEmails.has(s.personalEmail.toLowerCase().trim())) return true;
+    if (s.institutionalEmail && candidateEmails.has(s.institutionalEmail.toLowerCase().trim())) return true;
+    const sid = String(s.id || '').trim();
+    const supId = String(s.supervisorId || '').trim();
+    if (sid && identityIds.has(sid)) return true;
+    if (supId && identityIds.has(supId)) return true;
+    return false;
+  });
+
+  if (roundSup) {
+    if (roundSup.id) identityIds.add(String(roundSup.id).trim());
+    if (roundSup.supervisorId) identityIds.add(String(roundSup.supervisorId).trim());
+    if (roundSup.email) candidateEmails.add(roundSup.email.toLowerCase().trim());
+  }
+
+  // If neither master nor roundSup found, this account is not an authorized supervisor
+  if (!matchingMaster && !roundSup) {
+    return null;
+  }
+
+  const stableId = roundSup?.supervisorId || roundSup?.id || matchingMaster?.id || matchingMaster?.supervisorId || '';
+
+  // Quota resolution: capacity in round takes precedence, then maxQuota in round, then defaultQuota in master, default 10
+  const capacity = typeof roundSup?.capacity === 'number'
+    ? roundSup.capacity
+    : (typeof roundSup?.maxQuota === 'number'
+        ? roundSup.maxQuota
+        : (typeof matchingMaster?.defaultQuota === 'number' ? matchingMaster.defaultQuota : 10));
+
+  return {
+    id: roundSup?.id || matchingMaster?.id || stableId,
+    supervisorId: stableId,
+    stableId,
+    email: matchingMaster?.email || roundSup?.email || emailLower,
+    name: matchingMaster?.name || roundSup?.name || actor?.displayName || 'Thầy/Cô',
+    capacity,
+    defaultQuota: matchingMaster?.defaultQuota || 10,
+    activeInRound: roundSup ? (roundSup.activeInRound !== false && roundSup.active !== false) : false,
+    roundProgress: roundSup?.roundProgress || {},
+    acceptedCount: roundSup?.acceptedCount || 0,
+    candidateEmails,
+    identityIds,
+    isVisitingSupervisor: Boolean(
+      matchingMaster?.employmentType === 'adjunct' ||
+      (emailLower && !emailLower.endsWith('@tdtu.edu.vn'))
+    ),
+    rawMaster: matchingMaster,
+    rawRoundSupervisor: roundSup,
+    matchesPreference: (pref) => {
+      if (!pref) return false;
+      const pid = String(pref.supervisorId || pref.id || '').trim();
+      if (pid && identityIds.has(pid)) return true;
+      const pEmail = String(pref.supervisorEmail || pref.email || '').toLowerCase().trim();
+      if (pEmail && candidateEmails.has(pEmail)) return true;
+      return false;
+    }
+  };
+}
+
 // --- SUBMODULE WINDOW BRIDGE ---
 if (typeof window !== 'undefined') {
+  window.resolveSupervisorIdentity = resolveSupervisorIdentity;
   if (typeof loadAdminSupervisorsMaster !== 'undefined') window.loadAdminSupervisorsMaster = loadAdminSupervisorsMaster;
   if (typeof getSupervisorInitials !== 'undefined') window.getSupervisorInitials = getSupervisorInitials;
   if (typeof getSupervisorAvatarSvgDataUri !== 'undefined') window.getSupervisorAvatarSvgDataUri = getSupervisorAvatarSvgDataUri;

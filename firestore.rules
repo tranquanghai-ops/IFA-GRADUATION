@@ -196,13 +196,19 @@ service cloud.firestore {
 
       // Quyết định xét duyệt của GVHD từng vòng
       match /reviewDecisions/{decisionId} {
-        allow read: if admin()
+        allow get: if admin()
           || (signedIn() && (
               (resource.data.keys().hasAll(['scorerEmail']) && (resource.data.scorerEmail == email() || resource.data.scorerEmail.lower() == email().lower()))
               || (resource.data.keys().hasAll(['supervisorEmail']) && (resource.data.supervisorEmail == email() || resource.data.supervisorEmail.lower() == email().lower()))
               || (resource.data.keys().hasAll(['decidedBy']) && (resource.data.decidedBy == email() || resource.data.decidedBy.lower() == email().lower()))
               || (staff() && resource.data.keys().hasAll(['activityId', 'councilId'])
                   && isCouncilMember(resource.data.activityId, resource.data.councilId, email()))
+          ));
+        allow list: if admin()
+          || (signedIn() && (
+              (resource.data.keys().hasAll(['supervisorEmail']) && (resource.data.supervisorEmail == email() || resource.data.supervisorEmail.lower() == email().lower()))
+              || (resource.data.keys().hasAll(['decidedBy']) && (resource.data.decidedBy == email() || resource.data.decidedBy.lower() == email().lower()))
+              || (resource.data.keys().hasAll(['scorerEmail']) && (resource.data.scorerEmail == email() || resource.data.scorerEmail.lower() == email().lower()))
           ));
         allow create: if admin()
           || (signedIn()

@@ -45,7 +45,10 @@ window.initSupervisorPortal = async function() {
   // ACCESS RULE: Only supervisor, support supervisor, or admin can access
   const actor = getEffectiveActor();
   const emailLower = (actor.email || '').toLowerCase().trim();
-  const isSupervisorCandidate = actor.isSupervisor || actor.isAdmin ||
+  const supIdentityCheck = (typeof resolveSupervisorIdentity === 'function')
+    ? resolveSupervisorIdentity(actor, state.roundSupervisors, state.supervisorsMaster)
+    : null;
+  const isSupervisorCandidate = actor.isSupervisor || actor.isAdmin || Boolean(supIdentityCheck) ||
     (state.roundSupervisors || []).some(s => (s.email || '').toLowerCase().trim() === emailLower) ||
     (state.supervisorsMaster || []).some(s => (s.email || '').toLowerCase().trim() === emailLower);
 
@@ -417,19 +420,22 @@ window.loadSupervisorPortalData = async function(roundId) {
   const isDirect = isDirectSupervisorAssignment(round);
 
   // 1. Locate current supervisor profile
-  const matchingMaster = (state.supervisorsMaster || []).find(s =>
+  const supIdentity = (typeof resolveSupervisorIdentity === 'function')
+    ? resolveSupervisorIdentity(actor, state.roundSupervisors, state.supervisorsMaster)
+    : null;
+  const matchingMaster = supIdentity?.rawMaster || (state.supervisorsMaster || []).find(s =>
     (s.email || '').toLowerCase().trim() === emailLower ||
     (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
     (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower) ||
     (s.institutionalEmail && s.institutionalEmail.toLowerCase().trim() === emailLower) ||
     (actor.uid && (s.id === actor.uid || s.supervisorId === actor.uid))
   );
-  const supervisorIdentityIds = new Set([
+  const supervisorIdentityIds = supIdentity?.identityIds || new Set([
     actor.uid,
     matchingMaster?.id,
     matchingMaster?.supervisorId
   ].filter(Boolean).map(value => String(value).trim()));
-  const roundSupervisor = (state.roundSupervisors || []).find(s =>
+  const roundSupervisor = supIdentity?.rawRoundSupervisor || (state.roundSupervisors || []).find(s =>
     (s.email || '').toLowerCase().trim() === emailLower ||
     (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
     (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower) ||
@@ -442,7 +448,7 @@ window.loadSupervisorPortalData = async function(roundId) {
     currentSup = roundSupervisor ? { ...roundSupervisor, ...matchingMaster } : matchingMaster;
   }
 
-  const candidateEmails = new Set([
+  const candidateEmails = supIdentity?.candidateEmails || new Set([
     emailLower,
     matchingMaster?.email,
     currentSup?.email,
@@ -458,15 +464,8 @@ window.loadSupervisorPortalData = async function(roundId) {
     ...(Array.isArray(roundSupervisor?.emails) ? roundSupervisor.emails : [])
   ].filter(Boolean).map(e => String(e).toLowerCase().trim()));
 
-  const mySupId = matchingMaster?.id || matchingMaster?.supervisorId || currentSup?.id || currentSup?.supervisorId;
-  const supervisorIdsSet = new Set([
-    mySupId,
-    ...supervisorIdentityIds,
-    matchingMaster?.id,
-    matchingMaster?.supervisorId,
-    roundSupervisor?.id,
-    roundSupervisor?.supervisorId
-  ].filter(Boolean).map(v => String(v).trim()));
+  const mySupId = supIdentity?.stableId || matchingMaster?.id || matchingMaster?.supervisorId || currentSup?.id || currentSup?.supervisorId;
+  const supervisorIdsSet = supervisorIdentityIds;
 
   // Header and Hero Information
   const greetingEl = document.getElementById('supervisor-greeting-name');
@@ -720,7 +719,7 @@ window.loadSupervisorPortalData = async function(roundId) {
   const statAssignedEl = document.getElementById('sup-stat-assigned-total');
   if (statAssignedEl) statAssignedEl.textContent = totalAssignedCount;
 
-  const quota = currentSup?.quota || currentSup?.capacity || 10;
+  const quota = supIdentity ? supIdentity.capacity : (currentSup?.quota || currentSup?.capacity || 10);
   let primaryCount = 0;
   let supportCount = 0;
   let pendingCount = 0;

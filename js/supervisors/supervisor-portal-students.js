@@ -13,19 +13,22 @@ window.renderSupervisorAssignedStudents = function() {
   const round = state.activeRound;
   const actor = getEffectiveActor();
   const emailLower = (actor.email || '').toLowerCase().trim();
-  const matchingMaster = (state.supervisorsMaster || []).find(s =>
+  const supIdentity = (typeof resolveSupervisorIdentity === 'function')
+    ? resolveSupervisorIdentity(actor, state.roundSupervisors, state.supervisorsMaster)
+    : null;
+  const matchingMaster = supIdentity?.rawMaster || (state.supervisorsMaster || []).find(s =>
     (s.email || '').toLowerCase().trim() === emailLower ||
     (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
     (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower) ||
     (s.institutionalEmail && s.institutionalEmail.toLowerCase().trim() === emailLower) ||
     (actor.uid && (s.id === actor.uid || s.supervisorId === actor.uid))
   );
-  const supervisorIdentityIds = new Set([
+  const supervisorIdentityIds = supIdentity?.identityIds || new Set([
     actor.uid,
     matchingMaster?.id,
     matchingMaster?.supervisorId
   ].filter(Boolean).map(value => String(value).trim()));
-  const roundSupervisor = (state.roundSupervisors || []).find(s =>
+  const roundSupervisor = supIdentity?.rawRoundSupervisor || (state.roundSupervisors || []).find(s =>
     (s.email || '').toLowerCase().trim() === emailLower ||
     (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
     (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower) ||
@@ -34,7 +37,7 @@ window.renderSupervisorAssignedStudents = function() {
     supervisorIdentityIds.has(String(s.supervisorId || '').trim())
   );
   const currentSup = roundSupervisor || matchingMaster;
-  const candidateEmails = new Set([
+  const candidateEmails = supIdentity?.candidateEmails || new Set([
     emailLower,
     currentSup?.email,
     currentSup?.institutionalEmail,
@@ -50,15 +53,8 @@ window.renderSupervisorAssignedStudents = function() {
     ...(Array.isArray(roundSupervisor?.emails) ? roundSupervisor.emails : [])
   ].filter(Boolean).map(e => String(e).toLowerCase().trim()));
 
-  const mySupId = currentSup?.id || currentSup?.supervisorId || matchingMaster?.id || matchingMaster?.supervisorId;
-  const supervisorIdsSet = new Set([
-    mySupId,
-    ...supervisorIdentityIds,
-    roundSupervisor?.id,
-    roundSupervisor?.supervisorId,
-    matchingMaster?.id,
-    matchingMaster?.supervisorId
-  ].filter(Boolean).map(v => String(v).trim()));
+  const mySupId = supIdentity?.stableId || currentSup?.id || currentSup?.supervisorId || matchingMaster?.id || matchingMaster?.supervisorId;
+  const supervisorIdsSet = supervisorIdentityIds;
   const currentSupName = (currentSup?.name || '').toLowerCase().trim();
 
   const all = state.supervisorAssignedStudents || [];
