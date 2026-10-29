@@ -192,16 +192,24 @@ async function checkStudentEligibilityAndRegistration(roundId) {
   );
 
   if (!mssv) {
-    if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
-    if (heroCard) heroCard.classList.remove('hidden');
+    state.isEligible = false;
+    state.eligibilityState = 'unidentified';
+    if (nonEligibleAlert) {
+      nonEligibleAlert.classList.remove('hidden');
+      const h3 = nonEligibleAlert.querySelector('h3');
+      const p = nonEligibleAlert.querySelector('p');
+      if (h3) h3.textContent = 'Không xác định được Mã số sinh viên (MSSV) từ tài khoản đăng nhập.';
+      if (p) p.textContent = 'Vui lòng đăng xuất và đăng nhập lại bằng tài khoản Google sinh viên TDTU chính thức (MSSV@student.tdtu.edu.vn).';
+      const selfJoinDiv = document.getElementById('non-eligible-self-join-action');
+      if (selfJoinDiv) selfJoinDiv.classList.add('hidden');
+    }
+    if (heroCard) heroCard.classList.add('hidden');
     if (journeyCard) journeyCard.classList.remove('hidden');
     if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
     if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
     if (officialResultCard) officialResultCard.classList.add('hidden');
-    if (!isCurrentlyRegisteringTopic) {
-      if (ctaCard) ctaCard.classList.remove('hidden');
-      if (flowContainer) flowContainer.classList.add('hidden');
-    }
+    if (ctaCard) ctaCard.classList.add('hidden');
+    if (flowContainer) flowContainer.classList.add('hidden');
     renderSupervisorsGrid();
     updateStudentJourneyStepper();
     updateStudentPersonalSidebar();
@@ -232,19 +240,49 @@ async function checkStudentEligibilityAndRegistration(roundId) {
     if (isOfficiallyEligible) {
       state.isEligible = true;
       state.eligibilityState = 'eligible';
-      if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
+      if (nonEligibleAlert) {
+        nonEligibleAlert.classList.add('hidden');
+        const selfJoinDiv = document.getElementById('non-eligible-self-join-action');
+        if (selfJoinDiv) selfJoinDiv.classList.add('hidden');
+      }
       if (heroCard) heroCard.classList.remove('hidden');
       if (journeyCard) journeyCard.classList.remove('hidden');
     } else if (allowPre || isSelfJoined) {
       state.isEligible = 'pending';
       state.eligibilityState = 'pending';
-      if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
+      if (nonEligibleAlert) {
+        nonEligibleAlert.classList.add('hidden');
+        const selfJoinDiv = document.getElementById('non-eligible-self-join-action');
+        if (selfJoinDiv) selfJoinDiv.classList.add('hidden');
+      }
       if (heroCard) heroCard.classList.remove('hidden');
       if (journeyCard) journeyCard.classList.remove('hidden');
     } else {
       state.isEligible = false;
       state.eligibilityState = 'not_eligible';
-      if (nonEligibleAlert) nonEligibleAlert.classList.remove('hidden');
+      if (nonEligibleAlert) {
+        nonEligibleAlert.classList.remove('hidden');
+        const h3 = nonEligibleAlert.querySelector('h3');
+        const p = nonEligibleAlert.querySelector('p');
+        if (h3) h3.textContent = 'Bạn chưa có trong danh sách sinh viên đủ điều kiện đăng ký Đồ án tốt nghiệp đợt này.';
+        if (p) p.textContent = 'Tài khoản của bạn hiện chưa được ghi nhận trong danh sách sinh viên chính thức của đợt tốt nghiệp này. Nếu bạn thuộc đối tượng làm ĐATN hoặc cần hỗ trợ kiểm tra điều kiện, vui lòng liên hệ Văn phòng Khoa để được giải quyết.';
+        const selfJoinDiv = document.getElementById('non-eligible-self-join-action');
+        if (selfJoinDiv) {
+          if (roundData?.allowSelfJoin === true && !roundData?.isClosed && !roundData?.isHidden && roundData?.status !== 'closed') {
+            selfJoinDiv.classList.remove('hidden');
+            const btn = document.getElementById('btn-self-join-from-alert');
+            if (btn) {
+              btn.onclick = () => {
+                if (typeof window.openStudentConfirmJoinModal === 'function') {
+                  window.openStudentConfirmJoinModal(roundData);
+                }
+              };
+            }
+          } else {
+            selfJoinDiv.classList.add('hidden');
+          }
+        }
+      }
       if (heroCard) heroCard.classList.add('hidden');
       if (journeyCard) journeyCard.classList.add('hidden');
       if (timelineSection) timelineSection.classList.add('hidden');

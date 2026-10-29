@@ -270,6 +270,7 @@ window.checkAndHandlePendingRoundJoin = async function() {
 };
 
 async function openStudentConfirmJoinModal(round) {
+  if (!round) return;
   state.pendingJoinTargetRound = round;
   const studentMssv = state.studentMssv;
 
@@ -548,6 +549,7 @@ window.viewJoinedRoundPortal = function() {
     switchView('student');
   }
 };
+window.openStudentConfirmJoinModal = openStudentConfirmJoinModal;
 
 // Auto-detect join URL on bootstrap
 if (typeof window !== 'undefined') {

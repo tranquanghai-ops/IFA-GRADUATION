@@ -19,6 +19,85 @@ export function isSystemOwner(user = null) {
 }
 window.isSystemOwner = isSystemOwner;
 
+export function evaluateAccountDomainAndRole(rawEmail) {
+  const email = (rawEmail || '').toLowerCase().trim();
+  if (!email) {
+    return {
+      isValid: false,
+      reason: 'empty',
+      message: 'Không tìm thấy địa chỉ email trong tài khoản đăng nhập.'
+    };
+  }
+
+  // 1. Student domain: @student.tdtu.edu.vn
+  if (email.endsWith('@student.tdtu.edu.vn')) {
+    const studentMatch = email.match(/^([a-z0-9]+)@student\.tdtu\.edu\.vn$/i);
+    if (!studentMatch || !studentMatch[1]) {
+      return {
+        isValid: false,
+        isStudentDomain: true,
+        reason: 'invalid_mssv',
+        message: 'Email sinh viên không hợp lệ. Vui lòng sử dụng email có định dạng MSSV@student.tdtu.edu.vn.'
+      };
+    }
+    const mssv = String(studentMatch[1]).trim().toUpperCase();
+    return {
+      isValid: true,
+      accountType: 'student',
+      email,
+      mssv
+    };
+  }
+
+  // 2. Staff / Faculty / Admin domain: @tdtu.edu.vn
+  if (email.endsWith('@tdtu.edu.vn')) {
+    const isOwner = email === 'tranquanghai@tdtu.edu.vn';
+    return {
+      isValid: true,
+      accountType: 'staff',
+      email,
+      isOwner
+    };
+  }
+
+  // 3. Unauthorized personal or external domains
+  const isPersonal = email.includes('gmail.com') || email.includes('yahoo.com') || email.includes('outlook.com') || email.includes('hotmail.com');
+  return {
+    isValid: false,
+    isPersonal,
+    reason: isPersonal ? 'personal_email' : 'invalid_domain',
+    message: isPersonal
+      ? 'Email cá nhân không được phép sử dụng trong hệ thống. Sinh viên vui lòng đăng nhập bằng MSSV@student.tdtu.edu.vn.'
+      : 'Ứng dụng chỉ dành cho sinh viên và giảng viên sử dụng tài khoản Google TDTU. Vui lòng đăng nhập bằng email được Trường cấp.'
+  };
+}
+window.evaluateAccountDomainAndRole = evaluateAccountDomainAndRole;
+
+export function clearStudentSessionAndState() {
+  state.realUser = null;
+  state.user = null;
+  state.actualRole = null;
+  state.currentView = null;
+  state.role = 'student';
+  state.isAdmin = false;
+  state.isSupervisor = false;
+  state.isStudent = false;
+  state.studentMssv = '';
+  state.userStudentId = '';
+  state.myRegistration = null;
+  state.myOfficialAssignment = null;
+  state.studentRounds = [];
+  state.studentSelfProfile = null;
+  state.isRegisteringTopic = false;
+  try {
+    sessionStorage.removeItem('ifa_student_mssv');
+    sessionStorage.removeItem('ifa_student_email');
+    sessionStorage.removeItem('student_selected_round_id');
+    localStorage.removeItem('student_selected_round_id');
+  } catch (e) {}
+}
+window.clearStudentSessionAndState = clearStudentSessionAndState;
+
 export async function setupAuthListener() {
   showLoading('Đang khởi tạo IFA+ Graduation...');
 
@@ -32,20 +111,83 @@ export async function setupAuthListener() {
     state.user = user;
 
     if (user) {
+      // 0. Strict Identity & Domain Gatekeeper: Reject personal/unauthorized accounts immediately
+      const evalResult = evaluateAccountDomainAndRole(user.email);
+      if (!evalResult.isValid) {
+        console.warn('[IFA-Graduation Auth] Unauthorized account rejected:', user.email, evalResult.reason);
+        showToast(evalResult.message, 'error', 10000);
+
+        // Show prominent warning banner in login-required-section
+        const loginSec = document.getElementById('login-required-section');
+        if (loginSec) {
+          loginSec.classList.remove('hidden');
+          let authErrCard = document.getElementById('login-auth-error-card');
+          if (!authErrCard) {
+            authErrCard = document.createElement('div');
+            authErrCard.id = 'login-auth-error-card';
+            const container = loginSec.querySelector('.card-surface') || loginSec;
+            container.prepend(authErrCard);
+          }
+          authErrCard.className = 'p-4 mb-4 bg-rose-50 border border-rose-300 rounded-2xl text-rose-900 text-xs text-left space-y-1.5 shadow-sm';
+          authErrCard.innerHTML = `
+            <div class="flex items-start gap-2.5">
+              <span class="text-rose-600 text-base">⚠️</span>
+              <div class="flex-1">
+                <strong class="font-bold text-rose-950 block">Từ chối truy cập: ${window.escapeHtml ? window.escapeHtml(user.email) : user.email}</strong>
+                <p class="text-rose-800 leading-relaxed">${evalResult.message}</p>
+              </div>
+            </div>
+          `;
+        }
+
+        // Hide all internal views immediately
+        document.getElementById('view-student')?.classList.add('hidden');
+        document.getElementById('view-supervisor')?.classList.add('hidden');
+        document.getElementById('view-admin')?.classList.add('hidden');
+        document.getElementById('view-assessment')?.classList.add('hidden');
+
+        // Close any open registration flow or modal
+        const flowContainer = document.getElementById('registration-flow-container');
+        if (flowContainer) flowContainer.classList.add('hidden');
+        state.isRegisteringTopic = false;
+
+        // Clear all session and state
+        clearStudentSessionAndState();
+
+        // Proactively sign out of Firebase Auth
+        try {
+          await signOut(auth);
+        } catch (soErr) {
+          console.warn('[Auth] Signout notice:', soErr);
+        }
+
+        clearTimeout(safetyTimer);
+        hideLoading();
+        return;
+      }
+
+      // Valid account: remove any previous login error card
+      const prevErrCard = document.getElementById('login-auth-error-card');
+      if (prevErrCard) prevErrCard.remove();
+
       document.getElementById('login-required-section').classList.add('hidden');
-      
-      // Immediate synchronous student identity fast-path: prevent any race condition
-      const fastEmail = (user.email || '').toLowerCase().trim();
-      if (fastEmail.endsWith('@student.tdtu.edu.vn')) {
-        const m = fastEmail.match(/^([^@]+)@student\.tdtu\.edu\.vn$/i);
-        const fastMssv = m ? m[1].toUpperCase() : fastEmail.split('@')[0].toUpperCase();
+
+      if (evalResult.accountType === 'student') {
         state.isStudent = true;
-        state.studentMssv = fastMssv;
-        state.userStudentId = fastMssv;
+        state.studentMssv = evalResult.mssv;
+        state.userStudentId = evalResult.mssv;
         state.actualRole = 'student';
         try {
-          sessionStorage.setItem('ifa_student_mssv', fastMssv);
-          sessionStorage.setItem('ifa_student_email', fastEmail);
+          sessionStorage.setItem('ifa_student_mssv', evalResult.mssv);
+          sessionStorage.setItem('ifa_student_email', evalResult.email);
+        } catch (e) {}
+      } else {
+        state.isStudent = false;
+        state.studentMssv = '';
+        state.userStudentId = '';
+        try {
+          sessionStorage.removeItem('ifa_student_mssv');
+          sessionStorage.removeItem('ifa_student_email');
         } catch (e) {}
       }
 
@@ -59,6 +201,45 @@ export async function setupAuthListener() {
           ]);
         } catch (e) {
           console.warn('[IFA-Graduation] Role resolution notice:', e);
+        }
+
+        // Kiểm tra bảo vệ: Tài khoản hợp lệ tên miền nhưng chưa được cấp quyền trong hệ thống
+        if (state.actualRole === 'unauthorized' || (!state.isAdmin && !state.isSupervisor && !state.isStudent)) {
+          console.warn('[IFA-Graduation Auth] Staff account without assigned roles in IFA-Graduation:', user.email);
+          showToast(`Tài khoản Google TDTU của Thầy/Cô (${user.email}) chưa được phân quyền trong hệ thống IFA-Graduation. Vui lòng liên hệ Quản trị viên Khoa.`, 'warning', 10000);
+
+          const loginSec = document.getElementById('login-required-section');
+          if (loginSec) {
+            loginSec.classList.remove('hidden');
+            let authErrCard = document.getElementById('login-auth-error-card');
+            if (!authErrCard) {
+              authErrCard = document.createElement('div');
+              authErrCard.id = 'login-auth-error-card';
+              const container = loginSec.querySelector('.card-surface') || loginSec;
+              container.prepend(authErrCard);
+            }
+            authErrCard.className = 'p-4 mb-4 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs text-left space-y-1.5 shadow-sm';
+            authErrCard.innerHTML = `
+              <div class="flex items-start gap-2.5">
+                <span class="text-amber-600 text-base">⚠️</span>
+                <div class="flex-1">
+                  <strong class="font-bold text-amber-950 block">Tài khoản chưa được phân quyền: ${window.escapeHtml ? window.escapeHtml(user.email) : user.email}</strong>
+                  <p class="text-amber-800 leading-relaxed">Tài khoản Google TDTU này chưa được gán quyền Quản trị viên hoặc Giảng viên hướng dẫn trong hệ thống IFA-Graduation. Vui lòng liên hệ Quản trị viên Khoa để được cấp quyền.</p>
+                </div>
+              </div>
+            `;
+          }
+
+          document.getElementById('view-student')?.classList.add('hidden');
+          document.getElementById('view-supervisor')?.classList.add('hidden');
+          document.getElementById('view-admin')?.classList.add('hidden');
+          document.getElementById('view-assessment')?.classList.add('hidden');
+
+          clearStudentSessionAndState();
+          try { await signOut(auth); } catch (e) {}
+          clearTimeout(safetyTimer);
+          hideLoading();
+          return;
         }
 
         state.realIsAdmin = Boolean(state.isAdmin);
@@ -273,8 +454,12 @@ export async function handleLogout() {
     sessionStorage.removeItem('pendingCouncilCode');
     sessionStorage.removeItem('councilDirectMode');
     sessionStorage.removeItem('directCouncilCode');
+    sessionStorage.removeItem('pendingJoinRound');
+    sessionStorage.removeItem('ifa_graduation_impersonation');
     state.isCouncilDirectMode = false;
+    state.impersonation = null;
     document.body.classList.remove('council-standalone-active');
+    clearStudentSessionAndState();
     await signOut(auth);
   } catch (e) {
     console.warn('Signout notice:', e);
@@ -285,19 +470,43 @@ window.handleLogout = handleLogout;
 
 export async function resolveActualRoles(user) {
   if (!user) {
-    state.actualRole = null;
+    clearStudentSessionAndState();
+    return;
+  }
+
+  const evalResult = evaluateAccountDomainAndRole(user.email);
+  if (!evalResult.isValid) {
+    state.actualRole = 'unauthorized';
     state.currentView = null;
     state.role = 'student';
     state.isAdmin = false;
     state.isSupervisor = false;
     state.isStudent = false;
     state.studentMssv = '';
+    state.userStudentId = '';
     return;
   }
 
-  const email = (user.email || '').toLowerCase().trim();
+  // 1. SINH VIÊN: Chỉ tài khoản @student.tdtu.edu.vn có MSSV hợp lệ
+  if (evalResult.accountType === 'student') {
+    state.isAdmin = false;
+    state.isSupervisor = false;
+    state.isStudent = true;
+    state.studentMssv = evalResult.mssv;
+    state.userStudentId = evalResult.mssv;
+    state.actualRole = 'student';
+    state.currentView = 'student';
+    state.role = 'student';
+    try {
+      sessionStorage.setItem('ifa_student_mssv', evalResult.mssv);
+      sessionStorage.setItem('ifa_student_email', evalResult.email);
+    } catch (e) {}
+    return;
+  }
 
-  // 1. OWNER / ADMIN Check
+  // 2. GIẢNG VIÊN / QUẢN TRỊ VIÊN: Tài khoản @tdtu.edu.vn
+  const email = evalResult.email;
+
   let isAdmin = false;
   if (isSystemOwner(user)) {
     isAdmin = true;
@@ -305,49 +514,28 @@ export async function resolveActualRoles(user) {
     isAdmin = true;
   }
 
-  // 2. STUDENT Check
-  let isStudent = email.endsWith('@student.tdtu.edu.vn');
-  let studentMssv = '';
-  if (isStudent) {
-    const m = email.match(/^([^@]+)@student\.tdtu\.edu\.vn$/i);
-    studentMssv = m ? m[1].toUpperCase() : email.split('@')[0].toUpperCase();
-    state.isStudent = true;
-    state.studentMssv = studentMssv;
-    state.userStudentId = studentMssv;
-    state.actualRole = 'student';
-    try {
-      sessionStorage.setItem('ifa_student_mssv', studentMssv);
-      sessionStorage.setItem('ifa_student_email', email);
-    } catch (e) {}
-  }
-
-  // 3. SUPERVISOR Check: ONLY active lecturers in supervisorMaster match by email
   let isSupervisor = false;
-
   try {
-    // Lecturers / staff do not have student emails; only query admin/supervisor catalog if not a student
-    if (!isStudent) {
-      // Check if in-memory list already contains this active supervisor
-      if (state.supervisorsMaster && state.supervisorsMaster.length > 0) {
-        const match = state.supervisorsMaster.find(s => s.active !== false && s.email && s.email.toLowerCase().trim() === email);
-        if (match) isSupervisor = true;
-      }
+    // Check if in-memory list already contains this active supervisor
+    if (state.supervisorsMaster && state.supervisorsMaster.length > 0) {
+      const match = state.supervisorsMaster.find(s => s.active !== false && s.email && s.email.toLowerCase().trim() === email);
+      if (match) isSupervisor = true;
+    }
 
-      // If not found in memory, query Firestore
-      if (!isSupervisor) {
-        await Promise.race([
-          Promise.all([
-            (!isAdmin ? getDoc(doc(db, 'admins', email)).then(d => { if (d.exists()) isAdmin = true; }).catch(() => {}) : Promise.resolve()),
-            getDocs(collection(db, 'supervisorMaster')).then(snap => {
-              const activeSups = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.active !== false);
-              if (activeSups.some(s => s.email && s.email.toLowerCase().trim() === email)) {
-                isSupervisor = true;
-              }
-            }).catch(() => {})
-          ]),
-          new Promise(r => setTimeout(r, 2500))
-        ]);
-      }
+    // If not found in memory, query Firestore
+    if (!isSupervisor) {
+      await Promise.race([
+        Promise.all([
+          (!isAdmin ? getDoc(doc(db, 'admins', email)).then(d => { if (d.exists()) isAdmin = true; }).catch(() => {}) : Promise.resolve()),
+          getDocs(collection(db, 'supervisorMaster')).then(snap => {
+            const activeSups = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.active !== false);
+            if (activeSups.some(s => s.email && s.email.toLowerCase().trim() === email)) {
+              isSupervisor = true;
+            }
+          }).catch(() => {})
+        ]),
+        new Promise(r => setTimeout(r, 2500))
+      ]);
     }
   } catch (e) {
     console.warn('[IFA-Graduation] Admins/Supervisor lookup notice:', e);
@@ -355,23 +543,19 @@ export async function resolveActualRoles(user) {
 
   state.isAdmin = isAdmin;
   state.isSupervisor = isSupervisor;
-  state.isStudent = isStudent;
-  state.studentMssv = studentMssv || state.studentMssv || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('ifa_student_mssv') : '') || '';
-  if (state.studentMssv) {
-    state.userStudentId = state.studentMssv;
-  }
+  state.isStudent = false;
+  state.studentMssv = '';
+  state.userStudentId = '';
 
-  // Strict Hierarchy: OWNER / HIGH ADMIN / ADMIN > SUPERVISOR > STUDENT
   if (isAdmin) {
     state.actualRole = 'admin';
   } else if (isSupervisor) {
     state.actualRole = 'supervisor';
   } else {
-    state.actualRole = 'student';
+    state.actualRole = 'unauthorized';
   }
 
   // Determine currentView: URL param override if permitted
-  // Khi chủ sở hữu, admin, quản trị viên, GVHD vào trang chủ (/) thì phải là trang của GVHD vì admin vẫn phải HDTN
   const urlParams = new URLSearchParams(window.location.search);
   const viewParam = urlParams.get('view');
   const detectedPortal = (typeof getCurrentPortal === 'function') ? getCurrentPortal() : 'student';
@@ -380,17 +564,14 @@ export async function resolveActualRoles(user) {
     state.currentView = 'admin';
   } else if (viewParam === 'supervisor' && (isSupervisor || isAdmin)) {
     state.currentView = 'supervisor';
-  } else if (viewParam === 'student') {
-    state.currentView = 'student';
   } else if (detectedPortal === 'admin' && (isAdmin || state.impersonation)) {
     state.currentView = 'admin';
   } else if (detectedPortal === 'assessment') {
     state.currentView = 'assessment';
   } else if ((isAdmin || isSupervisor) && !state.impersonation) {
-    // Mặc định Cổng GVHD cho Chủ sở hữu, Admin và Giảng viên khi truy cập trang chủ (/)
     state.currentView = 'supervisor';
   } else {
-    state.currentView = state.actualRole || 'student';
+    state.currentView = null;
   }
   state.role = state.currentView;
 }
@@ -946,6 +1127,8 @@ initFirebase().then(() => {
 // --- SUBMODULE WINDOW BRIDGE ---
 if (typeof window !== 'undefined') {
   if (typeof isSystemOwner !== 'undefined') window.isSystemOwner = isSystemOwner;
+  if (typeof evaluateAccountDomainAndRole !== 'undefined') window.evaluateAccountDomainAndRole = evaluateAccountDomainAndRole;
+  if (typeof clearStudentSessionAndState !== 'undefined') window.clearStudentSessionAndState = clearStudentSessionAndState;
   if (typeof setupAuthListener !== 'undefined') window.setupAuthListener = setupAuthListener;
   if (typeof resolveActualRoles !== 'undefined') window.resolveActualRoles = resolveActualRoles;
   if (typeof updateAuthUI !== 'undefined') window.updateAuthUI = updateAuthUI;
