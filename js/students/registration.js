@@ -78,6 +78,12 @@ export function applyStudentProgressVisibility() {
     journeyCard.classList.toggle('hidden', !shouldShowRoadmap);
   }
 
+  // 1b. Timeline Roadmap section (Kế hoạch & Nộp bài ĐATN/ĐATH)
+  const timelineSection = document.getElementById('student-timeline-section');
+  if (timelineSection) {
+    timelineSection.classList.toggle('hidden', !shouldShowRoadmap);
+  }
+
   // 2. Hero milestones count badge
   if (milestonesWrap) {
     milestonesWrap.classList.toggle('hidden', !shouldShowRoadmap);
@@ -100,9 +106,11 @@ export function applyStudentProgressVisibility() {
 
   // 6. Manage Cases 1, 2, 3 messages & UI components
   if (!shouldShowRoadmap) {
+    if (timelineSection) timelineSection.classList.add('hidden');
     if (!hasTopic && !isDraft) {
       // CASE 1: Joined round, no registration, no supervisor
-      if (ctaCard) {
+      const isCurrentlyRegistering = Boolean(state.isRegisteringTopic);
+      if (ctaCard && !isCurrentlyRegistering) {
         ctaCard.classList.remove('hidden');
         const ctaTitle = document.getElementById('registration-cta-title');
         const ctaDesc = document.getElementById('registration-cta-description');
@@ -114,8 +122,14 @@ export function applyStudentProgressVisibility() {
           ctaDesc.classList.remove('hidden');
           ctaDesc.textContent = 'Bạn chưa hoàn tất đăng ký đề tài và phân công giảng viên hướng dẫn. Vui lòng thực hiện đăng ký để tiếp tục.';
         }
+      } else if (ctaCard && isCurrentlyRegistering) {
+        ctaCard.classList.add('hidden');
       }
-      if (flowContainer) flowContainer.classList.add('hidden');
+      if (flowContainer && isCurrentlyRegistering) {
+        flowContainer.classList.remove('hidden');
+      } else if (flowContainer && !isCurrentlyRegistering) {
+        flowContainer.classList.add('hidden');
+      }
       if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
     } else if (isDraft) {
       // CASE 2: Draft registration saved, not submitted
@@ -143,7 +157,18 @@ if (typeof window !== 'undefined') window.applyStudentProgressVisibility = apply
  * IFA+ Graduation — Students, Eligibility & IFAA Master Module
  */
 async function checkStudentEligibilityAndRegistration(roundId) {
-  const mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
+  let mssv = state.isPreviewMode ? state.previewMssv : state.studentMssv;
+  if (!mssv) {
+    if (state.user?.email && state.user.email.toLowerCase().endsWith('@student.tdtu.edu.vn')) {
+      mssv = state.user.email.split('@')[0].toUpperCase();
+      state.studentMssv = mssv;
+      state.userStudentId = mssv;
+    } else if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('ifa_student_mssv')) {
+      mssv = sessionStorage.getItem('ifa_student_mssv');
+      state.studentMssv = mssv;
+      state.userStudentId = mssv;
+    }
+  }
 
   state.isEligible = false;
   state.myRegistration = null;
@@ -161,6 +186,11 @@ async function checkStudentEligibilityAndRegistration(roundId) {
   const finalScoreCard = document.getElementById('student-final-score-card');
   applySupervisorAssignmentModeToRegistrationUI();
 
+  const isCurrentlyRegisteringTopic = Boolean(
+    state.isRegisteringTopic ||
+    (flowContainer && !flowContainer.classList.contains('hidden') && !state.myRegistration)
+  );
+
   if (!mssv) {
     if (nonEligibleAlert) nonEligibleAlert.classList.add('hidden');
     if (heroCard) heroCard.classList.remove('hidden');
@@ -168,8 +198,10 @@ async function checkStudentEligibilityAndRegistration(roundId) {
     if (alreadyRegCard) alreadyRegCard.classList.add('hidden');
     if (reviewInProgressCard) reviewInProgressCard.classList.add('hidden');
     if (officialResultCard) officialResultCard.classList.add('hidden');
-    if (ctaCard) ctaCard.classList.remove('hidden');
-    if (flowContainer) flowContainer.classList.add('hidden');
+    if (!isCurrentlyRegisteringTopic) {
+      if (ctaCard) ctaCard.classList.remove('hidden');
+      if (flowContainer) flowContainer.classList.add('hidden');
+    }
     renderSupervisorsGrid();
     updateStudentJourneyStepper();
     updateStudentPersonalSidebar();
@@ -327,9 +359,19 @@ async function checkStudentEligibilityAndRegistration(roundId) {
       } else if (officialResultCard) {
         officialResultCard.classList.add('hidden');
       }
-      if (ctaCard) ctaCard.classList.remove('hidden');
-      if (flowContainer) flowContainer.classList.add('hidden');
-      goToStep(1);
+      const isCurrentlyRegistering = Boolean(
+        state.isRegisteringTopic || 
+        (flowContainer && !flowContainer.classList.contains('hidden'))
+      );
+
+      if (isCurrentlyRegistering) {
+        if (ctaCard) ctaCard.classList.add('hidden');
+        if (flowContainer) flowContainer.classList.remove('hidden');
+      } else {
+        if (ctaCard) ctaCard.classList.remove('hidden');
+        if (flowContainer) flowContainer.classList.add('hidden');
+        goToStep(1);
+      }
       updateStudentJourneyStepper();
       updateStudentPersonalSidebar();
       renderRoundHeader();
@@ -955,6 +997,17 @@ window.collectStudentEligibilityDeclaration = function() {
 };
 
 window.validateAndGoToStep2 = function() {
+  const identity = (typeof getRegistrationStudentIdentity === 'function') ? getRegistrationStudentIdentity() : null;
+  if (!identity?.mssv) {
+    showToast('Không xác định được MSSV từ tài khoản đăng nhập. Vui lòng đăng nhập tài khoản sinh viên TDTU (@student.tdtu.edu.vn).', 'error');
+    const mssvErrEl = document.getElementById('registration-mssv-error');
+    if (mssvErrEl) {
+      mssvErrEl.textContent = '⚠️ Không xác định được Mã số sinh viên (MSSV) từ tài khoản đăng nhập. Vui lòng đăng nhập bằng tài khoản Google sinh viên TDTU (@student.tdtu.edu.vn).';
+      mssvErrEl.classList.remove('hidden');
+    }
+    return;
+  }
+
   const declResult = window.collectStudentEligibilityDeclaration?.();
   if (declResult && !declResult.valid) {
     showToast(declResult.error, 'warning');
@@ -1249,6 +1302,7 @@ window.submitRegistration = async function() {
     showToast(directAssignment
       ? (primaryPublishedSupervisor ? '🎉 ĐĂNG KÝ THÀNH CÔNG! GVHD đã phân công được giữ nguyên.' : '🎉 ĐĂNG KÝ THÀNH CÔNG! Vui lòng chờ Khoa phân công GVHD.')
       : '🎉 ĐĂNG KÝ NGUYỆN VỌNG THÀNH CÔNG!', 'success');
+    state.isRegisteringTopic = false;
     state.currentEligibilityDeclaration = null;
     await checkStudentEligibilityAndRegistration(roundId);
   } catch (err) {

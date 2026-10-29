@@ -270,6 +270,32 @@ window.loadStudentRoundActivities = async function(roundId) {
   const timelineSection = document.getElementById('student-timeline-section');
   if (!container) return;
 
+  const isStudentView = state.currentView === 'student' || state.impersonation?.target?.type === 'student' || (!state.isAdmin && state.isStudent);
+  if (isStudentView) {
+    const reg = state.myRegistration;
+    const assignment = state.myOfficialAssignment;
+    const effectiveAssignment = (typeof normalizeOfficialAssignment === 'function')
+      ? normalizeOfficialAssignment(assignment, reg)
+      : (assignment || reg);
+    const officialList = (effectiveAssignment && typeof getOfficialSupervisors === 'function')
+      ? getOfficialSupervisors(effectiveAssignment)
+      : (effectiveAssignment?.officialSupervisors || effectiveAssignment?.supervisors || []);
+    const hasTopic = Boolean(reg && (reg.topicTitle || reg.topic || reg.proposalTitle || reg.title || reg.topicName));
+    const isDraft = Boolean(reg && reg.status === 'draft');
+    const isSubmitted = Boolean(reg && !isDraft && hasTopic);
+    const hasOfficialSup = Boolean(
+      (assignment?.assignmentStatus === 'published' && officialList.length > 0) ||
+      (reg?.assignmentStatus === 'published' && officialList.length > 0) ||
+      (reg?.reviewStatus === 'accepted' && officialList.length > 0) ||
+      (reg?.reviewStatus === 'manually_assigned' && officialList.length > 0)
+    );
+    const shouldShowRoadmap = isSubmitted && hasOfficialSup && state.eligibilityState !== 'not_eligible';
+    if (!shouldShowRoadmap) {
+      if (timelineSection) timelineSection.classList.add('hidden');
+      return;
+    }
+  }
+
   if (state.eligibilityState === 'not_eligible' && (!state.isAdmin || state.impersonation)) {
     if (timelineSection) timelineSection.classList.add('hidden');
     return;

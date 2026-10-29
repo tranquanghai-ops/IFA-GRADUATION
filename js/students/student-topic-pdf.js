@@ -269,15 +269,39 @@ function getTopicPendingProposal(st) {
 window.getTopicPendingProposal = getTopicPendingProposal;
 
 function getRegistrationStudentIdentity() {
-  const mssv = state.isPreviewMode ? state.previewMssv : (state.studentMssv || state.impersonation?.target?.mssv || state.myRegistration?.studentId || state.myRegistration?.mssv);
-  const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(mssv) : null;
+  let mssv = '';
+  if (state.isPreviewMode) {
+    mssv = state.previewMssv || '';
+  } else if (state.impersonation && state.impersonation.target?.type === 'student') {
+    mssv = state.impersonation.target?.mssv || state.impersonation.target?.id || '';
+  } else {
+    mssv = state.studentMssv
+      || state.userStudentId
+      || (state.user?.email && state.user.email.toLowerCase().endsWith('@student.tdtu.edu.vn')
+          ? state.user.email.split('@')[0].toUpperCase()
+          : '')
+      || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('ifa_student_mssv') : '')
+      || state.myRegistration?.studentId
+      || state.myRegistration?.mssv
+      || '';
+  }
+  mssv = String(mssv || '').trim();
+  if (mssv && !state.studentMssv) {
+    state.studentMssv = mssv;
+    state.userStudentId = mssv;
+  }
+
+  const studentObj = (typeof window.getFacultyStudent === 'function' && mssv) ? window.getFacultyStudent(mssv) : null;
   const reg = state.myRegistration || {};
   const isFacReal = Boolean(studentObj && !studentObj.isMissing && !studentObj.notFoundInMaster);
+  const fullName = resolveOfficialStudentFullName(mssv, reg, studentObj) || state.user?.displayName || '';
+  const email = reg.personalEmail || reg.email || (state.impersonation?.target?.email) || (isFacReal ? studentObj.email : '') || state.user?.email || (mssv ? `${mssv.toLowerCase()}@student.tdtu.edu.vn` : '');
+
   return {
-    mssv,
-    fullName: resolveOfficialStudentFullName(mssv, reg, studentObj),
+    mssv: mssv || '',
+    fullName: fullName || '',
     major: reg.major || (isFacReal ? studentObj.major : '') || state.studentSelfProfile?.major || 'Thiết kế nội thất',
-    email: reg.personalEmail || reg.email || (state.impersonation?.target?.email) || (isFacReal ? studentObj.email : '') || state.user?.email || `${mssv}@student.tdtu.edu.vn`
+    email: email || ''
   };
 }
 
@@ -286,9 +310,9 @@ function populateRegistrationStudentForm() {
   const reg = state.myRegistration || {};
   const profile = state.studentSelfProfile || {};
   const values = {
-    'registration-student-name': identity.fullName,
-    'registration-student-id': identity.mssv,
-    'registration-student-major': identity.major,
+    'registration-student-name': identity.fullName || '',
+    'registration-student-id': identity.mssv || '',
+    'registration-student-major': identity.major || 'Thiết kế nội thất',
     'registration-personal-email': reg.personalEmail || profile.personalEmail || '',
     'registration-current-class': reg.currentClass || profile.currentClass || '',
     'registration-student-phone': reg.studentPhone || profile.phone || '',
@@ -301,10 +325,23 @@ function populateRegistrationStudentForm() {
   };
   Object.entries(values).forEach(([id, value]) => {
     const el = document.getElementById(id);
-    if (el) el.value = value;
+    if (el) el.value = (value === undefined || value === null) ? '' : String(value);
   });
   const counter = document.getElementById('topic-description-char-count');
-  if (counter) counter.textContent = String(values['input-topic-description'].length);
+  if (counter) counter.textContent = String((values['input-topic-description'] || '').length);
+
+  const mssvErrEl = document.getElementById('registration-mssv-error');
+  const nextBtn = document.getElementById('btn-registration-step-1-next');
+  if (!identity.mssv) {
+    if (mssvErrEl) {
+      mssvErrEl.textContent = '⚠️ Không xác định được Mã số sinh viên (MSSV) từ tài khoản đăng nhập. Vui lòng đăng nhập bằng tài khoản Google sinh viên TDTU (@student.tdtu.edu.vn).';
+      mssvErrEl.classList.remove('hidden');
+    }
+    if (nextBtn) nextBtn.disabled = true;
+  } else {
+    if (mssvErrEl) mssvErrEl.classList.add('hidden');
+    if (nextBtn) nextBtn.disabled = false;
+  }
 }
 
 function collectOfficialFormFields() {

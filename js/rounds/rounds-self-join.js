@@ -234,19 +234,19 @@ window.checkAndHandlePendingRoundJoin = async function() {
   }
 
   // 4. Check if student already joined
-  const studentMssv = state.studentMssv;
+  const studentMssv = state.studentMssv || state.userStudentId || (state.user?.email && state.user.email.toLowerCase().endsWith('@student.tdtu.edu.vn') ? state.user.email.split('@')[0].toUpperCase() : '');
   state.pendingJoinTargetRound = targetRound;
 
   let existingEligibleDoc = null;
   try {
-    existingEligibleDoc = await getDoc(doc(db, 'graduationRounds', targetRound.id, 'eligibleStudents', studentMssv));
+    if (studentMssv) {
+      existingEligibleDoc = await getDoc(doc(db, 'graduationRounds', targetRound.id, 'eligibleStudents', studentMssv));
+    }
   } catch (err) {
     console.warn('[SelfJoin] Check existing eligible doc notice:', err);
   }
 
   if (existingEligibleDoc && existingEligibleDoc.exists()) {
-    // Student already joined: Display modal in joined state without duplicate write
-    openStudentAlreadyJoinedModal(targetRound, existingEligibleDoc.data());
     try {
       sessionStorage.setItem('student_selected_round_id', targetRound.id);
       localStorage.setItem('student_selected_round_id', targetRound.id);
@@ -255,6 +255,13 @@ window.checkAndHandlePendingRoundJoin = async function() {
     state.selectedRoundId = targetRound.id;
     state.activeRound = targetRound;
     cleanJoinUrlParam();
+
+    const flowContainer = document.getElementById('registration-flow-container');
+    const isRegistering = Boolean(state.isRegisteringTopic || (flowContainer && !flowContainer.classList.contains('hidden')));
+    if (joinParam && !isRegistering) {
+      // Student already joined and arrived via join link: Display confirmation banner without interrupting registration
+      openStudentAlreadyJoinedModal(targetRound, existingEligibleDoc.data());
+    }
     return;
   }
 

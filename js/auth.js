@@ -34,6 +34,21 @@ export async function setupAuthListener() {
     if (user) {
       document.getElementById('login-required-section').classList.add('hidden');
       
+      // Immediate synchronous student identity fast-path: prevent any race condition
+      const fastEmail = (user.email || '').toLowerCase().trim();
+      if (fastEmail.endsWith('@student.tdtu.edu.vn')) {
+        const m = fastEmail.match(/^([^@]+)@student\.tdtu\.edu\.vn$/i);
+        const fastMssv = m ? m[1].toUpperCase() : fastEmail.split('@')[0].toUpperCase();
+        state.isStudent = true;
+        state.studentMssv = fastMssv;
+        state.userStudentId = fastMssv;
+        state.actualRole = 'student';
+        try {
+          sessionStorage.setItem('ifa_student_mssv', fastMssv);
+          sessionStorage.setItem('ifa_student_email', fastEmail);
+        } catch (e) {}
+      }
+
       try {
         // 1. Phân giải quyền nhanh
         showLoading('Đang xác định vai trò người dùng...');
@@ -292,32 +307,47 @@ export async function resolveActualRoles(user) {
 
   // 2. STUDENT Check
   let isStudent = email.endsWith('@student.tdtu.edu.vn');
-  let studentMssv = isStudent ? email.split('@')[0].toUpperCase() : '';
+  let studentMssv = '';
+  if (isStudent) {
+    const m = email.match(/^([^@]+)@student\.tdtu\.edu\.vn$/i);
+    studentMssv = m ? m[1].toUpperCase() : email.split('@')[0].toUpperCase();
+    state.isStudent = true;
+    state.studentMssv = studentMssv;
+    state.userStudentId = studentMssv;
+    state.actualRole = 'student';
+    try {
+      sessionStorage.setItem('ifa_student_mssv', studentMssv);
+      sessionStorage.setItem('ifa_student_email', email);
+    } catch (e) {}
+  }
 
   // 3. SUPERVISOR Check: ONLY active lecturers in supervisorMaster match by email
   let isSupervisor = false;
 
   try {
-    // Check if in-memory list already contains this active supervisor
-    if (state.supervisorsMaster && state.supervisorsMaster.length > 0) {
-      const match = state.supervisorsMaster.find(s => s.active !== false && s.email && s.email.toLowerCase().trim() === email);
-      if (match) isSupervisor = true;
-    }
+    // Lecturers / staff do not have student emails; only query admin/supervisor catalog if not a student
+    if (!isStudent) {
+      // Check if in-memory list already contains this active supervisor
+      if (state.supervisorsMaster && state.supervisorsMaster.length > 0) {
+        const match = state.supervisorsMaster.find(s => s.active !== false && s.email && s.email.toLowerCase().trim() === email);
+        if (match) isSupervisor = true;
+      }
 
-    // If not found in memory, query Firestore
-    if (!isSupervisor) {
-      await Promise.race([
-        Promise.all([
-          (!isAdmin ? getDoc(doc(db, 'admins', email)).then(d => { if (d.exists()) isAdmin = true; }).catch(() => {}) : Promise.resolve()),
-          getDocs(collection(db, 'supervisorMaster')).then(snap => {
-            const activeSups = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.active !== false);
-            if (activeSups.some(s => s.email && s.email.toLowerCase().trim() === email)) {
-              isSupervisor = true;
-            }
-          }).catch(() => {})
-        ]),
-        new Promise(r => setTimeout(r, 2500))
-      ]);
+      // If not found in memory, query Firestore
+      if (!isSupervisor) {
+        await Promise.race([
+          Promise.all([
+            (!isAdmin ? getDoc(doc(db, 'admins', email)).then(d => { if (d.exists()) isAdmin = true; }).catch(() => {}) : Promise.resolve()),
+            getDocs(collection(db, 'supervisorMaster')).then(snap => {
+              const activeSups = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.active !== false);
+              if (activeSups.some(s => s.email && s.email.toLowerCase().trim() === email)) {
+                isSupervisor = true;
+              }
+            }).catch(() => {})
+          ]),
+          new Promise(r => setTimeout(r, 2500))
+        ]);
+      }
     }
   } catch (e) {
     console.warn('[IFA-Graduation] Admins/Supervisor lookup notice:', e);
@@ -326,7 +356,10 @@ export async function resolveActualRoles(user) {
   state.isAdmin = isAdmin;
   state.isSupervisor = isSupervisor;
   state.isStudent = isStudent;
-  state.studentMssv = studentMssv;
+  state.studentMssv = studentMssv || state.studentMssv || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('ifa_student_mssv') : '') || '';
+  if (state.studentMssv) {
+    state.userStudentId = state.studentMssv;
+  }
 
   // Strict Hierarchy: OWNER / HIGH ADMIN / ADMIN > SUPERVISOR > STUDENT
   if (isAdmin) {

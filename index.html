@@ -593,7 +593,11 @@
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Họ và tên</label><input id="registration-student-name" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700"></div>
-                      <div><label class="block text-[11px] font-bold text-slate-600 mb-1">MSSV</label><input id="registration-student-id" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-700"></div>
+                      <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">MSSV</label>
+                        <input id="registration-student-id" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-700">
+                        <p id="registration-mssv-error" class="hidden text-rose-600 font-semibold text-[11px] mt-1"></p>
+                      </div>
                       <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Lớp <span class="text-rose-500">*</span></label><input id="registration-current-class" maxlength="50" placeholder="Lớp" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs"></div>
                       <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Ngành</label><input id="registration-student-major" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700"></div>
                       <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Email cá nhân <span class="text-rose-500">*</span></label><input id="registration-personal-email" type="email" maxlength="120" placeholder="Email cá nhân của sinh viên" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-700"></div>
@@ -810,8 +814,8 @@
                       <p class="text-[11px] text-blue-600">Chọn 1 Giảng viên hướng dẫn bạn ưu tiên cao nhất.</p>
                     </div>
                     <div class="flex items-center gap-2">
-                      <button id="btn-wizard-prev-rank" onclick="stepWizardRank(-1)" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all">← NV trước</button>
-                      <button id="btn-wizard-next-rank" onclick="stepWizardRank(1)" class="px-3 py-1.5 bg-blue-600 rounded-lg text-xs font-bold text-white hover:bg-blue-700 transition-all">NV tiếp →</button>
+                      <button type="button" id="btn-wizard-prev-rank" onclick="stepWizardRank(-1)" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all">← NV trước</button>
+                      <button type="button" id="btn-wizard-next-rank" onclick="stepWizardRank(1)" class="px-3 py-1.5 bg-blue-600 rounded-lg text-xs font-bold text-white hover:bg-blue-700 transition-all">NV tiếp →</button>
                     </div>
                   </div>
                 </div>

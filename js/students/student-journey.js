@@ -36,6 +36,7 @@ const resolveStudentSupervisorProfiles = (list, eff) => (typeof window !== 'unde
 // ============================================================================
 
 window.startStudentRegistration = function() {
+  state.isRegisteringTopic = true;
   const ctaCard = document.getElementById('registration-cta-card');
   const flowContainer = document.getElementById('registration-flow-container');
   if (ctaCard) ctaCard.classList.add('hidden');
@@ -54,6 +55,7 @@ window.startStudentRegistration = function() {
 };
 
 window.cancelRegistrationEdit = function() {
+  state.isRegisteringTopic = false;
   const flowContainer = document.getElementById('registration-flow-container');
   const ctaCard = document.getElementById('registration-cta-card');
   const alreadyCard = document.getElementById('already-registered-card');
