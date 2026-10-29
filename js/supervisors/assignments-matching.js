@@ -4,6 +4,12 @@ const renderRoundHeader = () => window.renderRoundHeader?.();
 const renderAdminRoundsTable = () => window.renderAdminRoundsTable?.();
 const renderAdminRoundsCards = () => window.renderAdminRoundsCards?.();
 const populateRoundSelectors = () => window.populateRoundSelectors?.();
+const showToast = (msg, type = 'info', duration) => {
+  if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+    return window.showToast(msg, type, duration);
+  }
+  console.log(`[Toast] [${type}] ${msg}`);
+};
 /**
  * IFA+ Graduation — Supervisor Assignments & Preference Matching Submodule
  */
@@ -476,6 +482,18 @@ window.addCardPreference = function(supervisorId, encName) {
 };
 
 window.removePreference = function(supervisorId) {
+  const getCount = (typeof window !== 'undefined' && typeof window.getLegacyPreferenceCount === 'function')
+    ? window.getLegacyPreferenceCount
+    : (() => {
+        const s = (typeof window !== 'undefined' && window.state) || (typeof state !== 'undefined' ? state : null);
+        const prefs = s?.myRegistration?.preferences;
+        return (Array.isArray(prefs) && prefs.length > 0 && prefs.length < 3) ? prefs.length : 0;
+      });
+  const legacyCount = getCount();
+  if (legacyCount > 0 && state.selectedPreferences.length <= legacyCount) {
+    showToast(`Hồ sơ đã nộp của bạn có ${legacyCount} nguyện vọng. Không được giảm số nguyện vọng đã đăng ký.`, 'warning');
+    return;
+  }
   state.selectedPreferences = state.selectedPreferences.filter(p => p.supervisorId !== supervisorId);
   state.selectedPreferences.forEach((p, idx) => p.rank = idx + 1);
   renderSupervisorsGrid();
@@ -536,18 +554,32 @@ function renderPreferencesTray() {
 
   const maxPref = 3;
   const count = state.selectedPreferences.length;
+  const legacyCount = (typeof window.getLegacyPreferenceCount === 'function')
+    ? window.getLegacyPreferenceCount()
+    : 0;
+  const isLegacy = legacyCount > 0;
 
   // Update dynamic tray progress hint
   const hintEl = document.getElementById('tray-mode-hint');
   if (hintEl) {
-    if (count === 3) {
-      hintEl.innerHTML = '<span class="text-emerald-400 font-bold">✓ Đã chọn đủ 3 nguyện vọng GVHD hợp lệ</span>';
-    } else if (count === 2) {
-      hintEl.innerHTML = '<span class="text-amber-300 font-medium">Đã chọn 2/3 nguyện vọng (Cần chọn thêm 1 GVHD bắt buộc)</span>';
-    } else if (count === 1) {
-      hintEl.innerHTML = '<span class="text-amber-300 font-medium">Đã chọn 1/3 nguyện vọng (Cần chọn thêm 2 GVHD khác nhau)</span>';
+    if (isLegacy) {
+      if (count === legacyCount) {
+        hintEl.innerHTML = `<span class="text-sky-300 font-medium">Hồ sơ đã nộp theo quy định trước đây (${count} nguyện vọng) • Có thể giữ nguyên hoặc bổ sung thêm</span>`;
+      } else if (count === 3) {
+        hintEl.innerHTML = '<span class="text-emerald-400 font-bold">✓ Đã bổ sung đủ 3 nguyện vọng GVHD (Tối ưu cơ hội xét duyệt)</span>';
+      } else {
+        hintEl.innerHTML = `<span class="text-sky-300 font-medium">Đã chọn ${count}/3 nguyện vọng (Hồ sơ cũ ${legacyCount} NV)</span>`;
+      }
     } else {
-      hintEl.innerHTML = '<span class="text-amber-400 font-semibold">Đã chọn 0/3 nguyện vọng (Bắt buộc chọn đủ 3 GVHD khác nhau)</span>';
+      if (count === 3) {
+        hintEl.innerHTML = '<span class="text-emerald-400 font-bold">✓ Đã chọn đủ 3 nguyện vọng GVHD hợp lệ</span>';
+      } else if (count === 2) {
+        hintEl.innerHTML = '<span class="text-amber-300 font-medium">Đã chọn 2/3 nguyện vọng (Cần chọn thêm 1 GVHD bắt buộc)</span>';
+      } else if (count === 1) {
+        hintEl.innerHTML = '<span class="text-amber-300 font-medium">Đã chọn 1/3 nguyện vọng (Cần chọn thêm 2 GVHD khác nhau)</span>';
+      } else {
+        hintEl.innerHTML = '<span class="text-amber-400 font-semibold">Đã chọn 0/3 nguyện vọng (Bắt buộc chọn đủ 3 GVHD khác nhau)</span>';
+      }
     }
   }
 
@@ -560,8 +592,9 @@ function renderPreferencesTray() {
       const supDisplayName = (typeof window !== 'undefined' && typeof window.resolveSupervisorName === 'function')
         ? window.resolveSupervisorName(pref.supervisorId || pref.id || pref.email, pref.supervisorName)
         : pref.supervisorName;
+      const rankTitle = isLegacy ? `Nguyện vọng ${rank}` : `Nguyện vọng ${rank} – Bắt buộc`;
       html += `
-        <div class="flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl text-xs shadow-sm" title="Nguyện vọng ${rank} – Bắt buộc">
+        <div class="flex items-center gap-1.5 bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-xl text-xs shadow-sm" title="${rankTitle}">
           <span class="w-6 h-6 rounded-full bg-amber-500 text-slate-900 font-extrabold text-[10px] flex items-center justify-center shadow-xs">${medal} NV${rank}</span>
           <span class="font-bold text-slate-100 max-w-[130px] truncate" title="${escapeHtml(supDisplayName)}">${escapeHtml(supDisplayName)}</span>
           <div class="flex items-center gap-0.5 ml-1">
@@ -572,10 +605,11 @@ function renderPreferencesTray() {
         </div>
       `;
     } else {
+      const emptyBadgeText = isLegacy ? `NV${rank} – Tự nguyện bổ sung` : `NV${rank} – Bắt buộc`;
       html += `
-        <div class="flex items-center gap-1.5 bg-slate-800/60 border border-dashed border-amber-500/50 px-3 py-1.5 rounded-xl text-xs text-slate-300">
+        <div class="flex items-center gap-1.5 bg-slate-800/60 border border-dashed ${isLegacy ? 'border-sky-400/40 text-slate-300' : 'border-amber-500/50 text-slate-300'} px-3 py-1.5 rounded-xl text-xs">
           <span class="w-6 h-6 rounded-full bg-slate-700 text-amber-300 font-black text-[10px] flex items-center justify-center">NV${rank}</span>
-          <span class="font-bold text-amber-200/90">NV${rank} – Bắt buộc</span>
+          <span class="font-bold ${isLegacy ? 'text-sky-200/90' : 'text-amber-200/90'}">${emptyBadgeText}</span>
         </div>
       `;
     }

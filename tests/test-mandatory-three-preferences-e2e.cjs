@@ -62,7 +62,7 @@ function createStaticServer(port) {
 }
 
 async function run() {
-  const PORT = 5057;
+  const PORT = 5077;
   console.log(`[E2E] Starting local server on port ${PORT}...`);
   const server = await createStaticServer(PORT);
 
@@ -75,6 +75,7 @@ async function run() {
   });
 
   const page = await browser.newPage();
+  page.setDefaultNavigationTimeout(60000);
 
   // Capture console logs and toast events
   const capturedToasts = [];
@@ -88,7 +89,7 @@ async function run() {
   try {
     console.log('[E2E] Navigating to IFA-Graduation application...');
     await page.setViewport({ width: 1280, height: 900 });
-    await page.goto(`http://127.0.0.1:${PORT}/index.html?emulator=true`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`http://127.0.0.1:${PORT}/index.html?emulator=true`, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await new Promise(r => setTimeout(r, 1500));
 
     // Setup Mock Test State: Student with Round 4/2027 and 11 round supervisors
@@ -264,8 +265,124 @@ async function run() {
     await page.screenshot({ path: mobileStep2Path, fullPage: true });
     console.log(`  📸 Saved mobile step 2 screenshot: ${mobileStep2Path}`);
 
+    // TEST 7: Legacy student with 1 preference editing registration
+    console.log('[E2E Test 7]: Testing legacy registration with 1 preference...');
+    await page.setViewport({ width: 1280, height: 900 });
+    const test7Result = await page.evaluate(async () => {
+      window._capturedToasts = [];
+      window.state.selectedPreferences = [
+        { rank: 1, supervisorId: 'SZ5gSix1l0BZs0NLkkjU', supervisorName: 'ThS. KTS. Phan Bảo Cường', department: 'Thiết kế nội thất' }
+      ];
+      window.state.myRegistration = {
+        studentId: '12100303',
+        topicTitle: 'Thiết kế nội thất Bảo tàng Nghệ thuật Cũ',
+        status: 'submitted',
+        preferences: [
+          { rank: 1, supervisorId: 'SZ5gSix1l0BZs0NLkkjU', supervisorName: 'ThS. KTS. Phan Bảo Cường', department: 'Thiết kế nội thất' }
+        ]
+      };
+
+      if (typeof window.goToStep === 'function') window.goToStep(2);
+      const trayHint = document.getElementById('tray-mode-hint')?.innerText || '';
+
+      await window.validateAndGoToStep3();
+      const step3Visible = !document.getElementById('step-panel-3')?.classList.contains('hidden');
+      const submitBtn = document.getElementById('btn-submit-registration');
+      const submitDisabled = submitBtn ? submitBtn.disabled : true;
+      const listText = document.getElementById('confirmation-preferences-section')?.innerText || '';
+
+      return { trayHint, step3Visible, submitDisabled, listText };
+    });
+
+    if (!test7Result.step3Visible || test7Result.submitDisabled || !test7Result.listText.includes('quy định trước đây')) {
+      throw new Error(`Test 7 Failed: Expected valid legacy 1-preference registration. Got: ${JSON.stringify(test7Result)}`);
+    }
+    console.log('  ✓ Test 7 Passed: Hồ sơ cũ 1 NV được giữ nguyên 1 NV, hiển thị thông báo trung tính và nút nộp được kích hoạt!');
+
+    const legacy1PrefPath = path.join(SCREENSHOT_DIR, '04_desktop_legacy_1_pref_step3.png');
+    await page.screenshot({ path: legacy1PrefPath, fullPage: true });
+    console.log(`  📸 Saved legacy 1-pref desktop screenshot: ${legacy1PrefPath}`);
+
+    // TEST 8: Legacy student with 2 preferences editing registration
+    console.log('[E2E Test 8]: Testing legacy registration with 2 preferences on mobile...');
+    await page.setViewport({ width: 375, height: 812, isMobile: true, hasTouch: true });
+    const test8Result = await page.evaluate(async () => {
+      window._capturedToasts = [];
+      window.state.selectedPreferences = [
+        { rank: 1, supervisorId: 'SZ5gSix1l0BZs0NLkkjU', supervisorName: 'ThS. KTS. Phan Bảo Cường', department: 'Thiết kế nội thất' },
+        { rank: 2, supervisorId: 'oWS52UHJbLDk2rkzQyPR', name: 'TS. KTX Nguyễn Minh Hiếu', department: 'Thiết kế nội thất' }
+      ];
+      window.state.myRegistration = {
+        studentId: '12200239',
+        topicTitle: 'Thiết kế nội thất Khu Nghỉ dưỡng Cũ 2 NV',
+        status: 'submitted',
+        preferences: [
+          { rank: 1, supervisorId: 'SZ5gSix1l0BZs0NLkkjU', supervisorName: 'ThS. KTS. Phan Bảo Cường' },
+          { rank: 2, supervisorId: 'oWS52UHJbLDk2rkzQyPR', name: 'TS. KTX Nguyễn Minh Hiếu' }
+        ]
+      };
+
+      if (typeof window.goToStep === 'function') window.goToStep(2);
+      await window.validateAndGoToStep3();
+      const step3Visible = !document.getElementById('step-panel-3')?.classList.contains('hidden');
+      const submitBtn = document.getElementById('btn-submit-registration');
+      const submitDisabled = submitBtn ? submitBtn.disabled : true;
+      const listText = document.getElementById('confirmation-preferences-section')?.innerText || '';
+
+      return { step3Visible, submitDisabled, listText };
+    });
+
+    if (!test8Result.step3Visible || test8Result.submitDisabled || !test8Result.listText.includes('2 nguyện vọng')) {
+      throw new Error(`Test 8 Failed: Expected valid legacy 2-preference registration. Got: ${JSON.stringify(test8Result)}`);
+    }
+    console.log('  ✓ Test 8 Passed: Hồ sơ cũ 2 NV nộp được bình thường trên Mobile với thông báo trung tính!');
+
+    const legacy2PrefPath = path.join(SCREENSHOT_DIR, '05_mobile_legacy_2_pref_step3.png');
+    await page.screenshot({ path: legacy2PrefPath, fullPage: true });
+    console.log(`  📸 Saved legacy 2-pref mobile screenshot: ${legacy2PrefPath}`);
+
+    // TEST 9: Legacy student with 2 preferences attempts to reduce to 1 preference -> BLOCKED
+    console.log('[E2E Test 9]: Testing blocking reduction from 2 to 1 preference for legacy...');
+    const test9Result = await page.evaluate(async () => {
+      window._capturedToasts = [];
+      const origToast = window.showToast;
+      window.showToast = function(msg, type) {
+        window._capturedToasts.push({ msg, type });
+        console.log(`[Toast] [${type}] ${msg}`);
+        if (typeof origToast === 'function') origToast(msg, type);
+      };
+
+      window.state.myRegistration = {
+        studentId: '12200239',
+        topicTitle: 'Thiết kế nội thất Khu Nghỉ dưỡng Cũ 2 NV',
+        status: 'submitted',
+        preferences: [
+          { rank: 1, supervisorId: 'SZ5gSix1l0BZs0NLkkjU', supervisorName: 'ThS. KTS. Phan Bảo Cường' },
+          { rank: 2, supervisorId: 'oWS52UHJbLDk2rkzQyPR', name: 'TS. KTX Nguyễn Minh Hiếu' }
+        ]
+      };
+      window.state.selectedPreferences = [
+        { rank: 1, supervisorId: 'SZ5gSix1l0BZs0NLkkjU', supervisorName: 'ThS. KTS. Phan Bảo Cường' },
+        { rank: 2, supervisorId: 'oWS52UHJbLDk2rkzQyPR', name: 'TS. KTX Nguyễn Minh Hiếu' }
+      ];
+      if (typeof window.goToStep === 'function') window.goToStep(2);
+      window.removePreference('oWS52UHJbLDk2rkzQyPR');
+      const count = window.state.selectedPreferences.length;
+      const allToasts = [...(window._capturedToasts || [])];
+      return { count, allToasts };
+    });
+
+    console.log('[E2E Test 9 Toasts]:', JSON.stringify(test9Result.allToasts));
+
+    const blockedToast = test9Result.allToasts.find(t => t.msg && t.msg.includes('Không được giảm số nguyện vọng'));
+    if (test9Result.count !== 2 || !blockedToast) {
+      throw new Error(`Test 9 Failed: Expected reduction blocking for legacy registration. Got count: ${test9Result.count}, toasts: ${JSON.stringify(test9Result.allToasts)}`);
+    }
+    console.log('  ✓ Test 9 Passed: Cố tình giảm số nguyện vọng ở hồ sơ cũ bị chặn với thông báo cảnh báo rõ ràng.');
+    console.log('  ✓ Test 9 Passed: Cố tình giảm số nguyện vọng ở hồ sơ cũ bị chặn với thông báo cảnh báo rõ ràng.');
+
     console.log('\n======================================================');
-    console.log('🎉 ALL 6 E2E BROWSER VALIDATION TESTS PASSED PERFECTLY!');
+    console.log('🎉 ALL 9 E2E BROWSER VALIDATION TESTS PASSED PERFECTLY!');
     console.log('======================================================\n');
   } finally {
     await browser.close();

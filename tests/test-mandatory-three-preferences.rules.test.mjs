@@ -287,4 +287,218 @@ test('MANDATORY 3 SUPERVISOR PREFERENCES FIRESTORE RULES SUITE', async (t) => {
     };
     await assertSucceeds(setDoc(doc(adminDb, `graduationRounds/${roundPreferenceId}/registrations/12000999`), adminPayload));
   });
+
+  await t.test('12. Hồ sơ cũ (legacy) có 1 NV: sinh viên sửa tên đề tài & thông tin cá nhân giữ nguyên 1 NV -> THÀNH CÔNG (PASS)', async () => {
+    // Seed initial legacy 1-NV registration using rules-disabled context
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), {
+        studentId: student1Mssv,
+        email: student1Email,
+        topicTitle: 'Thiết kế nội thất Cũ 1 NV',
+        projectType: 'Chuyên luận',
+        status: 'submitted',
+        preferences: [
+          { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' }
+        ]
+      });
+    });
+
+    const studentDb = env.authenticatedContext('st1', actor(student1Email)).firestore();
+    const updatePayload = {
+      studentId: student1Mssv,
+      email: student1Email,
+      topicTitle: 'Thiết kế nội thất Cũ 1 NV Đã Đổi Tên',
+      topicApprovalStatus: 'pending',
+      projectType: 'Chuyên luận',
+      status: 'submitted',
+      studentPhone: '0901234567',
+      preferences: [
+        { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' }
+      ]
+    };
+    await assertSucceeds(updateDoc(doc(studentDb, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), updatePayload));
+  });
+
+  await t.test('13. Hồ sơ cũ (legacy) có 2 NV: sinh viên cập nhật thông tin giữ nguyên 2 NV -> THÀNH CÔNG (PASS)', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), {
+        studentId: student1Mssv,
+        email: student1Email,
+        topicTitle: 'Thiết kế nội thất Cũ 2 NV',
+        projectType: 'Chuyên luận',
+        status: 'submitted',
+        preferences: [
+          { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' },
+          { rank: 2, supervisorId: 'sup_b', supervisorName: 'GVHD B' }
+        ]
+      });
+    });
+
+    const studentDb = env.authenticatedContext('st1', actor(student1Email)).firestore();
+    const updatePayload = {
+      studentId: student1Mssv,
+      email: student1Email,
+      topicTitle: 'Thiết kế nội thất Cũ 2 NV Đổi SĐT',
+      topicApprovalStatus: 'pending',
+      projectType: 'Chuyên luận',
+      status: 'submitted',
+      studentPhone: '0988776655',
+      preferences: [
+        { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' },
+        { rank: 2, supervisorId: 'sup_b', supervisorName: 'GVHD B' }
+      ]
+    };
+    await assertSucceeds(updateDoc(doc(studentDb, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), updatePayload));
+  });
+
+  await t.test('14. Hồ sơ cũ (legacy) có 1 NV: sinh viên tự nguyện nâng lên 2 NV (2 GVHD khác nhau) -> THÀNH CÔNG (PASS)', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), {
+        studentId: student1Mssv,
+        email: student1Email,
+        topicTitle: 'Thiết kế nội thất Cũ 1 NV',
+        projectType: 'Chuyên luận',
+        status: 'submitted',
+        preferences: [
+          { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' }
+        ]
+      });
+    });
+
+    const studentDb = env.authenticatedContext('st1', actor(student1Email)).firestore();
+    const upgradePayload = {
+      studentId: student1Mssv,
+      email: student1Email,
+      topicTitle: 'Thiết kế nội thất Cũ 1 NV',
+      projectType: 'Chuyên luận',
+      status: 'submitted',
+      preferences: [
+        { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' },
+        { rank: 2, supervisorId: 'sup_b', supervisorName: 'GVHD B' }
+      ]
+    };
+    await assertSucceeds(updateDoc(doc(studentDb, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), upgradePayload));
+  });
+
+  await t.test('15. Hồ sơ cũ (legacy) có 2 NV: sinh viên tự nguyện nâng lên đủ 3 NV (3 GVHD khác nhau) -> THÀNH CÔNG (PASS)', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), {
+        studentId: student1Mssv,
+        email: student1Email,
+        topicTitle: 'Thiết kế nội thất Cũ 2 NV',
+        projectType: 'Chuyên luận',
+        status: 'submitted',
+        preferences: [
+          { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' },
+          { rank: 2, supervisorId: 'sup_b', supervisorName: 'GVHD B' }
+        ]
+      });
+    });
+
+    const studentDb = env.authenticatedContext('st1', actor(student1Email)).firestore();
+    const upgradePayload = {
+      studentId: student1Mssv,
+      email: student1Email,
+      topicTitle: 'Thiết kế nội thất Cũ 2 NV',
+      projectType: 'Chuyên luận',
+      status: 'submitted',
+      preferences: [
+        { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' },
+        { rank: 2, supervisorId: 'sup_b', supervisorName: 'GVHD B' },
+        { rank: 3, supervisorId: 'sup_c', supervisorName: 'GVHD C' }
+      ]
+    };
+    await assertSucceeds(updateDoc(doc(studentDb, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), upgradePayload));
+  });
+
+  await t.test('16. Hồ sơ cũ (legacy) có 2 NV: sinh viên cố tình giảm còn 1 NV -> BỊ CHẶN (DENIED)', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), {
+        studentId: student1Mssv,
+        email: student1Email,
+        topicTitle: 'Thiết kế nội thất Cũ 2 NV',
+        projectType: 'Chuyên luận',
+        status: 'submitted',
+        preferences: [
+          { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' },
+          { rank: 2, supervisorId: 'sup_b', supervisorName: 'GVHD B' }
+        ]
+      });
+    });
+
+    const studentDb = env.authenticatedContext('st1', actor(student1Email)).firestore();
+    const downgradePayload = {
+      studentId: student1Mssv,
+      email: student1Email,
+      topicTitle: 'Thiết kế nội thất Cũ 2 NV',
+      projectType: 'Chuyên luận',
+      status: 'submitted',
+      preferences: [
+        { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' }
+      ]
+    };
+    await assertFails(updateDoc(doc(studentDb, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), downgradePayload));
+  });
+
+  await t.test('17. Hồ sơ cũ (legacy) có 1 NV: sinh viên cố tình xóa hết còn 0 NV -> BỊ CHẶN (DENIED)', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), {
+        studentId: student1Mssv,
+        email: student1Email,
+        topicTitle: 'Thiết kế nội thất Cũ 1 NV',
+        projectType: 'Chuyên luận',
+        status: 'submitted',
+        preferences: [
+          { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' }
+        ]
+      });
+    });
+
+    const studentDb = env.authenticatedContext('st1', actor(student1Email)).firestore();
+    const emptyPayload = {
+      studentId: student1Mssv,
+      email: student1Email,
+      topicTitle: 'Thiết kế nội thất Cũ 1 NV',
+      projectType: 'Chuyên luận',
+      status: 'submitted',
+      preferences: []
+    };
+    await assertFails(updateDoc(doc(studentDb, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), emptyPayload));
+  });
+
+  await t.test('18. Hồ sơ cũ (legacy) có 1 NV: nâng lên 2 NV nhưng trùng GVHD -> BỊ CHẶN (DENIED)', async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), {
+        studentId: student1Mssv,
+        email: student1Email,
+        topicTitle: 'Thiết kế nội thất Cũ 1 NV',
+        projectType: 'Chuyên luận',
+        status: 'submitted',
+        preferences: [
+          { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' }
+        ]
+      });
+    });
+
+    const studentDb = env.authenticatedContext('st1', actor(student1Email)).firestore();
+    const duplicatePayload = {
+      studentId: student1Mssv,
+      email: student1Email,
+      topicTitle: 'Thiết kế nội thất Cũ 1 NV',
+      projectType: 'Chuyên luận',
+      status: 'submitted',
+      preferences: [
+        { rank: 1, supervisorId: 'sup_a', supervisorName: 'GVHD A' },
+        { rank: 2, supervisorId: 'sup_a', supervisorName: 'GVHD A' }
+      ]
+    };
+    await assertFails(updateDoc(doc(studentDb, `graduationRounds/${roundPreferenceId}/registrations/${student1Mssv}`), duplicatePayload));
+  });
 });

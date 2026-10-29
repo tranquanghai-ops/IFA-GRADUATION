@@ -1107,27 +1107,57 @@ window.validateAndGoToStep2 = function() {
   goToStep(shouldSkipStudentSupervisorPreference() ? 3 : 2);
 };
 
+export function getLegacyPreferenceCount() {
+  const s = (typeof window !== 'undefined' && window.state) || (typeof state !== 'undefined' ? state : null);
+  if (!s || !s.myRegistration) return 0;
+  const prefs = s.myRegistration.preferences;
+  if (!Array.isArray(prefs)) return 0;
+  if (prefs.length > 0 && prefs.length < 3) {
+    return prefs.length;
+  }
+  return 0;
+}
+
+export function isExistingLegacyRegistration() {
+  return getLegacyPreferenceCount() > 0;
+}
+if (typeof window !== 'undefined') {
+  window.getLegacyPreferenceCount = getLegacyPreferenceCount;
+  window.isExistingLegacyRegistration = isExistingLegacyRegistration;
+}
+
 window.validateAndGoToStep3 = async function() {
   if (shouldSkipStudentSupervisorPreference()) {
     goToStep(3);
     return;
   }
   const count = (state.selectedPreferences || []).length;
+  const legacyCount = getLegacyPreferenceCount();
 
-  if (count === 0) {
-    showToast('Vui lòng chọn đầy đủ 3 nguyện vọng giảng viên hướng dẫn trước khi tiếp tục.', 'warning');
-    return;
-  }
-
-  if (count < 3) {
-    showToast(`Bạn hiện mới chọn ${count}/3 nguyện vọng. Bắt buộc phải chọn đủ 3 giảng viên hướng dẫn khác nhau trước khi tiếp tục.`, 'warning');
-    return;
+  if (legacyCount > 0) {
+    if (count < legacyCount) {
+      showToast(`Hồ sơ đã nộp của bạn có ${legacyCount} nguyện vọng. Không được giảm số nguyện vọng đã đăng ký.`, 'warning');
+      return;
+    }
+    if (count === 0) {
+      showToast('Vui lòng chọn ít nhất 1 nguyện vọng giảng viên hướng dẫn trước khi tiếp tục.', 'warning');
+      return;
+    }
+  } else {
+    if (count === 0) {
+      showToast('Vui lòng chọn đầy đủ 3 nguyện vọng giảng viên hướng dẫn trước khi tiếp tục.', 'warning');
+      return;
+    }
+    if (count < 3) {
+      showToast(`Bạn hiện mới chọn ${count}/3 nguyện vọng. Bắt buộc phải chọn đủ 3 giảng viên hướng dẫn khác nhau trước khi tiếp tục.`, 'warning');
+      return;
+    }
   }
 
   const supervisorIds = (state.selectedPreferences || []).map(p => p.supervisorId).filter(Boolean);
   const uniqueIds = new Set(supervisorIds);
-  if (uniqueIds.size !== 3 || supervisorIds.length !== 3) {
-    showToast('Mỗi giảng viên hướng dẫn chỉ được chọn ở một nguyện vọng. Vui lòng chọn đúng 3 giảng viên khác nhau.', 'warning');
+  if (uniqueIds.size !== count || supervisorIds.length !== count) {
+    showToast('Mỗi giảng viên hướng dẫn chỉ được chọn ở một nguyện vọng. Vui lòng chọn các giảng viên khác nhau.', 'warning');
     return;
   }
 
@@ -1143,7 +1173,7 @@ window.validateAndGoToStep3 = async function() {
     }
   }
 
-  // Ensure ranks are sequentially 1, 2, 3
+  // Ensure ranks are sequentially 1..count
   state.selectedPreferences.sort((a, b) => Number(a.rank) - Number(b.rank));
   state.selectedPreferences.forEach((p, idx) => {
     p.rank = idx + 1;
@@ -1167,9 +1197,11 @@ function renderConfirmationPanel() {
     const count = (state.selectedPreferences || []).length;
     const supIds = (state.selectedPreferences || []).map(p => p.supervisorId).filter(Boolean);
     const uniqueIds = new Set(supIds);
-    const isCompleteAndUnique = count === 3 && uniqueIds.size === 3;
+    const legacyCount = getLegacyPreferenceCount();
+    const isLegacyValid = legacyCount > 0 && count >= legacyCount && count <= 3 && uniqueIds.size === count;
+    const isStandardValid = count === 3 && uniqueIds.size === 3;
 
-    if (!isCompleteAndUnique) {
+    if (!isStandardValid && !isLegacyValid) {
       if (listEl) {
         listEl.className = 'p-4 bg-amber-50 rounded-xl border border-amber-300 text-amber-900 text-xs space-y-2';
         listEl.innerHTML = `
@@ -1202,6 +1234,35 @@ function renderConfirmationPanel() {
 
   if (!listEl) return;
 
+  const count = (state.selectedPreferences || []).length;
+  const legacyCount = getLegacyPreferenceCount();
+  const isLegacyValid = legacyCount > 0 && count >= legacyCount && count <= 3;
+
+  let legacyNoticeEl = document.getElementById('confirm-legacy-notice');
+  if (!legacyNoticeEl && preferencesSection) {
+    legacyNoticeEl = document.createElement('div');
+    legacyNoticeEl.id = 'confirm-legacy-notice';
+    preferencesSection.insertBefore(legacyNoticeEl, listEl);
+  }
+  if (legacyNoticeEl) {
+    if (isLegacyValid && count < 3) {
+      legacyNoticeEl.className = 'w-full mb-3 p-3 bg-sky-50 rounded-xl border border-sky-200 text-sky-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs';
+      legacyNoticeEl.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="text-base shrink-0">ℹ️</span>
+          <span><strong>Hồ sơ nộp theo quy định trước đây (${count} nguyện vọng):</strong> Thông tin hợp lệ, bạn có thể gửi cập nhật đề tài và thông tin cá nhân bình thường.</span>
+        </div>
+        <button type="button" onclick="goToStep(2)" class="text-tdtu-blue hover:underline font-bold text-[11px] shrink-0 self-end sm:self-auto">
+          + Bổ sung thêm GVHD
+        </button>
+      `;
+      legacyNoticeEl.classList.remove('hidden');
+    } else {
+      legacyNoticeEl.innerHTML = '';
+      legacyNoticeEl.classList.add('hidden');
+    }
+  }
+
   const medalOrder = [2, 1, 3];
   const orderedPreferences = [...state.selectedPreferences].sort((a, b) => {
     const aIndex = medalOrder.indexOf(Number(a.rank));
@@ -1209,8 +1270,7 @@ function renderConfirmationPanel() {
     return (aIndex < 0 ? 99 : aIndex) - (bIndex < 0 ? 99 : bIndex);
   });
 
-  listEl.className = 'flex flex-wrap sm:flex-nowrap items-end justify-center gap-3 sm:gap-5 pt-5 pb-2';
-  listEl.innerHTML = orderedPreferences.map(p => {
+  const cardsHtml = orderedPreferences.map(p => {
     const sup = (typeof resolveSupervisorProfile === 'function')
       ? resolveSupervisorProfile(p.supervisorId || p.id || p.email)
       : ((state.roundSupervisors || []).find(s => s.id === p.supervisorId) ||
@@ -1225,8 +1285,9 @@ function renderConfirmationPanel() {
     const isFirst = rank === 1;
     const medal = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : '🥉');
     const rankLabel = rank === 1 ? 'Nguyện vọng 1' : `Nguyện vọng ${rank}`;
+    const translateYClass = count > 1 && isFirst ? '-translate-y-4' : '';
     return `
-      <div class="relative flex flex-col items-center text-center w-[135px] sm:w-[175px] ${isFirst ? 'order-2 -translate-y-5' : (rank === 2 ? 'order-1' : 'order-3')}" title="${rankLabel}: ${escapedName}">
+      <div class="relative flex flex-col items-center text-center w-[135px] sm:w-[175px] ${isFirst ? 'order-2 ' + translateYClass : (rank === 2 ? 'order-1' : 'order-3')}" title="${rankLabel}: ${escapedName}">
         <div class="absolute -top-3 -right-1 sm:right-3 z-10 w-9 h-9 rounded-full bg-white border border-slate-200 shadow-md flex items-center justify-center text-xl">${medal}</div>
         <div class="${isFirst ? 'w-28 h-28 sm:w-32 sm:h-32 ring-4 ring-amber-300' : 'w-24 h-24 sm:w-28 sm:h-28 ring-4 ring-slate-200'} rounded-full bg-white p-1 shadow-lg">
           <img src="${avatarSrc}" onerror="this.onerror=null; this.src=getSupervisorAvatarSvgDataUri('${escapedName}');" class="w-full h-full rounded-full object-cover object-top" alt="${escapedName}">
@@ -1236,6 +1297,9 @@ function renderConfirmationPanel() {
       </div>
     `;
   }).join('');
+
+  listEl.className = 'flex flex-wrap sm:flex-nowrap items-end justify-center gap-3 sm:gap-5 pt-5 pb-2';
+  listEl.innerHTML = cardsHtml;
 }
 
 window.submitRegistration = async function() {
@@ -1285,15 +1349,33 @@ window.submitRegistration = async function() {
   const directAssignment = shouldSkipStudentSupervisorPreference();
   if (!directAssignment) {
     const prefs = state.selectedPreferences || [];
-    if (prefs.length !== 3) {
-      showToast(`Bắt buộc phải chọn đủ 3 nguyện vọng giảng viên hướng dẫn (hiện có ${prefs.length}/3).`, 'warning');
-      goToStep(2);
-      return;
+    const count = prefs.length;
+    const legacyCount = getLegacyPreferenceCount();
+    const isLegacy = legacyCount > 0;
+
+    if (isLegacy) {
+      if (count < legacyCount) {
+        showToast(`Hồ sơ đã nộp của bạn có ${legacyCount} nguyện vọng. Không được giảm số nguyện vọng đã đăng ký.`, 'warning');
+        goToStep(2);
+        return;
+      }
+      if (count === 0 || count > 3) {
+        showToast('Số lượng nguyện vọng không hợp lệ (cho phép từ 1 đến 3).', 'warning');
+        goToStep(2);
+        return;
+      }
+    } else {
+      if (count !== 3) {
+        showToast(`Bắt buộc phải chọn đủ 3 nguyện vọng giảng viên hướng dẫn (hiện có ${count}/3).`, 'warning');
+        goToStep(2);
+        return;
+      }
     }
+
     const supIds = prefs.map(p => p.supervisorId).filter(Boolean);
     const uniqueIds = new Set(supIds);
-    if (uniqueIds.size !== 3 || supIds.length !== 3) {
-      showToast('Mỗi giảng viên hướng dẫn chỉ được chọn ở một nguyện vọng. Vui lòng chọn 3 giảng viên khác nhau.', 'warning');
+    if (uniqueIds.size !== count || supIds.length !== count) {
+      showToast('Mỗi giảng viên hướng dẫn chỉ được chọn ở một nguyện vọng. Vui lòng chọn các giảng viên khác nhau.', 'warning');
       goToStep(2);
       return;
     }

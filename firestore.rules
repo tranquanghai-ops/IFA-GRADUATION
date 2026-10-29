@@ -260,6 +260,27 @@ service cloud.firestore {
           && prefs[1].supervisorId != prefs[2].supervisorId;
       }
 
+      // Bảo toàn hồ sơ cũ: cho phép hồ sơ cũ đã nộp hợp lệ trước khi ban hành quy định 3 NV (1 hoặc 2 NV)
+      // được cập nhật thông tin/đề tài mà không bị ép bổ sung NV; không được giảm số NV đã có; không trùng GVHD.
+      function validLegacyPreferencesUpdate(resPrefs, reqPrefs) {
+        return resPrefs is list
+          && resPrefs.size() > 0
+          && resPrefs.size() < 3
+          && reqPrefs is list
+          && reqPrefs.size() >= resPrefs.size()
+          && (
+            (reqPrefs.size() == 1
+              && reqPrefs[0].supervisorId is string && reqPrefs[0].supervisorId.size() > 0)
+            ||
+            (reqPrefs.size() == 2
+              && reqPrefs[0].supervisorId is string && reqPrefs[0].supervisorId.size() > 0
+              && reqPrefs[1].supervisorId is string && reqPrefs[1].supervisorId.size() > 0
+              && reqPrefs[0].supervisorId != reqPrefs[1].supervisorId)
+            ||
+            validStudentPreferences(reqPrefs)
+          );
+      }
+
       // Đăng ký nguyện vọng của sinh viên
       match /registrations/{studentId} {
         allow get: if admin()
@@ -371,6 +392,8 @@ service cloud.firestore {
             && request.resource.data.preferences is list
             && (
               validStudentPreferences(request.resource.data.preferences)
+              || (resource.data.keys().hasAll(['preferences'])
+                && validLegacyPreferencesUpdate(resource.data.preferences, request.resource.data.preferences))
               || (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['supervisorAssignmentMode'])
                 && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.supervisorAssignmentMode == 'direct_assignment')
               || (exists(/databases/$(database)/documents/graduationRounds/$(roundId)/officialAssignments/$(studentId))
