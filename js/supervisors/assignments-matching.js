@@ -96,6 +96,18 @@ export function normalizeOfficialAssignment(assignment, registration = null) {
     acceptedSupervisorId: acceptedSupId,
     acceptedSupervisorName: acceptedSupName,
     acceptedRank: source.acceptedRank || legacy.acceptedRank || 'manual',
+    className: (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? (window.resolveStudentProfile(source.studentId || legacy.studentId || source.id || legacy.id, { assignment: source, registration: legacy })?.className || '')
+      : (source.className || source.studentClass || source.currentClass || legacy.currentClass || legacy.className || legacy.studentClass || ''),
+    studentClass: (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? (window.resolveStudentProfile(source.studentId || legacy.studentId || source.id || legacy.id, { assignment: source, registration: legacy })?.className || '')
+      : (source.className || source.studentClass || source.currentClass || legacy.currentClass || legacy.className || legacy.studentClass || ''),
+    currentClass: (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? (window.resolveStudentProfile(source.studentId || legacy.studentId || source.id || legacy.id, { assignment: source, registration: legacy })?.className || '')
+      : (source.className || source.studentClass || source.currentClass || legacy.currentClass || legacy.className || legacy.studentClass || ''),
+    classDisplay: (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? (window.resolveStudentProfile(source.studentId || legacy.studentId || source.id || legacy.id, { assignment: source, registration: legacy })?.classDisplay || 'Chưa có dữ liệu lớp')
+      : (source.className || source.studentClass || source.currentClass || legacy.currentClass || legacy.className || legacy.studentClass || 'Chưa có dữ liệu lớp'),
     reviewStatus: supervisors.length > 0 ? 'manually_assigned' : (legacy.reviewStatus || 'unassigned'),
     assignmentStatus: source.assignmentStatus || (legacy.reviewStatus === 'accepted' || legacy.reviewStatus === 'manually_assigned' ? 'published' : '')
   };
@@ -700,6 +712,25 @@ export async function loadSupervisorReviewData(roundId) {
       });
     });
 
+    // 3b. Load eligibleStudents map for reliable student profile resolution
+    let eligibleMap = new Map();
+    try {
+      const elSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'eligibleStudents'));
+      elSnap.docs.forEach(d => {
+        const dData = d.data() || {};
+        const key = String(d.id || dData.studentId || dData.mssv || '').trim().toUpperCase();
+        if (key) eligibleMap.set(key, { id: d.id, ...dData });
+      });
+    } catch (elErr) {
+      console.warn('[SupervisorPortal] Could not query eligibleStudents:', elErr);
+      if (Array.isArray(state.eligibleStudents)) {
+        state.eligibleStudents.forEach(e => {
+          const key = String(e.studentId || e.mssv || e.id || '').trim().toUpperCase();
+          if (key) eligibleMap.set(key, e);
+        });
+      }
+    }
+
     // 4. Candidate identification per 3-Round rules (including Rule 3.5 early skip to NV3)
     const candidates = [];
     allRegistrations.forEach(registration => {
@@ -732,9 +763,22 @@ export async function loadSupervisorReviewData(roundId) {
         // Round 1: Only students who chose this supervisor as NV1
         if (matchesSup(pref1)) {
           const dec = allDecisions.find(d => matchesDecision(d, 1));
+          const prof1 = (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+            ? window.resolveStudentProfile(studentId, { registration, eligibleStudent: eligibleMap.get(studentId) })
+            : null;
+          const resolvedClass1 = prof1?.className || registration.currentClass || registration.studentClass || registration.className || '';
+          const resolvedName1 = prof1?.studentName || registration.studentName || studentId;
           candidates.push({
             ...registration,
+            ...(prof1 || {}),
             studentId,
+            studentName: resolvedName1,
+            fullName: resolvedName1,
+            className: resolvedClass1,
+            studentClass: resolvedClass1,
+            currentClass: resolvedClass1,
+            classDisplay: resolvedClass1 || 'Chưa có dữ liệu lớp',
+            hasValidClass: Boolean(resolvedClass1),
             candidateRank: 1,
             isEarlyTransition: false,
             currentDecision: dec?.decision === 'selected' ? 'selected' : ''
@@ -749,9 +793,22 @@ export async function loadSupervisorReviewData(roundId) {
         if ((nv2IsFullFromR1 || isExplicitlySkippedToNv3) && matchesSup(pref3)) {
           // Rule 3.5: NV3 supervisor sees this student in Round 2!
           const dec = allDecisions.find(d => matchesDecision(d, 3));
+          const prof2Skip = (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+            ? window.resolveStudentProfile(studentId, { registration, eligibleStudent: eligibleMap.get(studentId) })
+            : null;
+          const resolvedClass2Skip = prof2Skip?.className || registration.currentClass || registration.studentClass || registration.className || '';
+          const resolvedName2Skip = prof2Skip?.studentName || registration.studentName || studentId;
           candidates.push({
             ...registration,
+            ...(prof2Skip || {}),
             studentId,
+            studentName: resolvedName2Skip,
+            fullName: resolvedName2Skip,
+            className: resolvedClass2Skip,
+            studentClass: resolvedClass2Skip,
+            currentClass: resolvedClass2Skip,
+            classDisplay: resolvedClass2Skip || 'Chưa có dữ liệu lớp',
+            hasValidClass: Boolean(resolvedClass2Skip),
             candidateRank: 3,
             isEarlyTransition: true,
             currentDecision: dec?.decision === 'selected' ? 'selected' : ''
@@ -759,9 +816,22 @@ export async function loadSupervisorReviewData(roundId) {
         } else if (!nv2IsFullFromR1 && !isExplicitlySkippedToNv3 && matchesSup(pref2)) {
           // Regular NV2 candidate
           const dec = allDecisions.find(d => matchesDecision(d, 2));
+          const prof2Reg = (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+            ? window.resolveStudentProfile(studentId, { registration, eligibleStudent: eligibleMap.get(studentId) })
+            : null;
+          const resolvedClass2Reg = prof2Reg?.className || registration.currentClass || registration.studentClass || registration.className || '';
+          const resolvedName2Reg = prof2Reg?.studentName || registration.studentName || studentId;
           candidates.push({
             ...registration,
+            ...(prof2Reg || {}),
             studentId,
+            studentName: resolvedName2Reg,
+            fullName: resolvedName2Reg,
+            className: resolvedClass2Reg,
+            studentClass: resolvedClass2Reg,
+            currentClass: resolvedClass2Reg,
+            classDisplay: resolvedClass2Reg || 'Chưa có dữ liệu lớp',
+            hasValidClass: Boolean(resolvedClass2Reg),
             candidateRank: 2,
             isEarlyTransition: false,
             currentDecision: dec?.decision === 'selected' ? 'selected' : ''
@@ -771,9 +841,22 @@ export async function loadSupervisorReviewData(roundId) {
         // Round 3: NV3 candidates
         if (matchesSup(pref3)) {
           const dec = allDecisions.find(d => matchesDecision(d, 3));
+          const prof3 = (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+            ? window.resolveStudentProfile(studentId, { registration, eligibleStudent: eligibleMap.get(studentId) })
+            : null;
+          const resolvedClass3 = prof3?.className || registration.currentClass || registration.studentClass || registration.className || '';
+          const resolvedName3 = prof3?.studentName || registration.studentName || studentId;
           candidates.push({
             ...registration,
+            ...(prof3 || {}),
             studentId,
+            studentName: resolvedName3,
+            fullName: resolvedName3,
+            className: resolvedClass3,
+            studentClass: resolvedClass3,
+            currentClass: resolvedClass3,
+            classDisplay: resolvedClass3 || 'Chưa có dữ liệu lớp',
+            hasValidClass: Boolean(resolvedClass3),
             candidateRank: 3,
             isEarlyTransition: false,
             currentDecision: dec?.decision === 'selected' ? 'selected' : ''
@@ -909,6 +992,8 @@ function renderSupervisorCandidatesTable(readOnly) {
       (c.studentId || '').toLowerCase().includes(searchTerm) ||
       (c.studentName || '').toLowerCase().includes(searchTerm) ||
       (c.className || '').toLowerCase().includes(searchTerm) ||
+      (c.currentClass || '').toLowerCase().includes(searchTerm) ||
+      (c.studentClass || '').toLowerCase().includes(searchTerm) ||
       (c.topicTitle || '').toLowerCase().includes(searchTerm)
     );
   });
@@ -1000,8 +1085,8 @@ function renderSupervisorCandidatesTable(readOnly) {
       <tr class="border-b border-slate-100 transition-colors hover:bg-slate-50/80 ${isSelected ? 'bg-emerald-50/30' : (idx % 2 === 1 ? 'bg-slate-50/20' : 'bg-white')}">
         <td class="p-3.5 align-top font-mono font-bold text-slate-900">${c.studentId}</td>
         <td class="p-3.5 align-top">
-          <span class="font-bold text-slate-900 block leading-tight">${escapeHtml(c.studentName || '--')}</span>
-          <span class="text-[11px] text-slate-500 block mt-0.5">Lớp: ${escapeHtml(c.className || '--')}</span>
+          <span class="font-bold text-slate-900 block leading-tight">${escapeHtml(c.studentName || c.fullName || '--')}</span>
+          <span class="text-[11px] ${c.hasValidClass !== false && (c.className || c.currentClass) ? 'text-slate-500' : 'text-amber-600 font-medium italic'} block mt-0.5">Lớp: ${escapeHtml(c.className || c.currentClass || c.studentClass || 'Chưa có dữ liệu lớp')}</span>
           ${prefBadge}
         </td>
         <td class="p-3.5 align-top">

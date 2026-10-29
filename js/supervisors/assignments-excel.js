@@ -28,15 +28,18 @@ window.exportSupervisorAssignmentsExcel = function() {
   ]];
   rows.forEach((row, index) => {
     const master = typeof window.getFacultyStudentByMssv === 'function' ? window.getFacultyStudentByMssv(row.studentId) : null;
+    const profExcel = (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? window.resolveStudentProfile(row.studentId, { master, registration: row.registration, eligibleStudent: row.eligibleStudent, assignment: row.effective })
+      : null;
     const officials = getOfficialSupervisors(row.effective);
     const primary = officials.find(item => item.role === 'primary') || officials[0] || {};
     const support = officials.find(item => item.role === 'support') || {};
     data.push([
       index + 1,
       sanitizeExcelCell(row.studentId),
-      sanitizeExcelCell(master?.fullName || master?.name || resolveStudentName(row.studentId, row.effective?.studentName)),
-      sanitizeExcelCell(master?.major || row.eligibleStudent?.major || ''),
-      sanitizeExcelCell(master?.className || master?.studentClass || ''),
+      sanitizeExcelCell(profExcel?.studentName || master?.fullName || master?.name || resolveStudentName(row.studentId, row.effective?.studentName)),
+      sanitizeExcelCell(profExcel?.major || master?.major || row.eligibleStudent?.major || ''),
+      sanitizeExcelCell(profExcel?.className || master?.className || master?.studentClass || row.registration?.currentClass || ''),
       sanitizeExcelCell((typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function') ? window.getOfficialApprovedTopicTitle(row.registration || row.effective, 'Chưa đăng ký đề tài') : (row.registration?.topicTitle || 'Chưa đăng ký đề tài')),
       row.isRegistered ? 'Đã đăng ký' : 'Chưa đăng ký',
       sanitizeExcelCell(primary.supervisorEmail || ''),

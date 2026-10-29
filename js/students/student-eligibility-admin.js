@@ -197,35 +197,49 @@ function renderAdminEligibleStudentsTable() {
     let displayMajor = '';
     let isMissingInfo = false;
 
-    // Resolve Class: master -> registration (currentClass) -> official assignment -> eligible record snapshot
-    const resolvedClassValue = (isFoundInMaster && (master.className || master.studentClass))
+    // Resolve via Central SSOT Student Profile Resolver
+    const profile = (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? window.resolveStudentProfile(mssv, {
+          master,
+          registration: reg,
+          assignment,
+          eligibleStudent: s
+        })
+      : null;
+
+    const resolvedClassValue = profile?.className
+      || (isFoundInMaster && (master.className || master.studentClass))
       || reg?.currentClass || reg?.studentClass || reg?.className
       || assignment?.className || assignment?.studentClass
       || s.className || s.studentClass || s.class || '';
 
+    const hasValidClass = Boolean(resolvedClassValue);
     if (isFoundInMaster) {
-      displayName = master.fullName || master.name;
-      displayEmail = master.email || `${mssv.toLowerCase()}@student.tdtu.edu.vn`;
-      displayClass = resolvedClassValue || 'Chưa có thông tin';
-      displayMajor = master.major || reg?.major || assignment?.major || s.major || 'Thiết kế Nội thất';
+      displayName = profile?.fullName || master.fullName || master.name;
+      displayEmail = profile?.email || master.email || `${mssv.toLowerCase()}@student.tdtu.edu.vn`;
+      displayClass = resolvedClassValue || '<span class="text-amber-600 font-medium italic">Chưa có dữ liệu lớp</span>';
+      displayMajor = profile?.major || master.major || reg?.major || assignment?.major || s.major || 'Thiết kế Nội thất';
     } else {
-      // Fallback to registration, assignment, or snapshot in eligible record
-      const rawName = String(reg?.studentName || assignment?.studentName || s.name || s.fullName || s.studentName || '').trim();
+      const rawName = profile?.studentName || String(reg?.studentName || assignment?.studentName || s.name || s.fullName || s.studentName || '').trim();
       if (rawName && rawName !== mssv && !rawName.startsWith('Sinh viên ' + mssv)) {
         displayName = rawName;
       } else {
         displayName = '<span class="text-slate-400 italic">Chưa có thông tin</span>';
         isMissingInfo = true;
       }
-      displayEmail = reg?.email || assignment?.studentEmail || s.email || (mssv ? `${mssv.toLowerCase()}@student.tdtu.edu.vn` : '<span class="text-slate-400 italic">Chưa có thông tin</span>');
-      displayClass = resolvedClassValue || '<span class="text-slate-400 italic">Chưa có thông tin</span>';
-      displayMajor = reg?.major || assignment?.major || s.major || 'Thiết kế Nội thất';
+      displayEmail = profile?.email || reg?.email || assignment?.studentEmail || s.email || (mssv ? `${mssv.toLowerCase()}@student.tdtu.edu.vn` : '<span class="text-slate-400 italic">Chưa có thông tin</span>');
+      displayClass = resolvedClassValue || '<span class="text-amber-600 font-medium italic">Chưa có dữ liệu lớp</span>';
+      displayMajor = profile?.major || reg?.major || assignment?.major || s.major || 'Thiết kế Nội thất';
     }
 
     return {
       ...s,
       mssv,
       studentId: mssv,
+      className: resolvedClassValue,
+      studentClass: resolvedClassValue,
+      currentClass: resolvedClassValue,
+      hasValidClass,
       resolvedName: displayName,
       resolvedEmail: displayEmail,
       resolvedClass: displayClass,
@@ -277,6 +291,9 @@ function renderAdminEligibleStudentsTable() {
 
   const filtered = mergedList.filter(s => {
     if (!searchTerm) return true;
+    if (searchTerm === 'thiếu lớp' || searchTerm === 'thieu lop' || searchTerm === 'chưa có lớp' || searchTerm === 'chua co lop') {
+      return !s.hasValidClass;
+    }
     const nameText = typeof s.resolvedName === 'string' ? s.resolvedName.replace(/<[^>]*>/g, '').toLowerCase() : '';
     const status = getStudentStatus(s);
     const statusText = status.topicApprovalStatus === 'approved' || status.topicApprovalStatus === 'approved_with_pending_proposal'
@@ -496,6 +513,7 @@ window.addEligibleStudentByMssv = async function() {
       email: master.email || `${rawMssv.toLowerCase()}@student.tdtu.edu.vn`,
       className,
       studentClass: className,
+      currentClass: className,
       major: master.major || 'Thiết kế Nội thất',
       eligible: true,
       joinMethod: 'manual',
@@ -667,6 +685,8 @@ window.confirmExcelImport = async function() {
           name: s.name,
           email: s.email,
           className: s.className || '',
+          studentClass: s.className || '',
+          currentClass: s.className || '',
           major: s.major || 'Thiết kế Nội thất',
           eligible: true,
           joinMethod: 'excel',

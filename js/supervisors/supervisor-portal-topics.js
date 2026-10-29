@@ -163,7 +163,10 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
     const fullName = (typeof window.resolveOfficialStudentFullName === 'function')
       ? window.resolveOfficialStudentFullName(studentId, st, studentObj)
       : (st?.studentName || identity?.fullName || (studentObj && !studentObj.isMissing ? studentObj.fullName : '') || studentId);
-    const className = st?.currentClass || st?.studentClass || st?.className || studentObj?.className || studentObj?.studentClass || '--';
+    const profTop = (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? window.resolveStudentProfile(studentId, { registration: st, eligibleStudent: studentObj })
+      : null;
+    const className = profTop?.className || st?.currentClass || st?.studentClass || st?.className || studentObj?.className || studentObj?.studentClass || 'Chưa có dữ liệu lớp';
     const major = st?.major || studentObj?.major || identity?.major || 'Thiết kế nội thất';
     const personalEmail = st?.personalEmail || st?.email || studentObj?.email || identity?.email || '--';
     const phone = st?.studentPhone || studentObj?.phone || '--';

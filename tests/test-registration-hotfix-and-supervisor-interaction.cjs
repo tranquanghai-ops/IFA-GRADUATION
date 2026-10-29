@@ -53,65 +53,86 @@ global.renderSupervisorsGrid = () => {};
 global.getSelectedProjectTypes = () => ['Văn hóa / triển lãm / bảo tàng'];
 global.collectOfficialFormFields = () => ({ currentClass: '20050201' });
 global.validateOfficialFormFields = () => true;
+global.getRegistrationStudentIdentity = () => ({ mssv: '12000166', studentName: 'Nguyễn Văn Test', major: 'Thiết kế Nội thất' });
 global.goToStep = () => {};
 
 // ============================================================================
 // PHẦN 1: HOTFIX declResult & SUBMIT REGISTRATION
 // ============================================================================
 test('Phần 1: Hotfix ReferenceError declResult & Lưu bản khai điều kiện khi nộp đăng ký', async () => {
-  const regCode = fs.readFileSync(path.resolve(__dirname, '../js/students/registration.js'), 'utf8');
+  try {
+    const regCode = fs.readFileSync(path.resolve(__dirname, '../js/students/registration.js'), 'utf8');
 
-  // Verify declResult is declared or handled safely in submitRegistration
-  assert.ok(regCode.includes('finalDeclaration'), 'submitRegistration must define and use finalDeclaration');
-  assert.ok(!regCode.includes('declResult?.declaration'), 'submitRegistration must not use undeclared declResult?.declaration');
+    // Verify declResult is declared or handled safely in submitRegistration
+    assert.ok(regCode.includes('finalDeclaration'), 'submitRegistration must define and use finalDeclaration');
+    assert.ok(!regCode.includes('declResult?.declaration'), 'submitRegistration must not use undeclared declResult?.declaration');
 
-  // Simulate DOM elements for registration form
-  const domElements = {
-    'input-topic-title': { value: 'Thiết kế nội thất Trung tâm văn hóa Trà Việt' },
-    'input-project-type-other': { value: '' },
-    'topic-title-error': { classList: { add: () => {}, remove: () => {} }, textContent: '' },
-    'btn-submit-registration': { disabled: false, innerHTML: '' },
-    'student-topic-current-class': { value: '20050201' },
-    'student-topic-personal-email': { value: 'test@gmail.com' },
-    'student-topic-phone': { value: '0901234567' },
-    'student-topic-permanent-address': { value: 'TP.HCM' },
-    'student-topic-temporary-address': { value: 'TP.HCM' }
-  };
+    // Simulate DOM elements for registration form
+    const domElements = {
+      'input-topic-title': { value: 'Thiết kế nội thất Trung tâm văn hóa Trà Việt' },
+      'input-project-type-other': { value: '' },
+      'topic-title-error': { classList: { add: () => {}, remove: () => {} }, textContent: '' },
+      'btn-submit-registration': { disabled: false, innerHTML: '' },
+      'student-topic-current-class': { value: '20050201' },
+      'student-topic-personal-email': { value: 'test@gmail.com' },
+      'student-topic-phone': { value: '0901234567' },
+      'student-topic-permanent-address': { value: 'TP.HCM' },
+      'student-topic-temporary-address': { value: 'TP.HCM' }
+    };
 
-  global.document = {
-    getElementById: (id) => domElements[id] || null,
-    querySelector: (sel) => {
-      if (sel.includes('student-eligibility-status')) return { value: 'eligible' };
-      return null;
-    },
-    querySelectorAll: (sel) => {
-      if (sel.includes('project-type-checkbox:checked')) {
-        return [{ value: 'Văn hóa / triển lãm / bảo tàng' }];
+    global.document = {
+      getElementById: (id) => domElements[id] || null,
+      querySelector: (sel) => {
+        if (sel.includes('student-eligibility-status')) return { value: 'eligible' };
+        return null;
+      },
+      querySelectorAll: (sel) => {
+        if (sel.includes('project-type-checkbox:checked')) {
+          return [{ value: 'Văn hóa / triển lãm / bảo tàng' }];
+        }
+        return [];
       }
-      return [];
-    }
-  };
+    };
 
-  // Mock collectStudentEligibilityDeclaration
-  window.collectStudentEligibilityDeclaration = () => ({
-    valid: true,
-    declaration: {
-      status: 'eligible',
-      reasons: [],
-      missingCourses: [],
-      englishCertificateStatus: '',
-      otherReason: '',
-      studentDeclaredAt: '2026-10-27T10:00:00.000Z',
-      studentUpdatedAt: '2026-10-27T10:00:00.000Z'
-    }
-  });
+    // Mock collectStudentEligibilityDeclaration
+    window.collectStudentEligibilityDeclaration = () => ({
+      valid: true,
+      declaration: {
+        status: 'eligible',
+        reasons: [],
+        missingCourses: [],
+        englishCertificateStatus: '',
+        otherReason: '',
+        studentDeclaredAt: '2026-10-27T10:00:00.000Z',
+        studentUpdatedAt: '2026-10-27T10:00:00.000Z'
+      }
+    });
 
-  // Load registration module
-  await import('../js/students/registration.js');
-  assert.equal(typeof window.validateAndGoToStep2, 'function');
-  window.validateAndGoToStep2();
-  assert.ok(state.currentEligibilityDeclaration, 'validateAndGoToStep2 must persist declaration in state');
-  assert.equal(state.currentEligibilityDeclaration.status, 'eligible');
+    // Load registration module
+    await import('../js/students/registration.js');
+
+    // Re-mock collectStudentEligibilityDeclaration after module overwrites it
+    window.collectStudentEligibilityDeclaration = () => ({
+      valid: true,
+      declaration: {
+        status: 'eligible',
+        reasons: [],
+        missingCourses: [],
+        englishCertificateStatus: '',
+        otherReason: '',
+        studentDeclaredAt: '2026-10-27T10:00:00.000Z',
+        studentUpdatedAt: '2026-10-27T10:00:00.000Z'
+      }
+    });
+
+    assert.equal(typeof window.validateAndGoToStep2, 'function');
+    window.validateAndGoToStep2();
+    assert.ok(state.currentEligibilityDeclaration, 'validateAndGoToStep2 must persist declaration in state');
+    assert.equal(state.currentEligibilityDeclaration.status, 'eligible');
+  } catch (outerErr) {
+    console.error('OUTER ERR IN TEST:', outerErr);
+    throw outerErr;
+  }
 });
 
 // ============================================================================

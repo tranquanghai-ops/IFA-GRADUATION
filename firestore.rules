@@ -141,7 +141,7 @@ service cloud.firestore {
                   || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.isHidden == false)
               && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status'])
                   || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'active'])
-              && request.resource.data.keys().hasOnly(['studentId', 'mssv', 'name', 'fullName', 'email', 'className', 'studentClass', 'major', 'roundId', 'joinedAt', 'createdAt', 'joinMethod', 'source', 'eligible', 'eligibilityDeclaration'])
+              && request.resource.data.keys().hasOnly(['studentId', 'mssv', 'name', 'fullName', 'email', 'className', 'studentClass', 'currentClass', 'major', 'roundId', 'joinedAt', 'createdAt', 'joinMethod', 'source', 'eligible', 'eligibilityDeclaration'])
               && (!('eligibilityDeclaration' in request.resource.data)
                   || (request.resource.data.eligibilityDeclaration is map
                       && request.resource.data.eligibilityDeclaration.status == 'undeclared'
@@ -307,6 +307,8 @@ service cloud.firestore {
             && (!request.resource.data.keys().hasAll(['topicApprovalStatus']) || request.resource.data.topicApprovalStatus in ['pending', 'approved', 'rejected'])
             && (!request.resource.data.keys().hasAll(['projectTypes']) || (request.resource.data.projectTypes is list && request.resource.data.projectTypes.size() >= 1 && request.resource.data.projectTypes.size() <= 3))
             && (!request.resource.data.keys().hasAll(['currentClass']) || (request.resource.data.currentClass is string && request.resource.data.currentClass.size() <= 50))
+            && (!request.resource.data.keys().hasAll(['className']) || (request.resource.data.className is string && request.resource.data.className.size() <= 50))
+            && (!request.resource.data.keys().hasAll(['studentClass']) || (request.resource.data.studentClass is string && request.resource.data.studentClass.size() <= 50))
             && (!request.resource.data.keys().hasAll(['personalEmail']) || (request.resource.data.personalEmail is string && request.resource.data.personalEmail.size() <= 120))
             && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 30))
             && (!request.resource.data.keys().hasAll(['studentPermanentAddress']) || (request.resource.data.studentPermanentAddress is string && request.resource.data.studentPermanentAddress.size() <= 250))
@@ -372,6 +374,8 @@ service cloud.firestore {
             && request.resource.data.projectType is string
             && (!request.resource.data.keys().hasAll(['projectTypes']) || (request.resource.data.projectTypes is list && request.resource.data.projectTypes.size() >= 1 && request.resource.data.projectTypes.size() <= 3))
             && (!request.resource.data.keys().hasAll(['currentClass']) || (request.resource.data.currentClass is string && request.resource.data.currentClass.size() <= 50))
+            && (!request.resource.data.keys().hasAll(['className']) || (request.resource.data.className is string && request.resource.data.className.size() <= 50))
+            && (!request.resource.data.keys().hasAll(['studentClass']) || (request.resource.data.studentClass is string && request.resource.data.studentClass.size() <= 50))
             && (!request.resource.data.keys().hasAll(['personalEmail']) || (request.resource.data.personalEmail is string && request.resource.data.personalEmail.size() <= 120))
             && (!request.resource.data.keys().hasAll(['studentPhone']) || (request.resource.data.studentPhone is string && request.resource.data.studentPhone.size() <= 30))
             && (!request.resource.data.keys().hasAll(['studentPermanentAddress']) || (request.resource.data.studentPermanentAddress is string && request.resource.data.studentPermanentAddress.size() <= 250))

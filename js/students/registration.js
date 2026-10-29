@@ -1448,6 +1448,8 @@ window.submitRegistration = async function() {
       projectTypes,
       projectTypeOther,
       ...officialFormFields,
+      className: officialFormFields.currentClass || '',
+      studentClass: officialFormFields.currentClass || '',
       major: getRegistrationStudentIdentity().major,
       topicTitleVersion: nextVersion,
       topicTitleHistory,

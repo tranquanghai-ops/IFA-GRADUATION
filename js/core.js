@@ -991,6 +991,18 @@ export function normalizeOfficialAssignment(assignment, registration = null) {
     acceptedSupervisorId: acceptedSupId,
     acceptedSupervisorName: acceptedSupName,
     acceptedRank: source.acceptedRank || legacy.acceptedRank || 'manual',
+    className: (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? (window.resolveStudentProfile(source.studentId || legacy.studentId || source.id || legacy.id, { assignment: source, registration: legacy })?.className || '')
+      : (source.className || source.studentClass || source.currentClass || legacy.currentClass || legacy.className || legacy.studentClass || ''),
+    studentClass: (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? (window.resolveStudentProfile(source.studentId || legacy.studentId || source.id || legacy.id, { assignment: source, registration: legacy })?.className || '')
+      : (source.className || source.studentClass || source.currentClass || legacy.currentClass || legacy.className || legacy.studentClass || ''),
+    currentClass: (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? (window.resolveStudentProfile(source.studentId || legacy.studentId || source.id || legacy.id, { assignment: source, registration: legacy })?.className || '')
+      : (source.className || source.studentClass || source.currentClass || legacy.currentClass || legacy.className || legacy.studentClass || ''),
+    classDisplay: (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? (window.resolveStudentProfile(source.studentId || legacy.studentId || source.id || legacy.id, { assignment: source, registration: legacy })?.classDisplay || 'Chưa có dữ liệu lớp')
+      : (source.className || source.studentClass || source.currentClass || legacy.currentClass || legacy.className || legacy.studentClass || 'Chưa có dữ liệu lớp'),
     reviewStatus: supervisors.length > 0 ? 'manually_assigned' : (legacy.reviewStatus || 'unassigned'),
     assignmentStatus: source.assignmentStatus || (legacy.reviewStatus === 'accepted' || legacy.reviewStatus === 'manually_assigned' ? 'published' : '')
   };

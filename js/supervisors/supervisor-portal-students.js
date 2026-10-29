@@ -143,7 +143,10 @@ window.renderSupervisorAssignedStudents = function() {
     const studentId = st.studentId || st.id || '';
     const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(studentId) : null;
     const name = st.studentName || studentObj?.fullName || studentObj?.name || `Sinh viên ${studentId}`;
-    const className = st.currentClass || st.studentClass || st.className || studentObj?.className || studentObj?.studentClass || '--';
+    const prof = (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+      ? window.resolveStudentProfile(studentId, { assignment: st, master: studentObj })
+      : null;
+    const className = prof?.className || st.currentClass || st.studentClass || st.className || studentObj?.className || studentObj?.studentClass || 'Chưa có dữ liệu lớp';
     const major = st.major || studentObj?.major || 'Mỹ thuật Công nghiệp';
     const approvedVersions = (typeof window.getApprovedTopicVersions === 'function')
       ? window.getApprovedTopicVersions(st)
@@ -659,7 +662,10 @@ window.openSupervisorStudentDetailModal = async function(studentId, focusSection
   const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(studentId) : null;
 
   const fullName = st?.studentName || studentObj?.fullName || studentObj?.name || studentId;
-  const className = st?.currentClass || st?.studentClass || st?.className || studentObj?.className || studentObj?.studentClass || '--';
+  const profDetail = (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+    ? window.resolveStudentProfile(studentId, { assignment: st, master: studentObj })
+    : null;
+  const className = profDetail?.className || st?.currentClass || st?.studentClass || st?.className || studentObj?.className || studentObj?.studentClass || 'Chưa có dữ liệu lớp';
   const major = st?.major || studentObj?.major || 'Mỹ thuật Công nghiệp';
 
   const officialTitle = (typeof window.getOfficialApprovedTopicTitle === 'function')

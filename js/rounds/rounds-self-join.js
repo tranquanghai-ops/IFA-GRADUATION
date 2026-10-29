@@ -433,6 +433,7 @@ window.confirmStudentSelfJoinRound = async function() {
       email: (state.user?.email || `${studentMssv.toLowerCase()}@student.tdtu.edu.vn`).toLowerCase().trim(),
       className: className,
       studentClass: className,
+      currentClass: className,
       major: major,
       roundId: round.id,
       joinedAt: serverTimestamp(),

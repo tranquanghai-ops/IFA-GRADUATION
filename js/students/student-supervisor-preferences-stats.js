@@ -230,8 +230,11 @@ function buildStudentPreferenceItem({ mssv, rank, registration, supervisor, deci
     ? window.getFacultyStudentByMssv(mssv)
     : null;
 
-  const fullName = master?.fullName || master?.name || registration.studentName || mssv;
-  const className = master?.className || master?.studentClass || registration.currentClass || registration.studentClass || registration.className || '--';
+  const profStats = (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+    ? window.resolveStudentProfile(mssv, { master, registration })
+    : null;
+  const fullName = profStats?.fullName || master?.fullName || master?.name || registration.studentName || mssv;
+  const className = profStats?.className || master?.className || master?.studentClass || registration.currentClass || registration.studentClass || registration.className || 'Chưa có dữ liệu lớp';
   const major = master?.major || registration.major || 'Thiết kế Nội thất';
 
   // Topic title

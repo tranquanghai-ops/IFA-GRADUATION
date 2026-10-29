@@ -256,6 +256,170 @@ window.getFacultyStudent = function(studentId) {
   };
 };
 
+
+// ============================================================================
+// SINGLE SOURCE OF TRUTH (SSOT) STUDENT PROFILE RESOLVER
+// ============================================================================
+export function resolveStudentProfile(studentId, context = {}) {
+  let idInput = studentId;
+  let ctx = context || {};
+  if (studentId && typeof studentId === 'object') {
+    idInput = studentId.studentId || studentId.mssv || studentId.id || studentId.code;
+    ctx = { ...studentId, ...ctx };
+  }
+
+  // Preserve leading zeros: stringify and trim
+  const cleanId = String(idInput || '').trim().replace(/\s+/g, '').toUpperCase();
+  if (!cleanId) {
+    return {
+      studentId: '',
+      mssv: '',
+      studentName: 'Chưa có thông tin',
+      fullName: 'Chưa có thông tin',
+      name: 'Chưa có thông tin',
+      nameDisplay: 'Chưa có thông tin',
+      className: '',
+      studentClass: '',
+      currentClass: '',
+      classDisplay: 'Chưa có dữ liệu lớp',
+      hasValidClass: false,
+      major: 'Thiết kế Nội thất',
+      majorName: 'Thiết kế Nội thất',
+      email: '',
+      personalEmail: '',
+      phone: '',
+      studentPhone: '',
+      isMissingInfo: true,
+      isFoundInMaster: false
+    };
+  }
+
+  // 1. Source A: Faculty Student Master (IFAA)
+  const master = ctx.master || ((typeof window !== 'undefined' && typeof window.getFacultyStudentByMssv === 'function')
+    ? window.getFacultyStudentByMssv(cleanId)
+    : null);
+  const isFoundInMaster = Boolean(master && !master.notFoundInMaster && (master.fullName || master.name));
+
+  // 2. Source B: Round Eligible Record
+  const roundEligibleList = (typeof state !== 'undefined' && Array.isArray(state.eligibleStudents)) ? state.eligibleStudents : [];
+  const eligibleStudent = ctx.eligibleStudent
+    || roundEligibleList.find(e => String(e.studentId || e.mssv || e.id || '').trim().toUpperCase() === cleanId)
+    || null;
+
+  // 3. Source C: Registration Record
+  const registration = ctx.registration
+    || ((typeof state !== 'undefined' && state.myRegistration && String(state.myRegistration.studentId || '').trim().toUpperCase() === cleanId) ? state.myRegistration : null)
+    || ((typeof state !== 'undefined' && state.adminReviewData?.registrations) ? state.adminReviewData.registrations.find(r => String(r.studentId || r.id || '').trim().toUpperCase() === cleanId) : null)
+    || null;
+
+  // 4. Source D: Official Assignment
+  const assignment = ctx.assignment
+    || ((typeof state !== 'undefined' && state.myOfficialAssignment && String(state.myOfficialAssignment.studentId || '').trim().toUpperCase() === cleanId) ? state.myOfficialAssignment : null)
+    || null;
+
+  // Resolve Class (Authority order: Master -> Eligible Roster -> Registration -> Assignment -> Context)
+  const isCleanVal = v => {
+    if (!v) return false;
+    const str = String(v).trim();
+    return str.length > 0 && str !== '--' && str.toLowerCase() !== 'chưa cập nhật' && str.toLowerCase() !== 'chưa có lớp' && str.toLowerCase() !== 'chưa có thông tin';
+  };
+
+  let resolvedClass = '';
+  if (isFoundInMaster && isCleanVal(master.className || master.studentClass || master.class)) {
+    resolvedClass = String(master.className || master.studentClass || master.class).trim();
+  } else if (eligibleStudent && isCleanVal(eligibleStudent.className || eligibleStudent.studentClass || eligibleStudent.class || eligibleStudent.currentClass)) {
+    resolvedClass = String(eligibleStudent.className || eligibleStudent.studentClass || eligibleStudent.class || eligibleStudent.currentClass).trim();
+  } else if (registration && isCleanVal(registration.currentClass || registration.studentClass || registration.className || registration.class)) {
+    resolvedClass = String(registration.currentClass || registration.studentClass || registration.className || registration.class).trim();
+  } else if (assignment && isCleanVal(assignment.className || assignment.studentClass || assignment.currentClass)) {
+    resolvedClass = String(assignment.className || assignment.studentClass || assignment.currentClass).trim();
+  } else if (isCleanVal(ctx.currentClass || ctx.className || ctx.studentClass || ctx.class)) {
+    resolvedClass = String(ctx.currentClass || ctx.className || ctx.studentClass || ctx.class).trim();
+  }
+
+  // Check for class conflict (e.g. Master says 21010301 but Registration says 21010302)
+  let classConflict = null;
+  const masterClass = isFoundInMaster ? String(master.className || master.studentClass || '').trim() : '';
+  const regClass = registration ? String(registration.currentClass || registration.studentClass || registration.className || '').trim() : '';
+  if (masterClass && regClass && masterClass !== regClass && isCleanVal(masterClass) && isCleanVal(regClass)) {
+    classConflict = {
+      authoritative: masterClass,
+      secondary: regClass,
+      source: 'master_vs_registration'
+    };
+  }
+
+  // Resolve Student Name
+  let resolvedName = '';
+  const isCleanName = n => {
+    if (!n) return false;
+    const str = String(n).trim();
+    return str.length > 0 && str !== cleanId && !str.toUpperCase().startsWith('SINH VIÊN ' + cleanId) && str !== '--';
+  };
+
+  if (isFoundInMaster && isCleanName(master.fullName || master.name)) {
+    resolvedName = String(master.fullName || master.name).trim();
+  } else if (eligibleStudent && isCleanName(eligibleStudent.fullName || eligibleStudent.name || eligibleStudent.studentName)) {
+    resolvedName = String(eligibleStudent.fullName || eligibleStudent.name || eligibleStudent.studentName).trim();
+  } else if (registration && isCleanName(registration.studentName || registration.fullName || registration.name)) {
+    resolvedName = String(registration.studentName || registration.fullName || registration.name).trim();
+  } else if (assignment && isCleanName(assignment.studentName)) {
+    resolvedName = String(assignment.studentName).trim();
+  } else if (isCleanName(ctx.studentName || ctx.fullName || ctx.name)) {
+    resolvedName = String(ctx.studentName || ctx.fullName || ctx.name).trim();
+  }
+
+  const finalName = resolvedName || (cleanId ? `Sinh viên ${cleanId}` : '--');
+  const nameDisplay = resolvedName || cleanId || 'Chưa có thông tin';
+  const classDisplay = resolvedClass || 'Chưa có dữ liệu lớp';
+
+  // Resolve Major
+  const major = (isFoundInMaster && master.major)
+    || eligibleStudent?.major
+    || registration?.major
+    || assignment?.major
+    || ctx.major
+    || 'Thiết kế Nội thất';
+
+  // Resolve Email
+  const email = (isFoundInMaster && master.email)
+    || eligibleStudent?.email
+    || registration?.email
+    || assignment?.email
+    || `${cleanId.toLowerCase()}@student.tdtu.edu.vn`;
+
+  return {
+    studentId: cleanId,
+    mssv: cleanId,
+    studentName: finalName,
+    fullName: finalName,
+    name: finalName,
+    nameDisplay,
+    className: resolvedClass,
+    studentClass: resolvedClass,
+    currentClass: resolvedClass,
+    classDisplay,
+    hasValidClass: Boolean(resolvedClass),
+    classConflict,
+    major: String(major).trim(),
+    majorName: String(major).trim(),
+    email: String(email).trim().toLowerCase(),
+    personalEmail: registration?.personalEmail || master?.personalEmail || ctx.personalEmail || '',
+    phone: registration?.studentPhone || registration?.phone || master?.phone || ctx.phone || '',
+    studentPhone: registration?.studentPhone || registration?.phone || master?.phone || ctx.phone || '',
+    isFoundInMaster,
+    isMissingInfo: !resolvedClass || !resolvedName,
+    rawMaster: master || null,
+    rawEligible: eligibleStudent || null,
+    rawRegistration: registration || null,
+    rawAssignment: assignment || null
+  };
+}
+
+if (typeof window !== 'undefined') {
+  window.resolveStudentProfile = resolveStudentProfile;
+}
+
 window.getFacultyStudents = function(filterFn) {
   const list = state.facultyStudents || [];
   return typeof filterFn === 'function' ? list.filter(filterFn) : list;
