@@ -243,7 +243,7 @@ service cloud.firestore {
                && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['eligibilityFinalized'])
                    || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.eligibilityFinalized == false))
             )
-            && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized']
+            && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized', 'active']
                 || !get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status']))
             && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['openAt'])
                 || request.time >= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.openAt)
@@ -305,7 +305,7 @@ service cloud.firestore {
             && (request.resource.data.preferences.size() > 0
               || (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['supervisorAssignmentMode'])
                 && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.supervisorAssignmentMode == 'direct_assignment'))
-            && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized']
+            && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized', 'active']
                 || !get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status']))
             && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt'])
                 || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt)

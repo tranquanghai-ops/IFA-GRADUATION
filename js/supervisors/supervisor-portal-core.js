@@ -105,7 +105,6 @@ window.initSupervisorPortal = async function() {
 
 async function checkSupervisorParticipatesInRound(round, actor, matchingMaster, baseIdentityIds) {
   if (!round || !round.id) return false;
-  if (actor?.isAdmin) return true;
   const roundId = round.id;
   const emailLower = (actor?.email || '').toLowerCase().trim();
   const isStaffOrAdmin = Boolean(actor?.isAdmin || (emailLower && emailLower.endsWith('@tdtu.edu.vn')));
@@ -328,11 +327,18 @@ window.renderSupervisorRoundsDropdown = async function() {
   const filteredRounds = validRounds.filter(r => participatingRoundIds.has(r.id));
 
   const lockedRoundId = (state.impersonation && state.impersonation.target && state.impersonation.target.roundId) || '';
+  const savedSupRoundId = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('supervisor_selected_round_id') : null)
+    || (typeof localStorage !== 'undefined' ? localStorage.getItem('supervisor_selected_round_id') : null);
+
   if (filteredRounds.length > 0) {
-    let activeSelectionId = state.selectedRoundId;
+    let activeSelectionId = null;
     if (lockedRoundId && filteredRounds.some(r => r.id === lockedRoundId)) {
       activeSelectionId = lockedRoundId;
-    } else if (!activeSelectionId || !filteredRounds.some(r => r.id === activeSelectionId)) {
+    } else if (savedSupRoundId && filteredRounds.some(r => r.id === savedSupRoundId)) {
+      activeSelectionId = savedSupRoundId;
+    } else if (state.selectedRoundId && filteredRounds.some(r => r.id === state.selectedRoundId)) {
+      activeSelectionId = state.selectedRoundId;
+    } else {
       const preferredRound = filteredRounds.find(r => r.isActive) || filteredRounds[0];
       activeSelectionId = preferredRound.id;
     }
@@ -360,6 +366,10 @@ window.renderSupervisorRoundsDropdown = async function() {
 
 window.onSupervisorRoundSelected = async function(roundId) {
   if (!roundId) return;
+  try {
+    sessionStorage.setItem('supervisor_selected_round_id', roundId);
+    localStorage.setItem('supervisor_selected_round_id', roundId);
+  } catch (e) {}
   if (state.impersonation && state.impersonation.target) {
     const selectedRound = (state.rounds || []).find(r => r.id === roundId);
     state.impersonation.target.roundId = roundId;
@@ -710,7 +720,7 @@ window.loadSupervisorPortalData = async function(roundId) {
   const statAssignedEl = document.getElementById('sup-stat-assigned-total');
   if (statAssignedEl) statAssignedEl.textContent = totalAssignedCount;
 
-  const quota = currentSup?.quota || currentSup?.capacity || (actor.isAdmin ? displayStudents.length : 10);
+  const quota = currentSup?.quota || currentSup?.capacity || 10;
   let primaryCount = 0;
   let supportCount = 0;
   let pendingCount = 0;
@@ -723,7 +733,7 @@ window.loadSupervisorPortalData = async function(roundId) {
       const isMe = (sId && supervisorIdsSet.has(sId)) ||
         (sEmail && candidateEmails.has(sEmail)) ||
         (currentSupName && s.supervisorName && s.supervisorName.toLowerCase().trim() === currentSupName);
-      return (isMe || actor.isAdmin) && s.role === 'primary';
+      return isMe && s.role === 'primary';
     });
     if (isPrimary) primaryCount++;
     else supportCount++;
@@ -767,9 +777,9 @@ window.loadSupervisorPortalData = async function(roundId) {
   const subTabsContainer = document.getElementById('supervisor-sub-tabs-container');
   const assignedPanel = document.getElementById('sup-panel-assigned');
 
-  // Check if supervisor participates in this round (in round's supervisor roster, or has assigned students, or is admin)
+  // Check if supervisor participates in this round (in round's supervisor roster, or has assigned students)
   const isParticipatingInRound = Boolean(roundSupervisor) || Boolean(matchingMaster && (state.roundSupervisors || []).some(s => s.email === matchingMaster.email || s.supervisorId === matchingMaster.id));
-  const hasSupervisorDuties = isParticipatingInRound || totalAssignedCount > 0 || actor.isAdmin;
+  const hasSupervisorDuties = isParticipatingInRound || totalAssignedCount > 0;
   loadingCard?.classList.add('hidden');
 
   const isAssignmentPublished = isSupervisorRoundAssignmentPublished(round);

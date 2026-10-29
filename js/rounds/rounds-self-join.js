@@ -244,10 +244,16 @@ window.checkAndHandlePendingRoundJoin = async function() {
     console.warn('[SelfJoin] Check existing eligible doc notice:', err);
   }
 
-  if (existingEligibleDoc && existingEligibleDoc.exists() && existingEligibleDoc.data()?.eligible !== false) {
+  if (existingEligibleDoc && existingEligibleDoc.exists()) {
     // Student already joined: Display modal in joined state without duplicate write
     openStudentAlreadyJoinedModal(targetRound, existingEligibleDoc.data());
-    try { sessionStorage.removeItem('pendingJoinRound'); } catch (e) {}
+    try {
+      sessionStorage.setItem('student_selected_round_id', targetRound.id);
+      localStorage.setItem('student_selected_round_id', targetRound.id);
+      sessionStorage.removeItem('pendingJoinRound');
+    } catch (e) {}
+    state.selectedRoundId = targetRound.id;
+    state.activeRound = targetRound;
     cleanJoinUrlParam();
     return;
   }
@@ -489,8 +495,17 @@ window.confirmStudentSelfJoinRound = async function() {
 
     showToast('✓ Bạn đã tham gia đợt tốt nghiệp thành công!', 'success');
 
-    // Clean pending state & URL
-    try { sessionStorage.removeItem('pendingJoinRound'); } catch (e) {}
+    // Bind current student selection to joined round
+    try {
+      sessionStorage.setItem('student_selected_round_id', round.id);
+      localStorage.setItem('student_selected_round_id', round.id);
+      sessionStorage.removeItem('pendingJoinRound');
+    } catch (e) {}
+    state.selectedRoundId = round.id;
+    state.activeRound = round;
+    if (Array.isArray(state.studentRounds) && !state.studentRounds.some(r => r.id === round.id)) {
+      state.studentRounds.push(round);
+    }
     cleanJoinUrlParam();
 
     // Background refresh
@@ -511,8 +526,16 @@ window.confirmStudentSelfJoinRound = async function() {
 window.viewJoinedRoundPortal = function() {
   const round = state.pendingJoinTargetRound;
   closeStudentJoinRoundModal();
-  if (round && typeof selectRound === 'function') {
-    selectRound(round.id);
+  if (round) {
+    try {
+      sessionStorage.setItem('student_selected_round_id', round.id);
+      localStorage.setItem('student_selected_round_id', round.id);
+    } catch (e) {}
+    state.selectedRoundId = round.id;
+    state.activeRound = round;
+    if (typeof selectRound === 'function') {
+      selectRound(round.id);
+    }
   }
   if (typeof switchView === 'function') {
     switchView('student');

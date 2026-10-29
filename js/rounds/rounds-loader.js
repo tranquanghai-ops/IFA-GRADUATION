@@ -111,9 +111,10 @@ async function loadRounds() {
     renderRoundsDropdowns();
     if (typeof renderAdminRoundsTable === 'function') renderAdminRoundsTable(); else if (window.renderAdminRoundsTable) window.renderAdminRoundsTable();
 
-    // Check ?x=SHORTCODE URL parameter
+    // Check ?x=SHORTCODE, ?join=ROUND_ID URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const xCode = urlParams.get('x') || urlParams.get('round') || urlParams.get('e');
+    const joinCode = urlParams.get('join') || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('pendingJoinRound') : null);
     const aCode = urlParams.get('a');
     if (aCode) {
       state.targetActivitySlug = aCode;
@@ -123,6 +124,9 @@ async function loadRounds() {
     if (xCode) {
       // Find round matching shortCode, roundName or id
       targetRound = state.rounds.find(r => !r.deleted && (r.shortCode === xCode || r.roundName === xCode || r.id === xCode || r.slug === xCode || r.title === xCode));
+    } else if (joinCode) {
+      // Find round matching join link parameter
+      targetRound = state.rounds.find(r => !r.deleted && (r.id === joinCode || r.shortCode === joinCode || r.slug === joinCode || r.roundName === joinCode || r.title === joinCode));
     }
 
     // Restore exact simulated round after F5
@@ -146,23 +150,53 @@ async function loadRounds() {
       }
     }
 
-    // A student lands in a round where their MSSV is on the official roster.
-    // Keep explicit deep links and admin simulation targets authoritative.
-    if (!targetRound && state.currentView === 'student' && state.isStudent && !state.impersonation && state.studentMssv) {
-      const eligibleMatches = await Promise.all(state.rounds.filter(r => !r.deleted).map(async round => {
+    // Student round resolution:
+    // When the logged-in user is a student (or impersonating a student):
+    // Identify rounds where student has membership (eligibleStudents doc exists, OR registrations doc exists).
+    const isStudentUser = Boolean(
+      (state.isStudent && state.studentMssv) ||
+      (state.currentView === 'student' && state.studentMssv) ||
+      (state.impersonation && state.impersonation.target?.type === 'student')
+    );
+    const effectiveMssv = state.impersonation?.target?.mssv || state.studentMssv;
+
+    if (isStudentUser && effectiveMssv) {
+      const studentMembershipMatches = await Promise.all(state.rounds.filter(r => !r.deleted).map(async round => {
         try {
-          const eligibleDoc = await getDoc(doc(db, 'graduationRounds', round.id, 'eligibleStudents', state.studentMssv));
-          return eligibleDoc.exists() && eligibleDoc.data().eligible !== false ? round : null;
+          const [elDoc, regDoc] = await Promise.all([
+            getDoc(doc(db, 'graduationRounds', round.id, 'eligibleStudents', effectiveMssv)),
+            getDoc(doc(db, 'graduationRounds', round.id, 'registrations', effectiveMssv)).catch(() => null)
+          ]);
+          if ((elDoc && elDoc.exists()) || (regDoc && regDoc.exists())) {
+            return round;
+          }
+          return null;
         } catch (error) {
-          console.warn(`[Rounds] Could not check student roster in ${round.id}:`, error);
+          console.warn(`[Rounds] Could not check student membership in ${round.id}:`, error);
           return null;
         }
       }));
-      const matchedRounds = eligibleMatches.filter(Boolean);
-      targetRound = matchedRounds.find(round => round.isActive === true) || matchedRounds[0] || null;
+      const studentRounds = studentMembershipMatches.filter(Boolean);
+      state.studentRounds = studentRounds;
+
+      // If user did not land via explicit deep link or join link:
+      if (!targetRound) {
+        const savedStudentRoundId = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('student_selected_round_id') : null)
+          || (typeof localStorage !== 'undefined' ? localStorage.getItem('student_selected_round_id') : null);
+
+        if (savedStudentRoundId && studentRounds.some(r => r.id === savedStudentRoundId)) {
+          targetRound = studentRounds.find(r => r.id === savedStudentRoundId);
+        } else if (studentRounds.length === 1) {
+          // Exactly 1 round: MUST open this exact round! Never fallback to foreign active round!
+          targetRound = studentRounds[0];
+        } else if (studentRounds.length > 1) {
+          // Multiple rounds: prefer active round among studentRounds, otherwise latest
+          targetRound = studentRounds.find(r => r.isActive === true) || studentRounds[0];
+        }
+      }
     }
 
-    // If no direct link, ONLY use the ACTIVE round
+    // Fallback: ONLY if targetRound is still null (e.g. admin, or new student who has no membership in any round yet)
     if (!targetRound) {
       targetRound = state.rounds.find(r => !r.deleted && r.isActive === true);
     }
@@ -266,8 +300,24 @@ function renderRoundsDropdowns() {
   const optionsHtml = validRounds.map(r => '<option value="' + r.id + '" ' + (r.id === state.selectedRoundId ? 'selected' : '') + '>' + r.title + ' (' + (r.academicYear || '') + ')' + (r.isActive ? ' ★ Hiện hành' : '') + '</option>').join('');
 
   if (selectActive) {
-    selectActive.innerHTML = optionsHtml;
-    document.getElementById('multi-round-selector-wrap')?.classList.add('hidden');
+    const isStudentUser = Boolean(
+      (state.isStudent && state.studentMssv) ||
+      (state.currentView === 'student' && state.studentMssv) ||
+      (state.impersonation && state.impersonation.target?.type === 'student')
+    );
+    if (isStudentUser && Array.isArray(state.studentRounds) && state.studentRounds.length > 0) {
+      selectActive.innerHTML = state.studentRounds.map(r => '<option value="' + r.id + '" ' + (r.id === state.selectedRoundId ? 'selected' : '') + '>' + r.title + ' (' + (r.academicYear || '') + ')' + (r.isActive ? ' ★ Hiện hành' : '') + '</option>').join('');
+      if (state.studentRounds.length > 1) {
+        document.getElementById('multi-round-selector-wrap')?.classList.remove('hidden');
+      } else {
+        document.getElementById('multi-round-selector-wrap')?.classList.add('hidden');
+      }
+      selectActive.value = state.selectedRoundId;
+    } else {
+      selectActive.innerHTML = optionsHtml;
+      document.getElementById('multi-round-selector-wrap')?.classList.add('hidden');
+      selectActive.value = state.selectedRoundId;
+    }
   }
   if (selectAdminSup) selectAdminSup.innerHTML = optionsHtml;
   if (selectAdminStudent) selectAdminStudent.innerHTML = optionsHtml;
@@ -278,12 +328,22 @@ function renderRoundsDropdowns() {
 }
 
 window.onRoundSelected = function(roundId) {
+  try {
+    sessionStorage.setItem('student_selected_round_id', roundId);
+    localStorage.setItem('student_selected_round_id', roundId);
+  } catch (e) {}
   selectRound(roundId);
 };
 
 export async function selectRound(roundId) {
   state.selectedRoundId = roundId;
   state.activeRound = state.rounds.find(r => r.id === roundId) || null;
+  if (state.isStudent || state.currentView === 'student') {
+    try {
+      sessionStorage.setItem('student_selected_round_id', roundId);
+      localStorage.setItem('student_selected_round_id', roundId);
+    } catch (e) {}
+  }
   if (!state.activeRound) return;
 
   const emptyCard = document.getElementById('student-empty-round');
