@@ -211,9 +211,14 @@
                 <button type="button" onclick="setSupervisorCandidateFilter('selected')" id="sup-cand-flt-selected" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 cursor-pointer transition-all">
                   ✓ Đã chọn (<span id="sup-cand-cnt-selected">0</span>)
                 </button>
-                <button type="button" onclick="setSupervisorCandidateFilter('unselected')" id="sup-cand-flt-unselected" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 cursor-pointer transition-all">
-                  Chưa chọn (<span id="sup-cand-cnt-unselected">0</span>)
+                <button type="button" onclick="setSupervisorCandidateFilter('pending')" id="sup-cand-flt-pending" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 cursor-pointer transition-all">
+                  Chưa quyết định (<span id="sup-cand-cnt-pending">0</span>)
                 </button>
+                <button type="button" onclick="setSupervisorCandidateFilter('rejected')" id="sup-cand-flt-rejected" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-rose-600 border border-rose-200 hover:bg-rose-50 cursor-pointer transition-all">
+                  ✕ Không chọn (<span id="sup-cand-cnt-rejected">0</span>)
+                </button>
+                <!-- Backwards-compatibility alias for legacy code/tests expecting sup-cand-cnt-unselected -->
+                <span id="sup-cand-cnt-unselected" class="hidden">0</span>
               </div>
 
               <!-- Search Input -->

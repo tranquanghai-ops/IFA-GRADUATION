@@ -962,6 +962,7 @@ window.openAdminInspectSupModal = function(supId) {
     tbody.innerHTML = candidates.map(c => {
       const dec = decisions.find(d => d.round === currentRound && d.supervisorId === sup.id && d.studentId === c.studentId);
       const isSelected = dec && dec.decision === 'selected';
+      const isRejected = dec && dec.decision === 'rejected';
       const cStudentName = resolveStudentName(c.studentId, c.studentName);
 
       return `
@@ -970,7 +971,7 @@ window.openAdminInspectSupModal = function(supId) {
           <td class="p-3 font-semibold text-slate-800">${escapeHtml(cStudentName)}</td>
           <td class="p-3 max-w-xs font-medium text-slate-700 truncate" title="${c.topicTitle}">${c.topicTitle}</td>
           <td class="p-3">
-            ${isSelected ? '<span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Giảng viên đã chọn</span>' : '<span class="text-slate-400 font-semibold">Chưa chọn</span>'}
+            ${isSelected ? '<span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Giảng viên đã chọn</span>' : (isRejected ? '<span class="badge bg-rose-100 text-rose-800 font-bold">✕ Giảng viên không chọn</span>' : '<span class="text-slate-400 font-semibold">Chưa chọn</span>')}
           </td>
         </tr>
       `;
