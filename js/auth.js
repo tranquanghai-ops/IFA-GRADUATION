@@ -574,6 +574,15 @@ export async function resolveActualRoles(user) {
   state.userStudentId = studentMssv;
   state.supervisorProfile = supervisorProfile;
 
+  // Auto-index visiting supervisor if authenticated with external account (e.g. Gmail)
+  if (isSupervisor && !rawEmail.endsWith('@tdtu.edu.vn')) {
+    if (typeof ensureVisitingSupervisorAuthIndex === 'function') {
+      ensureVisitingSupervisorAuthIndex(user, supervisorProfile).catch(() => {});
+    } else if (typeof window.ensureVisitingSupervisorAuthIndex === 'function') {
+      window.ensureVisitingSupervisorAuthIndex(user, supervisorProfile).catch(() => {});
+    }
+  }
+
   if (isStudent) {
     state.actualRole = 'student';
     state.currentView = 'student';

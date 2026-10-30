@@ -1143,6 +1143,33 @@ window.saveSelectedSupervisorsToRound = async function() {
       sortOrder: 1,
       createdAt: serverTimestamp()
     }, { merge: true });
+
+    // For visiting supervisors with external emails, ensure auth index documents in round and master
+    if (sup.email && !sup.email.endsWith('@tdtu.edu.vn') && supId.toLowerCase() !== sup.email.toLowerCase().trim()) {
+      const emailLower = sup.email.toLowerCase().trim();
+      const roundEmailRef = doc(db, 'graduationRounds', roundId, 'supervisors', emailLower);
+      batch.set(roundEmailRef, {
+        isAuthIndex: true,
+        supervisorId: supId,
+        email: emailLower,
+        name: sup.name,
+        capacity: getSupervisorDefaultAndMaxQuota(sup).defaultQuota,
+        activeInRound: true,
+        createdAt: serverTimestamp()
+      }, { merge: true });
+
+      const masterEmailRef = doc(db, 'supervisorMaster', emailLower);
+      batch.set(masterEmailRef, {
+        isAuthIndex: true,
+        supervisorId: supId,
+        email: emailLower,
+        name: sup.name,
+        employmentType: sup.employmentType || 'adjunct',
+        defaultQuota: getSupervisorDefaultAndMaxQuota(sup).defaultQuota,
+        active: true,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    }
   });
 
   try {

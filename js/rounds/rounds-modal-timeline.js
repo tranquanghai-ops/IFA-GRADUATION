@@ -66,6 +66,19 @@ export async function ensureSupervisorsMasterLoaded(force = false) {
         : (window.filterAndDeduplicateMasterSupervisors ? window.filterAndDeduplicateMasterSupervisors(rawDocs) : rawDocs);
     } catch (e) {
       console.error('Error loading supervisorMaster:', e);
+      // Fallback: If listing full supervisorMaster is not permitted for visiting supervisor, query specifically by email
+      const userEmail = (typeof state !== 'undefined' && state.user?.email) ? String(state.user.email).toLowerCase().trim() : '';
+      if (userEmail) {
+        try {
+          const singleSnap = await getDocs(query(collection(db, 'supervisorMaster'), where('email', '==', userEmail)));
+          if (singleSnap && !singleSnap.empty) {
+            const docs = singleSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            state.supervisorsMaster = (typeof filterAndDeduplicateMasterSupervisors === 'function')
+              ? filterAndDeduplicateMasterSupervisors(docs)
+              : (window.filterAndDeduplicateMasterSupervisors ? window.filterAndDeduplicateMasterSupervisors(docs) : docs);
+          }
+        } catch (errFallback) {}
+      }
     } finally {
       _supervisorsMasterLoadingPromise = null;
     }

@@ -738,6 +738,60 @@ window.writeBatch = writeBatch;
 window.SafeBatchManager = SafeBatchManager;
 window.runTransaction = runTransaction;
 
+// Auto-indexing helper for Visiting Supervisors with external Google accounts (e.g. Gmail)
+export async function ensureVisitingSupervisorAuthIndex(userParam = null, supervisorProfile = null) {
+  const targetUser = userParam || (typeof state !== 'undefined' && (state.realUser || state.user)) || (typeof auth !== 'undefined' ? auth?.currentUser : null);
+  if (!targetUser || !targetUser.email) return null;
+
+  const emailLower = String(targetUser.email).trim().toLowerCase();
+  // Internal staff (@tdtu.edu.vn) and students (@student.tdtu.edu.vn) do not need auth indexing
+  if (emailLower.endsWith('@tdtu.edu.vn') || emailLower.endsWith('@student.tdtu.edu.vn')) {
+    return null;
+  }
+
+  try {
+    let masterProfile = supervisorProfile;
+    if (!masterProfile && typeof state !== 'undefined' && Array.isArray(state.supervisorsMaster)) {
+      masterProfile = state.supervisorsMaster.find(s =>
+        (s.email || '').toLowerCase().trim() === emailLower ||
+        (Array.isArray(s.emails) && s.emails.some(e => (e || '').toLowerCase().trim() === emailLower)) ||
+        (s.personalEmail && s.personalEmail.toLowerCase().trim() === emailLower)
+      );
+    }
+
+    if (!masterProfile) {
+      const q = query(collection(db, 'supervisorMaster'), where('email', '==', emailLower));
+      const snap = await getDocs(q).catch(() => null);
+      if (snap && !snap.empty) {
+        masterProfile = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      }
+    }
+
+    if (masterProfile && masterProfile.id && masterProfile.id.toLowerCase() !== emailLower) {
+      const indexRef = doc(db, 'supervisorMaster', emailLower);
+      const indexSnap = await getDoc(indexRef).catch(() => null);
+      if (!indexSnap || !indexSnap.exists()) {
+        await rawSetDoc(indexRef, {
+          isAuthIndex: true,
+          supervisorId: masterProfile.id,
+          email: emailLower,
+          name: masterProfile.name || targetUser.displayName || '',
+          employmentType: masterProfile.employmentType || 'adjunct',
+          defaultQuota: masterProfile.defaultQuota || 5,
+          active: masterProfile.active !== false,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        console.log('[Auth] Visiting supervisor index document created:', emailLower, '->', masterProfile.id);
+      }
+      return { indexCreated: true, supervisorId: masterProfile.id, email: emailLower };
+    }
+  } catch (err) {
+    console.warn('[Auth] ensureVisitingSupervisorAuthIndex notice:', err);
+  }
+  return null;
+}
+window.ensureVisitingSupervisorAuthIndex = ensureVisitingSupervisorAuthIndex;
+
 
 
 export const DEFAULT_PROJECT_TYPES = [

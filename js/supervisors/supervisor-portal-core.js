@@ -448,6 +448,30 @@ window.loadSupervisorPortalData = async function(roundId) {
     currentSup = roundSupervisor ? { ...roundSupervisor, ...matchingMaster } : matchingMaster;
   }
 
+  // Auto-index visiting supervisor for round security rules if participating
+  if (actor.email && !actor.email.endsWith('@tdtu.edu.vn') && roundSupervisor && roundSupervisor.id !== emailLower) {
+    if (typeof ensureVisitingSupervisorAuthIndex === 'function') {
+      ensureVisitingSupervisorAuthIndex(actor, matchingMaster || roundSupervisor).catch(() => {});
+    }
+    try {
+      const rIndexRef = doc(db, 'graduationRounds', roundId, 'supervisors', emailLower);
+      getDoc(rIndexRef).then(snap => {
+        if (!snap.exists()) {
+          rawSetDoc(rIndexRef, {
+            isAuthIndex: true,
+            supervisorId: roundSupervisor.id,
+            email: emailLower,
+            name: roundSupervisor.name || matchingMaster?.name || actor.displayName || '',
+            capacity: roundSupervisor.capacity || roundSupervisor.maxQuota || matchingMaster?.defaultQuota || 5,
+            maxQuota: roundSupervisor.maxQuota || roundSupervisor.capacity || matchingMaster?.defaultQuota || 5,
+            active: true,
+            createdAt: serverTimestamp()
+          }, { merge: true }).catch(() => {});
+        }
+      }).catch(() => {});
+    } catch (eIndex) {}
+  }
+
   const candidateEmails = supIdentity?.candidateEmails || new Set([
     emailLower,
     matchingMaster?.email,
@@ -719,7 +743,15 @@ window.loadSupervisorPortalData = async function(roundId) {
   const statAssignedEl = document.getElementById('sup-stat-assigned-total');
   if (statAssignedEl) statAssignedEl.textContent = totalAssignedCount;
 
-  const quota = supIdentity ? supIdentity.capacity : (currentSup?.quota || currentSup?.capacity || 10);
+  const quota = supIdentity
+    ? supIdentity.capacity
+    : (typeof currentSup?.capacity === 'number'
+        ? currentSup.capacity
+        : (typeof currentSup?.maxQuota === 'number'
+            ? currentSup.maxQuota
+            : (typeof currentSup?.defaultQuota === 'number'
+                ? currentSup.defaultQuota
+                : (currentSup?.employmentType === 'adjunct' ? 5 : 10))));
   let primaryCount = 0;
   let supportCount = 0;
   let pendingCount = 0;

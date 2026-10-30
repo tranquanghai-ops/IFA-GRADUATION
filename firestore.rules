@@ -10,15 +10,31 @@ service cloud.firestore {
 
     // Bổ sung ngoại lệ có kiểm soát cho Giảng viên hướng dẫn thỉnh giảng (Visiting Supervisor)
     function isVisitingSupervisor() {
-      return signedIn() && exists(/databases/$(database)/documents/supervisorMaster/$(email().lower()))
-        && get(/databases/$(database)/documents/supervisorMaster/$(email().lower())).data.get('active', true) != false;
+      return signedIn() && (
+        (exists(/databases/$(database)/documents/supervisorMaster/$(email().lower()))
+         && get(/databases/$(database)/documents/supervisorMaster/$(email().lower())).data.get('active', true) != false)
+        ||
+        (exists(/databases/$(database)/documents/supervisorMaster/$(email()))
+         && get(/databases/$(database)/documents/supervisorMaster/$(email())).data.get('active', true) != false)
+      );
+    }
+
+    function getVisitingSupervisorMasterId() {
+      return exists(/databases/$(database)/documents/supervisorMaster/$(email().lower()))
+        ? get(/databases/$(database)/documents/supervisorMaster/$(email().lower())).data.get('supervisorId', email().lower())
+        : (exists(/databases/$(database)/documents/supervisorMaster/$(email()))
+            ? get(/databases/$(database)/documents/supervisorMaster/$(email())).data.get('supervisorId', email())
+            : email().lower());
     }
 
     // Giảng viên tham gia đợt (Staff hoặc GVHD thỉnh giảng được phân công trong đợt)
     function isRoundSupervisor(roundId) {
       return signedIn() && (
         staff()
-        || (isVisitingSupervisor() && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(email().lower())))
+        || (isVisitingSupervisor() && (
+            exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(email().lower()))
+            || exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(getVisitingSupervisorMasterId()))
+           ))
       );
     }
 
@@ -72,7 +88,15 @@ service cloud.firestore {
                 || (resource.data.keys().hasAll(['personalEmail']) && resource.data.personalEmail.lower() == email().lower())
                ))
            ));
-      allow create, update, delete: if admin();
+      allow create, update: if admin()
+        || (signedIn() && (supervisorId == email() || supervisorId == email().lower())
+            && request.resource.data.isAuthIndex == true
+            && (request.resource.data.email == email() || request.resource.data.email.lower() == email().lower())
+            && exists(/databases/$(database)/documents/supervisorMaster/$(request.resource.data.supervisorId))
+            && (get(/databases/$(database)/documents/supervisorMaster/$(request.resource.data.supervisorId)).data.email == email()
+                || get(/databases/$(database)/documents/supervisorMaster/$(request.resource.data.supervisorId)).data.email.lower() == email().lower())
+            && get(/databases/$(database)/documents/supervisorMaster/$(request.resource.data.supervisorId)).data.get('active', true) != false);
+      allow delete: if admin();
     }
 
     // Danh mục Loại hình đồ án
@@ -114,7 +138,14 @@ service cloud.firestore {
       // GVHD tham gia đợt (kèm quota của đợt)
       match /supervisors/{supervisorId} {
         allow read: if signedIn();
-        allow create, delete: if admin();
+        allow create: if admin()
+          || (signedIn() && (supervisorId == email() || supervisorId == email().lower())
+              && request.resource.data.isAuthIndex == true
+              && (request.resource.data.email == email() || request.resource.data.email.lower() == email().lower())
+              && exists(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(request.resource.data.supervisorId))
+              && (get(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(request.resource.data.supervisorId)).data.email == email()
+                  || get(/databases/$(database)/documents/graduationRounds/$(roundId)/supervisors/$(request.resource.data.supervisorId)).data.email.lower() == email().lower()));
+        allow delete: if admin();
         allow update: if admin() || (signedIn() && (
           email() == supervisorId
           || email().lower() == supervisorId.lower()

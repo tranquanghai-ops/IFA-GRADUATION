@@ -667,15 +667,69 @@ export async function loadSupervisorReviewData(roundId) {
   if (roundInfoEl) roundInfoEl.textContent = `${state.activeRound?.title || ''}${roundYear}`;
   if (activeBadgeEl) activeBadgeEl.textContent = state.activeRound?.roundName || state.activeRound?.title || 'Đợt ĐATN';
 
+  // STATE 4: LỖI LIÊN KẾT HỒ SƠ GVHD
   if (!currentSup) {
     const ids = ['sup-stat-total-cap', 'sup-stat-accepted-prev', 'sup-stat-selected-curr', 'sup-stat-remaining-cap',
                  'sup-review-stat-total-cap', 'sup-review-stat-accepted-prev', 'sup-review-stat-selected-curr', 'sup-review-stat-remaining-cap', 'sup-review-stat-waiting'];
-    ids.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; });
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '--'; });
     const ind = document.getElementById('sup-round-review-indicator');
-    if (ind) ind.textContent = 'Thầy/Cô chưa tham gia đợt này';
+    if (ind) ind.textContent = 'Chưa liên kết hồ sơ Giảng viên hướng dẫn trong đợt này';
+    const stateTag = document.getElementById('sup-round-state-tag');
+    if (stateTag) stateTag.textContent = 'Chưa cấu hình đợt';
+    const actionBtns = document.getElementById('sup-review-action-btns');
+    if (actionBtns) actionBtns.innerHTML = '<span class="text-xs text-slate-400 italic">Chưa liên kết đợt</span>';
     const tbody = document.getElementById('sup-candidates-tbody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400">Thầy/Cô chưa được cấu hình vào danh sách GVHD đợt này.</td></tr>';
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="p-6">
+            <div class="bg-amber-50 border border-amber-300 rounded-2xl p-5 text-amber-900 text-xs shadow-sm flex items-start gap-3.5 text-left">
+              <span class="text-amber-600 text-2xl font-bold">ℹ️</span>
+              <div class="flex-1 space-y-1.5">
+                <strong class="font-bold text-amber-950 text-sm block">Tài khoản chưa được cấu hình vào danh sách GVHD của đợt này</strong>
+                <p class="text-amber-800 leading-relaxed">
+                  Tài khoản <strong>${escapeHtml(emailLower || 'chưa xác định')}</strong> chưa được liên kết với danh sách Giảng viên hướng dẫn tham gia đợt này.
+                  Nếu Thầy/Cô có hướng dẫn sinh viên trong đợt, vui lòng liên hệ Ban Chủ nhiệm Khoa hoặc Quản trị viên để được thêm vào danh sách GVHD của đợt.
+                </p>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
     return;
+  }
+
+  // Pre-bind Quota from supervisor identity so it NEVER displays false 0
+  const initialQuota = typeof currentSup?.capacity === 'number'
+    ? currentSup.capacity
+    : (typeof currentSup?.maxQuota === 'number'
+        ? currentSup.maxQuota
+        : (typeof currentSup?.defaultQuota === 'number'
+            ? currentSup.defaultQuota
+            : (currentSup?.employmentType === 'adjunct' ? 5 : 10)));
+  const setInitialVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setInitialVal('sup-stat-total-cap', initialQuota);
+  setInitialVal('sup-review-stat-total-cap', initialQuota);
+  setInitialVal('sup-stat-remaining-cap', initialQuota);
+  setInitialVal('sup-review-stat-remaining-cap', initialQuota);
+
+  // STATE 1: ĐANG TẢI (Loading Indicator)
+  const candidatesTbody = document.getElementById('sup-candidates-tbody');
+  if (candidatesTbody) {
+    candidatesTbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="p-8 text-center text-slate-500 font-medium">
+          <div class="inline-flex items-center gap-2.5">
+            <svg class="animate-spin h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span>Đang tải danh sách nguyện vọng xét duyệt...</span>
+          </div>
+        </td>
+      </tr>
+    `;
   }
 
   try {
@@ -684,9 +738,62 @@ export async function loadSupervisorReviewData(roundId) {
     const supData = supDoc.exists() ? supDoc.data() : (currentSup.rawRoundSupervisor || currentSup);
     state.supervisorRoundProgress = supData.roundProgress || {};
 
-    // 2. Load all registrations for this round
-    const regSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'registrations'));
-    const allRegistrations = regSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // 2. Load all registrations for this round with granular permission-denied detection
+    let allRegistrations = [];
+    try {
+      const regSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'registrations'));
+      allRegistrations = regSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (regErr) {
+      console.error('[SupervisorPortal] Query registrations failed:', regErr);
+      const isPermDenied = regErr?.code === 'permission-denied' ||
+        String(regErr).includes('permission-denied') ||
+        String(regErr).includes('Missing or insufficient permissions');
+
+      if (isPermDenied) {
+        // STATE 3: LỖI PHÂN QUYỀN (PERMISSION_DENIED)
+        const isVisiting = emailLower && !emailLower.endsWith('@tdtu.edu.vn');
+        const ind = document.getElementById('sup-round-review-indicator');
+        if (ind) ind.textContent = 'Lỗi phân quyền: Chưa được cấp quyền đọc danh sách sinh viên đăng ký';
+        const stateTag = document.getElementById('sup-round-state-tag');
+        if (stateTag) stateTag.textContent = 'Lỗi phân quyền';
+        const actionBtns = document.getElementById('sup-review-action-btns');
+        if (actionBtns) actionBtns.innerHTML = '<span class="px-3 py-1.5 bg-rose-900/40 border border-rose-500/40 text-rose-300 rounded-xl text-xs font-bold">⚠️ Lỗi phân quyền</span>';
+
+        if (candidatesTbody) {
+          candidatesTbody.innerHTML = `
+            <tr>
+              <td colspan="5" class="p-6">
+                <div class="bg-rose-50 border border-rose-300 rounded-2xl p-5 text-rose-900 text-xs shadow-sm flex items-start gap-3.5 text-left">
+                  <span class="text-rose-600 text-2xl font-bold">⚠️</span>
+                  <div class="flex-1 space-y-2">
+                    <strong class="font-bold text-rose-950 text-sm block">Không thể tải danh sách ứng viên (Lỗi phân quyền)</strong>
+                    <p class="text-rose-800 leading-relaxed">
+                      Tài khoản <strong>${escapeHtml(emailLower)}</strong> chưa được cấp quyền đọc dữ liệu xét duyệt trong đợt tốt nghiệp này.
+                      ${isVisiting ? 'Hệ thống đang tự động kích hoạt liên kết Giảng viên thỉnh giảng. Vui lòng bấm "Thử lại" hoặc tải lại trang.' : 'Vui lòng liên hệ Quản trị viên Khoa để kiểm tra phân quyền.'}
+                    </p>
+                    <div class="pt-2 flex items-center gap-2">
+                      <button onclick="loadSupervisorReviewData('${escapeHtml(roundId)}')" class="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-xl font-bold text-xs shadow-sm transition-all flex items-center gap-1.5">
+                        <span>🔄 Thử lại</span>
+                      </button>
+                      <button onclick="window.location.reload()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-xl font-bold text-xs shadow-sm transition-all">
+                        Tải lại trang
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+        // Background self-healing attempt
+        if (isVisiting && typeof window.ensureVisitingSupervisorAuthIndex === 'function' && (state.realUser || state.user)) {
+          window.ensureVisitingSupervisorAuthIndex(state.realUser || state.user, currentSup).catch(() => {});
+        }
+        return;
+      }
+      allRegistrations = state.activeRound?.registrations || [];
+    }
+
 
     // 3. Load decisions made in this round
     let allDecisions = [];
@@ -1041,7 +1148,7 @@ function renderSupervisorCandidatesTable(readOnly) {
           ? 'Chưa có ứng viên nào bị từ chối/không chọn.'
           : (currentFilter === 'pending' || currentFilter === 'unselected'
             ? 'Tất cả ứng viên trong danh sách đều đã có quyết định lựa chọn.'
-            : 'Không có ứng viên nào đăng ký Thầy/Cô ở Nguyện vọng này (hoặc đã được nhận ở vòng trước).')));
+            : 'Hiện chưa có sinh viên nào đăng ký Thầy/Cô ở Nguyện vọng này (hoặc đã được nhận ở các vòng trước).')));
     tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-400 font-medium">${emptyMsg}</td></tr>`;
     return;
   }
@@ -1051,7 +1158,11 @@ function renderSupervisorCandidatesTable(readOnly) {
   const currentSup = (typeof resolveSupervisorIdentity === 'function')
     ? resolveSupervisorIdentity(actor, state.roundSupervisors, state.supervisorsMaster)
     : (state.roundSupervisors || []).find(s => (s.email || '').toLowerCase().trim() === emailLower || (actor?.uid && (s.id === actor.uid || s.supervisorId === actor.uid)));
-  const totalCap = currentSup?.capacity ?? 10;
+  const totalCap = typeof currentSup?.capacity === 'number'
+    ? currentSup.capacity
+    : (typeof currentSup?.maxQuota === 'number'
+        ? currentSup.maxQuota
+        : (typeof currentSup?.defaultQuota === 'number' ? currentSup.defaultQuota : (currentSup?.employmentType === 'adjunct' ? 5 : 10)));
   const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
   const selectedCurr = Object.values(state.supervisorDecisions).filter(v => v === 'selected').length;
   const remainingCap = Math.max(0, totalCap - acceptedPrev - selectedCurr);

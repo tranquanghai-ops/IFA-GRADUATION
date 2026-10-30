@@ -7,6 +7,8 @@ import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection } from '
 const adminEmail = 'admin_rules@tdtu.edu.vn';
 const visitingEmail = 'quang.nguyen@gmail.com';
 const visitingOutlook = 'expert.consultant@outlook.com';
+const realQuangEmail = 'tquangarc@gmail.com';
+const alphanumericMasterId = 'VMiij78ssdGs9sPd6WTG';
 const strangerEmail = 'stranger@gmail.com';
 const studentMssv = '11900335';
 const studentEmail = `${studentMssv}@student.tdtu.edu.vn`;
@@ -88,6 +90,35 @@ before(async () => {
       email: studentEmail,
       phone: '0901234567',
       address: '123 Nguyễn Hữu Thọ, Q7'
+    });
+
+    // 7. Visiting supervisor with alphanumeric Master ID (like Production ThS. KTS. Nguyen Tang Quang)
+    await setDoc(doc(db, `supervisorMaster/${alphanumericMasterId}`), {
+      supervisorId: alphanumericMasterId,
+      name: 'ThS. KTS. Nguyễn Tăng Quang',
+      email: realQuangEmail,
+      personalEmail: realQuangEmail,
+      active: true,
+      status: 'active',
+      employmentType: 'adjunct',
+      defaultQuota: 5
+    });
+
+    await setDoc(doc(db, `graduationRounds/${roundAssignedId}/supervisors/${alphanumericMasterId}`), {
+      supervisorId: alphanumericMasterId,
+      name: 'ThS. KTS. Nguyễn Tăng Quang',
+      email: realQuangEmail,
+      capacity: 5,
+      maxQuota: 5,
+      active: true
+    });
+
+    await setDoc(doc(db, `graduationRounds/${roundAssignedId}/registrations/${studentMssv}`), {
+      studentId: studentMssv,
+      studentName: 'Nguyễn Văn Sinh Viên',
+      preferences: [
+        { rank: 1, supervisorId: alphanumericMasterId, supervisorName: 'ThS. KTS. Nguyễn Tăng Quang' }
+      ]
     });
   });
 });
@@ -177,5 +208,62 @@ test('--- FIRESTORE RULES: VISITING SUPERVISOR RBAC & SECURITY ---', async (t) =
   await t.test('10. Student CAN read their own graduationStudentProfile -> SUCCEEDS', async () => {
     const db = env.authenticatedContext('student_uid', actor(studentEmail)).firestore();
     await assertSucceeds(getDoc(doc(db, `graduationStudentProfiles/${studentMssv}`)));
+  });
+
+  await t.test('11. Visiting supervisor with alphanumeric Master ID creates own auth-index in supervisorMaster -> SUCCEEDS', async () => {
+    const db = env.authenticatedContext('quang_uid', actor(realQuangEmail)).firestore();
+    const indexPayload = {
+      isAuthIndex: true,
+      supervisorId: alphanumericMasterId,
+      email: realQuangEmail,
+      name: 'ThS. KTS. Nguyễn Tăng Quang',
+      employmentType: 'adjunct',
+      defaultQuota: 5,
+      active: true
+    };
+    await assertSucceeds(setDoc(doc(db, `supervisorMaster/${realQuangEmail}`), indexPayload));
+  });
+
+  await t.test('12. Unauthorized stranger CANNOT create auth-index in supervisorMaster -> FAILS', async () => {
+    const db = env.authenticatedContext('stranger_uid', actor(strangerEmail)).firestore();
+    const fakeIndexPayload = {
+      isAuthIndex: true,
+      supervisorId: alphanumericMasterId,
+      email: strangerEmail,
+      name: 'Stranger',
+      active: true
+    };
+    await assertFails(setDoc(doc(db, `supervisorMaster/${strangerEmail}`), fakeIndexPayload));
+  });
+
+  await t.test('13. Visiting supervisor CANNOT forge auth-index pointing to someone else master record -> FAILS', async () => {
+    const db = env.authenticatedContext('quang_uid', actor(realQuangEmail)).firestore();
+    const forgedIndexPayload = {
+      isAuthIndex: true,
+      supervisorId: 'non_existent_or_other_master_id',
+      email: realQuangEmail,
+      name: 'ThS. KTS. Nguyễn Tăng Quang',
+      active: true
+    };
+    await assertFails(setDoc(doc(db, `supervisorMaster/${realQuangEmail}`), forgedIndexPayload));
+  });
+
+  await t.test('14. Visiting supervisor with index doc can read registrations in assigned round -> SUCCEEDS', async () => {
+    const db = env.authenticatedContext('quang_uid', actor(realQuangEmail)).firestore();
+    await assertSucceeds(getDocs(collection(db, `graduationRounds/${roundAssignedId}/registrations`)));
+  });
+
+  await t.test('15. Visiting supervisor creates round auth-index in graduationRounds/{roundId}/supervisors/{email} -> SUCCEEDS', async () => {
+    const db = env.authenticatedContext('quang_uid', actor(realQuangEmail)).firestore();
+    const roundIndexPayload = {
+      isAuthIndex: true,
+      supervisorId: alphanumericMasterId,
+      email: realQuangEmail,
+      name: 'ThS. KTS. Nguyễn Tăng Quang',
+      capacity: 5,
+      maxQuota: 5,
+      active: true
+    };
+    await assertSucceeds(setDoc(doc(db, `graduationRounds/${roundAssignedId}/supervisors/${realQuangEmail}`), roundIndexPayload));
   });
 });
