@@ -347,95 +347,283 @@ window.getSupervisorId = getSupervisorId;
  * 4. Ensures a stable supervisorId pointing to the canonical document ID.
  * 5. Returns a clean array of unique master supervisor profiles.
  */
+export const KNOWN_SUPERVISOR_EMAIL_ALIASES = {
+  'tquangarc@gmail.com': ['nguyentangquang@tdtu.edu.vn'],
+  'nguyentangquang@tdtu.edu.vn': ['tquangarc@gmail.com']
+};
+window.KNOWN_SUPERVISOR_EMAIL_ALIASES = KNOWN_SUPERVISOR_EMAIL_ALIASES;
+
+export function extractSupervisorEmailAliases(d) {
+  const emails = new Set();
+  if (!d || typeof d !== 'object') return emails;
+
+  const addClean = (raw) => {
+    if (!raw || typeof raw !== 'string') return;
+    const s = raw.trim().toLowerCase();
+    if (s.includes('@') && !s.includes(' ') && s.length >= 5) {
+      emails.add(s);
+      const aliasList = KNOWN_SUPERVISOR_EMAIL_ALIASES[s];
+      if (Array.isArray(aliasList)) {
+        aliasList.forEach(a => emails.add(a.toLowerCase().trim()));
+      }
+    }
+  };
+
+  addClean(d.email);
+  addClean(d.personalEmail);
+  addClean(d.institutionalEmail);
+  if (Array.isArray(d.emails)) {
+    d.emails.forEach(e => addClean(e));
+  }
+  if (d.id && typeof d.id === 'string' && d.id.includes('@')) {
+    addClean(d.id);
+  }
+  if (d.supervisorEmail) addClean(d.supervisorEmail);
+
+  if (typeof d.photoUrl === 'string' && d.photoUrl) {
+    const photoMatch = d.photoUrl.match(/([a-zA-Z0-9._%+-]+)_(gmail\.com|tdtu\.edu\.vn|outlook\.com|yahoo\.com)/i);
+    if (photoMatch) {
+      addClean(`${photoMatch[1]}@${photoMatch[2]}`);
+    }
+  }
+
+  return emails;
+}
+window.extractSupervisorEmailAliases = extractSupervisorEmailAliases;
+
 export function filterAndDeduplicateMasterSupervisors(rawDocs = []) {
   if (!Array.isArray(rawDocs)) return [];
 
-  const canonicalMap = new Map(); // id -> doc
-  const emailToCanonicalMap = new Map(); // normalized email -> canonical doc
+  const canonicalMap = new Map();
+  const emailToCanonicalId = new Map();
   const indexDocs = [];
 
   rawDocs.forEach(d => {
     if (!d || typeof d !== 'object') return;
     const docId = String(d.id || '').trim();
-    const docEmail = String(d.email || '').trim().toLowerCase();
     const isExplicitIndex = Boolean(d.isAuthIndex === true);
     const isEmailId = docId.includes('@');
 
     if (isExplicitIndex || isEmailId) {
       indexDocs.push(d);
     } else {
-      // Non-email ID: canonical master profile
       const cleanDoc = { ...d, id: docId, supervisorId: d.supervisorId || docId, isAuthIndex: false };
       canonicalMap.set(docId, cleanDoc);
-      if (docEmail) {
-        emailToCanonicalMap.set(docEmail, cleanDoc);
+      const aliases = extractSupervisorEmailAliases(d);
+      aliases.forEach(e => emailToCanonicalId.set(e, docId));
+    }
+  });
+
+  const canonicalList = Array.from(canonicalMap.values());
+  const mergedCanonicalMap = new Map();
+  const finalEmailToId = new Map();
+
+  canonicalList.forEach(doc => {
+    const docId = doc.id;
+    const aliases = extractSupervisorEmailAliases(doc);
+
+    let existingId = null;
+    if (doc.supervisorMasterId && mergedCanonicalMap.has(doc.supervisorMasterId)) {
+      existingId = doc.supervisorMasterId;
+    } else if (doc.supervisorId && doc.supervisorId !== docId && mergedCanonicalMap.has(doc.supervisorId)) {
+      existingId = doc.supervisorId;
+    } else {
+      for (const e of aliases) {
+        if (finalEmailToId.has(e)) {
+          existingId = finalEmailToId.get(e);
+          break;
+        }
       }
     }
-  });
 
-  // Process potential email-only master docs: if an email doc has NO non-email doc, keep it
-  indexDocs.forEach(d => {
-    const docId = String(d.id || '').trim();
-    const docEmail = String(d.email || (docId.includes('@') ? docId : '')).trim().toLowerCase();
-    const supTargetId = String(d.supervisorId || d.authIndexFor || '').trim();
-
-    if (supTargetId && canonicalMap.has(supTargetId)) return;
-    if (docEmail && emailToCanonicalMap.has(docEmail)) return;
-
-    if (!canonicalMap.has(docId)) {
-      const promoted = { ...d, id: docId, supervisorId: docId, isAuthIndex: false };
-      canonicalMap.set(docId, promoted);
-      if (docEmail) emailToCanonicalMap.set(docEmail, promoted);
+    if (existingId && mergedCanonicalMap.has(existingId)) {
+      const existing = mergedCanonicalMap.get(existingId);
+      const isAdjunct = (doc.employmentType === 'adjunct' || existing.employmentType === 'adjunct');
+      const defQuota = isAdjunct ? 5 : (existing.defaultQuota || doc.defaultQuota || 10);
+      const merged = {
+        ...existing,
+        ...doc,
+        id: existingId,
+        supervisorId: existingId,
+        employmentType: isAdjunct ? 'adjunct' : (existing.employmentType || doc.employmentType || 'internal'),
+        defaultQuota: defQuota,
+        isAuthIndex: false
+      };
+      mergedCanonicalMap.set(existingId, merged);
+      aliases.forEach(e => finalEmailToId.set(e, existingId));
+    } else {
+      mergedCanonicalMap.set(docId, doc);
+      aliases.forEach(e => finalEmailToId.set(e, docId));
     }
   });
 
-  return Array.from(canonicalMap.values());
+  indexDocs.forEach(d => {
+    const docId = String(d.id || '').trim();
+    const supTargetId = String(d.supervisorId || d.authIndexFor || d.supervisorMasterId || '').trim();
+    const aliases = extractSupervisorEmailAliases(d);
+
+    let targetCanonicalId = null;
+    if (supTargetId && mergedCanonicalMap.has(supTargetId)) {
+      targetCanonicalId = supTargetId;
+    } else {
+      for (const e of aliases) {
+        if (finalEmailToId.has(e)) {
+          targetCanonicalId = finalEmailToId.get(e);
+          break;
+        }
+      }
+    }
+
+    if (targetCanonicalId && mergedCanonicalMap.has(targetCanonicalId)) {
+      const canonical = mergedCanonicalMap.get(targetCanonicalId);
+      if (d.employmentType === 'adjunct' || d.defaultQuota === 5) {
+        canonical.employmentType = 'adjunct';
+        canonical.defaultQuota = 5;
+      }
+      if (d.email && !canonical.personalEmail && d.email.toLowerCase().trim() !== (canonical.email || '').toLowerCase().trim()) {
+        canonical.personalEmail = d.email.toLowerCase().trim();
+      }
+      aliases.forEach(e => finalEmailToId.set(e, targetCanonicalId));
+      return;
+    }
+
+    if (!mergedCanonicalMap.has(docId)) {
+      const promoted = { ...d, id: docId, supervisorId: docId, isAuthIndex: false };
+      mergedCanonicalMap.set(docId, promoted);
+      aliases.forEach(e => finalEmailToId.set(e, docId));
+    }
+  });
+
+  return Array.from(mergedCanonicalMap.values());
 }
 window.filterAndDeduplicateMasterSupervisors = filterAndDeduplicateMasterSupervisors;
 
-/**
- * Deduplicates and filters raw documents from graduationRounds/{roundId}/supervisors.
- * Filters out email auth-index subcollection documents so each supervisor appears exactly once.
- */
 export function filterRoundSupervisorsList(rawDocs = []) {
   if (!Array.isArray(rawDocs)) return [];
 
+  const masterList = (typeof state !== 'undefined' && Array.isArray(state.supervisorsMaster)) ? state.supervisorsMaster : [];
   const canonicalMap = new Map();
-  const emailToCanonicalMap = new Map();
+  const emailToCanonicalKey = new Map();
   const indexDocs = [];
 
   rawDocs.forEach(d => {
     if (!d || typeof d !== 'object') return;
     const docId = String(d.id || '').trim();
-    const docEmail = String(d.email || '').trim().toLowerCase();
     const isExplicitIndex = Boolean(d.isAuthIndex === true);
     const isEmailId = docId.includes('@');
+    const supTargetId = String(d.supervisorId || d.authIndexFor || d.supervisorMasterId || '').trim();
 
-    if (isExplicitIndex || (isEmailId && d.supervisorId && d.supervisorId !== docId)) {
+    if (isExplicitIndex || (isEmailId && supTargetId && supTargetId !== docId)) {
       indexDocs.push(d);
     } else if (isEmailId) {
       indexDocs.push(d);
     } else {
       canonicalMap.set(docId, { ...d, id: docId });
-      if (docEmail) emailToCanonicalMap.set(docEmail, { ...d, id: docId });
+      const aliases = extractSupervisorEmailAliases(d);
+      aliases.forEach(e => emailToCanonicalKey.set(e, docId));
     }
   });
+
+  const finalRoundMap = new Map();
+  const finalRoundEmailMap = new Map();
+
+  for (const doc of canonicalMap.values()) {
+    const docId = doc.id;
+    const supTargetId = String(doc.supervisorId || doc.supervisorMasterId || docId).trim();
+    const aliases = extractSupervisorEmailAliases(doc);
+
+    let masterRecord = null;
+    if (masterList.length > 0) {
+      masterRecord = masterList.find(m => m.id === docId || m.id === supTargetId);
+      if (!masterRecord) {
+        for (const e of aliases) {
+          masterRecord = masterList.find(m => {
+            const mAliases = extractSupervisorEmailAliases(m);
+            return mAliases.has(e);
+          });
+          if (masterRecord) break;
+        }
+      }
+    }
+
+    const stableKey = masterRecord ? masterRecord.id : (supTargetId || docId);
+
+    let existingKey = null;
+    if (finalRoundMap.has(stableKey)) {
+      existingKey = stableKey;
+    } else {
+      for (const e of aliases) {
+        if (finalRoundEmailMap.has(e)) {
+          existingKey = finalRoundEmailMap.get(e);
+          break;
+        }
+      }
+    }
+
+    if (existingKey && finalRoundMap.has(existingKey)) {
+      const existing = finalRoundMap.get(existingKey);
+      const cap = (doc.capacity === 5 || existing.capacity === 5) ? 5 : (doc.capacity || existing.capacity || 10);
+      const unified = {
+        ...existing,
+        ...doc,
+        id: existingKey,
+        supervisorId: existingKey,
+        capacity: cap,
+        maxQuota: cap,
+        activeInRound: doc.activeInRound !== false || existing.activeInRound !== false
+      };
+      finalRoundMap.set(existingKey, unified);
+      aliases.forEach(e => finalRoundEmailMap.set(e, existingKey));
+    } else {
+      finalRoundMap.set(stableKey, { ...doc, id: stableKey, supervisorId: stableKey });
+      aliases.forEach(e => finalRoundEmailMap.set(e, stableKey));
+    }
+  }
 
   indexDocs.forEach(d => {
     const docId = String(d.id || '').trim();
-    const docEmail = String(d.email || (docId.includes('@') ? docId : '')).trim().toLowerCase();
-    const supTargetId = String(d.supervisorId || '').trim();
+    const supTargetId = String(d.supervisorId || d.authIndexFor || d.supervisorMasterId || '').trim();
+    const aliases = extractSupervisorEmailAliases(d);
 
-    if (supTargetId && canonicalMap.has(supTargetId)) return;
-    if (docEmail && emailToCanonicalMap.has(docEmail)) return;
+    let targetKey = null;
+    if (supTargetId && finalRoundMap.has(supTargetId)) {
+      targetKey = supTargetId;
+    } else {
+      for (const e of aliases) {
+        if (finalRoundEmailMap.has(e)) {
+          targetKey = finalRoundEmailMap.get(e);
+          break;
+        }
+      }
+    }
 
-    if (!canonicalMap.has(docId)) {
-      canonicalMap.set(docId, { ...d, id: docId });
-      if (docEmail) emailToCanonicalMap.set(docEmail, { ...d, id: docId });
+    if (!targetKey && masterList.length > 0) {
+      for (const e of aliases) {
+        const m = masterList.find(mDoc => extractSupervisorEmailAliases(mDoc).has(e));
+        if (m && finalRoundMap.has(m.id)) {
+          targetKey = m.id;
+          break;
+        }
+      }
+    }
+
+    if (targetKey && finalRoundMap.has(targetKey)) {
+      const existing = finalRoundMap.get(targetKey);
+      if (d.capacity === 5 || d.maxQuota === 5) {
+        existing.capacity = 5;
+        existing.maxQuota = 5;
+      }
+      aliases.forEach(e => finalRoundEmailMap.set(e, targetKey));
+      return;
+    }
+
+    if (!finalRoundMap.has(docId)) {
+      finalRoundMap.set(docId, { ...d, id: docId });
+      aliases.forEach(e => finalRoundEmailMap.set(e, docId));
     }
   });
 
-  return Array.from(canonicalMap.values());
+  return Array.from(finalRoundMap.values());
 }
 window.filterRoundSupervisorsList = filterRoundSupervisorsList;
 
@@ -483,10 +671,10 @@ export function getSupervisorMasterRecord(ref) {
   }
   if (candidateEmail) {
     const byEmail = masterList.find(s => {
-      const e = String(s.email || '').toLowerCase().trim();
-      if (e && e === candidateEmail) return true;
-      if (Array.isArray(s.emails) && s.emails.some(x => String(x || '').toLowerCase().trim() === candidateEmail)) return true;
-      return false;
+      const aliases = (typeof extractSupervisorEmailAliases === 'function')
+        ? extractSupervisorEmailAliases(s)
+        : new Set([String(s.email || '').toLowerCase().trim()]);
+      return aliases.has(candidateEmail);
     });
     if (byEmail) return byEmail;
   }

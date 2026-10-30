@@ -51,7 +51,7 @@ global.getSupervisorAvatarSvgDataUri = (name) => `data:image/svg+xml;utf8,<svg>$
 const rawCore = fs.readFileSync(path.join(root, 'js', 'core.js'), 'utf8');
 
 // Extract getSupervisorMasterRecord ... resolveSupervisorPhoto block
-const startIdx = rawCore.indexOf('export function getSupervisorMasterRecord');
+const startIdx = rawCore.indexOf('export function cleanSupervisorDisplayName');
 const endIdx = rawCore.indexOf('window.getSupervisorMasterRecord = getSupervisorMasterRecord;');
 const resolverBlock = rawCore.slice(startIdx, endIdx)
   .replace(/export\s+/g, '');
@@ -65,6 +65,7 @@ const normBlock = rawCore.slice(normStart, normEnd)
 vm.runInThisContext(resolverBlock);
 vm.runInThisContext(normBlock);
 
+global.cleanSupervisorDisplayName = cleanSupervisorDisplayName;
 global.getSupervisorMasterRecord = getSupervisorMasterRecord;
 global.resolveSupervisorProfile = resolveSupervisorProfile;
 global.resolveSupervisorName = resolveSupervisorName;

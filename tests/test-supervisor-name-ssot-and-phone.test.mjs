@@ -33,7 +33,7 @@ globalThis.getSupervisorAvatarSvgDataUri = (name) => `data:image/svg+xml;utf8,<s
 
 // Extract resolver functions from js/core.js safely without CDN imports
 const rawCore = fs.readFileSync(path.join(root, 'js', 'core.js'), 'utf8');
-const startIdx = rawCore.indexOf('export function filterAndDeduplicateMasterSupervisors');
+const startIdx = rawCore.indexOf('export const KNOWN_SUPERVISOR_EMAIL_ALIASES');
 const endIdx = rawCore.indexOf('window.toggleRoundOpenImmediately = function');
 if (startIdx === -1 || endIdx === -1) {
   throw new Error(`Failed to locate resolver block in js/core.js (start: ${startIdx}, end: ${endIdx})`);

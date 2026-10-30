@@ -1116,9 +1116,13 @@ window.saveRound = async function(e) {
               const emailRef = doc(db, 'graduationRounds', savedId, 'supervisors', emailClean);
               batch.set(emailRef, {
                 supervisorId: supData.id,
+                authIndexFor: supData.id,
+                isAuthIndex: true,
                 name: supData.name,
                 email: emailClean,
                 department: supData.department,
+                employmentType: supData.employmentType,
+                capacity: supData.maxQuota || supData.capacity,
                 active: true,
                 updatedAt: serverTimestamp()
               }, { merge: true });
