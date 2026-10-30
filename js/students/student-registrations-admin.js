@@ -363,7 +363,13 @@ window.exportRegistrationsCSV = function() {
 
   const headers = ['MSSV', 'Họ và tên', 'Trạng thái ĐK', 'Email', 'Tên đề tài', 'Loại hình đồ án', 'Nguyện vọng 1', 'Nguyện vọng 2', 'Nguyện vọng 3', 'Điều kiện', 'Trạng thái xét', 'Thời gian nộp'];
   const rows = list.map(r => {
-    const getSup = rank => (r.preferences || []).find(p => p.rank === rank)?.supervisorName || '';
+    const getSup = rank => {
+      const p = (r.preferences || []).find(pref => Number(pref.rank) === rank);
+      if (!p) return '';
+      return (typeof window.resolveSupervisorName === 'function')
+        ? window.resolveSupervisorName(p.supervisorId || p.id || p.email, p.supervisorName)
+        : (p.supervisorName || '');
+    };
     const dt = r.submittedAt ? (r.submittedAt.toDate ? r.submittedAt.toDate() : new Date(r.submittedAt)).toLocaleString('vi-VN') : '';
     let elText = 'Đủ điều kiện';
     if (r.eligibilityStatus === 'pending') elText = 'Chờ xét';

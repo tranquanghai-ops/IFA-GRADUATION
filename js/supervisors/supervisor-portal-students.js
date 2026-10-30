@@ -218,6 +218,11 @@ window.renderSupervisorAssignedStudents = function() {
                 <span class="font-bold text-tdtu-blue font-mono">MSSV: ${studentId}</span>
                 <span class="text-slate-400">•</span>
                 <span class="text-slate-600 font-medium truncate">Lớp: ${className}</span>
+                <span class="text-slate-400">•</span>
+                <span class="text-slate-600 font-medium inline-flex items-center gap-1">
+                  <span class="text-slate-400">📞 SĐT:</span>
+                  ${(st.phone || st.studentPhone || studentObj?.phone) ? `<a href="tel:${escapeHtml(String(st.phone || st.studentPhone || studentObj?.phone).replace(/[^\d+]/g, ''))}" class="font-semibold text-blue-600 hover:underline select-all">${escapeHtml(st.phone || st.studentPhone || studentObj?.phone)}</a>` : '<span class="text-slate-400 italic">Chưa cập nhật SĐT</span>'}
+                </span>
               </div>
             </div>
           </div>

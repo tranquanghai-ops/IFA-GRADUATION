@@ -87,7 +87,7 @@ assert.match(studentEligibility, /✓ Đã duyệt/);
 assert.match(studentEligibility, /⏳ Chờ duyệt/);
 assert.match(studentEligibility, /✕ Yêu cầu sửa/);
 
-const studentTopicPdf = read('js/students/student-topic-pdf.js');
+const studentTopicPdf = read('js/students/student-topic-pdf.js').replace(/\r\n/g, '\n');
 assert.match(studentTopicPdf, /function resolveOfficialStudentFullName/);
 assert.match(studentTopicPdf, /resolveOfficialStudentFullName/);
 assert.match(studentTopicPdf, /window\.resolveOfficialStudentFullName = resolveOfficialStudentFullName/);
@@ -99,7 +99,7 @@ const topicPdfContext = {
 };
 const fnMatch = studentTopicPdf.match(/function resolveOfficialStudentFullName\([\s\S]*?\n\}\nwindow\.resolveOfficialStudentFullName/);
 assert.ok(fnMatch, 'resolveOfficialStudentFullName function body found');
-vm.runInNewContext(fnMatch[0].replace(/\nwindow\.resolveOfficialStudentFullName$/, ''), topicPdfContext);
+vm.runInNewContext(fnMatch[0].replace(/\r?\nwindow\.resolveOfficialStudentFullName$/, ''), topicPdfContext);
 const resolvedName = topicPdfContext.resolveOfficialStudentFullName('12200254', { studentName: 'Nguyễn Thanh Hằng Nga' }, { fullName: 'Sinh viên 12200254', isMissing: true });
 assert.equal(resolvedName, 'Nguyễn Thanh Hằng Nga', 'resolveOfficialStudentFullName should return actual student name over placeholder');
 

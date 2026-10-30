@@ -51,7 +51,7 @@ window.getSupervisorDefaultAndMaxQuota = getSupervisorDefaultAndMaxQuota;
 let _supervisorsMasterLoadingPromise = null;
 
 export async function ensureSupervisorsMasterLoaded(force = false) {
-  if (!force && Array.isArray(state.supervisorsMaster) && state.supervisorsMaster.length > 0) {
+  if (!force && state._isSupervisorsMasterFullyLoaded && Array.isArray(state.supervisorsMaster) && state.supervisorsMaster.length > 0) {
     return state.supervisorsMaster;
   }
   if (!force && _supervisorsMasterLoadingPromise) {
@@ -64,6 +64,7 @@ export async function ensureSupervisorsMasterLoaded(force = false) {
       state.supervisorsMaster = (typeof filterAndDeduplicateMasterSupervisors === 'function')
         ? filterAndDeduplicateMasterSupervisors(rawDocs)
         : (window.filterAndDeduplicateMasterSupervisors ? window.filterAndDeduplicateMasterSupervisors(rawDocs) : rawDocs);
+      state._isSupervisorsMasterFullyLoaded = true;
     } catch (e) {
       console.error('Error loading supervisorMaster:', e);
       // Fallback: If listing full supervisorMaster is not permitted for visiting supervisor, query specifically by email

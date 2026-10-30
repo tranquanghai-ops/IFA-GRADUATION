@@ -77,6 +77,13 @@ function resolveOfficialSupervisorName(st, fallback = 'Giảng viên Hướng d�
   const primary = officials.find(s => s.role === 'primary') || officials[0];
 
   // 1. Resolve through Master Supervisor Resolver if ID or Email is available
+  const cleanName = val => {
+    if (typeof window !== 'undefined' && typeof window.cleanSupervisorDisplayName === 'function') {
+      return window.cleanSupervisorDisplayName(val);
+    }
+    return String(val || '').trim();
+  };
+
   const supId = primary?.supervisorId || st.acceptedSupervisorId || st.supervisorId;
   const supEmail = primary?.supervisorEmail || st.acceptedSupervisorEmail || st.supervisorEmail;
   if (supId || supEmail) {
@@ -84,19 +91,19 @@ function resolveOfficialSupervisorName(st, fallback = 'Giảng viên Hướng d�
       ? window.resolveSupervisorName(supId || supEmail, '')
       : '';
     if (resolvedMasterName && !isInvalid(resolvedMasterName)) {
-      return resolvedMasterName.trim();
+      return cleanName(resolvedMasterName);
     }
   }
 
   // 2. Check officialSupervisors
   if (primary?.supervisorName && !isInvalid(primary.supervisorName)) {
-    return primary.supervisorName.trim();
+    return cleanName(primary.supervisorName);
   }
 
   // 2. Direct properties on registration or assignment
   const directName = st.acceptedSupervisorName || st.supervisorName || st.finalSupervisorName;
   if (directName && !isInvalid(directName)) {
-    return String(directName).trim();
+    return cleanName(directName);
   }
 
   // 3. Official assignment in state
@@ -106,10 +113,10 @@ function resolveOfficialSupervisorName(st, fallback = 'Giảng viên Hướng d�
     const assOfficials = (typeof getOfficialSupervisors === 'function') ? getOfficialSupervisors(myAss) : [];
     const assPrimary = assOfficials.find(s => s.role === 'primary') || assOfficials[0];
     if (assPrimary?.supervisorName && !isInvalid(assPrimary.supervisorName)) {
-      return assPrimary.supervisorName.trim();
+      return cleanName(assPrimary.supervisorName);
     }
-    if (myAss.acceptedSupervisorName && !isInvalid(myAss.acceptedSupervisorName)) return myAss.acceptedSupervisorName.trim();
-    if (myAss.supervisorName && !isInvalid(myAss.supervisorName)) return myAss.supervisorName.trim();
+    if (myAss.acceptedSupervisorName && !isInvalid(myAss.acceptedSupervisorName)) return cleanName(myAss.acceptedSupervisorName);
+    if (myAss.supervisorName && !isInvalid(myAss.supervisorName)) return cleanName(myAss.supervisorName);
   }
 
   // 4. If current actor is a supervisor

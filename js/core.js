@@ -439,13 +439,28 @@ export function filterRoundSupervisorsList(rawDocs = []) {
 }
 window.filterRoundSupervisorsList = filterRoundSupervisorsList;
 
+export function cleanSupervisorDisplayName(rawName) {
+  if (!rawName || typeof rawName !== 'string') return '';
+  let cleaned = rawName.trim().replace(/\s+/g, ' ');
+  // Fix known historical typos: KTX -> KTS, MInh -> Minh
+  cleaned = cleaned.replace(/\bKTX\b/g, 'KTS');
+  cleaned = cleaned.replace(/\bMInh\b/g, 'Minh');
+  return cleaned;
+}
+window.cleanSupervisorDisplayName = cleanSupervisorDisplayName;
+
 export function getSupervisorMasterRecord(ref) {
   if (!ref) return null;
   const masterList = (typeof state !== 'undefined' && Array.isArray(state.supervisorsMaster)) ? state.supervisorsMaster : [];
-  const roundList = (typeof state !== 'undefined' && Array.isArray(state.roundSupervisors)) ? state.roundSupervisors : [];
+  const roundList = (typeof state !== 'undefined' && Array.isArray(state.roundSupervisors))
+    ? state.roundSupervisors
+    : ((typeof state !== 'undefined' && state.adminReviewData && Array.isArray(state.adminReviewData.supervisors))
+        ? state.adminReviewData.supervisors
+        : []);
 
   let candidateId = '';
   let candidateEmail = '';
+  let candidateName = '';
 
   if (typeof ref === 'string') {
     const s = ref.trim();
@@ -458,6 +473,7 @@ export function getSupervisorMasterRecord(ref) {
     candidateId = String(ref.supervisorId || ref.id || '').trim();
     const rawEmail = String(ref.supervisorEmail || ref.email || ref.institutionalEmail || ref.personalEmail || '').trim();
     if (rawEmail) candidateEmail = rawEmail.toLowerCase();
+    candidateName = String(ref.supervisorName || ref.name || '').trim();
   }
 
   // 1. Primary match: state.supervisorsMaster (Single Source of Truth)
@@ -474,18 +490,39 @@ export function getSupervisorMasterRecord(ref) {
     });
     if (byEmail) return byEmail;
   }
-
-  // 2. Secondary fallback: state.roundSupervisors
-  if (candidateId) {
-    const byRoundId = roundList.find(s => s.id === candidateId || s.supervisorId === candidateId);
-    if (byRoundId) return byRoundId;
+  if (candidateName) {
+    const cleanedCandidate = cleanSupervisorDisplayName(candidateName).toLowerCase();
+    const byName = masterList.find(s => {
+      const sName = cleanSupervisorDisplayName(s.name || '').toLowerCase();
+      return sName && sName === cleanedCandidate;
+    });
+    if (byName) return byName;
   }
-  if (candidateEmail) {
-    const byRoundEmail = roundList.find(s => {
+
+  // 2. Secondary fallback: check roundList, BUT if found, try to cross-reference with masterList by email!
+  let roundRecord = null;
+  if (candidateId) {
+    roundRecord = roundList.find(s => s.id === candidateId || s.supervisorId === candidateId);
+  }
+  if (!roundRecord && candidateEmail) {
+    roundRecord = roundList.find(s => {
       const e = String(s.email || '').toLowerCase().trim();
       return e && e === candidateEmail;
     });
-    if (byRoundEmail) return byRoundEmail;
+  }
+
+  if (roundRecord) {
+    const roundEmail = String(roundRecord.email || roundRecord.institutionalEmail || '').toLowerCase().trim();
+    if (roundEmail) {
+      const masterByRoundEmail = masterList.find(s => {
+        const e = String(s.email || '').toLowerCase().trim();
+        if (e && e === roundEmail) return true;
+        if (Array.isArray(s.emails) && s.emails.some(x => String(x || '').toLowerCase().trim() === roundEmail)) return true;
+        return false;
+      });
+      if (masterByRoundEmail) return masterByRoundEmail;
+    }
+    return roundRecord;
   }
 
   return null;
@@ -494,13 +531,20 @@ export function getSupervisorMasterRecord(ref) {
 export function resolveSupervisorProfile(ref, fallback = {}) {
   const master = getSupervisorMasterRecord(ref);
   if (!master) {
-    return (ref && typeof ref === 'object') ? { ...fallback, ...ref } : (fallback || null);
+    const res = (ref && typeof ref === 'object') ? { ...fallback, ...ref } : (fallback ? { ...fallback } : null);
+    if (res) {
+      if (res.name) res.name = cleanSupervisorDisplayName(res.name);
+      if (res.supervisorName) res.supervisorName = cleanSupervisorDisplayName(res.supervisorName);
+    }
+    return res;
   }
   const base = (ref && typeof ref === 'object') ? { ...fallback, ...ref } : (fallback || {});
+  const resolvedName = cleanSupervisorDisplayName(master.name || base.name || base.supervisorName || '');
   return {
     ...base,
     ...master,
-    name: master.name || base.name || base.supervisorName || '',
+    name: resolvedName,
+    supervisorName: resolvedName,
     email: master.email || base.email || base.supervisorEmail || '',
     department: master.department || base.department || '',
     photoUrl: master.photoUrl || base.photoUrl || '',
@@ -512,22 +556,22 @@ export function resolveSupervisorName(ref, fallbackName = '') {
   if (!ref && !fallbackName) return '';
   const master = getSupervisorMasterRecord(ref);
   if (master && master.name && String(master.name).trim()) {
-    return String(master.name).trim();
+    return cleanSupervisorDisplayName(String(master.name).trim());
   }
   if (fallbackName && String(fallbackName).trim()) {
-    return String(fallbackName).trim();
+    return cleanSupervisorDisplayName(String(fallbackName).trim());
   }
   if (ref && typeof ref === 'object') {
     const objName = ref.name || ref.supervisorName || '';
-    if (objName && String(objName).trim()) return String(objName).trim();
+    if (objName && String(objName).trim()) return cleanSupervisorDisplayName(String(objName).trim());
   }
   if (typeof ref === 'string' && !ref.includes('@') && !ref.includes('/')) {
     if (/^[A-Za-z0-9_-]{16,32}$/.test(ref)) {
-      return fallbackName || '--';
+      return fallbackName ? cleanSupervisorDisplayName(fallbackName) : '--';
     }
-    return ref;
+    return cleanSupervisorDisplayName(ref);
   }
-  return fallbackName || '--';
+  return fallbackName ? cleanSupervisorDisplayName(fallbackName) : '--';
 }
 
 export function resolveSupervisorDepartment(ref, fallbackDept = '') {

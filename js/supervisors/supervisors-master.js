@@ -9,6 +9,7 @@ async function loadAdminSupervisorsMaster() {
     state.supervisorsMaster = (typeof filterAndDeduplicateMasterSupervisors === 'function')
       ? filterAndDeduplicateMasterSupervisors(rawDocs)
       : (window.filterAndDeduplicateMasterSupervisors ? window.filterAndDeduplicateMasterSupervisors(rawDocs) : rawDocs);
+    state._isSupervisorsMasterFullyLoaded = true;
     renderAdminSupervisorsMasterTable();
   } catch (e) {
     console.error('Error loading master supervisors:', e);
@@ -837,6 +838,9 @@ window.saveSupervisorMaster = async function(e) {
     }
     if (typeof renderAdminAssignedSupervisorsTable === 'function' && document.getElementById('admin-assigned-supervisors-tbody')) {
       renderAdminAssignedSupervisorsTable();
+    }
+    if (typeof renderAdminManualAssignmentTable === 'function' && document.getElementById('admin-manual-assign-tbody')) {
+      renderAdminManualAssignmentTable();
     }
     if (typeof filterAdminRegistrationsTable === 'function' && document.getElementById('admin-registrations-tbody')) {
       filterAdminRegistrationsTable();

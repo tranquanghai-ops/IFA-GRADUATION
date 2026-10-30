@@ -284,10 +284,9 @@ function buildStudentPreferenceItem({ mssv, rank, registration, supervisor, deci
   } else if (isAcceptedByOther) {
     statusKey = 'accepted_other';
     const otherRank = registration.acceptedRank || '1';
-    let otherName = registration.acceptedSupervisorName;
-    if (!otherName && typeof window.resolveSupervisorName === 'function') {
-      otherName = window.resolveSupervisorName(registration.acceptedSupervisorId);
-    }
+    let otherName = (typeof window.resolveSupervisorName === 'function')
+      ? window.resolveSupervisorName(registration.acceptedSupervisorId, registration.acceptedSupervisorName)
+      : registration.acceptedSupervisorName;
     const nameLabel = otherName ? ` (${escapeHtml(otherName)})` : '';
     statusBadgeHtml = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">Được nhận ở NV${otherRank}${nameLabel}</span>`;
   } else if (hasRejectedDecision) {

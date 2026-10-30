@@ -884,6 +884,7 @@ export async function loadSupervisorReviewData(roundId) {
             : null;
           const resolvedClass1 = prof1?.className || registration.currentClass || registration.studentClass || registration.className || '';
           const resolvedName1 = prof1?.studentName || registration.studentName || studentId;
+          const resolvedPhone1 = prof1?.phone || prof1?.studentPhone || registration.studentPhone || registration.phone || '';
           candidates.push({
             ...registration,
             ...(prof1 || {}),
@@ -895,6 +896,8 @@ export async function loadSupervisorReviewData(roundId) {
             currentClass: resolvedClass1,
             classDisplay: resolvedClass1 || 'Chưa có dữ liệu lớp',
             hasValidClass: Boolean(resolvedClass1),
+            phone: resolvedPhone1,
+            studentPhone: resolvedPhone1,
             candidateRank: 1,
             isEarlyTransition: false,
             currentDecision: dec?.decision === 'selected' ? 'selected' : (dec?.decision === 'rejected' ? 'rejected' : '')
@@ -914,6 +917,7 @@ export async function loadSupervisorReviewData(roundId) {
             : null;
           const resolvedClass2Skip = prof2Skip?.className || registration.currentClass || registration.studentClass || registration.className || '';
           const resolvedName2Skip = prof2Skip?.studentName || registration.studentName || studentId;
+          const resolvedPhone2Skip = prof2Skip?.phone || prof2Skip?.studentPhone || registration.studentPhone || registration.phone || '';
           candidates.push({
             ...registration,
             ...(prof2Skip || {}),
@@ -925,6 +929,8 @@ export async function loadSupervisorReviewData(roundId) {
             currentClass: resolvedClass2Skip,
             classDisplay: resolvedClass2Skip || 'Chưa có dữ liệu lớp',
             hasValidClass: Boolean(resolvedClass2Skip),
+            phone: resolvedPhone2Skip,
+            studentPhone: resolvedPhone2Skip,
             candidateRank: 3,
             isEarlyTransition: true,
             currentDecision: dec?.decision === 'selected' ? 'selected' : (dec?.decision === 'rejected' ? 'rejected' : '')
@@ -937,6 +943,7 @@ export async function loadSupervisorReviewData(roundId) {
             : null;
           const resolvedClass2Reg = prof2Reg?.className || registration.currentClass || registration.studentClass || registration.className || '';
           const resolvedName2Reg = prof2Reg?.studentName || registration.studentName || studentId;
+          const resolvedPhone2Reg = prof2Reg?.phone || prof2Reg?.studentPhone || registration.studentPhone || registration.phone || '';
           candidates.push({
             ...registration,
             ...(prof2Reg || {}),
@@ -948,6 +955,8 @@ export async function loadSupervisorReviewData(roundId) {
             currentClass: resolvedClass2Reg,
             classDisplay: resolvedClass2Reg || 'Chưa có dữ liệu lớp',
             hasValidClass: Boolean(resolvedClass2Reg),
+            phone: resolvedPhone2Reg,
+            studentPhone: resolvedPhone2Reg,
             candidateRank: 2,
             isEarlyTransition: false,
             currentDecision: dec?.decision === 'selected' ? 'selected' : (dec?.decision === 'rejected' ? 'rejected' : '')
@@ -962,6 +971,7 @@ export async function loadSupervisorReviewData(roundId) {
             : null;
           const resolvedClass3 = prof3?.className || registration.currentClass || registration.studentClass || registration.className || '';
           const resolvedName3 = prof3?.studentName || registration.studentName || studentId;
+          const resolvedPhone3 = prof3?.phone || prof3?.studentPhone || registration.studentPhone || registration.phone || '';
           candidates.push({
             ...registration,
             ...(prof3 || {}),
@@ -973,6 +983,8 @@ export async function loadSupervisorReviewData(roundId) {
             currentClass: resolvedClass3,
             classDisplay: resolvedClass3 || 'Chưa có dữ liệu lớp',
             hasValidClass: Boolean(resolvedClass3),
+            phone: resolvedPhone3,
+            studentPhone: resolvedPhone3,
             candidateRank: 3,
             isEarlyTransition: false,
             currentDecision: dec?.decision === 'selected' ? 'selected' : (dec?.decision === 'rejected' ? 'rejected' : '')
@@ -1236,6 +1248,20 @@ function renderSupervisorCandidatesTable(readOnly) {
       }
     }
 
+    const rawPhone = String(c.phone || c.studentPhone || '').trim();
+    const cleanTel = rawPhone.replace(/[^\d+]/g, '');
+    const phoneHtml = cleanTel ? `
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600">
+        <span class="text-slate-400 select-none">📞 SĐT:</span>
+        <a href="tel:${escapeHtml(cleanTel)}" class="font-semibold text-blue-600 hover:text-blue-800 hover:underline select-all">${escapeHtml(rawPhone)}</a>
+      </div>
+    ` : `
+      <div class="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400 italic">
+        <span class="not-italic select-none">📞 SĐT:</span>
+        <span>Chưa cập nhật SĐT</span>
+      </div>
+    `;
+
     const rowBg = isSelected
       ? 'bg-emerald-50/30'
       : (isRejected
@@ -1248,7 +1274,8 @@ function renderSupervisorCandidatesTable(readOnly) {
         <td class="p-3.5 align-top">
           <span class="font-bold text-slate-900 block leading-tight">${escapeHtml(c.studentName || c.fullName || '--')}</span>
           <span class="text-[11px] ${c.hasValidClass !== false && (c.className || c.currentClass) ? 'text-slate-500' : 'text-amber-600 font-medium italic'} block mt-0.5">Lớp: ${escapeHtml(c.className || c.currentClass || c.studentClass || 'Chưa có dữ liệu lớp')}</span>
-          ${prefBadge}
+          ${phoneHtml}
+          <div class="mt-1.5">${prefBadge}</div>
         </td>
         <td class="p-3.5 align-top">
           <p class="font-bold text-slate-900 leading-snug">${escapeHtml(topicTitle)}</p>

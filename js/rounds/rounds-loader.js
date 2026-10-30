@@ -454,9 +454,15 @@ function renderRoundHeader() {
   if (assignedSupEl) {
     if (officialList.length > 0) {
       const p = officialList.find(s => s.role === 'primary') || officialList[0];
-      assignedSupEl.textContent = `GVHD: ${p.supervisorName || effectiveAssignment?.acceptedSupervisorName || 'Đã phân công'}`;
+      const supResolved = (typeof resolveSupervisorName === 'function')
+        ? resolveSupervisorName(p?.supervisorId || p?.supervisorEmail, p?.supervisorName || effectiveAssignment?.acceptedSupervisorName)
+        : (p?.supervisorName || effectiveAssignment?.acceptedSupervisorName || 'Đã phân công');
+      assignedSupEl.textContent = `GVHD: ${supResolved}`;
     } else if (effectiveAssignment?.acceptedSupervisorName) {
-      assignedSupEl.textContent = `GVHD: ${effectiveAssignment.acceptedSupervisorName}`;
+      const supResolved = (typeof resolveSupervisorName === 'function')
+        ? resolveSupervisorName(effectiveAssignment?.acceptedSupervisorId || effectiveAssignment?.acceptedSupervisorEmail, effectiveAssignment.acceptedSupervisorName)
+        : effectiveAssignment.acceptedSupervisorName;
+      assignedSupEl.textContent = `GVHD: ${supResolved}`;
     } else {
       assignedSupEl.textContent = 'GVHD: Chưa phân công';
     }

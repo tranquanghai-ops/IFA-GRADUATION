@@ -38,7 +38,7 @@ window.loadAdminReviewData = async function(roundId) {
     // 2. Fetch Supervisors & Master Catalog
     const [supSnap] = await Promise.all([
       getDocs(collection(db, 'graduationRounds', roundId, 'supervisors')),
-      (typeof ensureSupervisorsMasterLoaded === 'function' ? ensureSupervisorsMasterLoaded() : Promise.resolve())
+      (typeof ensureSupervisorsMasterLoaded === 'function' ? ensureSupervisorsMasterLoaded(true) : Promise.resolve())
     ]);
     const supervisors = supSnap.docs.map(d => {
       const roundSup = { id: d.id, ...d.data() };
@@ -59,6 +59,7 @@ window.loadAdminReviewData = async function(roundId) {
         } : {})
       };
     });
+    state.roundSupervisors = supervisors;
 
     // 3. Fetch Registrations
     const regSnap = await getDocs(collection(db, 'graduationRounds', roundId, 'registrations'));
@@ -1444,7 +1445,7 @@ window.saveAdminEditSupervisor = async function() {
   const updatedOfficials = [
     {
       supervisorId: newPrimary.id,
-      supervisorName: newPrimary.name,
+      supervisorName: (typeof resolveSupervisorName === 'function' ? resolveSupervisorName(newPrimary.id, newPrimary.name) : newPrimary.name),
       supervisorEmail: (newPrimary.email || '').toLowerCase().trim(),
       source: newPrimaryId === oldPrimary?.supervisorId ? (oldPrimary.source || 'preference') : 'admin_edited',
       role: 'primary',
@@ -1452,7 +1453,7 @@ window.saveAdminEditSupervisor = async function() {
     },
     ...(newSecondary ? [{
       supervisorId: newSecondary.id,
-      supervisorName: newSecondary.name,
+      supervisorName: (typeof resolveSupervisorName === 'function' ? resolveSupervisorName(newSecondary.id, newSecondary.name) : newSecondary.name),
       supervisorEmail: (newSecondary.email || '').toLowerCase().trim(),
       source: newSecondaryId === oldSecondary?.supervisorId ? (oldSecondary.source || 'admin_added') : 'admin_added',
       role: 'support',
@@ -1500,6 +1501,9 @@ window.saveAdminEditSupervisor = async function() {
 // --- SUBMODULE WINDOW BRIDGE ---
 if (typeof window !== 'undefined') {
   if (typeof renderAdminReviewManagement !== 'undefined') window.renderAdminReviewManagement = renderAdminReviewManagement;
+  if (typeof renderAdminManualAssignmentTable !== 'undefined') window.renderAdminManualAssignmentTable = renderAdminManualAssignmentTable;
+  if (typeof renderAdminReviewDashboard !== 'undefined') window.renderAdminReviewDashboard = renderAdminReviewDashboard;
+  if (typeof renderAdminReviewSupervisorsTable !== 'undefined') window.renderAdminReviewSupervisorsTable = renderAdminReviewSupervisorsTable;
   if (typeof openAdminAssignModal !== 'undefined') window.openAdminAssignModal = openAdminAssignModal;
   if (typeof saveAdminManualAssignment !== 'undefined') window.saveAdminManualAssignment = saveAdminManualAssignment;
   if (typeof openAdminEditSupervisorAssignmentModal !== 'undefined') window.openAdminEditSupervisorAssignmentModal = openAdminEditSupervisorAssignmentModal;

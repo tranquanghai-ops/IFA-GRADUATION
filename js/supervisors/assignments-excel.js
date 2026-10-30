@@ -279,7 +279,7 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
   const filtered = allRows.filter(row => {
     if (!q) return true;
     const reg = row.effective;
-    const supNames = getOfficialSupervisors(reg).map(s => s.supervisorName || '').join(' ').toLowerCase();
+    const supNames = getOfficialSupervisors(reg).map(s => ((typeof resolveSupervisorName === 'function' ? resolveSupervisorName(s.supervisorId || s.supervisorEmail, s.supervisorName) : s.supervisorName) || '')).join(' ').toLowerCase();
     const name = resolveStudentName(row.studentId, reg.studentName || row.eligibleStudent?.fullName || row.eligibleStudent?.name);
     return row.studentId.toLowerCase().includes(q) ||
       (reg.studentName || '').toLowerCase().includes(q) ||
@@ -318,9 +318,12 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
     const supports = officials.filter(s => s.role === 'support');
 
     const editingLocked = isAssignmentEditingLocked();
+    const primaryName = (typeof resolveSupervisorName === 'function')
+      ? resolveSupervisorName(primary?.supervisorId || primary?.supervisorEmail, primary?.supervisorName)
+      : (primary?.supervisorName || 'GVHD 1');
     const primaryHtml = (isAssigned && primary) ? `
       <button type="button" ${editingLocked ? 'disabled' : `onclick="openAdminEditSupervisorModal('${mssv}')"`} class="text-left ${editingLocked ? 'cursor-default' : 'hover:bg-blue-50 cursor-pointer'} p-1.5 -m-1.5 rounded-lg transition-colors" title="${editingLocked ? 'Mở khóa chỉnh sửa để thay đổi GVHD 1' : 'Bấm để đổi GVHD 1'}">
-        <span class="font-bold text-slate-900 text-xs block">${escapeHtml(primary.supervisorName || 'GVHD 1')}</span>
+        <span class="font-bold text-slate-900 text-xs block">${escapeHtml(primaryName || 'GVHD 1')}</span>
         <span class="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-200">GVHD 1</span>
         ${row.draft ? '<span class="block text-[9px] font-bold text-amber-700 mt-1">Chưa công bố</span>' : ''}
       </button>
@@ -328,17 +331,22 @@ window.renderAdminAssignedSupervisorsTable = function(filterVal = '') {
 
     const supportsHtml = (isAssigned && supports.length > 0) ? `
       <div class="space-y-1.5">
-        ${supports.map(sup => `
+        ${supports.map(sup => {
+          const supName = (typeof resolveSupervisorName === 'function')
+            ? resolveSupervisorName(sup.supervisorId || sup.supervisorEmail, sup.supervisorName)
+            : sup.supervisorName;
+          return `
           <div class="flex items-center justify-between gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded-lg">
             <div>
-              <button type="button" ${editingLocked ? 'disabled' : `onclick="openAdminEditSupervisorModal('${mssv}')"`} class="font-bold text-slate-800 text-xs block ${editingLocked ? 'cursor-default' : 'hover:text-indigo-700 hover:underline'}">${escapeHtml(sup.supervisorName)}</button>
+              <button type="button" ${editingLocked ? 'disabled' : `onclick="openAdminEditSupervisorModal('${mssv}')"`} class="font-bold text-slate-800 text-xs block ${editingLocked ? 'cursor-default' : 'hover:text-indigo-700 hover:underline'}">${escapeHtml(supName)}</button>
               <span class="text-[9px] text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-bold border border-indigo-200">GVHD 2</span>
             </div>
-            <button type="button" ${editingLocked ? 'disabled' : `onclick="removeSupportSupervisor('${mssv}', '${sup.supervisorId}', '${escapeHtml(sup.supervisorName)}', '${escapeHtml(studentDisplayName)}')"`} class="px-2 py-0.5 text-rose-600 hover:bg-rose-50 rounded text-[10px] font-bold border border-rose-200 transition-colors disabled:opacity-40" title="Gỡ GVHD 2 khỏi sinh viên này">
+            <button type="button" ${editingLocked ? 'disabled' : `onclick="removeSupportSupervisor('${mssv}', '${sup.supervisorId}', '${escapeHtml(supName)}', '${escapeHtml(studentDisplayName)}')"`} class="px-2 py-0.5 text-rose-600 hover:bg-rose-50 rounded text-[10px] font-bold border border-rose-200 transition-colors disabled:opacity-40" title="Gỡ GVHD 2 khỏi sinh viên này">
               Gỡ
             </button>
           </div>
-        `).join('')}
+        `;
+        }).join('')}
       </div>
     ` : (isAssigned
       ? `<button type="button" ${editingLocked ? 'disabled' : `onclick="openAddSupportSupervisorModal('${mssv}')"`} class="font-bold text-[11px] ${editingLocked ? 'text-slate-400 cursor-default' : 'text-indigo-700 hover:underline cursor-pointer'}" title="Bấm để chọn GVHD 2">Chưa có</button>`
