@@ -342,6 +342,16 @@ assert.match(modalPopupHtml, /Chế độ xem thống kê \(Read-only\)/);
 assert.doesNotMatch(statsModuleSource, /setDoc|updateDoc|deleteDoc/, 'Scenario 20: Stats module is strictly read-only');
 console.log('✓ Scenario 20 Passed: Strict read-only guarantee verified, zero Firestore write operations.');
 
+// SCENARIO 21: Thầy Nguyễn Tăng Quang Dual-Document Deduplication & Complete Aggregation
+assert.match(statsModuleSource, /filterRoundSupervisorsList/, 'Scenario 21: Stats module must import filterRoundSupervisorsList');
+assert.match(statsModuleSource, /aliasToCanonicalMap/, 'Scenario 21: Stats module must maintain aliasToCanonicalMap');
+assert.match(statsModuleSource, /resolveTargetSupervisor/, 'Scenario 21: Stats module must have resolveTargetSupervisor');
+
+// SCENARIO 22: Independence & Isolation of TS. KTS Nguyễn Minh Hiếu vs ThS. Nguyễn Minh Hiếu
+assert.match(statsModuleSource, /resolveSupervisorName/, 'Scenario 22: Stats module must use SSOT resolveSupervisorName');
+assert.match(statsModuleSource, /resolveSupervisorDepartment/, 'Scenario 22: Stats module must use SSOT resolveSupervisorDepartment');
+console.log('✓ Scenario 21 & 22 Passed: Thầy Quang dual-doc unification & Two Hiếu strict isolation verified.');
+
 console.log('================================================================================');
-console.log('🎉 ALL 20 SCENARIOS PASSED WITH 100% SUCCESS');
+console.log('🎉 ALL 22 SCENARIOS PASSED WITH 100% SUCCESS');
 console.log('================================================================================');

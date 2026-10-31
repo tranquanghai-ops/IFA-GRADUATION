@@ -40,8 +40,11 @@ window.loadAdminReviewData = async function(roundId) {
       getDocs(collection(db, 'graduationRounds', roundId, 'supervisors')),
       (typeof ensureSupervisorsMasterLoaded === 'function' ? ensureSupervisorsMasterLoaded(true) : Promise.resolve())
     ]);
-    const supervisors = supSnap.docs.map(d => {
-      const roundSup = { id: d.id, ...d.data() };
+    const rawRoundSups = supSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const filteredRoundSups = (typeof filterRoundSupervisorsList === 'function')
+      ? filterRoundSupervisorsList(rawRoundSups)
+      : (window.filterRoundSupervisorsList ? window.filterRoundSupervisorsList(rawRoundSups) : rawRoundSups);
+    const supervisors = filteredRoundSups.map(roundSup => {
       const master = (typeof resolveSupervisorProfile === 'function')
         ? resolveSupervisorProfile(roundSup.id || roundSup.supervisorId || roundSup.email, roundSup)
         : null;

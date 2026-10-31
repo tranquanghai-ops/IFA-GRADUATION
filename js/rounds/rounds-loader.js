@@ -100,12 +100,10 @@ async function loadRounds() {
           round.eligibleCount = eligibleSnap.size;
           round.eligibleStudentsCount = eligibleSnap.size;
           round.registrationsCount = registrationsSnap ? registrationsSnap.size : 0;
-          const validRoundSups = supervisorsSnap.docs.filter(d => {
-            const data = d.data() || {};
-            if (data.isAuthIndex === true) return false;
-            if (d.id.includes('@') && data.supervisorId && data.supervisorId !== d.id) return false;
-            return true;
-          });
+          const rawSups1 = supervisorsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const validRoundSups = (typeof filterRoundSupervisorsList === 'function')
+            ? filterRoundSupervisorsList(rawSups1)
+            : (window.filterRoundSupervisorsList ? window.filterRoundSupervisorsList(rawSups1) : rawSups1.filter(d => !d.isAuthIndex && !(d.id.includes('@') && d.supervisorId && d.supervisorId !== d.id)));
           round.supervisorCount = validRoundSups.length;
           round.supervisorsCount = validRoundSups.length;
         } catch (error) {
@@ -261,12 +259,10 @@ async function refreshRoundCardMetrics(roundId) {
     round.eligibleCount = eligibleSnap.size;
     round.eligibleStudentsCount = eligibleSnap.size;
     round.registrationsCount = registrationsSnap ? registrationsSnap.size : 0;
-    const validRoundSups2 = supervisorsSnap.docs.filter(d => {
-      const data = d.data() || {};
-      if (data.isAuthIndex === true) return false;
-      if (d.id.includes('@') && data.supervisorId && data.supervisorId !== d.id) return false;
-      return true;
-    });
+    const rawSups2 = supervisorsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const validRoundSups2 = (typeof filterRoundSupervisorsList === 'function')
+      ? filterRoundSupervisorsList(rawSups2)
+      : (window.filterRoundSupervisorsList ? window.filterRoundSupervisorsList(rawSups2) : rawSups2.filter(d => !d.isAuthIndex && !(d.id.includes('@') && d.supervisorId && d.supervisorId !== d.id)));
     round.supervisorCount = validRoundSups2.length;
     round.supervisorsCount = validRoundSups2.length;
     round.assignedCount = assignedStudentIds.size;

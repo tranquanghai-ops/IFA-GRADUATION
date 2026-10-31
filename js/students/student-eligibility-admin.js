@@ -152,12 +152,16 @@ window.loadAdminEligibleStudents = async function(roundId) {
     }
     if (document.getElementById('admin-round-student-select')?.value !== roundId) return;
     state.eligibleStudents = eligibleSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const rawSups = supSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const filteredSups = (typeof filterRoundSupervisorsList === 'function')
+      ? filterRoundSupervisorsList(rawSups)
+      : (window.filterRoundSupervisorsList ? window.filterRoundSupervisorsList(rawSups) : rawSups);
     state.eligibleStudentDetails = {
       roundId,
       registrations: new Map(registrationSnap.docs.map(d => [d.id.toUpperCase(), d.data()])),
       assignments: new Map(assignmentSnap.docs.map(d => [d.id.toUpperCase(), d.data()])),
       drafts: new Map(draftSnap.docs.map(d => [d.id.toUpperCase(), d.data()])),
-      supervisors: supSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      supervisors: filteredSups,
       decisions: decSnap.docs.map(d => ({ id: d.id, ...d.data() }))
     };
     renderAdminEligibleStudentsTable();

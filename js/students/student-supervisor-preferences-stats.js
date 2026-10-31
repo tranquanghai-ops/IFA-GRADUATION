@@ -3,7 +3,16 @@
  * Provides comprehensive statistics on NV1, NV2, NV3 counts, quota utilization,
  * and an interactive modal listing all applicants per preference rank.
  */
-import { state } from '../core.js';
+import {
+  state,
+  filterRoundSupervisorsList,
+  extractSupervisorEmailAliases,
+  cleanSupervisorDisplayName,
+  getSupervisorMasterRecord,
+  resolveSupervisorProfile,
+  resolveSupervisorName,
+  resolveSupervisorDepartment
+} from '../core.js';
 
 const escapeHtml = (unsafe) => (typeof window !== 'undefined' && window.escapeHtml ? window.escapeHtml(unsafe) : String(unsafe ?? ''));
 
@@ -59,7 +68,11 @@ export function renderAdminSupervisorPreferencesStats(roundId, data = {}) {
     : (round.supervisorAssignmentMode === 'direct_assignment');
 
   // Input data sources
-  const roundSupervisors = data.supervisors || [];
+  const rawSupervisors = data.supervisors || [];
+  const filteredSupervisors = (typeof filterRoundSupervisorsList === 'function')
+    ? filterRoundSupervisorsList(rawSupervisors)
+    : (typeof window.filterRoundSupervisorsList === 'function' ? window.filterRoundSupervisorsList(rawSupervisors) : rawSupervisors);
+  const roundSupervisors = Array.isArray(filteredSupervisors) ? filteredSupervisors : [];
   const registrationsMap = data.registrations instanceof Map ? data.registrations : new Map(Object.entries(data.registrations || {}));
   const assignmentsMap = data.assignments instanceof Map ? data.assignments : new Map(Object.entries(data.assignments || {}));
   const draftsMap = data.drafts instanceof Map ? data.drafts : new Map(Object.entries(data.drafts || {}));
@@ -75,29 +88,89 @@ export function renderAdminSupervisorPreferencesStats(roundId, data = {}) {
     return;
   }
 
-  // 1. Build initial supervisor map from round supervisors
+  // 1. Build initial supervisor map from round supervisors with robust SSOT deduplication
   const supMap = new Map();
+  const aliasToCanonicalMap = new Map();
+
   roundSupervisors.forEach(s => {
-    const master = (typeof window.resolveSupervisorProfile === 'function')
-      ? window.resolveSupervisorProfile(s.id || s.supervisorId || s.email, s)
-      : s;
-    const supId = String(s.id || s.supervisorId || master?.id || '').trim();
-    if (!supId) return;
+    if (!s || typeof s !== 'object') return;
+    if (s.isAuthIndex === true) return; // Explicit auth-index doc is never a separate supervisor row
 
-    const capacity = (typeof s.capacity === 'number')
-      ? s.capacity
-      : (typeof master?.capacity === 'number'
-        ? master.capacity
-        : (s.employmentType === 'adjunct' ? 5 : 10));
+    const master = (typeof resolveSupervisorProfile === 'function')
+      ? resolveSupervisorProfile(s.supervisorId || s.id || s.email, s)
+      : (typeof window.resolveSupervisorProfile === 'function' ? window.resolveSupervisorProfile(s.supervisorId || s.id || s.email, s) : s);
 
-    supMap.set(supId, {
-      supervisorId: supId,
+    // Determine canonical stable ID: prefer non-email master ID, else non-email supervisorId, else s.id
+    let canonicalId = '';
+    if (master && master.id && !master.id.includes('@')) {
+      canonicalId = String(master.id).trim();
+    } else if (s.supervisorId && !s.supervisorId.includes('@')) {
+      canonicalId = String(s.supervisorId).trim();
+    } else if (s.id && !s.id.includes('@')) {
+      canonicalId = String(s.id).trim();
+    } else {
+      canonicalId = String(master?.id || s.supervisorId || s.id || '').trim();
+    }
+    if (!canonicalId) return;
+
+    // Collect all associated IDs
+    const docIds = [canonicalId, s.id, s.supervisorId, master?.id].filter(Boolean).map(x => String(x).trim());
+
+    // Collect all associated email aliases
+    const emails = new Set();
+    if (typeof extractSupervisorEmailAliases === 'function') {
+      extractSupervisorEmailAliases(s).forEach(e => emails.add(e));
+      if (master && typeof extractSupervisorEmailAliases === 'function') extractSupervisorEmailAliases(master).forEach(e => emails.add(e));
+    }
+    if (s.email) emails.add(String(s.email).toLowerCase().trim());
+    if (master?.email) emails.add(String(master.email).toLowerCase().trim());
+    if (s.personalEmail) emails.add(String(s.personalEmail).toLowerCase().trim());
+    if (s.institutionalEmail) emails.add(String(s.institutionalEmail).toLowerCase().trim());
+
+    const isAdjunct = (master?.employmentType === 'adjunct' || s.employmentType === 'adjunct' || s.capacity === 5 || master?.capacity === 5);
+    const capacity = isAdjunct ? 5 : (typeof s.capacity === 'number' ? s.capacity : (typeof master?.capacity === 'number' ? master.capacity : 10));
+
+    if (supMap.has(canonicalId)) {
+      // Unify with existing entry: add aliases, preserve adjunct quota 5
+      const existing = supMap.get(canonicalId);
+      docIds.forEach(id => {
+        existing.identityIds.add(id);
+        aliasToCanonicalMap.set(id, canonicalId);
+      });
+      emails.forEach(e => {
+        existing.candidateEmails.add(e);
+        aliasToCanonicalMap.set(e, canonicalId);
+      });
+      if (isAdjunct || s.capacity === 5) {
+        existing.capacity = 5;
+        existing.remainingQuota = Math.max(0, 5 - existing.acceptedCount);
+        existing.employmentType = 'adjunct';
+      }
+      return;
+    }
+
+    const cleanName = (typeof resolveSupervisorName === 'function')
+      ? resolveSupervisorName(canonicalId, master?.name || s.name)
+      : (typeof window.resolveSupervisorName === 'function' ? window.resolveSupervisorName(canonicalId, master?.name || s.name) : (master?.name || s.name || canonicalId));
+
+    const cleanDept = (typeof resolveSupervisorDepartment === 'function')
+      ? resolveSupervisorDepartment(canonicalId, master?.department || s.department)
+      : (typeof window.resolveSupervisorDepartment === 'function' ? window.resolveSupervisorDepartment(canonicalId, master?.department || s.department) : (master?.department || s.department || '--'));
+
+    const identityIds = new Set(docIds);
+    const candidateEmails = new Set(emails);
+
+    docIds.forEach(id => aliasToCanonicalMap.set(id, canonicalId));
+    emails.forEach(e => aliasToCanonicalMap.set(e, canonicalId));
+
+    supMap.set(canonicalId, {
+      supervisorId: canonicalId,
       rawSupervisor: s,
       masterProfile: master,
-      displayName: master?.name || s.name || supId,
-      department: master?.department || s.department || '--',
+      displayName: cleanName,
+      department: cleanDept,
       email: (master?.email || s.email || '').toLowerCase().trim(),
-      employmentType: master?.employmentType || s.employmentType || 'regular',
+      employmentType: isAdjunct ? 'adjunct' : (master?.employmentType || s.employmentType || 'regular'),
       capacity,
       acceptedCount: 0,
       remainingQuota: capacity,
@@ -106,9 +179,43 @@ export function renderAdminSupervisorPreferencesStats(roundId, data = {}) {
       nv3Count: 0,
       totalCount: 0,
       studentsByRank: { 1: [], 2: [], 3: [] },
-      studentIdSets: { 1: new Set(), 2: new Set(), 3: new Set() }
+      studentIdSets: { 1: new Set(), 2: new Set(), 3: new Set() },
+      identityIds,
+      candidateEmails
     });
   });
+
+  // Target supervisor resolver that bridges stable IDs, email aliases, and Master records
+  function resolveTargetSupervisor(refId, refEmail) {
+    if (refId) {
+      const sId = String(refId).trim();
+      const canonicalKey = aliasToCanonicalMap.get(sId);
+      if (canonicalKey && supMap.has(canonicalKey)) return supMap.get(canonicalKey);
+      if (supMap.has(sId)) return supMap.get(sId);
+      if (typeof getSupervisorMasterRecord === 'function') {
+        const m = getSupervisorMasterRecord(sId);
+        if (m && supMap.has(m.id)) return supMap.get(m.id);
+      }
+      for (const sup of supMap.values()) {
+        if (sup.identityIds && sup.identityIds.has(sId)) return sup;
+        if (sup.supervisorId === sId || sup.rawSupervisor?.id === sId) return sup;
+      }
+    }
+    if (refEmail) {
+      const sEmail = String(refEmail).toLowerCase().trim();
+      const canonicalKey = aliasToCanonicalMap.get(sEmail);
+      if (canonicalKey && supMap.has(canonicalKey)) return supMap.get(canonicalKey);
+      for (const sup of supMap.values()) {
+        if (sup.candidateEmails && sup.candidateEmails.has(sEmail)) return sup;
+        if (sup.email && sup.email === sEmail) return sup;
+      }
+      if (typeof getSupervisorMasterRecord === 'function') {
+        const m = getSupervisorMasterRecord(refEmail);
+        if (m && supMap.has(m.id)) return supMap.get(m.id);
+      }
+    }
+    return null;
+  }
 
   // 2. Count registered preferences across valid student submissions
   registrationsList.forEach(reg => {
@@ -125,33 +232,7 @@ export function renderAdminSupervisorPreferencesStats(roundId, data = {}) {
       const pSupId = String(p.supervisorId || p.id || '').trim();
       const pEmail = (p.supervisorEmail || p.email || '').toLowerCase().trim();
 
-      // Find matching supervisor by stable ID, master record ID, or email
-      let targetSup = null;
-      if (pSupId && supMap.has(pSupId)) {
-        targetSup = supMap.get(pSupId);
-      }
-      if (!targetSup && pSupId && typeof window.getSupervisorMasterRecord === 'function') {
-        const m = window.getSupervisorMasterRecord(pSupId);
-        if (m && supMap.has(m.id)) {
-          targetSup = supMap.get(m.id);
-        }
-      }
-      if (!targetSup && pEmail) {
-        for (const sup of supMap.values()) {
-          if (sup.email && sup.email === pEmail) {
-            targetSup = sup;
-            break;
-          }
-        }
-      }
-      if (!targetSup && pSupId) {
-        for (const sup of supMap.values()) {
-          if (sup.rawSupervisor?.supervisorId === pSupId || sup.rawSupervisor?.id === pSupId) {
-            targetSup = sup;
-            break;
-          }
-        }
-      }
+      const targetSup = resolveTargetSupervisor(pSupId, pEmail);
 
       // If matched, record preference
       if (targetSup) {
@@ -170,7 +251,8 @@ export function renderAdminSupervisorPreferencesStats(roundId, data = {}) {
             decisions,
             assignments: assignmentsMap,
             drafts: draftsMap,
-            round
+            round,
+            resolveTargetSupervisor
           });
           targetSup.studentsByRank[rank].push(studentDetail);
         }
@@ -185,13 +267,23 @@ export function renderAdminSupervisorPreferencesStats(roundId, data = {}) {
     // A. From officialAssignments & drafts
     for (const [sid, a] of assignmentsMap.entries()) {
       const sups = a.supervisors || [];
-      if (sups.some(x => x.supervisorId === sup.supervisorId || x.supervisorId === sup.rawSupervisor?.id)) {
+      const hasThisSup = sups.some(x => {
+        const matched = resolveTargetSupervisor(x.supervisorId || x.id, x.email || x.supervisorEmail);
+        return matched && matched.supervisorId === sup.supervisorId;
+      }) || (a.acceptedSupervisorId && resolveTargetSupervisor(a.acceptedSupervisorId, null)?.supervisorId === sup.supervisorId);
+
+      if (hasThisSup) {
         assignedStudents.add(sid);
       }
     }
     for (const [sid, d] of draftsMap.entries()) {
       const sups = d.supervisors || [];
-      if (sups.some(x => x.supervisorId === sup.supervisorId || x.supervisorId === sup.rawSupervisor?.id)) {
+      const hasThisSup = sups.some(x => {
+        const matched = resolveTargetSupervisor(x.supervisorId || x.id, x.email || x.supervisorEmail);
+        return matched && matched.supervisorId === sup.supervisorId;
+      }) || (d.acceptedSupervisorId && resolveTargetSupervisor(d.acceptedSupervisorId, null)?.supervisorId === sup.supervisorId);
+
+      if (hasThisSup) {
         assignedStudents.add(sid);
       }
     }
@@ -199,9 +291,11 @@ export function renderAdminSupervisorPreferencesStats(roundId, data = {}) {
     // B. From accepted reviewStatus in registrations
     registrationsList.forEach(r => {
       const sid = String(r.studentId || r.mssv || r.id || '').trim().toUpperCase();
-      if ((r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') &&
-          (r.acceptedSupervisorId === sup.supervisorId || r.acceptedSupervisorId === sup.rawSupervisor?.id)) {
-        assignedStudents.add(sid);
+      if (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') {
+        const matched = resolveTargetSupervisor(r.acceptedSupervisorId, null);
+        if (matched && matched.supervisorId === sup.supervisorId) {
+          assignedStudents.add(sid);
+        }
       }
     });
 
@@ -225,7 +319,7 @@ window.renderAdminSupervisorPreferencesStats = renderAdminSupervisorPreferencesS
 /**
  * Builds student record details for display in the popup modal.
  */
-function buildStudentPreferenceItem({ mssv, rank, registration, supervisor, decisions, assignments, drafts, round }) {
+function buildStudentPreferenceItem({ mssv, rank, registration, supervisor, decisions, assignments, drafts, round, resolveTargetSupervisor }) {
   const master = (typeof window.getFacultyStudentByMssv === 'function')
     ? window.getFacultyStudentByMssv(mssv)
     : null;
@@ -250,23 +344,42 @@ function buildStudentPreferenceItem({ mssv, rank, registration, supervisor, deci
   const supId = supervisor.supervisorId;
   const rawSupId = supervisor.rawSupervisor?.id;
 
+  const matchesCurrentSupervisor = (checkId, checkEmail) => {
+    if (!checkId && !checkEmail) return false;
+    if (typeof resolveTargetSupervisor === 'function') {
+      const target = resolveTargetSupervisor(checkId, checkEmail);
+      if (target && target.supervisorId === supId) return true;
+    }
+    const cId = String(checkId || '').trim();
+    if (cId) {
+      if (cId === supId || cId === rawSupId) return true;
+      if (supervisor.identityIds && supervisor.identityIds.has(cId)) return true;
+    }
+    const cEmail = String(checkEmail || '').toLowerCase().trim();
+    if (cEmail) {
+      if (supervisor.email === cEmail) return true;
+      if (supervisor.candidateEmails && supervisor.candidateEmails.has(cEmail)) return true;
+    }
+    return false;
+  };
+
   // Check official assignment
   const assignment = assignments?.get(mssv) || drafts?.get(mssv);
-  const isAssignedToThis = assignment?.supervisors?.some(s => s.supervisorId === supId || s.supervisorId === rawSupId) ||
-    (assignment?.acceptedSupervisorId === supId || assignment?.acceptedSupervisorId === rawSupId);
+  const isAssignedToThis = assignment?.supervisors?.some(s => matchesCurrentSupervisor(s.supervisorId || s.id, s.email || s.supervisorEmail)) ||
+    matchesCurrentSupervisor(assignment?.acceptedSupervisorId, null);
 
   // Check registration acceptance
   const isAcceptedByThis = (registration.reviewStatus === 'accepted' || registration.reviewStatus === 'manually_assigned') &&
-    (registration.acceptedSupervisorId === supId || registration.acceptedSupervisorId === rawSupId);
+    matchesCurrentSupervisor(registration.acceptedSupervisorId, null);
 
   const isAcceptedByOther = (registration.reviewStatus === 'accepted' || registration.reviewStatus === 'manually_assigned') &&
     registration.acceptedSupervisorId &&
-    (registration.acceptedSupervisorId !== supId && registration.acceptedSupervisorId !== rawSupId);
+    !matchesCurrentSupervisor(registration.acceptedSupervisorId, null);
 
   // Check explicit rejection decision
   const hasRejectedDecision = (decisions || []).some(d =>
     Number(d.round) === rank &&
-    (d.supervisorId === supId || d.supervisorId === rawSupId) &&
+    matchesCurrentSupervisor(d.supervisorId, d.supervisorEmail) &&
     d.studentId === mssv &&
     d.decision === 'rejected'
   );
@@ -504,7 +617,12 @@ window.sortSupervisorStatsTable = sortSupervisorStatsTable;
  * Opens the supervisor preference students modal.
  */
 export function openSupervisorPreferenceStudentsModal(supervisorId, rank = 1) {
-  const sup = statsState.supervisors.find(s => s.supervisorId === supervisorId);
+  const sId = String(supervisorId || '').trim();
+  const sup = statsState.supervisors.find(s =>
+    s.supervisorId === sId ||
+    (s.identityIds && s.identityIds.has(sId)) ||
+    (s.candidateEmails && s.candidateEmails.has(sId.toLowerCase()))
+  );
   if (!sup) {
     console.warn('[SupervisorPreferencesStats] Supervisor not found:', supervisorId);
     return;
