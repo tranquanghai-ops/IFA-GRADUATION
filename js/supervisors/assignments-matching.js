@@ -1008,6 +1008,90 @@ export async function loadSupervisorReviewData(roundId) {
     });
     state.supervisorAcceptedStudents = acceptedStudents;
 
+    // Classify accepted students into Round 1 and Round 2
+    const round1AcceptedStudents = [];
+    const round2AcceptedStudents = [];
+
+    acceptedStudents.forEach(r => {
+      const studentId = String(r.studentId || r.mssv || r.id || '').trim().toUpperCase();
+      const accRank = Number(r.acceptedRank);
+
+      if (accRank === 1) {
+        round1AcceptedStudents.push(r);
+        return;
+      }
+      if (accRank === 2) {
+        round2AcceptedStudents.push(r);
+        return;
+      }
+
+      // Check allDecisions for explicit selected decision in round 1 or 2
+      const hasR1Dec = allDecisions.some(d =>
+        String(d.studentId || '').trim().toUpperCase() === studentId &&
+        Number(d.round) === 1 &&
+        d.decision === 'selected'
+      );
+      if (hasR1Dec) {
+        round1AcceptedStudents.push(r);
+        return;
+      }
+
+      const hasR2Dec = allDecisions.some(d =>
+        String(d.studentId || '').trim().toUpperCase() === studentId &&
+        Number(d.round) === 2 &&
+        d.decision === 'selected'
+      );
+      if (hasR2Dec) {
+        round2AcceptedStudents.push(r);
+        return;
+      }
+
+      // Check preferences matching currentSup
+      const pref1 = (r.preferences || []).find(p => Number(p.rank) === 1);
+      const pref2 = (r.preferences || []).find(p => Number(p.rank) === 2);
+      const matchesSup = (pref) => {
+        if (!pref) return false;
+        if (typeof currentSup.matchesPreference === 'function') return currentSup.matchesPreference(pref);
+        const pId = String(pref.supervisorId || pref.id || '').trim();
+        const pEmail = String(pref.supervisorEmail || pref.email || '').toLowerCase().trim();
+        return (pId && (pId === currentSup.id || pId === currentSup.supervisorId)) ||
+               (pEmail && (pEmail === emailLower || (currentSup.candidateEmails && currentSup.candidateEmails.has(pEmail))));
+      };
+
+      if (matchesSup(pref1)) {
+        round1AcceptedStudents.push(r);
+        return;
+      }
+      if (matchesSup(pref2)) {
+        round2AcceptedStudents.push(r);
+        return;
+      }
+
+      if (Number(r.currentPrefRank) === 1) {
+        round1AcceptedStudents.push(r);
+        return;
+      }
+      if (Number(r.currentPrefRank) === 2) {
+        round2AcceptedStudents.push(r);
+        return;
+      }
+
+      // Fallback based on review round
+      if (currentReviewRound === 2) {
+        round1AcceptedStudents.push(r);
+      } else if (currentReviewRound === 3) {
+        round1AcceptedStudents.push(r);
+      }
+    });
+
+    state.supervisorRound1AcceptedStudents = round1AcceptedStudents;
+    state.supervisorRound2AcceptedStudents = round2AcceptedStudents;
+    state.supervisorAcceptedByRound = {
+      1: round1AcceptedStudents,
+      2: round2AcceptedStudents
+    };
+    state.supervisorEligibleMap = eligibleMap;
+
     // Build decisions map
     const decisionsMap = {};
     candidates.forEach(candidate => {
@@ -1022,7 +1106,17 @@ export async function loadSupervisorReviewData(roundId) {
       : (typeof supData.maxQuota === 'number'
           ? supData.maxQuota
           : (typeof currentSup.capacity === 'number' ? currentSup.capacity : (currentSup.defaultQuota || 10)));
-    const acceptedPrev = acceptedStudents.length || (supData.acceptedCount || 0);
+
+    let acceptedPrev = 0;
+    if (currentReviewRound === 2) {
+      acceptedPrev = round1AcceptedStudents.length || (supData.acceptedCount || 0);
+    } else if (currentReviewRound === 3) {
+      acceptedPrev = (round1AcceptedStudents.length + round2AcceptedStudents.length) || (supData.acceptedCount || 0);
+    } else if (currentReviewRound === 1) {
+      acceptedPrev = 0;
+    } else {
+      acceptedPrev = acceptedStudents.length || (supData.acceptedCount || 0);
+    }
     const selectedCurr = candidates.filter(c => decisionsMap[c.studentId] === 'selected').length;
     const rejectedCurr = candidates.filter(c => decisionsMap[c.studentId] === 'rejected').length;
     const pendingCurr = candidates.filter(c => !decisionsMap[c.studentId] || (decisionsMap[c.studentId] !== 'selected' && decisionsMap[c.studentId] !== 'rejected')).length;
@@ -1046,6 +1140,7 @@ export async function loadSupervisorReviewData(roundId) {
 
     // Render review UI
     renderSupervisorReviewUI(currentSup, currentReviewRound, reviewStatus, isLocked, isCompleted, remainingCap);
+    renderSupervisorPreviousAcceptedRounds();
     renderSupervisorAcceptedTable();
   } catch (e) {
     console.error('Error loading supervisor review data:', e);
@@ -1094,6 +1189,7 @@ function renderSupervisorReviewUI(currentSup, currentRound, reviewStatus, isLock
 
   // Render candidates table
   renderSupervisorCandidatesTable(isLocked);
+  renderSupervisorPreviousAcceptedRounds();
 }
 
 export function getCandidateDisplayLabel(studentId) {
@@ -1175,7 +1271,14 @@ function renderSupervisorCandidatesTable(readOnly) {
     : (typeof currentSup?.maxQuota === 'number'
         ? currentSup.maxQuota
         : (typeof currentSup?.defaultQuota === 'number' ? currentSup.defaultQuota : (currentSup?.employmentType === 'adjunct' ? 5 : 10)));
-  const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
+  const currentRound = Number(state.activeRound?.currentReviewRound || 1);
+  const r1Count = (state.supervisorRound1AcceptedStudents || []).length;
+  const r2Count = (state.supervisorRound2AcceptedStudents || []).length;
+  let acceptedPrev = 0;
+  if (currentRound === 2) acceptedPrev = r1Count || (currentSup?.acceptedCount || 0);
+  else if (currentRound === 3) acceptedPrev = (r1Count + r2Count) || (currentSup?.acceptedCount || 0);
+  else if (currentRound === 1) acceptedPrev = 0;
+  else acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
   const selectedCurr = Object.values(state.supervisorDecisions).filter(v => v === 'selected').length;
   const remainingCap = Math.max(0, totalCap - acceptedPrev - selectedCurr);
 
@@ -1331,6 +1434,200 @@ window.toggleSupervisorCandidateDesc = function(studentId) {
   renderSupervisorCandidatesTable(isLocked);
 };
 
+export function renderSupervisorPreviousAcceptedRounds() {
+  const container = document.getElementById('sup-previous-rounds-container');
+  if (!container) return;
+
+  const currentReviewRound = Number(state.activeRound?.currentReviewRound || 1);
+  const reviewStatus = state.activeRound?.reviewStatus || 'round_1';
+
+  // Rule: Round 1 only displays candidate review table; previous rounds section is hidden
+  if (currentReviewRound <= 1 && (reviewStatus === 'round_1' || reviewStatus === 'not_started' || reviewStatus === 'draft' || !reviewStatus)) {
+    container.innerHTML = '';
+    container.classList.add('hidden');
+    return;
+  }
+
+  container.classList.remove('hidden');
+
+  const eligibleMap = state.supervisorEligibleMap || new Map();
+  const round1List = state.supervisorRound1AcceptedStudents || [];
+  const round2List = state.supervisorRound2AcceptedStudents || [];
+
+  state.supervisorPrevRoundsCollapsed = state.supervisorPrevRoundsCollapsed || {};
+
+  const safeEscape = (str) => {
+    if (typeof escapeHtml === 'function') return escapeHtml(str);
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  const buildRoundSectionHtml = (roundNum, studentList) => {
+    const count = studentList.length;
+    let isCollapsed = state.supervisorPrevRoundsCollapsed[roundNum];
+    if (isCollapsed === undefined) {
+      isCollapsed = count === 0;
+      state.supervisorPrevRoundsCollapsed[roundNum] = isCollapsed;
+    }
+
+    const countBadgeClass = count > 0
+      ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+      : 'bg-slate-100 text-slate-500 border-slate-200';
+
+    const prefBadge = roundNum === 1
+      ? '<span class="inline-flex px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-black">NV1</span>'
+      : '<span class="inline-flex px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 text-[10px] font-black">NV2</span>';
+
+    const statusBadge = roundNum === 1
+      ? '<span class="w-32 h-8 rounded-xl text-[11px] font-bold inline-flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">✓ Đã nhận NV1</span>'
+      : '<span class="w-32 h-8 rounded-xl text-[11px] font-bold inline-flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-300 shadow-2xs">✓ Đã nhận NV2</span>';
+
+    const tableRows = count === 0
+      ? `<tr><td colspan="6" class="p-8 text-center text-slate-400 font-medium">Chưa có sinh viên nào được nhận ở Vòng ${roundNum}.</td></tr>`
+      : studentList.map((r, idx) => {
+          const studentId = String(r.studentId || r.mssv || r.id || '').trim().toUpperCase();
+          const prof = (typeof window !== 'undefined' && typeof window.resolveStudentProfile === 'function')
+            ? window.resolveStudentProfile(studentId, { registration: r, eligibleStudent: eligibleMap.get(studentId) })
+            : null;
+
+          const resolvedName = prof?.studentName || prof?.fullName || r.studentName || r.fullName || studentId;
+          const resolvedClass = prof?.className || r.currentClass || r.studentClass || r.className || '';
+          const hasValidClass = Boolean(resolvedClass);
+          const rawPhone = String(prof?.phone || prof?.studentPhone || r.phone || r.studentPhone || '').trim();
+          const cleanTel = rawPhone.replace(/[^\d+]/g, '');
+
+          const phoneHtml = cleanTel ? `
+            <div class="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600">
+              <span class="text-slate-400 select-none">📞 SĐT:</span>
+              <a href="tel:${safeEscape(cleanTel)}" class="font-semibold text-blue-600 hover:text-blue-800 hover:underline select-all">${safeEscape(rawPhone)}</a>
+            </div>
+          ` : `
+            <div class="mt-1 flex items-center gap-1.5 text-[11px] text-slate-400 italic">
+              <span class="not-italic select-none">📞 SĐT:</span>
+              <span>Chưa cập nhật</span>
+            </div>
+          `;
+
+          const topicTitle = (typeof window !== 'undefined' && typeof window.getOfficialApprovedTopicTitle === 'function')
+            ? window.getOfficialApprovedTopicTitle(r, r.topicTitle || 'Chưa cập nhật tên đề tài')
+            : (r.topicTitle || 'Chưa cập nhật tên đề tài');
+          const topicDescription = String(r.topicDescription || 'Sinh viên chưa bổ sung mô tả định hướng thiết kế.');
+          const isExpanded = Boolean(state.expandedPrevDescriptions && state.expandedPrevDescriptions[studentId]);
+          const hasLongDesc = topicDescription.length > 120;
+          const projectType = r.projectType || '--';
+
+          return `
+            <tr class="border-b border-slate-100 transition-colors hover:bg-slate-50/80 bg-white">
+              <td class="p-3.5 align-top text-center font-bold text-slate-500">${idx + 1}</td>
+              <td class="p-3.5 align-top font-mono font-bold text-slate-900">${studentId}</td>
+              <td class="p-3.5 align-top">
+                <span class="font-bold text-slate-900 block leading-tight">${safeEscape(resolvedName)}</span>
+                <span class="text-[11px] ${hasValidClass ? 'text-slate-500' : 'text-amber-600 font-medium italic'} block mt-0.5">Lớp: ${safeEscape(resolvedClass || 'Chưa có dữ liệu lớp')}</span>
+                ${phoneHtml}
+                <div class="mt-1.5">${prefBadge}</div>
+              </td>
+              <td class="p-3.5 align-top">
+                <p class="font-bold text-slate-900 leading-snug">${safeEscape(topicTitle)}</p>
+                <div class="mt-1.5 pt-1.5 border-t border-slate-100">
+                  <span class="text-[10px] font-black uppercase tracking-wider text-tdtu-blue block">Mô tả định hướng</span>
+                  <p id="sup-prev-desc-${studentId}" class="mt-0.5 text-[11px] leading-relaxed text-slate-600 whitespace-pre-line text-justify ${!isExpanded && hasLongDesc ? 'line-clamp-3' : ''}">${safeEscape(topicDescription)}</p>
+                  ${hasLongDesc ? `
+                    <button type="button" id="sup-prev-desc-btn-${studentId}" onclick="toggleSupervisorPrevAcceptedDesc('${studentId}')" class="mt-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer inline-flex items-center gap-1">
+                      ${isExpanded ? 'Thu gọn ▲' : 'Xem thêm ▼'}
+                    </button>
+                  ` : ''}
+                </div>
+              </td>
+              <td class="p-3.5 align-top text-slate-700 text-xs whitespace-normal break-words leading-relaxed">${safeEscape(projectType)}</td>
+              <td class="p-3.5 align-top text-center">${statusBadge}</td>
+            </tr>
+          `;
+        }).join('');
+
+    return `
+      <div class="card-surface overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs" id="sup-prev-round-card-${roundNum}">
+        <div class="p-3.5 bg-slate-50/90 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-black uppercase tracking-wider text-slate-800">
+              DANH SÁCH SINH VIÊN ĐÃ NHẬN – VÒNG ${roundNum}
+            </span>
+            <span id="sup-prev-round-cnt-${roundNum}" class="px-2.5 py-0.5 rounded-full text-xs font-bold border ${countBadgeClass}">
+              (${count} sinh viên)
+            </span>
+          </div>
+          <button type="button" id="sup-prev-round-toggle-btn-${roundNum}" onclick="toggleSupervisorPreviousRoundCollapse(${roundNum})" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer transition-all inline-flex items-center gap-1 shadow-2xs self-start sm:self-auto">
+            <span>${isCollapsed ? 'Mở rộng' : 'Thu gọn'}</span>
+            <span>${isCollapsed ? '▼' : '▲'}</span>
+          </button>
+        </div>
+
+        <div id="sup-prev-round-body-${roundNum}" class="${isCollapsed ? 'hidden' : ''} overflow-x-auto">
+          <table class="w-full min-w-[860px] text-left text-xs">
+            <thead class="bg-slate-100/90 text-slate-700 font-bold uppercase border-b border-slate-200 text-[11px] tracking-wide">
+              <tr>
+                <th class="p-3.5 w-[5%] min-w-[50px] text-center align-middle">STT</th>
+                <th class="p-3.5 w-[8%] min-w-[85px] align-middle">MSSV</th>
+                <th class="p-3.5 w-[18%] min-w-[170px] align-middle">Họ và tên / Lớp / SĐT</th>
+                <th class="p-3.5 w-[45%] min-w-[320px] align-middle">Đề tài tốt nghiệp & mô tả định hướng</th>
+                <th class="p-3.5 w-[11%] min-w-[100px] align-middle">Loại hình</th>
+                <th class="p-3.5 w-[13%] min-w-[130px] text-center align-middle">Trạng thái nhận</th>
+              </tr>
+            </thead>
+            <tbody id="sup-prev-round-tbody-${roundNum}" class="divide-y divide-slate-100">
+              ${tableRows}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  };
+
+  let html = '';
+  if (currentReviewRound === 2) {
+    html = buildRoundSectionHtml(1, round1List);
+  } else if (currentReviewRound >= 3 || reviewStatus === 'manual_assignment') {
+    html = buildRoundSectionHtml(1, round1List) + buildRoundSectionHtml(2, round2List);
+  }
+
+  container.innerHTML = html;
+}
+window.renderSupervisorPreviousAcceptedRounds = renderSupervisorPreviousAcceptedRounds;
+
+window.toggleSupervisorPreviousRoundCollapse = function(roundNum) {
+  state.supervisorPrevRoundsCollapsed = state.supervisorPrevRoundsCollapsed || {};
+  state.supervisorPrevRoundsCollapsed[roundNum] = !state.supervisorPrevRoundsCollapsed[roundNum];
+  const body = document.getElementById(`sup-prev-round-body-${roundNum}`);
+  const btn = document.getElementById(`sup-prev-round-toggle-btn-${roundNum}`);
+  const isCollapsed = Boolean(state.supervisorPrevRoundsCollapsed[roundNum]);
+  if (body) {
+    if (isCollapsed) body.classList.add('hidden');
+    else body.classList.remove('hidden');
+  }
+  if (btn) {
+    btn.innerHTML = `<span>${isCollapsed ? 'Mở rộng' : 'Thu gọn'}</span> <span>${isCollapsed ? '▼' : '▲'}</span>`;
+  }
+};
+
+window.toggleSupervisorPrevAcceptedDesc = function(studentId) {
+  state.expandedPrevDescriptions = state.expandedPrevDescriptions || {};
+  state.expandedPrevDescriptions[studentId] = !state.expandedPrevDescriptions[studentId];
+  const descEl = document.getElementById(`sup-prev-desc-${studentId}`);
+  const btnEl = document.getElementById(`sup-prev-desc-btn-${studentId}`);
+  const isExp = Boolean(state.expandedPrevDescriptions[studentId]);
+  if (descEl) {
+    if (isExp) descEl.classList.remove('line-clamp-3');
+    else descEl.classList.add('line-clamp-3');
+  }
+  if (btnEl) {
+    btnEl.innerHTML = isExp ? 'Thu gọn ▲' : 'Xem thêm ▼';
+  }
+};
+
 window.filterSupervisorCandidates = function() {
   const isLocked = Boolean(state.activeRound?.reviewLocks && state.activeRound?.reviewLocks['round_' + (state.activeRound?.currentReviewRound || 1)]);
   renderSupervisorCandidatesTable(isLocked);
@@ -1378,7 +1675,14 @@ window.setSupervisorDecision = async function(studentId, nextDecision) {
 
   // Quota check when selecting
   const totalCap = currentSup.capacity ?? 10;
-  const acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
+  const currentRound = Number(state.activeRound?.currentReviewRound || 1);
+  const r1Count = (state.supervisorRound1AcceptedStudents || []).length;
+  const r2Count = (state.supervisorRound2AcceptedStudents || []).length;
+  let acceptedPrev = 0;
+  if (currentRound === 2) acceptedPrev = r1Count || (currentSup?.acceptedCount || 0);
+  else if (currentRound === 3) acceptedPrev = (r1Count + r2Count) || (currentSup?.acceptedCount || 0);
+  else if (currentRound === 1) acceptedPrev = 0;
+  else acceptedPrev = (state.supervisorAcceptedStudents || []).length || (currentSup?.acceptedCount || 0);
 
   if (nextDecision === 'selected') {
     const selectedCurr = Object.values(state.supervisorDecisions || {}).filter(v => v === 'selected').length;

@@ -1175,6 +1175,11 @@
               </table>
             </div>
           </div>
+
+          <!-- Accepted Students in Previous Rounds Container -->
+          <div id="sup-previous-rounds-container" class="space-y-6 mt-6">
+            <!-- Dynamically populated when currentReviewRound >= 2 -->
+          </div>
         </div>
 
         <!-- 6. SUB-PANEL C: ACCEPTED STUDENTS ACROSS ROUNDS -->
@@ -1672,7 +1677,6 @@
       </div>
 
     </section>
-
 <section id="view-admin" class="hidden space-y-6">
 
       <!-- IMPERSONATION LOCK CARD (v2.6.0-beta.1) -->
@@ -2450,9 +2454,17 @@
                 <span>📥 Tải lên danh sách SV (.xlsx)</span>
                 <input type="file" id="excel-file-input" accept=".xlsx,.xls" onchange="handleExcelFileUpload(event)" class="hidden">
               </label>
-              <button type="button" onclick="openRoundJoinLinkModal()" class="cursor-pointer px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all inline-flex items-center gap-1.5">
-                <span>🔗 Link tham gia</span>
-              </button>
+              <div id="admin-round-join-link-toolbar-controls" class="flex items-center gap-1.5">
+                <span id="admin-round-join-link-badge" class="px-2.5 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1 border shadow-2xs bg-slate-200 text-slate-700 border-slate-300">
+                  <span>🔒 Link đã khóa</span>
+                </span>
+                <button type="button" id="btn-admin-toggle-round-join-link" onclick="adminQuickToggleRoundJoinLink()" class="cursor-pointer px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all inline-flex items-center gap-1">
+                  <span>🔓 Mở lại link</span>
+                </button>
+                <button type="button" id="btn-open-round-join-link-modal" onclick="openRoundJoinLinkModal()" class="cursor-pointer px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all inline-flex items-center gap-1.5">
+                  <span>🔗 Link tham gia</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -4488,6 +4500,10 @@
             <span>📋</span>
             <span>Sao chép</span>
           </button>
+        </div>
+        <div id="round-join-link-locked-notice" class="hidden p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold flex items-center gap-2">
+          <span>🔒</span>
+          <span>Link đã khóa – SV mới không thể tham gia</span>
         </div>
       </div>
 

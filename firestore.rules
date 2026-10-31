@@ -360,7 +360,8 @@ service cloud.firestore {
             && (
               exists(/databases/$(database)/documents/graduationRounds/$(roundId)/eligibleStudents/$(studentId))
               ||
-              (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.get('allowRegistrationBeforeEligibility', false) == true
+              (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.allowSelfJoin == true
+               && get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.get('allowRegistrationBeforeEligibility', false) == true
                && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['eligibilityFinalized'])
                    || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.eligibilityFinalized == false))
             )

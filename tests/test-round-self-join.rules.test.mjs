@@ -333,4 +333,99 @@ test('--- FIRESTORE RULES: SELF-JOIN ELIGIBLE STUDENTS ---', async (t) => {
       eligible: false
     }));
   });
+  await t.test('13. Admin CÓ THỂ thêm sinh viên thủ công khi link đã khóa (allowSelfJoin == false)', async () => {
+    const adminDb = env.authenticatedContext('admin_uid', actor(adminEmail)).firestore();
+    const manualMssv = '12345678';
+    const manualEmail = `${manualMssv}@student.tdtu.edu.vn`;
+    await assertSucceeds(setDoc(doc(adminDb, `graduationRounds/${roundDisabledId}/eligibleStudents/${manualMssv}`), {
+      studentId: manualMssv,
+      mssv: manualMssv,
+      name: 'SV Thêm Thủ Công',
+      fullName: 'SV Thêm Thủ Công',
+      email: manualEmail,
+      roundId: roundDisabledId,
+      eligible: false,
+      joinMethod: 'manual_admin',
+      source: 'admin_manual'
+    }));
+  });
+
+  await t.test('14. Admin CÓ THỂ khóa / mở lại link (allowSelfJoin: true/false) trên graduationRounds doc', async () => {
+    const adminDb = env.authenticatedContext('admin_uid', actor(adminEmail)).firestore();
+    await assertSucceeds(updateDoc(doc(adminDb, `graduationRounds/${roundDisabledId}`), {
+      allowSelfJoin: true
+    }));
+    await assertSucceeds(updateDoc(doc(adminDb, `graduationRounds/${roundDisabledId}`), {
+      allowSelfJoin: false
+    }));
+  });
+
+  await t.test('15. Sinh viên KHÔNG THỂ tự ý sửa allowSelfJoin trên graduationRounds', async () => {
+    const studentDb = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
+    await assertFails(updateDoc(doc(studentDb, `graduationRounds/${roundDisabledId}`), {
+      allowSelfJoin: true
+    }));
+  });
+
+  await t.test('16. Sinh viên chưa có trong eligibleStudents KHÔNG THỂ tạo registration khi link đã khóa', async () => {
+    const outsiderStudentMssv = '19999999';
+    const outsiderStudentEmail = `${outsiderStudentMssv}@student.tdtu.edu.vn`;
+    const studentDb = env.authenticatedContext('outsider_uid', actor(outsiderStudentEmail)).firestore();
+    const regPayload = {
+      studentId: outsiderStudentMssv,
+      email: outsiderStudentEmail,
+      topicTitle: 'Thử lách luật đăng ký khi chưa vào đợt',
+      projectType: 'Chuyên luận',
+      status: 'submitted',
+      preferences: [
+        { rank: 1, supervisorId: 'sup_1', supervisorName: 'GVHD 1' },
+        { rank: 2, supervisorId: 'sup_2', supervisorName: 'GVHD 2' },
+        { rank: 3, supervisorId: 'sup_3', supervisorName: 'GVHD 3' }
+      ]
+    };
+    await assertFails(setDoc(doc(studentDb, `graduationRounds/${roundDisabledId}/registrations/${outsiderStudentMssv}`), regPayload));
+  });
+
+  await t.test('17. Admin CÓ THỂ ghi auditLog khi khóa/mở link; Sinh viên KHÔNG THỂ xóa hoặc ghi giả auditLog khóa link', async () => {
+    const adminDb = env.authenticatedContext('admin_uid', actor(adminEmail)).firestore();
+    const studentDb = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
+
+    // Admin ghi audit log khóa link -> THÀNH CÔNG
+    await assertSucceeds(setDoc(doc(adminDb, `graduationRounds/${roundDisabledId}/auditLogs/audit_lock_1`), {
+      action: 'Khóa link tham gia',
+      by: adminEmail,
+      roundId: roundDisabledId,
+      previousStatus: 'open',
+      newStatus: 'locked'
+    }));
+
+    // Sinh viên cố tình sửa hoặc xóa audit log -> BỊ CHẶN
+    await assertFails(updateDoc(doc(studentDb, `graduationRounds/${roundDisabledId}/auditLogs/audit_lock_1`), {
+      action: 'Mạo danh'
+    }));
+    await assertFails(deleteDoc(doc(studentDb, `graduationRounds/${roundDisabledId}/auditLogs/audit_lock_1`)));
+
+    // Sinh viên cố tình ghi giả action 'Khóa link tham gia' -> BỊ CHẶN
+    await assertFails(setDoc(doc(studentDb, `graduationRounds/${roundDisabledId}/auditLogs/fake_audit`), {
+      action: 'Khóa link tham gia',
+      by: student1Email,
+      roundId: roundDisabledId
+    }));
+  });
+
+  await t.test('18. Sinh viên ĐÃ CÓ trong eligibleStudents vẫn đọc được hồ sơ khi link bị khóa', async () => {
+    const db = env.authenticatedContext('student1_uid', actor(student1Email)).firestore();
+    const adminDb = env.authenticatedContext('admin_uid', actor(adminEmail)).firestore();
+    await assertSucceeds(updateDoc(doc(adminDb, `graduationRounds/${roundOpenId}`), {
+      allowSelfJoin: false
+    }));
+
+    const snap = await assertSucceeds(getDoc(doc(db, `graduationRounds/${roundOpenId}/eligibleStudents/${student1Mssv}`)));
+    assert.equal(snap.exists(), true);
+    assert.equal(snap.data().studentId, student1Mssv);
+
+    await assertSucceeds(updateDoc(doc(adminDb, `graduationRounds/${roundOpenId}`), {
+      allowSelfJoin: true
+    }));
+  });
 });

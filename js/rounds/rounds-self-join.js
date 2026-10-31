@@ -6,6 +6,209 @@
 
 // --- Admin: Join Link Modal & Toggle ---
 
+window.updateAdminRoundJoinLinkToolbar = function(optRoundId) {
+  const roundId = optRoundId || document.getElementById('admin-round-student-select')?.value || state.selectedRoundId || state.activeRound?.id;
+  const badgeEl = document.getElementById('admin-round-join-link-badge');
+  const btnEl = document.getElementById('btn-admin-toggle-round-join-link');
+  if (!badgeEl || !btnEl) return;
+
+  if (!roundId) {
+    badgeEl.className = 'hidden';
+    btnEl.className = 'hidden';
+    return;
+  }
+
+  const round = (state.rounds || []).find(r => r.id === roundId) || (state.activeRound?.id === roundId ? state.activeRound : null);
+  const isOpen = Boolean(round?.allowSelfJoin);
+
+  btnEl.disabled = false;
+  if (isOpen) {
+    badgeEl.className = 'px-2.5 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1 border shadow-2xs bg-emerald-100 text-emerald-800 border-emerald-300';
+    badgeEl.innerHTML = '<span>🔓 Link đang mở</span>';
+    badgeEl.title = 'Sinh viên mới có thể tự tham gia đợt qua link';
+
+    btnEl.className = 'cursor-pointer px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all inline-flex items-center gap-1';
+    btnEl.innerHTML = '<span>🔒 Khóa link</span>';
+    btnEl.title = 'Bấm để khóa link tham gia đợt tốt nghiệp';
+  } else {
+    badgeEl.className = 'px-2.5 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1 border shadow-2xs bg-slate-200 text-slate-700 border-slate-300';
+    badgeEl.innerHTML = '<span>🔒 Link đã khóa</span>';
+    badgeEl.title = 'Đợt đã khóa link – SV mới không thể tự tham gia';
+
+    btnEl.className = 'cursor-pointer px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all inline-flex items-center gap-1';
+    btnEl.innerHTML = '<span>🔓 Mở lại link</span>';
+    btnEl.title = 'Bấm để mở lại link tham gia đợt tốt nghiệp';
+  }
+};
+
+window.updateRoundJoinLinkModalUi = function(isOpen) {
+  const toggleEl = document.getElementById('round-join-link-toggle');
+  const badgeEl = document.getElementById('round-join-link-status-badge');
+  const noticeEl = document.getElementById('round-join-link-locked-notice');
+
+  if (toggleEl) toggleEl.checked = Boolean(isOpen);
+  if (badgeEl) {
+    if (isOpen) {
+      badgeEl.textContent = '● Đang BẬT (Cho phép tự tham gia)';
+      badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300';
+    } else {
+      badgeEl.textContent = '○ Đang TẮT (Link đã khóa)';
+      badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200';
+    }
+  }
+  if (noticeEl) {
+    if (isOpen) {
+      noticeEl.classList.add('hidden');
+    } else {
+      noticeEl.classList.remove('hidden');
+    }
+  }
+};
+
+window.executeRoundJoinLinkToggle = async function(roundId, targetOpen) {
+  const btnEl = document.getElementById('btn-admin-toggle-round-join-link');
+  const toggleEl = document.getElementById('round-join-link-toggle');
+
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.innerHTML = '<span>⏳ Đang lưu...</span>';
+  }
+  if (toggleEl) {
+    toggleEl.disabled = true;
+  }
+
+  try {
+    const currentSnap = await getDoc(doc(db, 'graduationRounds', roundId));
+    const previousAllowSelfJoin = currentSnap.exists() ? Boolean(currentSnap.data().allowSelfJoin) : false;
+
+    await updateDoc(doc(db, 'graduationRounds', roundId), {
+      allowSelfJoin: Boolean(targetOpen),
+      updatedAt: serverTimestamp()
+    });
+
+    // Audit log
+    try {
+      const actorEmail = (state.user?.email || '').toLowerCase().trim();
+      const actionText = targetOpen ? 'Mở lại link tham gia' : 'Khóa link tham gia';
+      await addDoc(collection(db, 'graduationRounds', roundId, 'auditLogs'), {
+        action: actionText,
+        by: actorEmail,
+        email: actorEmail,
+        actorEmail: actorEmail,
+        roundId: roundId,
+        previousStatus: previousAllowSelfJoin ? 'open' : 'locked',
+        newStatus: targetOpen ? 'open' : 'locked',
+        previousAllowSelfJoin: previousAllowSelfJoin,
+        allowSelfJoin: Boolean(targetOpen),
+        timestamp: serverTimestamp(),
+        createdAt: serverTimestamp()
+      });
+    } catch (auditErr) {
+      console.warn('[SelfJoin] Audit log error:', auditErr);
+    }
+
+    // Update in-memory round
+    const inList = (state.rounds || []).find(r => r.id === roundId);
+    if (inList) inList.allowSelfJoin = Boolean(targetOpen);
+    if (state.activeRound && state.activeRound.id === roundId) state.activeRound.allowSelfJoin = Boolean(targetOpen);
+    if (state.currentJoinLinkRound && state.currentJoinLinkRound.id === roundId) state.currentJoinLinkRound.allowSelfJoin = Boolean(targetOpen);
+
+    // Update UI components
+    window.updateAdminRoundJoinLinkToolbar(roundId);
+    window.updateRoundJoinLinkModalUi(targetOpen);
+
+    showToast(
+      targetOpen
+        ? '✓ Đã mở lại link cho phép sinh viên mới tham gia!'
+        : '✓ Đã khóa link tham gia đợt tốt nghiệp.',
+      targetOpen ? 'success' : 'info'
+    );
+  } catch (err) {
+    console.error('[SelfJoin] Toggle error:', err);
+    showToast('Lỗi cập nhật trạng thái link: ' + err.message, 'error');
+    window.updateAdminRoundJoinLinkToolbar(roundId);
+    if (state.currentJoinLinkRound) {
+      window.updateRoundJoinLinkModalUi(Boolean(state.currentJoinLinkRound.allowSelfJoin));
+    }
+  } finally {
+    if (btnEl) btnEl.disabled = false;
+    if (toggleEl) toggleEl.disabled = false;
+  }
+};
+
+window.adminQuickToggleRoundJoinLink = async function() {
+  const roundId = document.getElementById('admin-round-student-select')?.value || state.selectedRoundId || state.activeRound?.id;
+  if (!roundId) {
+    showToast('Vui lòng chọn đợt tốt nghiệp.', 'warning');
+    return;
+  }
+
+  let round = (state.rounds || []).find(r => r.id === roundId);
+  if (!round) {
+    try {
+      const snap = await getDoc(doc(db, 'graduationRounds', roundId));
+      if (snap.exists()) {
+        round = { id: snap.id, ...snap.data() };
+      }
+    } catch (e) {
+      console.warn('[SelfJoin] Fetch round doc notice:', e);
+    }
+  }
+
+  if (!round) {
+    showToast('Không tìm thấy thông tin đợt tốt nghiệp.', 'error');
+    return;
+  }
+
+  const isCurrentlyOpen = Boolean(round.allowSelfJoin);
+  const targetOpen = !isCurrentlyOpen;
+
+  if (targetOpen === false) {
+    // Lock confirmation
+    const confirmed = (typeof window.showConfirm === 'function')
+      ? await window.showConfirm(
+          'Khóa link tham gia đợt tốt nghiệp?',
+          'Sinh viên chưa tham gia đợt sẽ không thể sử dụng link này để tham gia. Những sinh viên đã tham gia vẫn giữ nguyên hồ sơ và quyền truy cập hiện có.',
+          {
+            confirmText: 'Xác nhận khóa link',
+            cancelText: 'Hủy',
+            danger: true
+          }
+        )
+      : confirm('Khóa link tham gia đợt tốt nghiệp?\nSinh viên chưa tham gia đợt sẽ không thể sử dụng link này để tham gia. Những sinh viên đã tham gia vẫn giữ nguyên hồ sơ và quyền truy cập hiện có.');
+
+    if (!confirmed) return;
+  } else {
+    // Reopen confirmation
+    const isReviewing = Boolean(
+      ['round_1', 'round_2', 'round_3', 'completed'].includes(round.reviewStatus) ||
+      Number(round.currentReviewRound) > 1 ||
+      (round.reviewLocks && Object.keys(round.reviewLocks).length > 0) ||
+      (state.eligibleStudentDetails?.roundId === round.id && state.eligibleStudentDetails?.decisions?.length > 0)
+    );
+
+    const message = isReviewing
+      ? 'Đợt này đã bắt đầu xét nguyện vọng. Việc mở lại link có thể làm thay đổi danh sách sinh viên. Bạn có chắc muốn tiếp tục?'
+      : 'Sinh viên mới sẽ có thể sử dụng link để tự xác nhận tham gia đợt tốt nghiệp này.';
+
+    const confirmed = (typeof window.showConfirm === 'function')
+      ? await window.showConfirm(
+          'Cho phép sinh viên mới tham gia đợt này qua link?',
+          message,
+          {
+            confirmText: 'Mở lại link',
+            cancelText: 'Hủy',
+            danger: false
+          }
+        )
+      : confirm('Cho phép sinh viên mới tham gia đợt này qua link?\n' + message);
+
+    if (!confirmed) return;
+  }
+
+  await window.executeRoundJoinLinkToggle(roundId, targetOpen);
+};
+
 window.openRoundJoinLinkModal = async function(roundId) {
   const targetId = roundId || document.getElementById('admin-round-student-select')?.value || state.selectedRoundId || state.activeRound?.id;
   if (!targetId) {
@@ -42,18 +245,7 @@ window.openRoundJoinLinkModal = async function(roundId) {
 
   // Toggle switch and status badge
   const isEnabled = Boolean(round.allowSelfJoin);
-  const toggleEl = document.getElementById('round-join-link-toggle');
-  const badgeEl = document.getElementById('round-join-link-status-badge');
-  if (toggleEl) toggleEl.checked = isEnabled;
-  if (badgeEl) {
-    if (isEnabled) {
-      badgeEl.textContent = '● Đang BẬT (Cho phép tự tham gia)';
-      badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300';
-    } else {
-      badgeEl.textContent = '○ Đang TẮT (Khóa tham gia)';
-      badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200';
-    }
-  }
+  window.updateRoundJoinLinkModalUi(isEnabled);
 
   // Generate unique join link: ?join=ROUND_ID
   const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://ifa-graduation.web.app';
@@ -71,40 +263,65 @@ window.closeRoundJoinLinkModal = function() {
 };
 
 window.toggleRoundSelfJoin = async function(enabled) {
-  const roundId = state.currentJoinLinkRoundId;
+  const roundId = state.currentJoinLinkRoundId || state.currentJoinLinkRound?.id;
   if (!roundId) return;
 
-  const badgeEl = document.getElementById('round-join-link-status-badge');
+  let round = state.currentJoinLinkRound || (state.rounds || []).find(r => r.id === roundId);
   const toggleEl = document.getElementById('round-join-link-toggle');
+  const targetOpen = Boolean(enabled);
 
-  try {
-    await updateDoc(doc(db, 'graduationRounds', roundId), {
-      allowSelfJoin: Boolean(enabled),
-      updatedAt: serverTimestamp()
-    });
+  if (targetOpen === false) {
+    // Lock confirmation
+    const confirmed = (typeof window.showConfirm === 'function')
+      ? await window.showConfirm(
+          'Khóa link tham gia đợt tốt nghiệp?',
+          'Sinh viên chưa tham gia đợt sẽ không thể sử dụng link này để tham gia. Những sinh viên đã tham gia vẫn giữ nguyên hồ sơ và quyền truy cập hiện có.',
+          {
+            confirmText: 'Xác nhận khóa link',
+            cancelText: 'Hủy',
+            danger: true
+          }
+        )
+      : confirm('Khóa link tham gia đợt tốt nghiệp?\nSinh viên chưa tham gia đợt sẽ không thể sử dụng link này để tham gia. Những sinh viên đã tham gia vẫn giữ nguyên hồ sơ và quyền truy cập hiện có.');
 
-    // Update in-memory round
-    if (state.currentJoinLinkRound) state.currentJoinLinkRound.allowSelfJoin = Boolean(enabled);
-    const inList = (state.rounds || []).find(r => r.id === roundId);
-    if (inList) inList.allowSelfJoin = Boolean(enabled);
-    if (state.activeRound && state.activeRound.id === roundId) state.activeRound.allowSelfJoin = Boolean(enabled);
-
-    if (badgeEl) {
-      if (enabled) {
-        badgeEl.textContent = '● Đang BẬT (Cho phép tự tham gia)';
-        badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300';
-      } else {
-        badgeEl.textContent = '○ Đang TẮT (Khóa tham gia)';
-        badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200';
-      }
+    if (!confirmed) {
+      if (toggleEl) toggleEl.checked = true;
+      return;
     }
+  } else {
+    // Reopen confirmation
+    const isReviewing = Boolean(
+      round && (
+        ['round_1', 'round_2', 'round_3', 'completed'].includes(round.reviewStatus) ||
+        Number(round.currentReviewRound) > 1 ||
+        (round.reviewLocks && Object.keys(round.reviewLocks).length > 0) ||
+        (state.eligibleStudentDetails?.roundId === round.id && state.eligibleStudentDetails?.decisions?.length > 0)
+      )
+    );
 
-    showToast(enabled ? '✓ Đã BẬT link cho phép sinh viên tự tham gia!' : '✓ Đã KHÓA link tự tham gia của đợt này.', enabled ? 'success' : 'info');
-  } catch (err) {
-    console.error('[SelfJoin] Toggle error:', err);
-    showToast('Lỗi cập nhật trạng thái link: ' + err.message, 'error');
-    if (toggleEl) toggleEl.checked = !enabled;
+    const message = isReviewing
+      ? 'Đợt này đã bắt đầu xét nguyện vọng. Việc mở lại link có thể làm thay đổi danh sách sinh viên. Bạn có chắc muốn tiếp tục?'
+      : 'Sinh viên mới sẽ có thể sử dụng link để tự xác nhận tham gia đợt tốt nghiệp này.';
+
+    const confirmed = (typeof window.showConfirm === 'function')
+      ? await window.showConfirm(
+          'Cho phép sinh viên mới tham gia đợt này qua link?',
+          message,
+          {
+            confirmText: 'Mở lại link',
+            cancelText: 'Hủy',
+            danger: false
+          }
+        )
+      : confirm('Cho phép sinh viên mới tham gia đợt này qua link?\n' + message);
+
+    if (!confirmed) {
+      if (toggleEl) toggleEl.checked = false;
+      return;
+    }
   }
+
+  await window.executeRoundJoinLinkToggle(roundId, targetOpen);
 };
 
 window.copyRoundJoinLink = async function() {
@@ -225,15 +442,7 @@ window.checkAndHandlePendingRoundJoin = async function() {
     return;
   }
 
-  // Check if self-join is allowed
-  if (targetRound.allowSelfJoin !== true) {
-    showToast(`Đợt tốt nghiệp "${targetRound.title || targetRound.roundName}" hiện không mở tính năng tự tham gia qua link. Vui lòng liên hệ Quản trị viên Khoa.`, 'warning', 6000);
-    try { sessionStorage.removeItem('pendingJoinRound'); } catch (e) {}
-    cleanJoinUrlParam();
-    return;
-  }
-
-  // 4. Check if student already joined
+  // 4. Check if student already joined (Existing members must NEVER be blocked by locked link)
   const studentMssv = state.studentMssv || state.userStudentId || (state.user?.email && state.user.email.toLowerCase().endsWith('@student.tdtu.edu.vn') ? state.user.email.split('@')[0].toUpperCase() : '');
   state.pendingJoinTargetRound = targetRound;
 
@@ -265,7 +474,15 @@ window.checkAndHandlePendingRoundJoin = async function() {
     return;
   }
 
-  // 5. Student NOT yet joined: Open confirmation modal
+  // 5. Check if self-join link is locked (for new students attempting to join)
+  if (targetRound.allowSelfJoin !== true) {
+    showToast('Đợt tốt nghiệp này đã ngừng tiếp nhận sinh viên tham gia mới. Vui lòng liên hệ Khoa nếu cần hỗ trợ.', 'warning', 7000);
+    try { sessionStorage.removeItem('pendingJoinRound'); } catch (e) {}
+    cleanJoinUrlParam();
+    return;
+  }
+
+  // 6. Student NOT yet joined and link is open: Open confirmation modal
   await openStudentConfirmJoinModal(targetRound);
 };
 
@@ -403,10 +620,10 @@ window.confirmStudentSelfJoinRound = async function() {
   }
 
   try {
-    // Pre-check round still allows join
+    // Pre-check round still allows join (Race condition check against fresh snapshot)
     const roundSnap = await getDoc(doc(db, 'graduationRounds', round.id));
     if (!roundSnap.exists() || roundSnap.data().allowSelfJoin !== true) {
-      throw new Error('Đợt tốt nghiệp này hiện đã khóa tính năng tự tham gia qua link.');
+      throw new Error('Đợt tốt nghiệp này đã ngừng tiếp nhận sinh viên tham gia mới. Vui lòng liên hệ Khoa nếu cần hỗ trợ.');
     }
     if (roundSnap.data().isClosed || roundSnap.data().status === 'closed' || roundSnap.data().isHidden) {
       throw new Error('Đợt tốt nghiệp này đã kết thúc hoặc lưu trữ.');

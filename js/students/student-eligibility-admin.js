@@ -165,6 +165,9 @@ window.loadAdminEligibleStudents = async function(roundId) {
       decisions: decSnap.docs.map(d => ({ id: d.id, ...d.data() }))
     };
     renderAdminEligibleStudentsTable();
+    if (typeof window.updateAdminRoundJoinLinkToolbar === 'function') {
+      window.updateAdminRoundJoinLinkToolbar(roundId);
+    }
     if (typeof window.renderAdminSupervisorPreferencesStats === 'function') {
       window.renderAdminSupervisorPreferencesStats(roundId, state.eligibleStudentDetails);
     }

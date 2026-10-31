@@ -333,6 +333,9 @@ function renderRoundsDropdowns() {
   if (selectAdminReview) selectAdminReview.innerHTML = optionsHtml;
   const selectAdminTimeline = document.getElementById('admin-timeline-round-select');
   if (selectAdminTimeline) selectAdminTimeline.innerHTML = optionsHtml;
+  if (typeof window.updateAdminRoundJoinLinkToolbar === 'function') {
+    window.updateAdminRoundJoinLinkToolbar();
+  }
 }
 
 window.onRoundSelected = function(roundId) {
