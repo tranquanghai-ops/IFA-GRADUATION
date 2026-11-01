@@ -281,8 +281,91 @@ function renderAdminReviewSupervisorsTable() {
   const tbody = document.getElementById('admin-review-supervisors-tbody');
   if (!tbody) return;
 
-  const currentRound = Number(state.activeRound?.currentReviewRound || 1);
+  const round = state.activeRound || {};
+  const currentRound = Number(round.currentReviewRound || 1);
+  const isPublished = Boolean(round.status === 'published' || round.reviewStatus === 'completed' || currentRound > 3);
   const supervisors = state.adminReviewData.supervisors || [];
+  const registrations = state.adminReviewData.registrations || [];
+  const decisions = state.adminReviewData.decisions || [];
+
+  const headerTitleEl = document.querySelector('#admin-review-supervisors-section h3');
+  const headerSubtitleEl = document.querySelector('#admin-review-supervisors-section p');
+  const theadEl = document.querySelector('#admin-review-supervisors-section thead');
+
+  // Khi đã chốt 3 vòng và công bố, hiển thị kết quả phân công và chỉ tiêu cuối cùng
+  if (isPublished) {
+    if (headerTitleEl) headerTitleEl.textContent = 'Bảng tổng kết xét duyệt GVHD (Đã chốt 3 vòng & Công bố)';
+    if (headerSubtitleEl) headerSubtitleEl.textContent = 'Đã hoàn tất quy trình xét duyệt. Dưới đây là kết quả chỉ tiêu và số lượng sinh viên đã nhận chính thức của từng GVHD.';
+    if (theadEl) {
+      theadEl.innerHTML = `
+        <tr>
+          <th class="p-3.5">GVHD</th>
+          <th class="p-3.5">Bộ môn</th>
+          <th class="p-3.5 text-center">Chỉ tiêu</th>
+          <th class="p-3.5 text-center">Tổng đã nhận</th>
+          <th class="p-3.5 text-center">Chỉ tiêu còn lại</th>
+          <th class="p-3.5 text-center">Tỷ lệ lấp đầy</th>
+          <th class="p-3.5 text-center">Trạng thái GV</th>
+          <th class="p-3.5 text-right">Thao tác</th>
+        </tr>
+      `;
+    }
+
+    tbody.innerHTML = supervisors.map(s => {
+      const totalCap = typeof s.capacity === 'number' ? s.capacity : 10;
+      const assignedCount = typeof getSupervisorAssignmentCount === 'function'
+        ? getSupervisorAssignmentCount(s.id)
+        : registrations.filter(r => (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') && (r.acceptedSupervisorId === s.id || r.acceptedSupervisorId === s.supervisorId)).length;
+      const remainingCap = Math.max(0, totalCap - assignedCount);
+      const fillPercent = totalCap > 0 ? Math.round((assignedCount / totalCap) * 100) : 0;
+
+      const resolvedName = (typeof resolveSupervisorName === 'function')
+        ? resolveSupervisorName(s.id || s.supervisorId || s.email, s.name)
+        : (window.resolveSupervisorName ? window.resolveSupervisorName(s.id || s.supervisorId || s.email, s.name) : s.name);
+      const resolvedDept = (typeof resolveSupervisorDepartment === 'function')
+        ? resolveSupervisorDepartment(s.id || s.supervisorId || s.email, s.department)
+        : (window.resolveSupervisorDepartment ? window.resolveSupervisorDepartment(s.id || s.supervisorId || s.email, s.department) : (s.department || '--'));
+
+      return `
+        <tr class="hover:bg-slate-50 transition-colors">
+          <td class="p-3.5 font-bold text-slate-900">${escapeHtml(resolvedName)}</td>
+          <td class="p-3.5 text-slate-600">${escapeHtml(resolvedDept)}</td>
+          <td class="p-3.5 text-center font-bold text-slate-800">${totalCap}</td>
+          <td class="p-3.5 text-center font-bold text-emerald-600">${assignedCount}</td>
+          <td class="p-3.5 text-center font-bold ${remainingCap > 0 ? 'text-amber-600' : 'text-slate-400'}">${remainingCap}</td>
+          <td class="p-3.5 text-center font-bold text-purple-700">${fillPercent}%</td>
+          <td class="p-3.5 text-center"><span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Đã hoàn tất</span></td>
+          <td class="p-3.5 text-right">
+            <button onclick="openAdminInspectSupModal('${s.id}')" class="text-blue-600 hover:underline font-bold text-xs cursor-pointer">Xem chi tiết</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const progressRatioEl = document.getElementById('adm-sup-progress-ratio');
+    if (progressRatioEl) {
+      progressRatioEl.className = 'badge bg-emerald-100 text-emerald-900 font-bold';
+      progressRatioEl.textContent = `${supervisors.length} / ${supervisors.length} GV hoàn tất (Đã công bố)`;
+    }
+    return;
+  }
+
+  // Khôi phục thead thông thường nếu đang trong các vòng xét
+  if (theadEl) {
+    theadEl.innerHTML = `
+      <tr>
+        <th class="p-3.5">GVHD</th>
+        <th class="p-3.5">Bộ môn</th>
+        <th class="p-3.5 text-center">Chỉ tiêu</th>
+        <th class="p-3.5 text-center">Đã nhận trước</th>
+        <th class="p-3.5 text-center">Ứng viên vòng này</th>
+        <th class="p-3.5 text-center">Đang chọn</th>
+        <th class="p-3.5 text-center">Chỉ tiêu còn lại</th>
+        <th class="p-3.5 text-center">Trạng thái GV</th>
+        <th class="p-3.5 text-right">Thao tác</th>
+      </tr>
+    `;
+  }
   const registrations = state.adminReviewData.registrations || [];
   const decisions = state.adminReviewData.decisions || [];
 
@@ -937,9 +1020,90 @@ window.confirmAdminLockRound = async function() {
 
 window.openAdminInspectSupModal = function(supId) {
   state.inspectingSupervisorId = supId;
-  const currentRound = state.activeRound?.currentReviewRound || 1;
-  const sup = state.adminReviewData.supervisors.find(s => s.id === supId);
+  const round = state.activeRound || {};
+  const currentRound = Number(round.currentReviewRound || 1);
+  const isPublished = Boolean(round.status === 'published' || round.reviewStatus === 'completed' || currentRound > 3);
+  const sup = (state.adminReviewData?.supervisors || []).find(s => s.id === supId);
   if (!sup) return;
+
+  const totalCap = typeof sup.capacity === 'number' ? sup.capacity : 10;
+  const resolvedSupName = (typeof resolveSupervisorName === 'function')
+    ? resolveSupervisorName(sup.id || sup.supervisorId || sup.email, sup.name)
+    : (window.resolveSupervisorName ? window.resolveSupervisorName(sup.id || sup.supervisorId || sup.email, sup.name) : sup.name);
+
+  const theadEl = document.querySelector('#modal-admin-inspect-sup thead tr');
+  const tbody = document.getElementById('inspect-sup-candidates-tbody');
+
+  // Khi đã công bố, hiển thị toàn bộ sinh viên đã trúng tuyển / phân công cho GVHD này
+  if (isPublished) {
+    const allAssignmentRows = typeof getAdminAssignmentRows === 'function' ? getAdminAssignmentRows() : [];
+    const supStudents = allAssignmentRows.filter(row => {
+      if (!row.isAssigned) return false;
+      const officials = row.officialAssignment?.supervisors || [];
+      if (officials.some(item => item.supervisorId === sup.id || item.supervisorId === sup.supervisorId)) {
+        return true;
+      }
+      const r = row.registration || {};
+      return (r.acceptedSupervisorId === sup.id || r.acceptedSupervisorId === sup.supervisorId);
+    });
+
+    document.getElementById('inspect-sup-name').textContent = `Kết quả Xét duyệt & Phân công: ${resolvedSupName}`;
+    document.getElementById('inspect-sup-quota-info').textContent = `Chỉ tiêu: ${totalCap} | Tổng đã nhận: ${supStudents.length} | Chỉ tiêu còn lại: ${Math.max(0, totalCap - supStudents.length)}`;
+
+    if (theadEl) {
+      theadEl.innerHTML = `
+        <th class="p-3 text-left">MSSV</th>
+        <th class="p-3 text-left">HỌ VÀ TÊN</th>
+        <th class="p-3 text-left">ĐỀ TÀI</th>
+        <th class="p-3 text-left">KẾT QUẢ PHÂN CÔNG</th>
+      `;
+    }
+
+    if (supStudents.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-slate-400">Giảng viên chưa có sinh viên nào trúng tuyển hoặc phân công trong đợt này.</td></tr>';
+    } else {
+      tbody.innerHTML = supStudents.map(row => {
+        const r = row.registration || {};
+        const cStudentName = resolveStudentName(row.studentId, r.studentName || row.eligibleStudent?.fullName || row.eligibleStudent?.name);
+        const topicTitle = r.topicTitle || 'Chưa đăng ký đề tài';
+
+        let matchBadge = '';
+        if (Number(r.acceptedRank) === 1) {
+          matchBadge = '<span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Trúng tuyển NV1</span>';
+        } else if (Number(r.acceptedRank) === 2) {
+          matchBadge = '<span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Trúng tuyển NV2</span>';
+        } else if (Number(r.acceptedRank) === 3) {
+          matchBadge = '<span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Trúng tuyển NV3</span>';
+        } else if (r.reviewStatus === 'manually_assigned' || row.officialAssignment?.source === 'manually_assigned' || row.officialAssignment?.source === 'admin_assigned') {
+          matchBadge = '<span class="badge bg-indigo-100 text-indigo-800 font-bold">🛠️ Khoa phân công</span>';
+        } else {
+          matchBadge = '<span class="badge bg-emerald-100 text-emerald-800 font-bold">✓ Phân công chính thức</span>';
+        }
+
+        return `
+          <tr class="hover:bg-slate-50 transition-colors">
+            <td class="p-3 font-mono font-bold text-slate-900">${row.studentId}</td>
+            <td class="p-3 font-semibold text-slate-800">${escapeHtml(cStudentName)}</td>
+            <td class="p-3 max-w-xs font-medium text-slate-700 truncate" title="${escapeHtml(topicTitle)}">${escapeHtml(topicTitle)}</td>
+            <td class="p-3">${matchBadge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('modal-admin-inspect-sup').classList.remove('hidden');
+    return;
+  }
+
+  // Khôi phục thead thông thường cho vòng xét
+  if (theadEl) {
+    theadEl.innerHTML = `
+      <th class="p-3 text-left">MSSV</th>
+      <th class="p-3 text-left">HỌ VÀ TÊN</th>
+      <th class="p-3 text-left">ĐỀ TÀI</th>
+      <th class="p-3 text-left">TRẠNG THÁI LỰA CHỌN</th>
+    `;
+  }
 
   const totalCap = sup.capacity || 10;
   const acceptedPrev = (state.adminReviewData.registrations || []).filter(r => {

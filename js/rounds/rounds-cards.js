@@ -624,7 +624,8 @@ window.openRoundWorkspaceModal = async function(roundId, actionKey, subSection =
   document.body.style.overflow = 'hidden';
   modal.classList.remove('hidden');
 
-  if (actionKey === 'review' && subSection === 'assigned') {
+  const isRoundPublished = Boolean(round?.status === 'published' || round?.reviewStatus === 'completed');
+  if (actionKey === 'review' && (subSection === 'assigned' || isRoundPublished)) {
     setTimeout(() => {
       document.getElementById('admin-official-supervisors-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 350);

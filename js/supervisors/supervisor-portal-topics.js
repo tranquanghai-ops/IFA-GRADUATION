@@ -334,6 +334,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
       }
       if (docSupStatusEl) {
         docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-emerald-700 italic';
+        docSupStatusEl.style.color = '#047857';
         docSupStatusEl.textContent = `✓ Đã duyệt đề tài${reviewedBy ? ' (' + reviewedBy + ')' : ''}`;
         docSupStatusEl.classList.remove('hidden');
       }
@@ -369,7 +370,8 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
         badgeEl.textContent = `✕ Yêu cầu chỉnh sửa (Lần ${viewingVersion})`;
       }
       if (docSupStatusEl) {
-        docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-rose-700 italic';
+        docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-rose-600 italic';
+        docSupStatusEl.style.color = '#dc2626';
         docSupStatusEl.textContent = `✕ Yêu cầu chỉnh sửa: ${note || st.topicApprovalNote || ''}`;
         docSupStatusEl.classList.remove('hidden');
       }
@@ -395,6 +397,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
       }
       if (docSupStatusEl) {
         docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-amber-700 italic';
+        docSupStatusEl.style.color = '#b45309';
         docSupStatusEl.textContent = '(Chờ GVHD xem xét & ký duyệt)';
         docSupStatusEl.classList.remove('hidden');
       }
@@ -633,14 +636,17 @@ window.toggleTopicPreviewEditMode = function(isEdit = true) {
     if (docSupStatusEl) {
       if (isApproved) {
         docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-emerald-700 italic';
+        docSupStatusEl.style.color = '#047857';
         docSupStatusEl.textContent = '✓ Đã duyệt đề tài';
         docSupStatusEl.classList.remove('hidden');
       } else if (status === 'rejected') {
-        docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-rose-700 italic';
+        docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-rose-600 italic';
+        docSupStatusEl.style.color = '#dc2626';
         docSupStatusEl.textContent = `✕ Yêu cầu chỉnh sửa: ${st.topicApprovalNote || ''}`;
         docSupStatusEl.classList.remove('hidden');
       } else {
         docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-amber-700 italic';
+        docSupStatusEl.style.color = '#b45309';
         docSupStatusEl.textContent = '(Chờ GVHD xem xét & ký duyệt)';
         docSupStatusEl.classList.remove('hidden');
       }
@@ -776,7 +782,8 @@ window.saveTopicPreviewEdits = async function() {
     }
     if (docSupStatusEl) {
       docSupStatusEl.className = 'mt-1.5 text-xs font-bold text-amber-700 italic';
-      docSupStatusEl.textContent = '(Chờ GVHD xem xét & ký duyệt)';
+        docSupStatusEl.style.color = '#b45309';
+        docSupStatusEl.textContent = '(Chờ GVHD xem xét & ký duyệt)';
     }
 
     window.toggleTopicPreviewEditMode(false);

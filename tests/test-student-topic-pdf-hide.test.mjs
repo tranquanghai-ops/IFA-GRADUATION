@@ -139,4 +139,30 @@ test('TEST SUITE: STUDENT TOPIC REGISTRATION PREVIEW - PDF & PRINT VISIBILITY RE
     assert.ok(expectedDateStr.includes(`năm ${expectedYyyy}`), 'Chuỗi ngày in phải chứa đúng năm hiện tại');
     assert.ok(expectedDateStr.startsWith('Tp.HCM, ngày '), 'Chuỗi ngày in phải bắt đầu bằng Tp.HCM, ngày');
   });
+
+  await t.test('8. Kiểm tra: Khi GVHD yêu cầu sửa đề tài, chữ phải màu đỏ nổi bật thay vì màu xanh', () => {
+    // Không còn inline color:#047857 trong modal-topic-preview.html
+    assert.doesNotMatch(modalHtml, /id="topic-preview-doc-sup-status"[^>]*color:#047857/);
+    assert.doesNotMatch(indexHtml, /id="topic-preview-doc-sup-status"[^>]*color:#047857/);
+
+    // supervisor-portal-topics.js phải gán style.color = '#dc2626' và text-rose-600 khi rejected
+    assert.match(topicsJs, /docSupStatusEl\.style\.color\s*=\s*'#dc2626';/);
+    assert.match(topicsJs, /docSupStatusEl\.className\s*=\s*'mt-1\.5 text-xs font-bold text-rose-600 italic';/);
+  });
+
+  await t.test('9. Kiểm tra: Khi đã chốt 3 vòng và công bố, bảng tổng kết GVHD hiển thị kết quả cuối cùng', () => {
+    const adminJs = read('js/supervisors/assignments-admin.js');
+    assert.match(adminJs, /Bảng tổng kết xét duyệt GVHD \(Đã chốt 3 vòng & Công bố\)/);
+    assert.match(adminJs, /const isPublished = Boolean\(round\.status === 'published' \|\| round\.reviewStatus === 'completed' \|\| currentRound > 3\);/);
+    assert.match(adminJs, /✓ Đã hoàn tất/);
+    assert.match(adminJs, /\$\{supervisors\.length\} \/ \$\{supervisors\.length\} GV hoàn tất \(Đã công bố\)/);
+  });
+
+  await t.test('10. Kiểm tra: Modal xem chi tiết GVHD khi đã công bố hiển thị danh sách SV trúng tuyển/phân công', () => {
+    const adminJs = read('js/supervisors/assignments-admin.js');
+    assert.match(adminJs, /Kết quả Xét duyệt & Phân công:/);
+    assert.match(adminJs, /KẾT QUẢ PHÂN CÔNG/);
+    assert.match(adminJs, /✓ Trúng tuyển NV1/);
+    assert.match(adminJs, /🛠️ Khoa phân công/);
+  });
 });
