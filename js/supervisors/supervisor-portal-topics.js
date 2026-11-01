@@ -325,10 +325,17 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
     const btnReject = document.getElementById('btn-topic-preview-reject');
     const btnCancelApproval = document.getElementById('btn-topic-preview-cancel-approval');
     const btnStudentEdit = document.getElementById('btn-topic-preview-student-edit');
+    const btnPdf = document.getElementById('btn-topic-preview-download-pdf');
+
+    const isTopicApproved = (status === 'approved' || Boolean(matchedApproved));
+    const canShowPdf = isStudentViewer ? isTopicApproved : true;
 
     // Role-based button visibility
     if (btnStudentEdit) {
       btnStudentEdit.classList.toggle('hidden', !isStudentViewer || isViewingPastVersion);
+    }
+    if (btnPdf) {
+      btnPdf.classList.toggle('hidden', !canShowPdf);
     }
 
     if (status === 'approved') {
@@ -428,6 +435,8 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
     modal._currentStudentId = studentId;
     modal._currentRegistration = st;
     modal._isStudentViewer = isStudentViewer;
+    modal._status = status;
+    modal._isTopicApproved = isTopicApproved;
 
     // Bind actions
     if (btnApprove && !isStudentViewer) {
@@ -449,8 +458,8 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
       };
     }
 
-    const btnPdf = document.getElementById('btn-topic-preview-download-pdf');
     if (btnPdf) {
+      btnPdf.classList.toggle('hidden', !canShowPdf);
       btnPdf.onclick = () => {
         const activeVer = modal?._viewingVersion || viewingVersion || null;
         if (typeof window.downloadOfficialTopicRegistrationPdf === 'function') {
@@ -598,8 +607,16 @@ window.toggleTopicPreviewEditMode = function(isEdit = true) {
       descEditWrap.style.display = 'none';
     }
 
+    const currentVersion = Number(st.topicTitleVersion || 1);
+    const viewingVer = Number(modal._viewingVersion || currentVersion);
+    const approvedVersions = modal._approvedVersions || (typeof window.getApprovedTopicVersions === 'function' ? window.getApprovedTopicVersions(st) : []);
+    const isViewingApprovedVersion = approvedVersions.some(v => Number(v.version) === viewingVer);
+    const status = isViewingApprovedVersion ? 'approved' : (modal._status || st?.topicApprovalStatus || 'pending');
+    const isApproved = (status === 'approved' || isViewingApprovedVersion || Boolean(modal._isTopicApproved));
+    const canShowPdf = isStudent ? isApproved : true;
+
     if (btnEdit) btnEdit.classList.toggle('hidden', !isStudent || modal._isViewingPastVersion);
-    if (btnPdf) btnPdf.classList.remove('hidden');
+    if (btnPdf) btnPdf.classList.toggle('hidden', !canShowPdf);
 
     if (footerSave) footerSave.classList.add('hidden');
     if (footerCancel) footerCancel.classList.add('hidden');
@@ -738,7 +755,12 @@ window.saveTopicPreviewEdits = async function() {
       submittedAt: new Date(),
       updatedAt: new Date()
     };
-    if (modal) modal._currentRegistration = state.myRegistration;
+    if (modal) {
+      modal._currentRegistration = state.myRegistration;
+      modal._viewingVersion = nextVersion;
+      modal._isTopicApproved = false;
+      modal._status = 'pending';
+    }
 
     // Update DOM paper fields
     const titleTextEl = document.getElementById('topic-preview-doc-title');

@@ -481,6 +481,24 @@ async function ensureTimesFontLoaded() {
 window.ensureTimesFontLoaded = ensureTimesFontLoaded;
 
 window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
+  const modal = document.getElementById('modal-supervisor-topic-preview');
+  const isStudent = Boolean(
+    modal?._isStudentViewer ||
+    state.currentRole === 'student' ||
+    state.currentView === 'student' ||
+    state.role === 'student' ||
+    state.isStudent ||
+    (state.impersonation?.target?.type === 'student') ||
+    (!targetStudentId || targetStudentId === state.myRegistration?.studentId || targetStudentId === state.studentMssv)
+  );
+  const reg = modal?._currentRegistration || state.myRegistration;
+  const isApproved = Boolean(modal?._isTopicApproved || reg?.topicApprovalStatus === 'approved' || modal?._isViewingPastVersion);
+  if (isStudent && !isApproved && !state.isAdmin) {
+    if (typeof showToast === 'function') {
+      showToast('Phiếu đăng ký chỉ được xuất và in sau khi GVHD xác nhận duyệt đề tài.', 'warning');
+    }
+    return;
+  }
   const paper = document.getElementById('topic-preview-paper');
   if (!paper) {
     if (typeof window.downloadOfficialTopicRegistrationPdf === 'function') {
@@ -633,6 +651,26 @@ window.downloadOfficialTopicRegistrationPdf = async function(targetStudentId = n
     showToast('Không tìm thấy thông tin đăng ký.', 'warning');
     return;
   }
+  const isStudentRole = Boolean(
+    modal?._isStudentViewer ||
+    state.currentRole === 'student' ||
+    state.currentView === 'student' ||
+    state.role === 'student' ||
+    state.isStudent ||
+    (state.impersonation?.target?.type === 'student') ||
+    (!targetStudentId || targetStudentId === state.myRegistration?.studentId || targetStudentId === state.studentMssv)
+  );
+
+  const isApprovedVer = targetVersion
+    ? ((Array.isArray(reg.topicTitleHistory) && reg.topicTitleHistory.some(h => Number(h.version) === Number(targetVersion) && h.status === 'approved')) ||
+       (typeof window.getApprovedTopicVersions === 'function' && window.getApprovedTopicVersions(reg).some(v => Number(v.version) === Number(targetVersion))))
+    : (reg.topicApprovalStatus === 'approved');
+
+  if (isStudentRole && !isApprovedVer && !state.isAdmin) {
+    showToast('Phiếu PDF chỉ được xuất và in sau khi GVHD xác nhận duyệt đề tài.', 'warning');
+    return;
+  }
+
   if (!targetStudentId && reg.topicApprovalStatus !== 'approved' && !targetVersion) {
     showToast('Phiếu PDF chỉ được tải sau khi GVHD xác nhận tên đề tài.', 'warning');
     return;
