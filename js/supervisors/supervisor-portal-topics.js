@@ -629,9 +629,6 @@ window.toggleTopicPreviewEditMode = function(isEdit = true) {
       if (btnCancelApproval) btnCancelApproval.classList.add('hidden');
     }
 
-    const status = st?.topicApprovalStatus || 'pending';
-    const isApproved = (status === 'approved' || modal._isViewingPastVersion);
-
     // Restore supervisor status when viewing
     if (docSupStatusEl) {
       if (isApproved) {

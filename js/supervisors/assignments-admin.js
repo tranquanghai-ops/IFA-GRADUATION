@@ -285,9 +285,6 @@ function renderAdminReviewSupervisorsTable() {
   const currentRound = Number(round.currentReviewRound || 1);
   const isPublished = Boolean(round.status === 'published' || round.reviewStatus === 'completed' || currentRound > 3);
   const supervisors = state.adminReviewData.supervisors || [];
-  const registrations = state.adminReviewData.registrations || [];
-  const decisions = state.adminReviewData.decisions || [];
-
   const headerTitleEl = document.querySelector('#admin-review-supervisors-section h3');
   const headerSubtitleEl = document.querySelector('#admin-review-supervisors-section p');
   const theadEl = document.querySelector('#admin-review-supervisors-section thead');
@@ -1027,13 +1024,8 @@ window.openAdminInspectSupModal = function(supId) {
   if (!sup) return;
 
   const totalCap = typeof sup.capacity === 'number' ? sup.capacity : 10;
-  const resolvedSupName = (typeof resolveSupervisorName === 'function')
-    ? resolveSupervisorName(sup.id || sup.supervisorId || sup.email, sup.name)
-    : (window.resolveSupervisorName ? window.resolveSupervisorName(sup.id || sup.supervisorId || sup.email, sup.name) : sup.name);
-
-  const theadEl = document.querySelector('#modal-admin-inspect-sup thead tr');
-  const tbody = document.getElementById('inspect-sup-candidates-tbody');
-
+    const theadEl = document.querySelector('#modal-admin-inspect-sup thead tr');
+  
   // Khi đã công bố, hiển thị toàn bộ sinh viên đã trúng tuyển / phân công cho GVHD này
   if (isPublished) {
     const allAssignmentRows = typeof getAdminAssignmentRows === 'function' ? getAdminAssignmentRows() : [];
@@ -1105,8 +1097,7 @@ window.openAdminInspectSupModal = function(supId) {
     `;
   }
 
-  const totalCap = sup.capacity || 10;
-  const acceptedPrev = (state.adminReviewData.registrations || []).filter(r => {
+    const acceptedPrev = (state.adminReviewData.registrations || []).filter(r => {
     return (r.reviewStatus === 'accepted' || r.reviewStatus === 'manually_assigned') &&
       (r.acceptedSupervisorId === sup.id) &&
       (r.acceptedRank < currentRound);
