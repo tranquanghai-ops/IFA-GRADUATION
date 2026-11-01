@@ -507,8 +507,24 @@ window.printOfficialTopicRegistrationPaper = function(targetStudentId = null) {
     return;
   }
 
+  // Khi SV bấm in phiếu, ngày trên phiếu luôn là ngày bấm in
+  const printNow = new Date();
+  const printDd = String(printNow.getDate()).padStart(2, '0');
+  const printMm = String(printNow.getMonth() + 1).padStart(2, '0');
+  const printYyyy = printNow.getFullYear();
+  const printDateStr = `Tp.HCM, ngày ${printDd} tháng ${printMm} năm ${printYyyy}`;
+
+  const docDateEl = document.getElementById('topic-preview-doc-date');
+  if (docDateEl) {
+    docDateEl.textContent = printDateStr;
+  }
+
   // Clone paper and strip all edit wraps, textareas, notes, and supervisor approval status before printing
   const paperClone = paper.cloneNode(true);
+  const cloneDateEl = paperClone.querySelector('#topic-preview-doc-date');
+  if (cloneDateEl) {
+    cloneDateEl.textContent = printDateStr;
+  }
   const elementsToRemove = paperClone.querySelectorAll(
     '#topic-preview-doc-title-edit-wrap, #topic-preview-doc-desc-edit-wrap, #topic-preview-doc-sup-status, .hidden, .no-print, textarea, button'
   );
@@ -687,10 +703,11 @@ window.downloadOfficialTopicRegistrationPdf = async function(targetStudentId = n
   identity = identity || getRegistrationStudentIdentity();
   const studentObj = (typeof window.getFacultyStudent === 'function') ? window.getFacultyStudent(identity.mssv) : null;
   const round = state.activeRound || {};
-  const approvedDate = reg.topicReviewedAt?.toDate ? reg.topicReviewedAt.toDate() : new Date();
-  const dd = String(approvedDate.getDate()).padStart(2, '0');
-  const mm = String(approvedDate.getMonth() + 1).padStart(2, '0');
-  const yyyy = approvedDate.getFullYear();
+  // Khi SV bấm in / xuất phiếu PDF, ngày trên phiếu luôn là ngày bấm in
+  const printNow = new Date();
+  const dd = String(printNow.getDate()).padStart(2, '0');
+  const mm = String(printNow.getMonth() + 1).padStart(2, '0');
+  const yyyy = printNow.getFullYear();
   const roundLabel = round.title || round.roundName || 'ĐỒ ÁN TỐT NGHIỆP';
 
   const approvedList = getApprovedTopicVersions(reg);

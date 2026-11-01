@@ -214,22 +214,11 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
     const programHeading = roundHeadingMatch?.[1] || normalizedRoundLabel;
     const roundHeading = roundHeadingMatch?.[2] || (round.roundName ? (String(round.roundName).toUpperCase().startsWith('ĐỢT') ? round.roundName.toUpperCase() : `ĐỢT ${round.roundName.toUpperCase()}`) : '');
 
-    let dd = '--', mm = '--', yyyy = '----';
-    if (reviewedAt) {
-      const approvedDate = reviewedAt.toDate ? reviewedAt.toDate() : new Date(reviewedAt);
-      if (!isNaN(approvedDate.getTime())) {
-        dd = String(approvedDate.getDate()).padStart(2, '0');
-        mm = String(approvedDate.getMonth() + 1).padStart(2, '0');
-        yyyy = approvedDate.getFullYear();
-      }
-    } else if (st?.submittedAt) {
-      const subDate = st.submittedAt.toDate ? st.submittedAt.toDate() : new Date(st.submittedAt);
-      if (!isNaN(subDate.getTime())) {
-        dd = String(subDate.getDate()).padStart(2, '0');
-        mm = String(subDate.getMonth() + 1).padStart(2, '0');
-        yyyy = subDate.getFullYear();
-      }
-    }
+    // Ngày trên phiếu ở chữ ký Người đăng ký luôn là ngày hiện tại khi xem/bấm in phiếu
+    const signDate = new Date();
+    const dd = String(signDate.getDate()).padStart(2, '0');
+    const mm = String(signDate.getMonth() + 1).padStart(2, '0');
+    const yyyy = signDate.getFullYear();
 
     // Header info
     const setEl = (id, val) => {
@@ -461,6 +450,15 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
     if (btnPdf) {
       btnPdf.classList.toggle('hidden', !canShowPdf);
       btnPdf.onclick = () => {
+        // Khi SV bấm in phiếu, ngày trên phiếu luôn là ngày bấm in
+        const clickPrintDate = new Date();
+        const pDd = String(clickPrintDate.getDate()).padStart(2, '0');
+        const pMm = String(clickPrintDate.getMonth() + 1).padStart(2, '0');
+        const pYyyy = clickPrintDate.getFullYear();
+        const docDateEl = document.getElementById('topic-preview-doc-date');
+        if (docDateEl) {
+          docDateEl.textContent = `Tp.HCM, ngày ${pDd} tháng ${pMm} năm ${pYyyy}`;
+        }
         const activeVer = modal?._viewingVersion || viewingVersion || null;
         if (typeof window.downloadOfficialTopicRegistrationPdf === 'function') {
           window.downloadOfficialTopicRegistrationPdf(studentId, activeVer);

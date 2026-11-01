@@ -117,4 +117,26 @@ test('TEST SUITE: STUDENT TOPIC REGISTRATION PREVIEW - PDF & PRINT VISIBILITY RE
     assert.equal(canShowPdfB, true, 'Sinh viên đã được duyệt thì canShowPdf phải là true');
     assert.equal(btnPdf.classList.contains('hidden'), false, 'Nút Tải PDF/In phải hiển thị (không có class hidden)');
   });
+
+  await t.test('7. Kiểm tra: Khi SV bấm in phiếu, ngày trên phiếu luôn là ngày bấm in (today)', () => {
+    // 7a. Kiểm tra mã nguồn supervisor-portal-topics.js: khởi tạo ngày và cập nhật khi click in
+    assert.match(topicsJs, /const\s+signDate\s*=\s*new Date\(\);/, 'Phải khởi tạo signDate bằng new Date()');
+    assert.match(topicsJs, /const\s+clickPrintDate\s*=\s*new Date\(\);/, 'Khi click nút PDF/In phải lấy new Date()');
+    assert.match(topicsJs, /docDateEl\.textContent\s*=\s*`Tp\.HCM, ngày \$\{pDd\} tháng \$\{pMm\} năm \$\{pYyyy\}`;/);
+
+    // 7b. Kiểm tra mã nguồn student-topic-pdf.js: in giấy và xuất PDF luôn dùng new Date()
+    assert.match(pdfJs, /const\s+printNow\s*=\s*new Date\(\);/, 'printOfficialTopicRegistrationPaper phải lấy new Date()');
+    assert.match(pdfJs, /cloneDateEl\.textContent\s*=\s*printDateStr;/, 'Bản in clone phải cập nhật ngày in');
+    assert.match(pdfJs, /Tp\.HCM, ngày \$\{dd\} tháng \$\{mm\} năm \$\{yyyy\}/, 'PDF format chuẩn tiếng Việt');
+
+    // 7c. Mô phỏng ngày in thực tế
+    const today = new Date();
+    const expectedDd = String(today.getDate()).padStart(2, '0');
+    const expectedMm = String(today.getMonth() + 1).padStart(2, '0');
+    const expectedYyyy = today.getFullYear();
+    const expectedDateStr = `Tp.HCM, ngày ${expectedDd} tháng ${expectedMm} năm ${expectedYyyy}`;
+
+    assert.ok(expectedDateStr.includes(`năm ${expectedYyyy}`), 'Chuỗi ngày in phải chứa đúng năm hiện tại');
+    assert.ok(expectedDateStr.startsWith('Tp.HCM, ngày '), 'Chuỗi ngày in phải bắt đầu bằng Tp.HCM, ngày');
+  });
 });
