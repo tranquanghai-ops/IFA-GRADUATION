@@ -5,6 +5,9 @@ const getAdminAssignmentRows = () => (typeof window !== 'undefined' && window.ge
 const isAssignmentEditingLocked = () => (typeof window !== 'undefined' && window.isAssignmentEditingLocked ? window.isAssignmentEditingLocked() : false);
 const ensureAssignmentEditingAllowed = () => (typeof window !== 'undefined' && window.ensureAssignmentEditingAllowed ? window.ensureAssignmentEditingAllowed() : true);
 const getSupervisorAssignmentCount = (...args) => (typeof window !== 'undefined' && window.getSupervisorAssignmentCount ? window.getSupervisorAssignmentCount(...args) : 0);
+const buildAssignmentDraftPayload = (...args) => (typeof window !== 'undefined' && typeof window.buildAssignmentDraftPayload === 'function' ? window.buildAssignmentDraftPayload(...args) : {});
+const buildOfficialAssignmentPayload = (...args) => (typeof window !== 'undefined' && typeof window.buildOfficialAssignmentPayload === 'function' ? window.buildOfficialAssignmentPayload(...args) : {});
+const isOfficialSupervisor = (...args) => (typeof window !== 'undefined' && typeof window.isOfficialSupervisor === 'function' ? window.isOfficialSupervisor(...args) : false);
 /**
  * IFA+ Graduation — Supervisor Assignment Excel Import/Export Submodule
  */

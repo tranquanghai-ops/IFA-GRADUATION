@@ -8,6 +8,9 @@ const isAssignmentEditingLocked = () => (typeof window !== 'undefined' && window
 const ensureAssignmentEditingAllowed = () => (typeof window !== 'undefined' && window.ensureAssignmentEditingAllowed ? window.ensureAssignmentEditingAllowed() : true);
 const getSupervisorAssignmentCount = (...args) => (typeof window !== 'undefined' && window.getSupervisorAssignmentCount ? window.getSupervisorAssignmentCount(...args) : 0);
 const refreshRoundCardMetrics = (roundId) => (typeof window !== 'undefined' && typeof window.refreshRoundCardMetrics === 'function' ? window.refreshRoundCardMetrics(roundId) : Promise.resolve());
+const buildAssignmentDraftPayload = (...args) => (typeof window !== 'undefined' && typeof window.buildAssignmentDraftPayload === 'function' ? window.buildAssignmentDraftPayload(...args) : {});
+const buildOfficialAssignmentPayload = (...args) => (typeof window !== 'undefined' && typeof window.buildOfficialAssignmentPayload === 'function' ? window.buildOfficialAssignmentPayload(...args) : {});
+const isOfficialSupervisor = (...args) => (typeof window !== 'undefined' && typeof window.isOfficialSupervisor === 'function' ? window.isOfficialSupervisor(...args) : false);
 /**
  * IFA+ Graduation — Admin Manual Assignments & Support Supervisor Submodule
  */

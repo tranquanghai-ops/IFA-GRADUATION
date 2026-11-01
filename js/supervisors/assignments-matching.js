@@ -145,7 +145,9 @@ function getAdminAssignmentRows() {
   });
 }
 
-function buildOfficialAssignmentPayload(row, supervisors, assignmentStatus = 'draft') {
+const resolveStudentName = (sid, fallback) => (typeof window !== 'undefined' && typeof window.resolveStudentName === 'function' ? window.resolveStudentName(sid, fallback) : (fallback || sid || '--'));
+
+export function buildOfficialAssignmentPayload(row, supervisors, assignmentStatus = 'draft') {
   const enrichedSupervisors = supervisors.map(item => {
     const profile = (state.adminReviewData?.supervisors || []).find(s => s.id === item.supervisorId || s.supervisorId === item.supervisorId)
       || (state.supervisorsMaster || []).find(s => s.id === item.supervisorId || s.supervisorId === item.supervisorId);
@@ -184,7 +186,7 @@ function buildOfficialAssignmentPayload(row, supervisors, assignmentStatus = 'dr
   };
 }
 
-function buildAssignmentDraftPayload(row, supervisors, source = 'manually_assigned') {
+export function buildAssignmentDraftPayload(row, supervisors, source = 'manually_assigned') {
   return {
     ...buildOfficialAssignmentPayload(row, supervisors, 'draft'),
     source,
@@ -2224,4 +2226,7 @@ if (typeof window !== 'undefined') {
   window.isAssignmentEditingLocked = isAssignmentEditingLocked;
   window.ensureAssignmentEditingAllowed = ensureAssignmentEditingAllowed;
   window.getSupervisorAssignmentCount = getSupervisorAssignmentCount;
+  window.buildOfficialAssignmentPayload = buildOfficialAssignmentPayload;
+  window.buildAssignmentDraftPayload = buildAssignmentDraftPayload;
+  window.isOfficialSupervisor = isOfficialSupervisor;
 }
