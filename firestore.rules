@@ -119,11 +119,12 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAll(['permanentAddress']) || (request.resource.data.permanentAddress is string && request.resource.data.permanentAddress.size() <= 250))
         && (!request.resource.data.keys().hasAll(['temporaryAddress']) || (request.resource.data.temporaryAddress is string && request.resource.data.temporaryAddress.size() <= 250))
         && (!request.resource.data.keys().hasAll(['address']) || (request.resource.data.address is string && request.resource.data.address.size() <= 250))
+        && (!request.resource.data.keys().hasAll(['topicDescription']) || (request.resource.data.topicDescription is string && request.resource.data.topicDescription.size() <= 2000))
         && (!request.resource.data.keys().hasAll(['updatedAt']) || request.resource.data.updatedAt is timestamp)
         && (!request.resource.data.keys().hasAll(['updatedBy']) || (request.resource.data.updatedBy is string && request.resource.data.updatedBy.lower() == email().lower()))
         && request.resource.data.keys().hasOnly([
           'studentId', 'email', 'currentClass', 'personalEmail', 'phone',
-          'permanentAddress', 'temporaryAddress', 'address', 'updatedAt', 'updatedBy'
+          'permanentAddress', 'temporaryAddress', 'address', 'topicDescription', 'updatedAt', 'updatedBy'
         ]));
       allow delete: if admin();
     }
@@ -393,6 +394,29 @@ service cloud.firestore {
             && (!request.resource.data.keys().hasAll(['updatedAt']) || request.resource.data.updatedAt is timestamp)
             && request.resource.data.topicTitle == resource.data.topicTitle
             && request.resource.data.studentId == resource.data.studentId)
+          // 2. Sinh viên đổi / cập nhật đề tài và mô tả định hướng thiết kế để GVHD duyệt lại (kể cả sau khi đã đóng cổng đăng ký ban đầu / trong đợt đã phân công)
+          || (student()
+            && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
+            && resource.data.email.lower() == email().lower()
+            && request.resource.data.studentId == studentId
+            && request.resource.data.email.lower() == email().lower()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'topicTitle', 'topicDescription', 'topicTitleVersion', 'topicTitleHistory',
+              'topicApprovalStatus', 'topicApprovalNote', 'submittedAt', 'updatedAt', 'updatedBy'
+            ])
+            && request.resource.data.topicTitle is string
+            && request.resource.data.topicTitle.size() > 0
+            && request.resource.data.topicTitle.size() <= 250
+            && (!request.resource.data.keys().hasAll(['topicDescription']) || (request.resource.data.topicDescription is string && request.resource.data.topicDescription.size() <= 2000))
+            && request.resource.data.topicApprovalStatus == 'pending'
+            && (!request.resource.data.keys().hasAll(['topicTitleVersion']) || request.resource.data.topicTitleVersion is int || request.resource.data.topicTitleVersion is number)
+            && (!request.resource.data.keys().hasAll(['topicTitleHistory']) || (request.resource.data.topicTitleHistory is list && request.resource.data.topicTitleHistory.size() <= 50))
+            && (!request.resource.data.keys().hasAll(['topicApprovalNote']) || (request.resource.data.topicApprovalNote is string && request.resource.data.topicApprovalNote.size() <= 1000))
+            && (!request.resource.data.keys().hasAll(['submittedAt']) || request.resource.data.submittedAt is timestamp)
+            && (!request.resource.data.keys().hasAll(['updatedAt']) || request.resource.data.updatedAt is timestamp)
+            && (!request.resource.data.keys().hasAll(['updatedBy']) || (request.resource.data.updatedBy is string && (request.resource.data.updatedBy.lower() == email().lower() || request.resource.data.updatedBy == studentId)))
+            && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized', 'active']
+                || !get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status'])))
           || (student()
             && email().matches('(?i)^' + studentId + '@student\\.tdtu\\.edu\\.vn$')
             && resource.data.email.lower() == email().lower()

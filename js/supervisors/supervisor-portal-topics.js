@@ -6,8 +6,8 @@ const getOfficialSupervisors = (reg) => (typeof window !== 'undefined' && window
  */
 window.reviewStudentTopicTitle = async function(studentId, decision) {
   if (!checkImpersonationWriteGuard('Duyệt tên đề tài')) return;
-  const roundId = state.selectedRoundId || state.activeRound?.id;
   const modal = document.getElementById('modal-supervisor-topic-preview');
+  const roundId = modal?._currentRoundId || state.selectedRoundId || state.activeRoundId || state.activeRound?.id;
   let registration = (state.supervisorAssignedStudents || []).find(st => (st.studentId || st.id) === studentId) ||
     (modal?._currentRegistration && (modal._currentRegistration.studentId === studentId || modal._currentRegistration.mssv === studentId) ? modal._currentRegistration : null);
 
@@ -107,6 +107,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
 
     const round = state.activeRound || {};
     const roundId = state.selectedRoundId || state.activeRoundId || round.id;
+    modal._currentRoundId = roundId;
     let st = null;
     let identity = null;
     let isStudentViewer = false;
@@ -671,7 +672,7 @@ window.saveTopicPreviewEdits = async function() {
   if (!checkImpersonationWriteGuard('Chỉnh sửa phiếu đăng ký')) return;
 
   const modal = document.getElementById('modal-supervisor-topic-preview');
-  const roundId = state.selectedRoundId || state.activeRound?.id;
+  const roundId = modal?._currentRoundId || state.selectedRoundId || state.activeRoundId || state.activeRound?.id;
   const reg = state.myRegistration || modal?._currentRegistration;
   const actor = (typeof getEffectiveActor === 'function') ? getEffectiveActor() : null;
   const mssv = modal?._currentStudentId || state.studentMssv || reg?.studentId || reg?.mssv;
@@ -741,13 +742,17 @@ window.saveTopicPreviewEdits = async function() {
       topicApprovalNote: '',
       submittedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      updatedBy: actor?.email || state.user?.email || mssv
+      updatedBy: actor?.email || state.user?.email || (mssv + "@student.tdtu.edu.vn")
     };
 
     await updateDoc(doc(db, 'graduationRounds', roundId, 'registrations', mssv), updatePayload);
+    const studentEmail = actor?.email || state.user?.email || (mssv + "@student.tdtu.edu.vn");
     await setDoc(doc(db, 'graduationStudentProfiles', mssv), {
+      studentId: mssv,
+      email: studentEmail,
       topicDescription: newDesc,
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
+      updatedBy: studentEmail
     }, { merge: true }).catch(() => {});
 
     state.myRegistration = {

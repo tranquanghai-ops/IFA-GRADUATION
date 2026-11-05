@@ -8,7 +8,8 @@ const testFiles = [
   'tests/test-progress-review-security-audit.rules.test.mjs',
   'tests/test-firestore-security-hardening.rules.test.mjs',
   'tests/test-round-self-join.rules.test.mjs',
-  'tests/test-visiting-supervisor-access.rules.test.mjs'
+  'tests/test-visiting-supervisor-access.rules.test.mjs',
+  'tests/test-student-topic-revision.rules.test.mjs'
 ];
 
 console.log(`[Rules Test Runner] Running ${testFiles.length} Firestore rules test suites...`);
