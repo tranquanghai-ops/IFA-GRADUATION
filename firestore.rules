@@ -415,6 +415,10 @@ service cloud.firestore {
             && (!request.resource.data.keys().hasAll(['submittedAt']) || request.resource.data.submittedAt is timestamp)
             && (!request.resource.data.keys().hasAll(['updatedAt']) || request.resource.data.updatedAt is timestamp)
             && (!request.resource.data.keys().hasAll(['updatedBy']) || (request.resource.data.updatedBy is string && (request.resource.data.updatedBy.lower() == email().lower() || request.resource.data.updatedBy == studentId)))
+            && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['allowTopicRevision'])
+                || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.allowTopicRevision == true)
+            && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['topicRevisionLocked'])
+                || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.topicRevisionLocked != true)
             && (get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.status in ['open', 'published', 'reviewing', 'finalized', 'active']
                 || !get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status'])))
           || (student()
@@ -463,6 +467,9 @@ service cloud.firestore {
                 || !get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['status']))
             && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['closeAt'])
                 || request.time <= get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.closeAt)
+            && (!get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.keys().hasAll(['topicRevisionLocked'])
+                || get(/databases/$(database)/documents/graduationRounds/$(roundId)).data.topicRevisionLocked != true
+                || request.resource.data.topicTitle == resource.data.topicTitle)
             && (!request.resource.data.keys().hasAll(['adminReview'])
                 || (resource.data.keys().hasAll(['adminReview']) && request.resource.data.adminReview == resource.data.adminReview)));
 

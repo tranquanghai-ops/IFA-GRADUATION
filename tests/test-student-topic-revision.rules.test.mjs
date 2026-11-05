@@ -39,12 +39,21 @@ beforeEach(async () => {
   await env.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
 
+    // 0. Setup admin
+    await setDoc(doc(db, `admins/${adminEmail}`), {
+      email: adminEmail,
+      active: true,
+      role: 'admin'
+    });
+
     // 1. Round 12/2026 with closeAt in the past
     await setDoc(doc(db, `graduationRounds/${roundId}`), {
       status: 'published',
       title: 'ĐỒ ÁN TỐT NGHIỆP/ĐỒ ÁN TỔNG HỢP - ĐỢT 12/2026',
       openAt: new Date(Date.now() - 60 * 24 * 3600 * 1000), // 60 days ago
-      closeAt: new Date(Date.now() - 30 * 24 * 3600 * 1000) // 30 days ago (CLOSED!)
+      closeAt: new Date(Date.now() - 30 * 24 * 3600 * 1000), // 30 days ago (CLOSED!)
+      allowTopicRevision: true,
+      topicRevisionLocked: false
     });
 
     // 2. Official assignment of student 11900375 to supervisor
@@ -90,7 +99,7 @@ after(async () => {
 });
 
 test('--- FIRESTORE RULES: STUDENT TOPIC REVISION (ĐỔI TÊN ĐỀ TÀI KHI ĐÃ ĐÓNG CỔNG) ---', async (t) => {
-  await t.test('1. Sinh viên CÓ THỂ cập nhật tên đề tài & mô tả mới (Version 2, pending) khi closeAt đã qua -> SUCCEEDS', async () => {
+  await t.test('1. Sinh viên CÓ THỂ cập nhật tên đề tài & mô tả mới (Version 2, pending) khi closeAt đã qua và chưa hết hạn đổi đề tài -> SUCCEEDS', async () => {
     const db = env.authenticatedContext(studentMssv, actor(studentEmail)).firestore();
     const regRef = doc(db, `graduationRounds/${roundId}/registrations/${studentMssv}`);
 
@@ -180,6 +189,68 @@ test('--- FIRESTORE RULES: STUDENT TOPIC REVISION (ĐỔI TÊN ĐỀ TÀI KHI Đ
         topicReviewedAt: new Date(),
         topicReviewedBy: supervisorEmail,
         updatedAt: new Date()
+      })
+    );
+  });
+
+  await t.test('6. Khi Admin bấm Hết thời gian đổi đề tài (allowTopicRevision: false, topicRevisionLocked: true), sinh viên KHÔNG THỂ đổi tên đề tài nữa -> FAILS', async () => {
+    // Admin khóa đổi đề tài
+    await env.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await updateDoc(doc(db, `graduationRounds/${roundId}`), {
+        allowTopicRevision: false,
+        topicRevisionLocked: true
+      });
+    });
+
+    const db = env.authenticatedContext(studentMssv, actor(studentEmail)).firestore();
+    const regRef = doc(db, `graduationRounds/${roundId}/registrations/${studentMssv}`);
+
+    await assertFails(
+      updateDoc(regRef, {
+        topicTitle: 'Thiết kế nội thất sau khi đã hết thời gian',
+        topicDescription: 'Cố tình nộp sau khi khóa',
+        topicTitleVersion: 2,
+        topicApprovalStatus: 'pending',
+        topicApprovalNote: '',
+        submittedAt: new Date(),
+        updatedAt: new Date(),
+        updatedBy: studentEmail
+      })
+    );
+  });
+
+  await t.test('7. Admin CÓ THỂ khóa và mở lại thời gian đổi đề tài trên graduationRounds doc -> SUCCEEDS', async () => {
+    const db = env.authenticatedContext('admin_uid', actor(adminEmail)).firestore();
+    const roundRef = doc(db, `graduationRounds/${roundId}`);
+
+    // Admin khóa
+    await assertSucceeds(
+      updateDoc(roundRef, {
+        allowTopicRevision: false,
+        topicRevisionLocked: true,
+        updatedAt: new Date()
+      })
+    );
+
+    // Admin mở lại
+    await assertSucceeds(
+      updateDoc(roundRef, {
+        allowTopicRevision: true,
+        topicRevisionLocked: false,
+        updatedAt: new Date()
+      })
+    );
+  });
+
+  await t.test('8. Sinh viên KHÔNG THỂ tự sửa allowTopicRevision hoặc topicRevisionLocked trên graduationRounds -> FAILS', async () => {
+    const db = env.authenticatedContext(studentMssv, actor(studentEmail)).firestore();
+    const roundRef = doc(db, `graduationRounds/${roundId}`);
+
+    await assertFails(
+      updateDoc(roundRef, {
+        allowTopicRevision: true,
+        topicRevisionLocked: false
       })
     );
   });

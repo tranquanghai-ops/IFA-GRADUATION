@@ -105,9 +105,13 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
     const modal = document.getElementById('modal-supervisor-topic-preview');
     if (!modal) return;
 
-    const round = state.activeRound || {};
-    const roundId = state.selectedRoundId || state.activeRoundId || round.id;
+    const roundId = state.selectedRoundId || state.activeRoundId || state.activeRound?.id;
+    const round = (state.rounds || []).find(item => item.id === roundId) || state.activeRound || {};
     modal._currentRoundId = roundId;
+    const isTopicRevisionLocked = (typeof window.isRoundTopicRevisionLocked === 'function')
+      ? window.isRoundTopicRevisionLocked(round)
+      : Boolean(round?.allowTopicRevision === false || round?.topicRevisionLocked === true);
+    modal._isTopicRevisionLocked = isTopicRevisionLocked;
     let st = null;
     let identity = null;
     let isStudentViewer = false;
@@ -322,7 +326,7 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
 
     // Role-based button visibility
     if (btnStudentEdit) {
-      btnStudentEdit.classList.toggle('hidden', !isStudentViewer || isViewingPastVersion);
+      btnStudentEdit.classList.toggle('hidden', !isStudentViewer || isViewingPastVersion || isTopicRevisionLocked);
     }
     if (btnPdf) {
       btnPdf.classList.toggle('hidden', !canShowPdf);
@@ -430,6 +434,9 @@ window.openTopicRegistrationPreviewModal = function(studentId = null, startInEdi
     modal._isStudentViewer = isStudentViewer;
     modal._status = status;
     modal._isTopicApproved = isTopicApproved;
+    if (isTopicRevisionLocked && isStudentViewer && footerNoteEl) {
+      footerNoteEl.innerHTML = '🔒 <strong>Đã hết thời hạn đổi tên đề tài.</strong> Bạn chỉ có thể xem lại thông tin phiếu đăng ký và in/tải PDF.';
+    }
 
     // Bind actions
     if (btnApprove && !isStudentViewer) {
@@ -502,7 +509,13 @@ window.toggleTopicPreviewEditMode = function(isEdit = true) {
   const modal = document.getElementById('modal-supervisor-topic-preview');
   if (!modal) return;
   const isStudent = Boolean(modal._isStudentViewer);
-  if (isEdit && (!isStudent || modal._isViewingPastVersion)) return;
+  const isLocked = Boolean(modal._isTopicRevisionLocked);
+  if (isEdit && (!isStudent || modal._isViewingPastVersion || isLocked)) {
+    if (isLocked && typeof showToast === 'function') {
+      showToast('Đã hết thời hạn đổi tên đề tài. Bạn chỉ có thể xem lại phiếu đăng ký.', 'warning');
+    }
+    return;
+  }
 
   const titleTextEl = document.getElementById('topic-preview-doc-title');
   const titleEditWrap = document.getElementById('topic-preview-doc-title-edit-wrap');
@@ -679,6 +692,15 @@ window.saveTopicPreviewEdits = async function() {
 
   if (!reg || !roundId || !mssv) {
     showToast('Không xác định được thông tin sinh viên hoặc đợt tốt nghiệp.', 'error');
+    return;
+  }
+
+  const currentRound = (state.rounds || []).find(r => r.id === roundId) || state.activeRound;
+  const isRoundLocked = (typeof window.isRoundTopicRevisionLocked === 'function')
+    ? window.isRoundTopicRevisionLocked(currentRound)
+    : Boolean(currentRound?.allowTopicRevision === false || currentRound?.topicRevisionLocked === true);
+  if (isRoundLocked) {
+    showToast('Đã hết thời hạn đổi tên đề tài. Bạn không thể lưu thay đổi.', 'warning');
     return;
   }
 

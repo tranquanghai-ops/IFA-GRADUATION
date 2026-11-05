@@ -168,6 +168,9 @@ window.loadAdminEligibleStudents = async function(roundId) {
     if (typeof window.updateAdminRoundJoinLinkToolbar === 'function') {
       window.updateAdminRoundJoinLinkToolbar(roundId);
     }
+    if (typeof window.updateAdminRoundTopicRevisionToolbar === 'function') {
+      window.updateAdminRoundTopicRevisionToolbar(roundId);
+    }
     if (typeof window.renderAdminSupervisorPreferencesStats === 'function') {
       window.renderAdminSupervisorPreferencesStats(roundId, state.eligibleStudentDetails);
     }

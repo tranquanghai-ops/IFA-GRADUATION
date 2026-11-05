@@ -336,6 +336,9 @@ function renderRoundsDropdowns() {
   if (typeof window.updateAdminRoundJoinLinkToolbar === 'function') {
     window.updateAdminRoundJoinLinkToolbar();
   }
+  if (typeof window.updateAdminRoundTopicRevisionToolbar === 'function') {
+    window.updateAdminRoundTopicRevisionToolbar();
+  }
 }
 
 window.onRoundSelected = function(roundId) {
@@ -622,11 +625,22 @@ function renderRoundHeader() {
         }
       }
 
+      const currentActiveRound = round || state.activeRound || {};
+      const isTopicRevisionLocked = (typeof window.isRoundTopicRevisionLocked === 'function')
+        ? window.isRoundTopicRevisionLocked(currentActiveRound)
+        : Boolean(currentActiveRound?.allowTopicRevision === false || currentActiveRound?.topicRevisionLocked === true);
+
+      const editTopicBtn = document.getElementById('btn-hero-edit-topic');
+      if (editTopicBtn) {
+        editTopicBtn.classList.toggle('hidden', isTopicRevisionLocked);
+      }
+
       if (topicMetaEl) {
         const submittedAt = fmtDate(reg?.submittedAt);
         const timeStr = submittedAt ? `🕒 Đã nộp: ${submittedAt}` : '';
         const typeStr = reg?.projectType ? `📁 Loại hình: ${reg.projectType}` : '';
-        topicMetaEl.innerHTML = [typeStr, timeStr].filter(Boolean).map(item => `<span>${escapeHtml(item)}</span>`).join('<span class="text-white/30">•</span>');
+        const lockStr = isTopicRevisionLocked ? '🔒 Đã hết hạn đổi đề tài' : '';
+        topicMetaEl.innerHTML = [typeStr, timeStr, lockStr].filter(Boolean).map(item => `<span>${escapeHtml(item)}</span>`).join('<span class="text-white/30">•</span>');
       }
 
       if (topicReviewNoteEl) {
