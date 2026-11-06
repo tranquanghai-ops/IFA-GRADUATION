@@ -1,8 +1,3 @@
-import { db, doc, updateDoc, getDoc, serverTimestamp } from '../firebase-config.js';
-import { state } from '../state.js';
-import { showToast } from '../ui.js';
-import { checkImpersonationWriteGuard, getEffectiveActor } from '../auth.js';
-
 /**
  * IFA+ Graduation — Round Topic Revision Lock Subsystem
  * Allows Admin to lock / unlock topic title and description revisions for a graduation round.
@@ -63,7 +58,7 @@ window.adminToggleRoundTopicRevision = async function(optRoundId) {
 
   const roundId = optRoundId || document.getElementById('admin-round-student-select')?.value || state.selectedRoundId || state.activeRound?.id;
   if (!roundId) {
-    showToast('Vui lòng chọn đợt tốt nghiệp trước khi thực hiện thao tác.', 'warning');
+    if (typeof showToast === 'function') showToast('Vui lòng chọn đợt tốt nghiệp trước khi thực hiện thao tác.', 'warning');
     return;
   }
 
@@ -80,7 +75,7 @@ window.adminToggleRoundTopicRevision = async function(optRoundId) {
   }
 
   if (!round) {
-    showToast('Không tìm thấy thông tin đợt tốt nghiệp.', 'error');
+    if (typeof showToast === 'function') showToast('Không tìm thấy thông tin đợt tốt nghiệp.', 'error');
     return;
   }
 
@@ -162,15 +157,19 @@ window.adminToggleRoundTopicRevision = async function(optRoundId) {
       renderStudentTopicHero(state.myRegistration, state.activeRound);
     }
 
-    showToast(
-      targetLocked
-        ? '🔒 Đã hết thời gian đổi tên đề tài. Sinh viên đã bị khóa quyền chỉnh sửa.'
-        : '🔓 Đã mở lại thời gian đổi tên đề tài cho sinh viên.',
-      'success'
-    );
+    if (typeof showToast === 'function') {
+      showToast(
+        targetLocked
+          ? '🔒 Đã hết thời gian đổi tên đề tài. Sinh viên đã bị khóa quyền chỉnh sửa.'
+          : '🔓 Đã mở lại thời gian đổi tên đề tài cho sinh viên.',
+        'success'
+      );
+    }
   } catch (err) {
     console.error('[TopicLock] Error toggling topic revision lock:', err);
-    showToast('Lỗi khi cập nhật trạng thái: ' + (err.message || err), 'error');
+    if (typeof showToast === 'function') {
+      showToast('Lỗi khi cập nhật trạng thái: ' + (err.message || err), 'error');
+    }
     if (btnEl) {
       btnEl.disabled = false;
       btnEl.innerHTML = originalHtml;
