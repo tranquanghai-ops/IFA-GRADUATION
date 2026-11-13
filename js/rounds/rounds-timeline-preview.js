@@ -150,7 +150,7 @@ function renderTimelineWeekEvents(events = [], weekNumber = null, roundId = null
       : (dayCount > 0 ? `Còn ${dayCount} ngày` : (endDate >= today ? (dayCount === 0 ? 'Hôm nay' : 'Đang diễn ra') : 'Đã diễn ra'));
     const dateLabel = startValue === endValue ? shortDate(startValue) : `${shortDate(startValue)}–${shortDate(endValue)}`;
     const clickHandler = isAdmin
-      ? (event.activityId ? `editActivityModal('${escapeHtml(event.activityId)}')` : `openAdminTimelineEventEditor('${escapeHtml(roundId || '')}', ${event.sourceWeek || weekNumber}, '${escapeHtml(event.id || String(eventIndex))}')`)
+      ? (event.activityId ? `editActivityModal('${escapeHtml(event.activityId)}', '${escapeHtml(roundId || '')}')` : `openAdminTimelineEventEditor('${escapeHtml(roundId || '')}', ${event.sourceWeek || weekNumber}, '${escapeHtml(event.id || String(eventIndex))}')`)
       : `openStudentTimelineEvent(${weekNumber}, ${eventIndex}, ${roundId ? `'${escapeHtml(roundId)}'` : 'null'})`;
     return `<button type="button" onclick="event.stopPropagation(); ${clickHandler}" title="${isAdmin ? 'Bấm để chỉnh sửa sự kiện' : 'Xem chi tiết sự kiện'}" class="flex w-full items-center gap-1.5 rounded-md border px-1.5 py-1 text-left text-[11px] leading-tight hover:shadow-sm cursor-pointer transition" style="background-color:${color}18;border-color:${color}66;color:${color}">
       <span class="shrink-0">📌 ${escapeHtml(dateLabel)}</span><span class="min-w-0 flex-1 truncate font-black">${escapeHtml(event.title)}</span>${countdown ? `<span class="shrink-0 font-bold opacity-80">${countdown}</span>` : ''}
@@ -720,7 +720,7 @@ window.openAdminTimelineDayAction = function(weekNumber, dateKey, roundId) {
         ${matches.map(event => {
           const color = normalizeRoundWeekEventColor(event.displayColor || event.color);
           const clickHandler = event.activityId
-            ? `editActivityModal('${escapeHtml(event.activityId)}')`
+            ? `editActivityModal('${escapeHtml(event.activityId)}', '${escapeHtml(roundId || '')}')`
             : `openAdminTimelineEventEditor('${escapeHtml(roundId)}', ${weekNumber}, '${escapeHtml(event.id)}')`;
           return `
             <div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-blue-50 transition">

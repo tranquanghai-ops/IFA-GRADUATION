@@ -1480,14 +1480,125 @@ window.openCreateActivityModal = function() {
   document.getElementById('modal-activity').classList.remove('hidden');
 };
 
-window.editActivityModal = function(actId) {
-  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
-  const targetRound = (state.rounds || []).find(r => r.id === roundId);
-  const list = targetRound?.activities || state.roundActivities || [];
-  const act = list.find(a => a.id === actId);
+
+export async function findActivityAndRound(actId, explicitRoundId = null) {
+  if (!actId) return { act: null, targetRound: null, roundId: null };
+  const targetIdStr = String(actId).trim();
+  let roundId = explicitRoundId || null;
+  let targetRound = null;
+  let act = null;
+
+  // 1. If explicit roundId is passed, search in that round first
+  if (roundId) {
+    targetRound = (state.rounds || []).find(r => r.id === roundId);
+    act = (targetRound?.activities || []).find(a => String(a.id) === targetIdStr);
+  }
+
+  // 2. Search in currently active or selected round in dropdown / state
+  if (!act) {
+    const selRoundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId || state.activeRound?.id;
+    if (selRoundId) {
+      const candidateRound = (state.rounds || []).find(r => r.id === selRoundId);
+      const candidateList = candidateRound?.activities || state.roundActivities || [];
+      const found = candidateList.find(a => String(a.id) === targetIdStr);
+      if (found) {
+        act = found;
+        roundId = selRoundId;
+        targetRound = candidateRound;
+      }
+    }
+  }
+
+  // 3. Search across all rounds in state.rounds
+  if (!act) {
+    for (const r of (state.rounds || [])) {
+      const found = (r.activities || []).find(a => String(a.id) === targetIdStr);
+      if (found) {
+        act = found;
+        targetRound = r;
+        roundId = r.id;
+        break;
+      }
+    }
+  }
+
+  // 4. Check state.roundActivities
+  if (!act && Array.isArray(state.roundActivities)) {
+    const found = state.roundActivities.find(a => String(a.id) === targetIdStr);
+    if (found) {
+      act = found;
+      roundId = roundId || found.roundId || state.selectedRoundId;
+      targetRound = (state.rounds || []).find(r => r.id === roundId) || targetRound;
+    }
+  }
+
+  // 5. Query Firestore fallback if not in memory
+  if (!act && typeof db !== 'undefined') {
+    const candidateRoundIds = [
+      roundId,
+      explicitRoundId,
+      document.getElementById('admin-timeline-round-select')?.value,
+      state.selectedRoundId,
+      state.activeRound?.id,
+      ...(state.rounds || []).map(r => r.id)
+    ].filter(Boolean);
+    const uniqueIds = [...new Set(candidateRoundIds)];
+
+    for (const cId of uniqueIds) {
+      try {
+        if (typeof getDoc === 'function') {
+          const rDocSnap = await getDoc(doc(db, 'graduationRounds', cId));
+          if (rDocSnap && rDocSnap.exists()) {
+            const rData = rDocSnap.data();
+            const rActs = Array.isArray(rData.activities) ? rData.activities : [];
+            const found = rActs.find(a => String(a.id) === targetIdStr);
+            if (found) {
+              act = found;
+              roundId = cId;
+              targetRound = (state.rounds || []).find(r => r.id === cId) || { id: cId, ...rData };
+              targetRound.activities = rActs;
+              break;
+            }
+          }
+          const subDocSnap = await getDoc(doc(db, 'graduationRounds', cId, 'activities', targetIdStr));
+          if (subDocSnap && subDocSnap.exists()) {
+            act = { id: subDocSnap.id, ...subDocSnap.data() };
+            roundId = cId;
+            targetRound = (state.rounds || []).find(r => r.id === cId);
+            if (targetRound) {
+              if (!Array.isArray(targetRound.activities)) targetRound.activities = [];
+              targetRound.activities.push(act);
+            }
+            break;
+          }
+        }
+      } catch (e) {
+        console.warn(`[findActivityAndRound] Firestore fallback error for round ${cId}:`, e);
+      }
+    }
+  }
+
+  return { act, targetRound, roundId: roundId || targetRound?.id || null };
+}
+
+window.editActivityModal = async function(actId, optRoundId = null) {
+  if (typeof window.closeStudentTimelineEvent === 'function') {
+    window.closeStudentTimelineEvent();
+  }
+
+  const { act, targetRound, roundId } = await findActivityAndRound(actId, optRoundId);
   if (!act) {
     showToast('Không tìm thấy thông tin mốc kế hoạch!', 'error');
     return;
+  }
+
+  const resolvedRoundId = roundId || targetRound?.id || document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+  if (resolvedRoundId) {
+    state.selectedRoundId = resolvedRoundId;
+    const select = document.getElementById('admin-timeline-round-select');
+    if (select && select.value !== resolvedRoundId) {
+      select.value = resolvedRoundId;
+    }
   }
 
   document.getElementById('activity-form-id').value = act.id;
@@ -1576,20 +1687,23 @@ window.editActivityModal = function(actId) {
   document.getElementById('modal-activity').classList.remove('hidden');
 };
 
-window.copyActivityModal = function(actId) {
-  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
-  const targetRound = (state.rounds || []).find(r => r.id === roundId);
-  const list = targetRound?.activities || state.roundActivities || [];
-  const act = list.find(a => a.id === actId);
+window.copyActivityModal = async function(actId, optRoundId = null) {
+  if (typeof window.closeStudentTimelineEvent === 'function') {
+    window.closeStudentTimelineEvent();
+  }
+
+  const { act, targetRound, roundId } = await findActivityAndRound(actId, optRoundId);
   if (!act) {
     showToast('Không tìm thấy thông tin mốc kế hoạch!', 'error');
     return;
   }
 
+  const resolvedRoundId = roundId || targetRound?.id || document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
+
   // Clear ID so it will create a new activity on save
   document.getElementById('form-activity').reset();
   document.getElementById('activity-form-id').value = '';
-  document.getElementById('activity-form-round-id').value = roundId;
+  document.getElementById('activity-form-round-id').value = resolvedRoundId;
   document.getElementById('activity-form-title').value = act.title ? `${act.title} (Bản sao)` : '';
   document.getElementById('activity-form-type').value = act.activityType || 'other';
   document.getElementById('activity-form-location').value = act.location || '';
@@ -1681,16 +1795,13 @@ window.closeActivityModal = function() {
 };
 
 // DUPLICATE ACTIVITY WITHIN SAME ROUND
-window.duplicateActivityWithinRound = async function(actId) {
+window.duplicateActivityWithinRound = async function(actId, optRoundId = null) {
   if (!actId) return;
-  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
-  const targetRound = (state.rounds || []).find(r => r.id === roundId);
+  const { act: src, targetRound, roundId } = await findActivityAndRound(actId, optRoundId);
   if (!targetRound) {
     showToast('Không tìm thấy thông tin đợt tốt nghiệp!', 'warning');
     return;
   }
-  const list = targetRound?.activities || state.roundActivities || [];
-  const src = list.find(a => a.id === actId);
   if (!src) {
     showToast('Không tìm thấy thông tin mốc kế hoạch cần sao chép!', 'error');
     return;
@@ -2198,14 +2309,14 @@ window.saveActivity = async function(e) {
 };
 
 // 6. DELETE ACTIVITY
-window.deleteActivity = async function(actId) {
-  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
-  const targetRound = (state.rounds || []).find(r => r.id === roundId);
-  if (!targetRound) return;
+window.deleteActivity = async function(actId, optRoundId = null) {
+  const { act, targetRound, roundId } = await findActivityAndRound(actId, optRoundId);
+  if (!targetRound || !act) {
+    showToast('Không tìm thấy thông tin mốc kế hoạch!', 'error');
+    return;
+  }
 
   const activities = targetRound.activities || [];
-  const act = activities.find(a => a.id === actId);
-  if (!act) return;
 
   const confirmed = await showConfirm(
     'Xóa mốc kế hoạch',
@@ -2239,14 +2350,11 @@ window.deleteActivity = async function(actId) {
 };
 
 // 7. TOGGLE VISIBILITY
-window.toggleActivityVisibility = async function(actId) {
-  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
-  const targetRound = (state.rounds || []).find(r => r.id === roundId);
-  if (!targetRound) return;
+window.toggleActivityVisibility = async function(actId, optRoundId = null) {
+  const { act, targetRound, roundId } = await findActivityAndRound(actId, optRoundId);
+  if (!targetRound || !act) return;
 
   const activities = targetRound.activities || [];
-  const act = activities.find(a => a.id === actId);
-  if (!act) return;
 
   const willPublish = !isActivityPublished(act);
   act.visibility = willPublish;
@@ -2270,13 +2378,12 @@ window.toggleActivityVisibility = async function(actId) {
 };
 
 // 8. MOVE ACTIVITY (REORDER UP/DOWN)
-window.moveActivity = async function(actId, direction) {
-  const roundId = document.getElementById('admin-timeline-round-select')?.value || state.selectedRoundId;
-  const targetRound = (state.rounds || []).find(r => r.id === roundId);
-  if (!targetRound) return;
+window.moveActivity = async function(actId, direction, optRoundId = null) {
+  const { act, targetRound, roundId } = await findActivityAndRound(actId, optRoundId);
+  if (!targetRound || !act) return;
 
   const activities = targetRound.activities || [];
-  const idx = activities.findIndex(a => a.id === actId);
+  const idx = activities.findIndex(a => String(a.id) === String(act.id));
   if (idx < 0) return;
 
   if (direction === 'up' && idx > 0) {

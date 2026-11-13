@@ -480,8 +480,19 @@ window.adminDeleteStudentSubmission = async function(studentId, actId, roundId, 
 
 // 7. ADMIN ACTIVITY SUBMISSIONS DASHBOARD
 window.openActivitySubmissionDashboard = function(roundId, actId) {
-  const round = (state.rounds || []).find(r => r.id === roundId);
-  const act = (round?.activities || []).find(a => a.id === actId);
+  let round = (state.rounds || []).find(r => r.id === roundId);
+  let act = (round?.activities || []).find(a => String(a.id) === String(actId));
+  if (!act) {
+    for (const r of (state.rounds || [])) {
+      const found = (r.activities || []).find(a => String(a.id) === String(actId));
+      if (found) {
+        act = found;
+        round = r;
+        roundId = r.id;
+        break;
+      }
+    }
+  }
   if (!round || !act) {
     showToast('Không tìm thấy thông tin mốc kế hoạch!', 'error');
     return;
